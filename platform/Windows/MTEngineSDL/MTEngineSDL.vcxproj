@@ -1,0 +1,749 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\..\src\Embedded\RES_Embedded.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Audio\CAudioChannel.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Audio\CAudioChannelBusFloat.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Audio\CAudioChannelBusInt.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Audio\CAudioChannelMusicPlayer.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Audio\CMusicChannel.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Audio\CPianoKeyboard.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Audio\CSlrMusicFile.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Audio\CSlrMusicFileOgg.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Audio\CSlrMusicSwitcher.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Audio\SND_Main.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Audio\SND_SoundEngine.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Audio\WAV\SND_WavReader.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\CByteBuffer.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\CConfigStorage.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\CConfigStorageHjson.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\CContinuousParam.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\CContinuousParamBezier.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\CContinuousParamLinear.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\CContinuousParamSin.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\CContinuousParamSinHalf.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\CDataAdapter.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\CImageData.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\CSlrAnimation.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\CSlrAnimationState.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\CSlrDate.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\CSlrFile.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\CSlrFileFromMemory.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\CSlrFileMemory.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\CSlrFileZlib.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\CSlrFont.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\CSlrFontBitmap.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\CSlrFontProportional.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\CSlrImage.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\CSlrImageBase.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\CSlrImageMask.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\CSlrImageTexture.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\CSlrKeyboardShortcuts.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\CSlrResourceBase.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\CSlrString.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\CSlrTextParser.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\CSlrTexture.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\GAM_GamePads.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\MTH_FastMath.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\MTH_FixedPoint.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\MTH_Random.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\Pool\CPool.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\RES_DeployFile.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\RES_ResourceManager.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\SYS_CommandLine.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\SYS_Funct.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\SYS_KeyCodes.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\SYS_Main.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\SYS_PauseResume.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\SYS_PIPE.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\SYS_Startup.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\SYS_Threading.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\VID_Blits.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\VID_ImageBinding.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\VID_Main.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Funct\CFeatureConfig.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Funct\DataTable\CDataTable.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Funct\DataTable\CGuiViewDataTable.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Funct\DataTable\FUN_CSVParser.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Funct\FUN_IntervalTree.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Funct\ImageProcessing\CImageKernel.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Funct\ImageProcessing\IMG_Filters.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Funct\ImageProcessing\IMG_HoughLines.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Funct\ImageProcessing\IMG_Scale.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Funct\ImageProcessing\IMG_SimpleSegmentation.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Funct\ImageProcessing\resampler\resampler.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Funct\ImageProcessing\stb_image\stb_image.c" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\CGuiMain.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\COneTouchData.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CColorsTheme.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiBackground.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiButton.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiButtonMenu.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiButtonSwitch.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiButtonText.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiEditBoxFloat.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiEditBoxHex.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiEditBoxInt.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiEditBoxText.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiEditHex.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiElement.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiEvent.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiLabel.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiList.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiListTree.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiRadio.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiRichTextLabel.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiSlider.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiTheme.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiView.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiViewFade.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiViewFrame.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiViewHorizontalScroll.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiViewList.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiViewMenu.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiViewMessageBox.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiViewMovingPane.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiViewNumKeys.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiViewSaveFile.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiViewSelectFile.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiViewSelectFolder.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiViewSplit4.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiViewToolBox.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiViewVerticalScroll.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiViewWindowsManager.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiWindow.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\GUI_Main.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewConsole.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewDummy.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewImageWithLayer.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\CRecentlyOpenedFiles.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\GUI_Debug.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\LoadingScreen\CGuiViewBaseLoadingScreen.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\LoadingScreen\CGuiViewLoadingScreen.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\ResourceManager\CGuiViewBaseResourceManager.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\ResourceManager\CGuiViewResourceManager.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Layout\CLayoutManager.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Layout\CLayoutParameter.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\hjson\hjson_decode.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\hjson\hjson_encode.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\hjson\hjson_parsenumber.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\hjson\hjson_value.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\imguiext\imguial_fonts.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\imguiext\imguial_log.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\imguiext\imguial_term.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\imguiext\imguiComboFilter.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\imguiext\imguifilesystem.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\imguiext\imguihelper.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\imgui\imgui.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\imgui\imgui_demo.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\imgui\imgui_draw.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\imgui\imgui_freetype.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\imgui\imgui_impl_opengl3.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\imgui\imgui_impl_sdl.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\imgui\imgui_tables.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\imgui\imgui_widgets.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\implot\implot.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\implot\implot_demo.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\cdjpeg.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jaricom.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jcapimin.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jcapistd.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jcarith.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jccoefct.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jccolor.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jcdctmgr.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jchuff.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jcinit.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jcmainct.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jcmarker.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jcmaster.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jcomapi.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jcparam.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jcprepct.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jcsample.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jctrans.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jdapimin.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jdapistd.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jdarith.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jdatadst.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jdatasrc.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jdcoefct.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jdcolor.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jddctmgr.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jdhuff.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jdinput.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jdmainct.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jdmarker.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jdmaster.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jdmerge.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jdpostct.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jdsample.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jdtrans.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jerror.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jfdctflt.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jfdctfst.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jfdctint.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jidctflt.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jidctfst.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jidctint.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jmemansi.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jmemmgr.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jquant1.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jquant2.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jutils.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\rdbmp.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\rdcolmap.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\rdgif.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\rdppm.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\rdrle.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\rdswitch.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\rdtarga.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\transupp.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\wrbmp.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\wrgif.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\wrppm.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\wrrle.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\wrtarga.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\JPEGReader.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\JPEGWriter.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\internalJSONNode.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONAllocator.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONChildren.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONDebug.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONIterators.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONMemory.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONNode.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONNode_Mutex.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONPreparse.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONStream.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONValidator.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONWorker.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONWriter.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\libjson.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\libpng\png.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\libpng\pngerror.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\libpng\pngget.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\libpng\pngmem.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\libpng\pngpread.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\libpng\pngread.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\libpng\pngrio.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\libpng\pngrtran.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\libpng\pngrutil.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\libpng\pngset.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\libpng\pngtrans.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\libpng\pngwio.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\libpng\pngwrite.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\libpng\pngwtran.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\libpng\pngwutil.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\lodepng\lodepng.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\md5\MD5.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\minizip\ioapi.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\minizip\mztools.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\minizip\unzip.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\minizip\zip.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\mtrand\MTH_MTRand.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\mtrand\mtrand.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\nfd\nfd_common.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\pugixml\pugixml.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\tremor\Ogg\bitwise.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\tremor\Ogg\framing.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\tremor\tremor-block.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\tremor\tremor-codebook.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\tremor\tremor-floor0.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\tremor\tremor-floor1.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\tremor\tremor-info.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\tremor\tremor-mapping0.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\tremor\tremor-mdct.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\tremor\tremor-registry.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\tremor\tremor-res012.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\tremor\tremor-sharedbook.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\tremor\tremor-synthesis.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\tremor\tremor-vorbisfile.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\tremor\tremor-window.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\zlib\adler32.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\zlib\compress.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\zlib\crc32.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\zlib\deflate.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\zlib\gzclose.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\zlib\gzlib.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\zlib\gzread.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\zlib\gzwrite.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\zlib\infback.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\zlib\inffast.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\zlib\inflate.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\zlib\inftrees.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\zlib\trees.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\zlib\uncompr.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\zlib\zutil.c" />
+    <ClCompile Include="..\src.Windows\CLogByteBuffer.cpp" />
+    <ClCompile Include="..\src.Windows\CSlrFileFromDocuments.cpp" />
+    <ClCompile Include="..\src.Windows\CSlrFileFromOS.cpp" />
+    <ClCompile Include="..\src.Windows\CSlrFileFromResources.cpp" />
+    <ClCompile Include="..\src.Windows\CSlrFileFromTemp.cpp" />
+    <ClCompile Include="..\src.Windows\CSlrFontSystem.cpp" />
+    <ClCompile Include="..\src.Windows\DBG_ConStream.cpp" />
+    <ClCompile Include="..\src.Windows\DBG_Log.cpp" />
+    <ClCompile Include="..\src.Windows\getopt.c" />
+    <ClCompile Include="..\src.Windows\gl3w.c" />
+    <ClCompile Include="..\src.Windows\main.cpp" />
+    <ClCompile Include="..\src.Windows\mman.c" />
+    <ClCompile Include="..\src.Windows\nfd_win.cpp" />
+    <ClCompile Include="..\src.Windows\SYS_FileSystem.cpp" />
+    <ClCompile Include="..\src.Windows\SYS_Memory.cpp" />
+    <ClCompile Include="..\src.Windows\SYS_MiniDump.cpp" />
+    <ClCompile Include="..\src.Windows\SYS_Platform.cpp" />
+    <ClCompile Include="..\src.Windows\SYS_SharedMemory.cpp" />
+    <ClCompile Include="..\src.Windows\win-gettimeofday.cpp" />
+    <ClCompile Include="..\src.Windows\win-registry.cpp" />
+    <ClCompile Include="..\src.Windows\win-usleep.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\src\Embedded\console_plain_gfx.h" />
+    <ClInclude Include="..\..\..\src\Embedded\default_font_fnt.h" />
+    <ClInclude Include="..\..\..\src\Embedded\default_font_gfx.h" />
+    <ClInclude Include="..\..\..\src\Embedded\RES_Embedded.h" />
+    <ClInclude Include="..\..\..\src\Engine\Audio\CAudioChannel.h" />
+    <ClInclude Include="..\..\..\src\Engine\Audio\CAudioChannelBusFloat.h" />
+    <ClInclude Include="..\..\..\src\Engine\Audio\CAudioChannelBusInt.h" />
+    <ClInclude Include="..\..\..\src\Engine\Audio\CAudioChannelMusicPlayer.h" />
+    <ClInclude Include="..\..\..\src\Engine\Audio\CMusicChannel.h" />
+    <ClInclude Include="..\..\..\src\Engine\Audio\CPianoKeyboard.h" />
+    <ClInclude Include="..\..\..\src\Engine\Audio\CSlrMusicFile.h" />
+    <ClInclude Include="..\..\..\src\Engine\Audio\CSlrMusicFileOgg.h" />
+    <ClInclude Include="..\..\..\src\Engine\Audio\CSlrMusicSwitcher.h" />
+    <ClInclude Include="..\..\..\src\Engine\Audio\SND_Main.h" />
+    <ClInclude Include="..\..\..\src\Engine\Audio\SND_SoundEngine.h" />
+    <ClInclude Include="..\..\..\src\Engine\Audio\WAV\SND_WavReader.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\CByteBuffer.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\CCombinations.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\CConfigStorage.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\CConfigStorageHjson.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\CContinuousParam.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\CContinuousParamBezier.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\CContinuousParamLinear.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\CContinuousParamSin.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\CContinuousParamSinHalf.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\CDataAdapter.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\CGlobalDropFileCallback.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\CGlobalKeyboardCallback.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\CGlobalLogicCallback.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\CGlobalOSWindowChangedCallback.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\CImageData.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\ConstantsAndMacros.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\CSlrAnimation.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\CSlrAnimationState.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\CSlrDate.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\CSlrFile.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\CSlrFileFromMemory.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\CSlrFileMemory.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\CSlrFileZlib.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\CSlrFont.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\CSlrFontBitmap.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\CSlrFontProportional.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\CSlrImage.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\CSlrImageBase.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\CSlrImageMask.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\CSlrImageTexture.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\CSlrKeyboardShortcuts.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\CSlrResourceBase.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\CSlrString.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\CSlrTextParser.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\CSlrTexture.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\GAM_GamePads.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\GFX_Types.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\MTH_FastMath.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\MTH_FastMathSinTab.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\MTH_FixedPoint.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\MTH_FixedPointUtils.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\MTH_FixedPoint_SinTab.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\MTH_Random.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\Pool\CPool.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\RES_DeployFile.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\RES_ResourceManager.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\SYS_CommandLine.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\SYS_Defs.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\SYS_DocsVsRes.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\SYS_Funct.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\SYS_KeyCodes.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\SYS_Main.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\SYS_PauseResume.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\SYS_PIPE.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\SYS_Startup.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\SYS_Threading.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\SYS_Types.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\VID_Blits.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\VID_ImageBinding.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\VID_Main.h" />
+    <ClInclude Include="..\..\..\src\Engine\Funct\CFeatureConfig.h" />
+    <ClInclude Include="..\..\..\src\Engine\Funct\DataTable\CDataTable.h" />
+    <ClInclude Include="..\..\..\src\Engine\Funct\DataTable\CGuiViewDataTable.h" />
+    <ClInclude Include="..\..\..\src\Engine\Funct\DataTable\FUN_CSVParser.h" />
+    <ClInclude Include="..\..\..\src\Engine\Funct\FUN_IntervalTree.h" />
+    <ClInclude Include="..\..\..\src\Engine\Funct\ImageProcessing\CImageKernel.h" />
+    <ClInclude Include="..\..\..\src\Engine\Funct\ImageProcessing\IMG_Filters.h" />
+    <ClInclude Include="..\..\..\src\Engine\Funct\ImageProcessing\IMG_HoughLines.h" />
+    <ClInclude Include="..\..\..\src\Engine\Funct\ImageProcessing\IMG_Scale.h" />
+    <ClInclude Include="..\..\..\src\Engine\Funct\ImageProcessing\IMG_SimpleSegmentation.h" />
+    <ClInclude Include="..\..\..\src\Engine\Funct\ImageProcessing\resampler\resampler.h" />
+    <ClInclude Include="..\..\..\src\Engine\Funct\ImageProcessing\stb_image\stb_image.h" />
+    <ClInclude Include="..\..\..\src\Engine\Funct\std_membuf.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\CGuiMain.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\COneTouchData.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CColorsTheme.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiBackground.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiButton.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiButtonMenu.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiButtonSwitch.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiButtonText.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiEditBoxFloat.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiEditBoxHex.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiEditBoxInt.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiEditBoxText.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiEditHex.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiElement.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiEvent.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiFolderFavorite.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiLabel.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiList.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiListTree.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiRadio.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiRichTextLabel.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiSlider.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiTheme.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiView.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiViewFade.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiViewFrame.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiViewHorizontalScroll.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiViewList.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiViewMenu.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiViewMessageBox.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiViewMovingPane.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiViewNumKeys.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiViewSaveFile.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiViewSelectFile.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiViewSelectFolder.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiViewSplit4.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiViewToolBox.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiViewVerticalScroll.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiViewWindowsManager.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiWindow.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\GuiConsts.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\GUI_Main.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewConsole.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewDummy.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewImageWithLayer.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\CRecentlyOpenedFiles.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\GUI_Debug.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\LoadingScreen\CGuiViewBaseLoadingScreen.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\LoadingScreen\CGuiViewLoadingScreen.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\ResourceManager\CGuiViewBaseResourceManager.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\ResourceManager\CGuiViewResourceManager.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Layout\CLayoutManager.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Layout\CLayoutParameter.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\hjson\hjson.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\imguiext\dirent_portable.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\imguiext\IconsFontAwesome_c.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\imguiext\IconsKenney_c.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\imguiext\IconsMaterialDesign_c.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\imguiext\imguial_button.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\imguiext\imguial_fonts.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\imguiext\imguial_log.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\imguiext\imguial_term.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\imguiext\imguiComboFilter.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\imguiext\imguifilesystem.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\imguiext\imguihelper.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\imguiext\imgui_memory_editor.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\imgui\imconfig.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\imgui\imgui.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\imgui\imgui_freetype.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\imgui\imgui_impl_opengl3.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\imgui\imgui_impl_sdl.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\imgui\imgui_internal.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\imgui\imstb_rectpack.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\imgui\imstb_textedit.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\imgui\imstb_truetype.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\implot\implot.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\cderror.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\cdjpeg.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jconfig.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jdct.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jerror.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jinclude.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jmemsys.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jmorecfg.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jpegint.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jpeglib.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jversion.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\transupp.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\jpeg\JPEG.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\jpeg\JPEGReader.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\jpeg\JPEGWriter.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\JSONOptions.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\libjson.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\_internal\Dependencies\libbase64++\libbase64++.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\_internal\Dependencies\mempool++\mempool.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\internalJSONNode.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONAllocator.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONChildren.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONDebug.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONDefs.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONDefs\GNU_C.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONDefs\Strings_Defs.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONDefs\Unknown_C.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONDefs\Visual_C.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONGlobals.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONMemory.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONMemoryPool.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONNode.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONPreparse.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONSharedString.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONSingleton.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONStats.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONStream.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONValidator.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONWorker.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSON_Base64.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\NumberToString.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\libpng\png.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\libpng\pngconf.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\libpng\pngdebug.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\libpng\pnginfo.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\libpng\pnglibconf.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\libpng\pngpriv.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\libpng\pngstruct.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\lodepng\lodepng.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\md5\MD5.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\md5\MD5_Defs.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\minizip\crypt.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\minizip\ioapi.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\minizip\mztools.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\minizip\unzip.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\minizip\zip.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\mtrand\MTH_MTRand.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\mtrand\mtrand.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\nfd\nfd.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\nfd\nfd_common.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\pugixml\pugiconfig.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\pugixml\pugixml.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\tremor\config-tremor.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\tremor\Ogg\ogg.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\tremor\Ogg\tremor-os_types.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\tremor\tremor-asm_arm.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\tremor\tremor-backends.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\tremor\tremor-block.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\tremor\tremor-codebook.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\tremor\tremor-codec_internal.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\tremor\tremor-ivorbiscodec.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\tremor\tremor-ivorbisfile.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\tremor\tremor-lsp_lookup.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\tremor\tremor-mdct.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\tremor\tremor-mdct_lookup.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\tremor\tremor-misc.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\tremor\tremor-os.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\tremor\tremor-registry.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\tremor\tremor-window.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\tremor\tremor-window_lookup.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\utf8\utf8.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\utf8\utf8_checked.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\utf8\utf8_core.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\utf8\utf8_unchecked.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\zlib\crc32.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\zlib\deflate.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\zlib\gzguts.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\zlib\inffast.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\zlib\inffixed.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\zlib\inflate.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\zlib\inftrees.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\zlib\trees.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\zlib\zconf.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\zlib\zlib.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\zlib\zutil.h" />
+    <ClInclude Include="..\..\..\src\MT_API.h" />
+    <ClInclude Include="..\..\..\src\MT_VERSION.h" />
+    <ClInclude Include="..\src.Windows\CLogByteBuffer.h" />
+    <ClInclude Include="..\src.Windows\CSlrFileFromDocuments.h" />
+    <ClInclude Include="..\src.Windows\CSlrFileFromOS.h" />
+    <ClInclude Include="..\src.Windows\CSlrFileFromResources.h" />
+    <ClInclude Include="..\src.Windows\CSlrFileFromTemp.h" />
+    <ClInclude Include="..\src.Windows\CSlrFontSystem.h" />
+    <ClInclude Include="..\src.Windows\DBG_ConStream.h" />
+    <ClInclude Include="..\src.Windows\DBG_Log.h" />
+    <ClInclude Include="..\src.Windows\dirent.h" />
+    <ClInclude Include="..\src.Windows\getopt.h" />
+    <ClInclude Include="..\src.Windows\libgen.h" />
+    <ClInclude Include="..\src.Windows\main.h" />
+    <ClInclude Include="..\src.Windows\mman.h" />
+    <ClInclude Include="..\src.Windows\snprintf.h" />
+    <ClInclude Include="..\src.Windows\SYS_FileSystem.h" />
+    <ClInclude Include="..\src.Windows\SYS_Memory.h" />
+    <ClInclude Include="..\src.Windows\SYS_MiniDump.h" />
+    <ClInclude Include="..\src.Windows\SYS_Platform.h" />
+    <ClInclude Include="..\src.Windows\SYS_SharedMemory.h" />
+    <ClInclude Include="..\src.Windows\unistd.h" />
+    <ClInclude Include="..\src.Windows\win-gettimeofday.h" />
+    <ClInclude Include="..\src.Windows\win-registry.h" />
+    <ClInclude Include="..\src.Windows\win-usleep.h" />
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>16.0</VCProjectVersion>
+    <ProjectGuid>{E93D3B41-0438-4721-ABFE-83F1F37490CF}</ProjectGuid>
+    <RootNamespace>MTEngineSDL</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <IncludePath>$(ProjectDir)..\include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(ProjectDir)..\libs\$(Platform)\$(Configuration);$(LibraryPath)</LibraryPath>
+    <OutDir>$(ProjectDir)..\bin\$(Platform)\$(Configuration)\</OutDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <OutDir>$(ProjectDir)..\bin\$(Platform)\$(Configuration)\</OutDir>
+    <LibraryPath>$(ProjectDir)..\libs\$(Platform)\$(Configuration);$(LibraryPath)</LibraryPath>
+    <IncludePath>$(ProjectDir)..\include;$(IncludePath)</IncludePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <OutDir>$(ProjectDir)..\bin\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(Configuration)\</IntDir>
+    <LibraryPath>$(ProjectDir)..\libs\$(Platform)\$(Configuration);$(LibraryPath)</LibraryPath>
+    <IncludePath>$(ProjectDir)..\include;$(IncludePath)</IncludePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <OutDir>$(ProjectDir)..\bin\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(Configuration)\</IntDir>
+    <LibraryPath>$(ProjectDir)..\libs\$(Platform)\$(Configuration);$(LibraryPath)</LibraryPath>
+    <IncludePath>$(ProjectDir)..\include;$(IncludePath)</IncludePath>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <SDLCheck>true</SDLCheck>
+      <ConformanceMode>false</ConformanceMode>
+      <PreprocessorDefinitions>_MBCS;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;WIN32</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>C:\develop\MTEngineSDL\src\Engine\Libs\hjson;C:\develop\MTEngineSDL\src\Engine\Libs\stb;C:\develop\MTEngineSDL\src\Engine\Libs\ENet;C:\develop\MTEngineSDL\src\Engine\Libs\utf8;C:\develop\MTEngineSDL\src\Engine\Libs\zlib;C:\develop\MTEngineSDL\src\Engine\Libs\tremor\Ogg;C:\develop\MTEngineSDL\src\Engine\Libs\tremor;C:\develop\MTEngineSDL\src\Engine\Libs\pugixml;C:\develop\MTEngineSDL\src\Engine\Libs\minizip;C:\develop\MTEngineSDL\src\Engine\Libs\md5;C:\develop\MTEngineSDL\src\Engine\Libs\mtrand;C:\develop\MTEngineSDL\src\Engine\Libs\lodepng;C:\develop\MTEngineSDL\src\Engine\Libs\libjson;C:\develop\MTEngineSDL\src\Engine\Libs\libpng;C:\develop\MTEngineSDL\src\Engine\Libs\jpeg\jpeg-9a;C:\develop\MTEngineSDL\src\Engine\Libs\jpeg;C:\develop\MTEngineSDL\src\Engine\Libs\imguiext;C:\develop\MTEngineSDL\src\Engine\Libs\implot;C:\develop\MTEngineSDL\src\Engine\Libs\imgui;C:\develop\MTEngineSDL\src\Engine\Libs\nfd;C:\develop\MTEngineSDL\src\Engine\Libs;C:\develop\MTEngineSDL\src\Engine\GUI\Helpers\ResourceManager;C:\develop\MTEngineSDL\src\Engine\GUI\Helpers\LoadingScreen;C:\develop\MTEngineSDL\src\Engine\GUI\Helpers;C:\develop\MTEngineSDL\src\Engine\GUI\Layout;C:\develop\MTEngineSDL\src\Engine\GUI\Controls;C:\develop\MTEngineSDL\src\Engine\GUI;C:\develop\MTEngineSDL\src\Engine\Funct\ImageProcessing\stb_image;C:\develop\MTEngineSDL\src\Engine\Funct\ImageProcessing\resampler;C:\develop\MTEngineSDL\src\Engine\Funct\ImageProcessing;C:\develop\MTEngineSDL\src\Engine\Funct\DataTable;C:\develop\MTEngineSDL\src\Engine\Funct;C:\develop\MTEngineSDL\src\Engine\Core\Net;C:\develop\MTEngineSDL\src\Engine\Core\Pool;C:\develop\MTEngineSDL\src\Engine\Core;C:\develop\MTEngineSDL\src\Engine\Audio\WAV;C:\develop\MTEngineSDL\src\Engine\Audio;C:\develop\MTEngineSDL\src\Engine;C:\develop\MTEngineSDL\src\Embedded;C:\develop\MTEngineSDL\src;C:\develop\MTEngineSDL\platform\Windows\src.Windows;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <AdditionalDependencies>SDL2.lib;SDL2main.lib;version.lib;imm32.lib;setupapi.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <SDLCheck>true</SDLCheck>
+      <ConformanceMode>false</ConformanceMode>
+      <AdditionalIncludeDirectories>C:\develop\MTEngineSDL\src\Engine\Libs\hjson;C:\develop\MTEngineSDL\src\Engine\Libs\stb;C:\develop\MTEngineSDL\src\Engine\Libs\ENet;C:\develop\MTEngineSDL\src\Engine\Libs\utf8;C:\develop\MTEngineSDL\src\Engine\Libs\zlib;C:\develop\MTEngineSDL\src\Engine\Libs\tremor\Ogg;C:\develop\MTEngineSDL\src\Engine\Libs\tremor;C:\develop\MTEngineSDL\src\Engine\Libs\pugixml;C:\develop\MTEngineSDL\src\Engine\Libs\minizip;C:\develop\MTEngineSDL\src\Engine\Libs\md5;C:\develop\MTEngineSDL\src\Engine\Libs\mtrand;C:\develop\MTEngineSDL\src\Engine\Libs\lodepng;C:\develop\MTEngineSDL\src\Engine\Libs\libjson;C:\develop\MTEngineSDL\src\Engine\Libs\libpng;C:\develop\MTEngineSDL\src\Engine\Libs\jpeg\jpeg-9a;C:\develop\MTEngineSDL\src\Engine\Libs\jpeg;C:\develop\MTEngineSDL\src\Engine\Libs\imguiext;C:\develop\MTEngineSDL\src\Engine\Libs\implot;C:\develop\MTEngineSDL\src\Engine\Libs\imgui;C:\develop\MTEngineSDL\src\Engine\Libs\nfd;C:\develop\MTEngineSDL\src\Engine\Libs;C:\develop\MTEngineSDL\src\Engine\GUI\Helpers\ResourceManager;C:\develop\MTEngineSDL\src\Engine\GUI\Helpers\LoadingScreen;C:\develop\MTEngineSDL\src\Engine\GUI\Helpers;C:\develop\MTEngineSDL\src\Engine\GUI\Layout;C:\develop\MTEngineSDL\src\Engine\GUI\Controls;C:\develop\MTEngineSDL\src\Engine\GUI;C:\develop\MTEngineSDL\src\Engine\Funct\ImageProcessing\stb_image;C:\develop\MTEngineSDL\src\Engine\Funct\ImageProcessing\resampler;C:\develop\MTEngineSDL\src\Engine\Funct\ImageProcessing;C:\develop\MTEngineSDL\src\Engine\Funct\DataTable;C:\develop\MTEngineSDL\src\Engine\Funct;C:\develop\MTEngineSDL\src\Engine\Core\Net;C:\develop\MTEngineSDL\src\Engine\Core\Pool;C:\develop\MTEngineSDL\src\Engine\Core;C:\develop\MTEngineSDL\src\Engine\Audio\WAV;C:\develop\MTEngineSDL\src\Engine\Audio;C:\develop\MTEngineSDL\src\Engine;C:\develop\MTEngineSDL\src\Embedded;C:\develop\MTEngineSDL\src;C:\develop\MTEngineSDL\platform\Windows\src.Windows;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;WIN32;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <AdditionalDependencies>SDL2.lib;SDL2main.lib;version.lib;imm32.lib;setupapi.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <ConformanceMode>false</ConformanceMode>
+      <PreprocessorDefinitions>_MBCS;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;WIN32</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>C:\develop\MTEngineSDL\src\Engine\Libs\hjson;C:\develop\MTEngineSDL\src\Engine\Libs\stb;C:\develop\MTEngineSDL\src\Engine\Libs\ENet;C:\develop\MTEngineSDL\src\Engine\Libs\utf8;C:\develop\MTEngineSDL\src\Engine\Libs\zlib;C:\develop\MTEngineSDL\src\Engine\Libs\tremor\Ogg;C:\develop\MTEngineSDL\src\Engine\Libs\tremor;C:\develop\MTEngineSDL\src\Engine\Libs\pugixml;C:\develop\MTEngineSDL\src\Engine\Libs\minizip;C:\develop\MTEngineSDL\src\Engine\Libs\md5;C:\develop\MTEngineSDL\src\Engine\Libs\mtrand;C:\develop\MTEngineSDL\src\Engine\Libs\lodepng;C:\develop\MTEngineSDL\src\Engine\Libs\libjson;C:\develop\MTEngineSDL\src\Engine\Libs\libpng;C:\develop\MTEngineSDL\src\Engine\Libs\jpeg\jpeg-9a;C:\develop\MTEngineSDL\src\Engine\Libs\jpeg;C:\develop\MTEngineSDL\src\Engine\Libs\imguiext;C:\develop\MTEngineSDL\src\Engine\Libs\implot;C:\develop\MTEngineSDL\src\Engine\Libs\imgui;C:\develop\MTEngineSDL\src\Engine\Libs\nfd;C:\develop\MTEngineSDL\src\Engine\Libs;C:\develop\MTEngineSDL\src\Engine\GUI\Helpers\ResourceManager;C:\develop\MTEngineSDL\src\Engine\GUI\Helpers\LoadingScreen;C:\develop\MTEngineSDL\src\Engine\GUI\Helpers;C:\develop\MTEngineSDL\src\Engine\GUI\Layout;C:\develop\MTEngineSDL\src\Engine\GUI\Controls;C:\develop\MTEngineSDL\src\Engine\GUI;C:\develop\MTEngineSDL\src\Engine\Funct\ImageProcessing\stb_image;C:\develop\MTEngineSDL\src\Engine\Funct\ImageProcessing\resampler;C:\develop\MTEngineSDL\src\Engine\Funct\ImageProcessing;C:\develop\MTEngineSDL\src\Engine\Funct\DataTable;C:\develop\MTEngineSDL\src\Engine\Funct;C:\develop\MTEngineSDL\src\Engine\Core\Net;C:\develop\MTEngineSDL\src\Engine\Core\Pool;C:\develop\MTEngineSDL\src\Engine\Core;C:\develop\MTEngineSDL\src\Engine\Audio\WAV;C:\develop\MTEngineSDL\src\Engine\Audio;C:\develop\MTEngineSDL\src\Engine;C:\develop\MTEngineSDL\src\Embedded;C:\develop\MTEngineSDL\src;C:\develop\MTEngineSDL\platform\Windows\src.Windows;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalDependencies>SDL2.lib;SDL2main.lib;version.lib;imm32.lib;setupapi.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <ConformanceMode>false</ConformanceMode>
+      <AdditionalIncludeDirectories>C:\develop\MTEngineSDL\src\Engine\Libs\hjson;C:\develop\MTEngineSDL\src\Engine\Libs\stb;C:\develop\MTEngineSDL\src\Engine\Libs\ENet;C:\develop\MTEngineSDL\src\Engine\Libs\utf8;C:\develop\MTEngineSDL\src\Engine\Libs\zlib;C:\develop\MTEngineSDL\src\Engine\Libs\tremor\Ogg;C:\develop\MTEngineSDL\src\Engine\Libs\tremor;C:\develop\MTEngineSDL\src\Engine\Libs\pugixml;C:\develop\MTEngineSDL\src\Engine\Libs\minizip;C:\develop\MTEngineSDL\src\Engine\Libs\md5;C:\develop\MTEngineSDL\src\Engine\Libs\mtrand;C:\develop\MTEngineSDL\src\Engine\Libs\lodepng;C:\develop\MTEngineSDL\src\Engine\Libs\libjson;C:\develop\MTEngineSDL\src\Engine\Libs\libpng;C:\develop\MTEngineSDL\src\Engine\Libs\jpeg\jpeg-9a;C:\develop\MTEngineSDL\src\Engine\Libs\jpeg;C:\develop\MTEngineSDL\src\Engine\Libs\imguiext;C:\develop\MTEngineSDL\src\Engine\Libs\implot;C:\develop\MTEngineSDL\src\Engine\Libs\imgui;C:\develop\MTEngineSDL\src\Engine\Libs\nfd;C:\develop\MTEngineSDL\src\Engine\Libs;C:\develop\MTEngineSDL\src\Engine\GUI\Helpers\ResourceManager;C:\develop\MTEngineSDL\src\Engine\GUI\Helpers\LoadingScreen;C:\develop\MTEngineSDL\src\Engine\GUI\Helpers;C:\develop\MTEngineSDL\src\Engine\GUI\Layout;C:\develop\MTEngineSDL\src\Engine\GUI\Controls;C:\develop\MTEngineSDL\src\Engine\GUI;C:\develop\MTEngineSDL\src\Engine\Funct\ImageProcessing\stb_image;C:\develop\MTEngineSDL\src\Engine\Funct\ImageProcessing\resampler;C:\develop\MTEngineSDL\src\Engine\Funct\ImageProcessing;C:\develop\MTEngineSDL\src\Engine\Funct\DataTable;C:\develop\MTEngineSDL\src\Engine\Funct;C:\develop\MTEngineSDL\src\Engine\Core\Net;C:\develop\MTEngineSDL\src\Engine\Core\Pool;C:\develop\MTEngineSDL\src\Engine\Core;C:\develop\MTEngineSDL\src\Engine\Audio\WAV;C:\develop\MTEngineSDL\src\Engine\Audio;C:\develop\MTEngineSDL\src\Engine;C:\develop\MTEngineSDL\src\Embedded;C:\develop\MTEngineSDL\src;C:\develop\MTEngineSDL\platform\Windows\src.Windows;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;WIN32;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalDependencies>SDL2.lib;SDL2main.lib;version.lib;imm32.lib;setupapi.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>
