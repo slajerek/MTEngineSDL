@@ -1,0 +1,1893 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="Source Files\src">
+      <UniqueIdentifier>{57bfc9b7-76cf-43e4-8351-1cc9d95efd96}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Embedded">
+      <UniqueIdentifier>{01cacc41-3719-4504-9998-60f2b8f4b019}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine">
+      <UniqueIdentifier>{a43dd8ee-f8f4-45c1-acf8-db598f27509a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Audio">
+      <UniqueIdentifier>{49cffcee-9697-4fb7-a04f-923fe0574a12}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Audio\WAV">
+      <UniqueIdentifier>{f825fdd6-87f3-4149-9ba4-454ed5ccb2d9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Core">
+      <UniqueIdentifier>{61da1565-5852-48a7-9633-03ab0c634247}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Core\Pool">
+      <UniqueIdentifier>{e560b552-0e55-4580-bb3a-c32b47617d9f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Funct">
+      <UniqueIdentifier>{3c7765d3-37c3-4fb3-9e3e-1a01f907991b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Funct\ImageProcessing">
+      <UniqueIdentifier>{d8869e42-8a13-4f14-9f4f-b6d3066c05e8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Funct\ImageProcessing\resampler">
+      <UniqueIdentifier>{86e3ca22-90a8-40bb-b792-15cf81722c2b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Funct\ImageProcessing\stb_image">
+      <UniqueIdentifier>{cb29d260-cfd4-4fde-a9eb-95f52f6f28f0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Libs">
+      <UniqueIdentifier>{5c80658c-66ab-4c55-b4a5-2357c6a5b1bb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Libs\imgui">
+      <UniqueIdentifier>{57eab370-9115-495f-9e8b-aac554e988e6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Libs\jpeg">
+      <UniqueIdentifier>{c7b55a29-9046-4cfc-9919-b41656e4231c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Libs\jpeg\jpeg-9a">
+      <UniqueIdentifier>{b9e5d473-3ead-4bc9-8c77-763a5e62bb77}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Libs\libpng">
+      <UniqueIdentifier>{e39f0107-f3ed-4b57-a766-abfe81deb932}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Libs\lodepng">
+      <UniqueIdentifier>{3a607960-034c-4cae-a850-c56b08a4c4ab}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Libs\mtrand">
+      <UniqueIdentifier>{bdaa3a08-48f7-42f9-8881-b3ba604f4000}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Libs\tremor">
+      <UniqueIdentifier>{b60e6169-4373-4610-bcc0-d98deb6c0800}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Libs\tremor\Ogg">
+      <UniqueIdentifier>{b02e27fd-3007-4ccc-8764-6ec4c649c0cd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Libs\zlib">
+      <UniqueIdentifier>{97fe5f6d-b366-4d06-aa56-8e46cf65154a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src.Windows">
+      <UniqueIdentifier>{a868ea90-aa48-4c3b-b91e-109e5c5374e9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\GUI">
+      <UniqueIdentifier>{add7abfa-af36-42e4-a630-294c61c1e729}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\GUI\Controls">
+      <UniqueIdentifier>{8f1bae2f-52d1-4b66-9894-0abbf7da9d83}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\GUI\Helpers">
+      <UniqueIdentifier>{210b6d06-51ca-4e7f-be6e-a2ea85ecc43e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\GUI\Helpers\LoadingScreen">
+      <UniqueIdentifier>{b6c2096e-01ee-41a3-ab50-0190f66f246c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\GUI\Helpers\ResourceManager">
+      <UniqueIdentifier>{9473fa45-1294-4e88-86e5-b9041bfc5fc0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Funct\DataTable">
+      <UniqueIdentifier>{9520a58f-0841-40a9-8981-77fe2c63520c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Libs\utf8">
+      <UniqueIdentifier>{80abc163-0f67-4e75-b134-118b20a5bbe1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Libs\imguiext">
+      <UniqueIdentifier>{a3e85ac5-d5bb-4bba-a2b7-7110beea2972}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Libs\nfd">
+      <UniqueIdentifier>{dbedd06e-1cc8-42e4-a5fa-09a3f2f700bb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Libs\libjson">
+      <UniqueIdentifier>{c2163a70-ff81-4af4-8384-280b83a43116}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Libs\libjson\_internal">
+      <UniqueIdentifier>{039def89-a686-4137-a274-9cad7a65a7e3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Libs\libjson\_internal\Dependencies">
+      <UniqueIdentifier>{3d2bb021-29fb-468f-a65e-dac3f7b26316}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Libs\libjson\_internal\Dependencies\libbase64++">
+      <UniqueIdentifier>{0b70eba2-3b11-4ea2-82c5-5f0717dc09e9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Libs\libjson\_internal\Dependencies\mempool++">
+      <UniqueIdentifier>{cfc81973-6bcf-4d08-b22c-71f23eeb935c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Libs\libjson\_internal\Source">
+      <UniqueIdentifier>{17014d21-0c2c-404d-99ca-d89833633b31}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Libs\libjson\_internal\Source\JSONDefs">
+      <UniqueIdentifier>{f02d101e-8018-4240-b868-7da13bc43199}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Libs\md5">
+      <UniqueIdentifier>{c0223fae-7162-45e0-afdf-3850f836dea1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Libs\minizip">
+      <UniqueIdentifier>{0aae6480-cbdf-4b70-b58f-be1835fc4203}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Libs\pugixml">
+      <UniqueIdentifier>{8442de7f-b1de-4ec2-9a35-cb36bae110d3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Libs\implot">
+      <UniqueIdentifier>{a11ee73c-4011-4838-9c9d-c5c5902c2514}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\GUI\Layout">
+      <UniqueIdentifier>{eee14c14-44a6-40a3-9205-f49850274837}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Libs\hjson">
+      <UniqueIdentifier>{5dacc4f1-46ba-40a6-b061-740f27e5675e}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\..\src\Embedded\RES_Embedded.cpp">
+      <Filter>Source Files\src\Embedded</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Audio\WAV\SND_WavReader.cpp">
+      <Filter>Source Files\src\Engine\Audio\WAV</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Audio\CAudioChannel.cpp">
+      <Filter>Source Files\src\Engine\Audio</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Audio\CAudioChannelBusFloat.cpp">
+      <Filter>Source Files\src\Engine\Audio</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Audio\CAudioChannelBusInt.cpp">
+      <Filter>Source Files\src\Engine\Audio</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Audio\CAudioChannelMusicPlayer.cpp">
+      <Filter>Source Files\src\Engine\Audio</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Audio\CMusicChannel.cpp">
+      <Filter>Source Files\src\Engine\Audio</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Audio\CSlrMusicFile.cpp">
+      <Filter>Source Files\src\Engine\Audio</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Audio\CSlrMusicFileOgg.cpp">
+      <Filter>Source Files\src\Engine\Audio</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Audio\CSlrMusicSwitcher.cpp">
+      <Filter>Source Files\src\Engine\Audio</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Audio\SND_Main.cpp">
+      <Filter>Source Files\src\Engine\Audio</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Audio\SND_SoundEngine.cpp">
+      <Filter>Source Files\src\Engine\Audio</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\Pool\CPool.cpp">
+      <Filter>Source Files\src\Engine\Core\Pool</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Funct\ImageProcessing\stb_image\stb_image.c">
+      <Filter>Source Files\src\Engine\Funct\ImageProcessing\stb_image</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Funct\ImageProcessing\resampler\resampler.cpp">
+      <Filter>Source Files\src\Engine\Funct\ImageProcessing\resampler</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Funct\ImageProcessing\CImageKernel.cpp">
+      <Filter>Source Files\src\Engine\Funct\ImageProcessing</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Funct\ImageProcessing\IMG_Filters.cpp">
+      <Filter>Source Files\src\Engine\Funct\ImageProcessing</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Funct\ImageProcessing\IMG_HoughLines.cpp">
+      <Filter>Source Files\src\Engine\Funct\ImageProcessing</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Funct\ImageProcessing\IMG_Scale.cpp">
+      <Filter>Source Files\src\Engine\Funct\ImageProcessing</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Funct\FUN_IntervalTree.cpp">
+      <Filter>Source Files\src\Engine\Funct</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\tremor\Ogg\bitwise.c">
+      <Filter>Source Files\src\Engine\Libs\tremor\Ogg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\tremor\Ogg\framing.c">
+      <Filter>Source Files\src\Engine\Libs\tremor\Ogg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\tremor\tremor-block.c">
+      <Filter>Source Files\src\Engine\Libs\tremor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\tremor\tremor-codebook.c">
+      <Filter>Source Files\src\Engine\Libs\tremor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\tremor\tremor-floor0.c">
+      <Filter>Source Files\src\Engine\Libs\tremor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\tremor\tremor-floor1.c">
+      <Filter>Source Files\src\Engine\Libs\tremor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\tremor\tremor-info.c">
+      <Filter>Source Files\src\Engine\Libs\tremor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\tremor\tremor-mapping0.c">
+      <Filter>Source Files\src\Engine\Libs\tremor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\tremor\tremor-mdct.c">
+      <Filter>Source Files\src\Engine\Libs\tremor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\tremor\tremor-registry.c">
+      <Filter>Source Files\src\Engine\Libs\tremor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\tremor\tremor-res012.c">
+      <Filter>Source Files\src\Engine\Libs\tremor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\tremor\tremor-sharedbook.c">
+      <Filter>Source Files\src\Engine\Libs\tremor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\tremor\tremor-synthesis.c">
+      <Filter>Source Files\src\Engine\Libs\tremor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\tremor\tremor-vorbisfile.c">
+      <Filter>Source Files\src\Engine\Libs\tremor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\tremor\tremor-window.c">
+      <Filter>Source Files\src\Engine\Libs\tremor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\zlib\adler32.c">
+      <Filter>Source Files\src\Engine\Libs\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\zlib\compress.c">
+      <Filter>Source Files\src\Engine\Libs\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\zlib\crc32.c">
+      <Filter>Source Files\src\Engine\Libs\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\zlib\deflate.c">
+      <Filter>Source Files\src\Engine\Libs\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\zlib\gzclose.c">
+      <Filter>Source Files\src\Engine\Libs\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\zlib\gzlib.c">
+      <Filter>Source Files\src\Engine\Libs\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\zlib\gzread.c">
+      <Filter>Source Files\src\Engine\Libs\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\zlib\gzwrite.c">
+      <Filter>Source Files\src\Engine\Libs\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\zlib\infback.c">
+      <Filter>Source Files\src\Engine\Libs\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\zlib\inffast.c">
+      <Filter>Source Files\src\Engine\Libs\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\zlib\inflate.c">
+      <Filter>Source Files\src\Engine\Libs\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\zlib\inftrees.c">
+      <Filter>Source Files\src\Engine\Libs\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\zlib\trees.c">
+      <Filter>Source Files\src\Engine\Libs\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\zlib\uncompr.c">
+      <Filter>Source Files\src\Engine\Libs\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\zlib\zutil.c">
+      <Filter>Source Files\src\Engine\Libs\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\JPEGReader.cpp">
+      <Filter>Source Files\src\Engine\Libs\jpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\JPEGWriter.cpp">
+      <Filter>Source Files\src\Engine\Libs\jpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\cdjpeg.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jaricom.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jcapimin.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jcapistd.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jcarith.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jccoefct.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jccolor.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jcdctmgr.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jchuff.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jcinit.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jcmainct.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jcmarker.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jcmaster.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jcomapi.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jcparam.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jcprepct.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jcsample.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jctrans.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jdapimin.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jdapistd.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jdarith.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jdatadst.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jdatasrc.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jdcoefct.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jdcolor.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jddctmgr.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jdhuff.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jdinput.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jdmainct.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jdmarker.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jdmaster.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jdmerge.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jdpostct.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jdsample.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jdtrans.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jerror.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jfdctflt.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jfdctfst.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jfdctint.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jidctflt.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jidctfst.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jidctint.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jmemansi.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jmemmgr.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jquant1.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jquant2.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jutils.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\rdbmp.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\rdcolmap.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\rdgif.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\rdppm.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\rdrle.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\rdswitch.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\rdtarga.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\transupp.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\wrbmp.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\wrgif.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\wrppm.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\wrrle.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\wrtarga.c">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\libpng\png.c">
+      <Filter>Source Files\src\Engine\Libs\libpng</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\libpng\pngerror.c">
+      <Filter>Source Files\src\Engine\Libs\libpng</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\libpng\pngget.c">
+      <Filter>Source Files\src\Engine\Libs\libpng</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\libpng\pngmem.c">
+      <Filter>Source Files\src\Engine\Libs\libpng</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\libpng\pngpread.c">
+      <Filter>Source Files\src\Engine\Libs\libpng</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\libpng\pngread.c">
+      <Filter>Source Files\src\Engine\Libs\libpng</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\libpng\pngrio.c">
+      <Filter>Source Files\src\Engine\Libs\libpng</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\libpng\pngrtran.c">
+      <Filter>Source Files\src\Engine\Libs\libpng</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\libpng\pngrutil.c">
+      <Filter>Source Files\src\Engine\Libs\libpng</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\libpng\pngset.c">
+      <Filter>Source Files\src\Engine\Libs\libpng</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\libpng\pngtrans.c">
+      <Filter>Source Files\src\Engine\Libs\libpng</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\libpng\pngwio.c">
+      <Filter>Source Files\src\Engine\Libs\libpng</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\libpng\pngwrite.c">
+      <Filter>Source Files\src\Engine\Libs\libpng</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\libpng\pngwtran.c">
+      <Filter>Source Files\src\Engine\Libs\libpng</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\libpng\pngwutil.c">
+      <Filter>Source Files\src\Engine\Libs\libpng</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\lodepng\lodepng.cpp">
+      <Filter>Source Files\src\Engine\Libs\lodepng</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\mtrand\MTH_MTRand.cpp">
+      <Filter>Source Files\src\Engine\Libs\mtrand</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\mtrand\mtrand.cpp">
+      <Filter>Source Files\src\Engine\Libs\mtrand</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src.Windows\CLogByteBuffer.cpp">
+      <Filter>Source Files\src.Windows</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src.Windows\CSlrFileFromDocuments.cpp">
+      <Filter>Source Files\src.Windows</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src.Windows\CSlrFileFromOS.cpp">
+      <Filter>Source Files\src.Windows</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src.Windows\CSlrFileFromResources.cpp">
+      <Filter>Source Files\src.Windows</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src.Windows\CSlrFileFromTemp.cpp">
+      <Filter>Source Files\src.Windows</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src.Windows\CSlrFontSystem.cpp">
+      <Filter>Source Files\src.Windows</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src.Windows\DBG_ConStream.cpp">
+      <Filter>Source Files\src.Windows</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src.Windows\DBG_Log.cpp">
+      <Filter>Source Files\src.Windows</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src.Windows\getopt.c">
+      <Filter>Source Files\src.Windows</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src.Windows\gl3w.c">
+      <Filter>Source Files\src.Windows</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src.Windows\main.cpp">
+      <Filter>Source Files\src.Windows</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src.Windows\mman.c">
+      <Filter>Source Files\src.Windows</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src.Windows\SYS_FileSystem.cpp">
+      <Filter>Source Files\src.Windows</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src.Windows\SYS_Memory.cpp">
+      <Filter>Source Files\src.Windows</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src.Windows\SYS_MiniDump.cpp">
+      <Filter>Source Files\src.Windows</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src.Windows\SYS_SharedMemory.cpp">
+      <Filter>Source Files\src.Windows</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src.Windows\win-gettimeofday.cpp">
+      <Filter>Source Files\src.Windows</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src.Windows\win-usleep.cpp">
+      <Filter>Source Files\src.Windows</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\CGuiMain.cpp">
+      <Filter>Source Files\src\Engine\GUI</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\COneTouchData.cpp">
+      <Filter>Source Files\src\Engine\GUI</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\GUI_Main.cpp">
+      <Filter>Source Files\src\Engine\GUI</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiBackground.cpp">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiButton.cpp">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiButtonMenu.cpp">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiButtonSwitch.cpp">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiButtonText.cpp">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiEditBoxFloat.cpp">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiEditBoxHex.cpp">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiEditBoxInt.cpp">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiEditBoxText.cpp">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiEditHex.cpp">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiElement.cpp">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiLabel.cpp">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiList.cpp">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiListTree.cpp">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiRadio.cpp">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiRichTextLabel.cpp">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiSlider.cpp">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiTheme.cpp">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiView.cpp">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiViewFade.cpp">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiViewFrame.cpp">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiViewHorizontalScroll.cpp">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiViewList.cpp">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiViewMenu.cpp">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiViewMessageBox.cpp">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiViewNumKeys.cpp">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiViewSaveFile.cpp">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiViewSelectFile.cpp">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiViewSelectFolder.cpp">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiViewSplit4.cpp">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiViewToolBox.cpp">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiViewVerticalScroll.cpp">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiViewWindowsManager.cpp">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiWindow.cpp">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewConsole.cpp">
+      <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewDummy.cpp">
+      <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\GUI_Debug.cpp">
+      <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\LoadingScreen\CGuiViewBaseLoadingScreen.cpp">
+      <Filter>Source Files\src\Engine\GUI\Helpers\LoadingScreen</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\LoadingScreen\CGuiViewLoadingScreen.cpp">
+      <Filter>Source Files\src\Engine\GUI\Helpers\LoadingScreen</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\ResourceManager\CGuiViewBaseResourceManager.cpp">
+      <Filter>Source Files\src\Engine\GUI\Helpers\ResourceManager</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\ResourceManager\CGuiViewResourceManager.cpp">
+      <Filter>Source Files\src\Engine\GUI\Helpers\ResourceManager</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Funct\DataTable\CDataTable.cpp">
+      <Filter>Source Files\src\Engine\Funct\DataTable</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Funct\DataTable\CGuiViewDataTable.cpp">
+      <Filter>Source Files\src\Engine\Funct\DataTable</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Funct\DataTable\FUN_CSVParser.cpp">
+      <Filter>Source Files\src\Engine\Funct\DataTable</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\imguiext\imguial_fonts.cpp">
+      <Filter>Source Files\src\Engine\Libs\imguiext</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\imguiext\imguial_log.cpp">
+      <Filter>Source Files\src\Engine\Libs\imguiext</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\imguiext\imguial_term.cpp">
+      <Filter>Source Files\src\Engine\Libs\imguiext</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\imguiext\imguifilesystem.cpp">
+      <Filter>Source Files\src\Engine\Libs\imguiext</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\imguiext\imguihelper.cpp">
+      <Filter>Source Files\src\Engine\Libs\imguiext</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\nfd\nfd_common.c">
+      <Filter>Source Files\src\Engine\Libs\nfd</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src.Windows\nfd_win.cpp">
+      <Filter>Source Files\src.Windows</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\internalJSONNode.cpp">
+      <Filter>Source Files\src\Engine\Libs\libjson\_internal\Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONAllocator.cpp">
+      <Filter>Source Files\src\Engine\Libs\libjson\_internal\Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONChildren.cpp">
+      <Filter>Source Files\src\Engine\Libs\libjson\_internal\Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONDebug.cpp">
+      <Filter>Source Files\src\Engine\Libs\libjson\_internal\Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONIterators.cpp">
+      <Filter>Source Files\src\Engine\Libs\libjson\_internal\Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONMemory.cpp">
+      <Filter>Source Files\src\Engine\Libs\libjson\_internal\Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONNode.cpp">
+      <Filter>Source Files\src\Engine\Libs\libjson\_internal\Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONNode_Mutex.cpp">
+      <Filter>Source Files\src\Engine\Libs\libjson\_internal\Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONPreparse.cpp">
+      <Filter>Source Files\src\Engine\Libs\libjson\_internal\Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONStream.cpp">
+      <Filter>Source Files\src\Engine\Libs\libjson\_internal\Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONValidator.cpp">
+      <Filter>Source Files\src\Engine\Libs\libjson\_internal\Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONWorker.cpp">
+      <Filter>Source Files\src\Engine\Libs\libjson\_internal\Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONWriter.cpp">
+      <Filter>Source Files\src\Engine\Libs\libjson\_internal\Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\libjson.cpp">
+      <Filter>Source Files\src\Engine\Libs\libjson\_internal\Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\md5\MD5.cpp">
+      <Filter>Source Files\src\Engine\Libs\md5</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\minizip\ioapi.c">
+      <Filter>Source Files\src\Engine\Libs\minizip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\minizip\mztools.c">
+      <Filter>Source Files\src\Engine\Libs\minizip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\minizip\unzip.c">
+      <Filter>Source Files\src\Engine\Libs\minizip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\minizip\zip.c">
+      <Filter>Source Files\src\Engine\Libs\minizip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\pugixml\pugixml.cpp">
+      <Filter>Source Files\src\Engine\Libs\pugixml</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\CByteBuffer.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\CConfigStorage.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\CContinuousParamLinear.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\CContinuousParamSin.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\CContinuousParamSinHalf.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\CImageData.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\CSlrAnimation.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\CSlrAnimationState.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\CSlrDate.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\CSlrFile.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\CSlrFileFromMemory.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\CSlrFileMemory.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\CSlrFileZlib.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\CSlrFont.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\CSlrFontBitmap.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\CSlrFontProportional.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\CSlrImage.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\CSlrImageBase.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\CSlrImageTexture.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\CSlrKeyboardShortcuts.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\CSlrResourceBase.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\CSlrString.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\CSlrTextParser.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\CSlrTexture.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\MTH_FastMath.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\MTH_FixedPoint.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\MTH_Random.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\RES_DeployFile.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\RES_ResourceManager.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\SYS_CommandLine.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\SYS_Funct.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\SYS_KeyCodes.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\SYS_Main.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\SYS_PauseResume.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\SYS_PIPE.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\SYS_Startup.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\VID_Blits.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\VID_ImageBinding.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\VID_Main.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\SYS_Threading.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src.Windows\SYS_Platform.cpp">
+      <Filter>Source Files\src.Windows</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\implot\implot.cpp">
+      <Filter>Source Files\src\Engine\Libs\implot</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\implot\implot_demo.cpp">
+      <Filter>Source Files\src\Engine\Libs\implot</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\imgui\imgui.cpp">
+      <Filter>Source Files\src\Engine\Libs\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\imgui\imgui_demo.cpp">
+      <Filter>Source Files\src\Engine\Libs\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\imgui\imgui_draw.cpp">
+      <Filter>Source Files\src\Engine\Libs\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\imgui\imgui_impl_opengl3.cpp">
+      <Filter>Source Files\src\Engine\Libs\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\imgui\imgui_impl_sdl.cpp">
+      <Filter>Source Files\src\Engine\Libs\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\imgui\imgui_tables.cpp">
+      <Filter>Source Files\src\Engine\Libs\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\imgui\imgui_widgets.cpp">
+      <Filter>Source Files\src\Engine\Libs\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\imgui\imgui_freetype.cpp">
+      <Filter>Source Files\src\Engine\Libs\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Audio\CPianoKeyboard.cpp">
+      <Filter>Source Files\src\Engine\Audio</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\GAM_GamePads.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiEvent.cpp">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Layout\CLayoutManager.cpp">
+      <Filter>Source Files\src\Engine\GUI\Layout</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Layout\CLayoutParameter.cpp">
+      <Filter>Source Files\src\Engine\GUI\Layout</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Funct\ImageProcessing\IMG_SimpleSegmentation.cpp">
+      <Filter>Source Files\src\Engine\Funct\ImageProcessing</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CColorsTheme.cpp">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\hjson\hjson_decode.cpp">
+      <Filter>Source Files\src\Engine\Libs\hjson</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\hjson\hjson_encode.cpp">
+      <Filter>Source Files\src\Engine\Libs\hjson</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\hjson\hjson_parsenumber.cpp">
+      <Filter>Source Files\src\Engine\Libs\hjson</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\hjson\hjson_value.cpp">
+      <Filter>Source Files\src\Engine\Libs\hjson</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\CConfigStorageHjson.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\imguiext\imguiComboFilter.cpp">
+      <Filter>Source Files\src\Engine\Libs\imguiext</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Funct\CFeatureConfig.cpp">
+      <Filter>Source Files\src\Engine\Funct</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiViewMovingPane.cpp">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewImageWithLayer.cpp">
+      <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\CDataAdapter.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src.Windows\win-registry.cpp">
+      <Filter>Source Files\src.Windows</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\CContinuousParam.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\CContinuousParamBezier.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\CSlrImageMask.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\CRecentlyOpenedFiles.cpp">
+      <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\src.Windows\CLogByteBuffer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src.Windows\CSlrFileFromDocuments.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src.Windows\CSlrFileFromOS.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src.Windows\CSlrFileFromResources.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src.Windows\CSlrFileFromTemp.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src.Windows\CSlrFontSystem.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src.Windows\DBG_ConStream.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src.Windows\DBG_Log.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src.Windows\dirent.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src.Windows\getopt.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src.Windows\libgen.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src.Windows\main.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src.Windows\mman.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src.Windows\snprintf.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src.Windows\SYS_FileSystem.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src.Windows\SYS_Memory.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src.Windows\SYS_MiniDump.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src.Windows\SYS_SharedMemory.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src.Windows\unistd.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src.Windows\win-gettimeofday.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src.Windows\win-usleep.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\MT_VERSION.h">
+      <Filter>Source Files\src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Embedded\console_plain_gfx.h">
+      <Filter>Source Files\src\Embedded</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Embedded\default_font_fnt.h">
+      <Filter>Source Files\src\Embedded</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Embedded\default_font_gfx.h">
+      <Filter>Source Files\src\Embedded</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Embedded\RES_Embedded.h">
+      <Filter>Source Files\src\Embedded</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Audio\WAV\SND_WavReader.h">
+      <Filter>Source Files\src\Engine\Audio\WAV</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Audio\CAudioChannel.h">
+      <Filter>Source Files\src\Engine\Audio</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Audio\CAudioChannelBusFloat.h">
+      <Filter>Source Files\src\Engine\Audio</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Audio\CAudioChannelBusInt.h">
+      <Filter>Source Files\src\Engine\Audio</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Audio\CAudioChannelMusicPlayer.h">
+      <Filter>Source Files\src\Engine\Audio</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Audio\CMusicChannel.h">
+      <Filter>Source Files\src\Engine\Audio</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Audio\CSlrMusicFile.h">
+      <Filter>Source Files\src\Engine\Audio</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Audio\CSlrMusicFileOgg.h">
+      <Filter>Source Files\src\Engine\Audio</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Audio\CSlrMusicSwitcher.h">
+      <Filter>Source Files\src\Engine\Audio</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Audio\SND_Main.h">
+      <Filter>Source Files\src\Engine\Audio</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Audio\SND_SoundEngine.h">
+      <Filter>Source Files\src\Engine\Audio</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\Pool\CPool.h">
+      <Filter>Source Files\src\Engine\Core\Pool</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Funct\ImageProcessing\stb_image\stb_image.h">
+      <Filter>Source Files\src\Engine\Funct\ImageProcessing\stb_image</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Funct\ImageProcessing\resampler\resampler.h">
+      <Filter>Source Files\src\Engine\Funct\ImageProcessing\resampler</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Funct\ImageProcessing\CImageKernel.h">
+      <Filter>Source Files\src\Engine\Funct\ImageProcessing</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Funct\ImageProcessing\IMG_Filters.h">
+      <Filter>Source Files\src\Engine\Funct\ImageProcessing</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Funct\ImageProcessing\IMG_HoughLines.h">
+      <Filter>Source Files\src\Engine\Funct\ImageProcessing</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Funct\ImageProcessing\IMG_Scale.h">
+      <Filter>Source Files\src\Engine\Funct\ImageProcessing</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Funct\FUN_IntervalTree.h">
+      <Filter>Source Files\src\Engine\Funct</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Funct\std_membuf.h">
+      <Filter>Source Files\src\Engine\Funct</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\tremor\Ogg\ogg.h">
+      <Filter>Source Files\src\Engine\Libs\tremor\Ogg</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\tremor\Ogg\tremor-os_types.h">
+      <Filter>Source Files\src\Engine\Libs\tremor\Ogg</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\tremor\config-tremor.h">
+      <Filter>Source Files\src\Engine\Libs\tremor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\tremor\tremor-asm_arm.h">
+      <Filter>Source Files\src\Engine\Libs\tremor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\tremor\tremor-backends.h">
+      <Filter>Source Files\src\Engine\Libs\tremor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\tremor\tremor-block.h">
+      <Filter>Source Files\src\Engine\Libs\tremor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\tremor\tremor-codebook.h">
+      <Filter>Source Files\src\Engine\Libs\tremor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\tremor\tremor-codec_internal.h">
+      <Filter>Source Files\src\Engine\Libs\tremor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\tremor\tremor-ivorbiscodec.h">
+      <Filter>Source Files\src\Engine\Libs\tremor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\tremor\tremor-ivorbisfile.h">
+      <Filter>Source Files\src\Engine\Libs\tremor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\tremor\tremor-lsp_lookup.h">
+      <Filter>Source Files\src\Engine\Libs\tremor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\tremor\tremor-mdct.h">
+      <Filter>Source Files\src\Engine\Libs\tremor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\tremor\tremor-mdct_lookup.h">
+      <Filter>Source Files\src\Engine\Libs\tremor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\tremor\tremor-misc.h">
+      <Filter>Source Files\src\Engine\Libs\tremor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\tremor\tremor-os.h">
+      <Filter>Source Files\src\Engine\Libs\tremor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\tremor\tremor-registry.h">
+      <Filter>Source Files\src\Engine\Libs\tremor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\tremor\tremor-window.h">
+      <Filter>Source Files\src\Engine\Libs\tremor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\tremor\tremor-window_lookup.h">
+      <Filter>Source Files\src\Engine\Libs\tremor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\zlib\crc32.h">
+      <Filter>Source Files\src\Engine\Libs\zlib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\zlib\deflate.h">
+      <Filter>Source Files\src\Engine\Libs\zlib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\zlib\gzguts.h">
+      <Filter>Source Files\src\Engine\Libs\zlib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\zlib\inffast.h">
+      <Filter>Source Files\src\Engine\Libs\zlib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\zlib\inffixed.h">
+      <Filter>Source Files\src\Engine\Libs\zlib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\zlib\inflate.h">
+      <Filter>Source Files\src\Engine\Libs\zlib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\zlib\inftrees.h">
+      <Filter>Source Files\src\Engine\Libs\zlib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\zlib\trees.h">
+      <Filter>Source Files\src\Engine\Libs\zlib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\zlib\zconf.h">
+      <Filter>Source Files\src\Engine\Libs\zlib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\zlib\zlib.h">
+      <Filter>Source Files\src\Engine\Libs\zlib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\zlib\zutil.h">
+      <Filter>Source Files\src\Engine\Libs\zlib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\jpeg\JPEG.h">
+      <Filter>Source Files\src\Engine\Libs\jpeg</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\jpeg\JPEGReader.h">
+      <Filter>Source Files\src\Engine\Libs\jpeg</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\jpeg\JPEGWriter.h">
+      <Filter>Source Files\src\Engine\Libs\jpeg</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\cderror.h">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\cdjpeg.h">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jconfig.h">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jdct.h">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jerror.h">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jinclude.h">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jmemsys.h">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jmorecfg.h">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jpegint.h">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jpeglib.h">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jversion.h">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\transupp.h">
+      <Filter>Source Files\src\Engine\Libs\jpeg\jpeg-9a</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\libpng\png.h">
+      <Filter>Source Files\src\Engine\Libs\libpng</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\libpng\pngconf.h">
+      <Filter>Source Files\src\Engine\Libs\libpng</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\libpng\pngdebug.h">
+      <Filter>Source Files\src\Engine\Libs\libpng</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\libpng\pnginfo.h">
+      <Filter>Source Files\src\Engine\Libs\libpng</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\libpng\pnglibconf.h">
+      <Filter>Source Files\src\Engine\Libs\libpng</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\libpng\pngpriv.h">
+      <Filter>Source Files\src\Engine\Libs\libpng</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\libpng\pngstruct.h">
+      <Filter>Source Files\src\Engine\Libs\libpng</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\lodepng\lodepng.h">
+      <Filter>Source Files\src\Engine\Libs\lodepng</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\mtrand\MTH_MTRand.h">
+      <Filter>Source Files\src\Engine\Libs\mtrand</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\mtrand\mtrand.h">
+      <Filter>Source Files\src\Engine\Libs\mtrand</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\CGuiMain.h">
+      <Filter>Source Files\src\Engine\GUI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\COneTouchData.h">
+      <Filter>Source Files\src\Engine\GUI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\GUI_Main.h">
+      <Filter>Source Files\src\Engine\GUI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\GuiConsts.h">
+      <Filter>Source Files\src\Engine\GUI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiBackground.h">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiButton.h">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiButtonMenu.h">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiButtonSwitch.h">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiButtonText.h">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiEditBoxFloat.h">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiEditBoxHex.h">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiEditBoxInt.h">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiEditBoxText.h">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiEditHex.h">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiElement.h">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiFolderFavorite.h">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiLabel.h">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiList.h">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiListTree.h">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiRadio.h">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiRichTextLabel.h">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiSlider.h">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiTheme.h">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiView.h">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiViewFade.h">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiViewFrame.h">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiViewHorizontalScroll.h">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiViewList.h">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiViewMenu.h">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiViewMessageBox.h">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiViewNumKeys.h">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiViewSaveFile.h">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiViewSelectFile.h">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiViewSelectFolder.h">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiViewSplit4.h">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiViewToolBox.h">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiViewVerticalScroll.h">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiViewWindowsManager.h">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiWindow.h">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewConsole.h">
+      <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewDummy.h">
+      <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\GUI_Debug.h">
+      <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\LoadingScreen\CGuiViewBaseLoadingScreen.h">
+      <Filter>Source Files\src\Engine\GUI\Helpers\LoadingScreen</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\LoadingScreen\CGuiViewLoadingScreen.h">
+      <Filter>Source Files\src\Engine\GUI\Helpers\LoadingScreen</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\ResourceManager\CGuiViewBaseResourceManager.h">
+      <Filter>Source Files\src\Engine\GUI\Helpers\ResourceManager</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\ResourceManager\CGuiViewResourceManager.h">
+      <Filter>Source Files\src\Engine\GUI\Helpers\ResourceManager</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Funct\DataTable\CDataTable.h">
+      <Filter>Source Files\src\Engine\Funct\DataTable</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Funct\DataTable\CGuiViewDataTable.h">
+      <Filter>Source Files\src\Engine\Funct\DataTable</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Funct\DataTable\FUN_CSVParser.h">
+      <Filter>Source Files\src\Engine\Funct\DataTable</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\utf8\utf8.h">
+      <Filter>Source Files\src\Engine\Libs\utf8</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\utf8\utf8_checked.h">
+      <Filter>Source Files\src\Engine\Libs\utf8</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\utf8\utf8_core.h">
+      <Filter>Source Files\src\Engine\Libs\utf8</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\utf8\utf8_unchecked.h">
+      <Filter>Source Files\src\Engine\Libs\utf8</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\imguiext\dirent_portable.h">
+      <Filter>Source Files\src\Engine\Libs\imguiext</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\imguiext\IconsFontAwesome_c.h">
+      <Filter>Source Files\src\Engine\Libs\imguiext</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\imguiext\IconsKenney_c.h">
+      <Filter>Source Files\src\Engine\Libs\imguiext</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\imguiext\IconsMaterialDesign_c.h">
+      <Filter>Source Files\src\Engine\Libs\imguiext</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\imguiext\imgui_memory_editor.h">
+      <Filter>Source Files\src\Engine\Libs\imguiext</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\imguiext\imguial_button.h">
+      <Filter>Source Files\src\Engine\Libs\imguiext</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\imguiext\imguial_fonts.h">
+      <Filter>Source Files\src\Engine\Libs\imguiext</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\imguiext\imguial_log.h">
+      <Filter>Source Files\src\Engine\Libs\imguiext</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\imguiext\imguial_term.h">
+      <Filter>Source Files\src\Engine\Libs\imguiext</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\imguiext\imguifilesystem.h">
+      <Filter>Source Files\src\Engine\Libs\imguiext</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\imguiext\imguihelper.h">
+      <Filter>Source Files\src\Engine\Libs\imguiext</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\nfd\nfd.h">
+      <Filter>Source Files\src\Engine\Libs\nfd</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\nfd\nfd_common.h">
+      <Filter>Source Files\src\Engine\Libs\nfd</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\_internal\Dependencies\libbase64++\libbase64++.h">
+      <Filter>Source Files\src\Engine\Libs\libjson\_internal\Dependencies\libbase64++</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\_internal\Dependencies\mempool++\mempool.h">
+      <Filter>Source Files\src\Engine\Libs\libjson\_internal\Dependencies\mempool++</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONDefs\GNU_C.h">
+      <Filter>Source Files\src\Engine\Libs\libjson\_internal\Source\JSONDefs</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONDefs\Strings_Defs.h">
+      <Filter>Source Files\src\Engine\Libs\libjson\_internal\Source\JSONDefs</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONDefs\Unknown_C.h">
+      <Filter>Source Files\src\Engine\Libs\libjson\_internal\Source\JSONDefs</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONDefs\Visual_C.h">
+      <Filter>Source Files\src\Engine\Libs\libjson\_internal\Source\JSONDefs</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\internalJSONNode.h">
+      <Filter>Source Files\src\Engine\Libs\libjson\_internal\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSON_Base64.h">
+      <Filter>Source Files\src\Engine\Libs\libjson\_internal\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONAllocator.h">
+      <Filter>Source Files\src\Engine\Libs\libjson\_internal\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONChildren.h">
+      <Filter>Source Files\src\Engine\Libs\libjson\_internal\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONDebug.h">
+      <Filter>Source Files\src\Engine\Libs\libjson\_internal\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONDefs.h">
+      <Filter>Source Files\src\Engine\Libs\libjson\_internal\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONGlobals.h">
+      <Filter>Source Files\src\Engine\Libs\libjson\_internal\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONMemory.h">
+      <Filter>Source Files\src\Engine\Libs\libjson\_internal\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONMemoryPool.h">
+      <Filter>Source Files\src\Engine\Libs\libjson\_internal\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONNode.h">
+      <Filter>Source Files\src\Engine\Libs\libjson\_internal\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONPreparse.h">
+      <Filter>Source Files\src\Engine\Libs\libjson\_internal\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONSharedString.h">
+      <Filter>Source Files\src\Engine\Libs\libjson\_internal\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONSingleton.h">
+      <Filter>Source Files\src\Engine\Libs\libjson\_internal\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONStats.h">
+      <Filter>Source Files\src\Engine\Libs\libjson\_internal\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONStream.h">
+      <Filter>Source Files\src\Engine\Libs\libjson\_internal\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONValidator.h">
+      <Filter>Source Files\src\Engine\Libs\libjson\_internal\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONWorker.h">
+      <Filter>Source Files\src\Engine\Libs\libjson\_internal\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\NumberToString.h">
+      <Filter>Source Files\src\Engine\Libs\libjson\_internal\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\JSONOptions.h">
+      <Filter>Source Files\src\Engine\Libs\libjson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\libjson\libjson.h">
+      <Filter>Source Files\src\Engine\Libs\libjson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\md5\MD5.h">
+      <Filter>Source Files\src\Engine\Libs\md5</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\md5\MD5_Defs.h">
+      <Filter>Source Files\src\Engine\Libs\md5</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\minizip\crypt.h">
+      <Filter>Source Files\src\Engine\Libs\minizip</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\minizip\ioapi.h">
+      <Filter>Source Files\src\Engine\Libs\minizip</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\minizip\mztools.h">
+      <Filter>Source Files\src\Engine\Libs\minizip</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\minizip\unzip.h">
+      <Filter>Source Files\src\Engine\Libs\minizip</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\minizip\zip.h">
+      <Filter>Source Files\src\Engine\Libs\minizip</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\pugixml\pugiconfig.h">
+      <Filter>Source Files\src\Engine\Libs\pugixml</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\pugixml\pugixml.h">
+      <Filter>Source Files\src\Engine\Libs\pugixml</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\MT_API.h">
+      <Filter>Source Files\src\Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\CByteBuffer.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\CCombinations.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\CConfigStorage.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\CContinuousParam.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\CContinuousParamBezier.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\CContinuousParamLinear.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\CContinuousParamSin.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\CContinuousParamSinHalf.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\CGlobalKeyboardCallback.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\CGlobalLogicCallback.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\CGlobalOSWindowChangedCallback.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\CImageData.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\ConstantsAndMacros.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\CSlrAnimation.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\CSlrAnimationState.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\CSlrDate.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\CSlrFile.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\CSlrFileFromMemory.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\CSlrFileMemory.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\CSlrFileZlib.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\CSlrFont.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\CSlrFontBitmap.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\CSlrFontProportional.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\CSlrImage.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\CSlrImageBase.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\CSlrImageTexture.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\CSlrKeyboardShortcuts.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\CSlrResourceBase.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\CSlrString.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\CSlrTextParser.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\CSlrTexture.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\GFX_Types.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\MTH_FastMath.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\MTH_FastMathSinTab.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\MTH_FixedPoint.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\MTH_FixedPoint_SinTab.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\MTH_FixedPointUtils.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\MTH_Random.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\RES_DeployFile.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\RES_ResourceManager.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\SYS_CommandLine.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\SYS_Defs.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\SYS_DocsVsRes.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\SYS_Funct.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\SYS_KeyCodes.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\SYS_Main.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\SYS_PauseResume.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\SYS_PIPE.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\SYS_Startup.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\SYS_Types.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\VID_Blits.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\VID_ImageBinding.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\VID_Main.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\SYS_Threading.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src.Windows\SYS_Platform.h">
+      <Filter>Source Files\src.Windows</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\implot\implot.h">
+      <Filter>Source Files\src\Engine\Libs\implot</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\imgui\imconfig.h">
+      <Filter>Source Files\src\Engine\Libs\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\imgui\imgui.h">
+      <Filter>Source Files\src\Engine\Libs\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\imgui\imgui_impl_opengl3.h">
+      <Filter>Source Files\src\Engine\Libs\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\imgui\imgui_impl_sdl.h">
+      <Filter>Source Files\src\Engine\Libs\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\imgui\imgui_internal.h">
+      <Filter>Source Files\src\Engine\Libs\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\imgui\imstb_rectpack.h">
+      <Filter>Source Files\src\Engine\Libs\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\imgui\imstb_textedit.h">
+      <Filter>Source Files\src\Engine\Libs\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\imgui\imstb_truetype.h">
+      <Filter>Source Files\src\Engine\Libs\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\imgui\imgui_freetype.h">
+      <Filter>Source Files\src\Engine\Libs\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Audio\CPianoKeyboard.h">
+      <Filter>Source Files\src\Engine\Audio</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\GAM_GamePads.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiEvent.h">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Layout\CLayoutManager.h">
+      <Filter>Source Files\src\Engine\GUI\Layout</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Layout\CLayoutParameter.h">
+      <Filter>Source Files\src\Engine\GUI\Layout</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Funct\ImageProcessing\IMG_SimpleSegmentation.h">
+      <Filter>Source Files\src\Engine\Funct\ImageProcessing</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CColorsTheme.h">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\hjson\hjson.h">
+      <Filter>Source Files\src\Engine\Libs\hjson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\CConfigStorageHjson.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\imguiext\imguiComboFilter.h">
+      <Filter>Source Files\src\Engine\Libs\imguiext</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Funct\CFeatureConfig.h">
+      <Filter>Source Files\src\Engine\Funct</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiViewMovingPane.h">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewImageWithLayer.h">
+      <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\CDataAdapter.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src.Windows\win-registry.h">
+      <Filter>Source Files\src.Windows</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\CSlrImageMask.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\CGlobalDropFileCallback.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\CRecentlyOpenedFiles.h">
+      <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

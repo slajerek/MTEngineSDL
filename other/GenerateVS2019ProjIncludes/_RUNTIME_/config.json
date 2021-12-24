@@ -1,0 +1,18 @@
+{
+	"projectName" : "c64d",
+	"code" : [
+		{
+			"folder" : "C:\develop\c64d\src",
+			"prefix" : "..\..\..\src",
+			"filterPrefix" : "Source Files\src"
+		}
+	],
+	"lib" : [
+		{
+			"folder" : "C:\develop\MTEngineSDL\src"
+		},
+		{
+			"folder" : "C:\develop\MTEngineSDL\platform\Windows\src.Windows"
+		}
+	]
+}
