@@ -4,7 +4,6 @@
 #include "SND_Main.h"
 #include "SYS_FileSystem.h"
 #include "CSlrString.h"
-#include "SDL.h"
 
 //#define WRITE_AUDIO_OUT_TO_FILE
 

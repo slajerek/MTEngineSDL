@@ -9,21 +9,17 @@ add_definitions(
     -DIMGUI_IMPL_OPENGL_LOADER_GL3W
 )
 
-FIND_PACKAGE(PkgConfig REQUIRED)
-PKG_CHECK_MODULES(GTK3 REQUIRED gtk+-3.0)
-INCLUDE_DIRECTORIES(${GTK3_INCLUDE_DIRS})
-LINK_DIRECTORIES(${GTK3_LIBRARY_DIRS})
-ADD_DEFINITIONS(${GTK3_CFLAGS_OTHER})
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(GTK3 REQUIRED gtk+-3.0)
+include_directories(${GTK3_INCLUDE_DIRS})
+link_directories(${GTK3_LIBRARY_DIRS})
+add_definitions(${GTK3_CFLAGS_OTHER})
+find_package(SDL2 REQUIRED)
+include_directories(${SDL2_INCLUDE_DIRS})
 
 include_directories(
-    #"/usr/include/gtk-3.0"
-    #"/usr/include/glib-2.0"
-    #"/usr/lib/x86_64-linux-gnu/glib-2.0/include"
-    #"/usr/include/pango-1.0"
-    "${CMAKE_CURRENT_BINARY_DIR}/../sdl2/include"
     "${CMAKE_CURRENT_BINARY_DIR}/../libclipboard/include"
     "${CMAKE_CURRENT_SOURCE_DIR}/other/lib/libclipboard/include"
-    "${CMAKE_CURRENT_SOURCE_DIR}/other/lib/SDL2-2.0.10-static/include"
     "${CMAKE_CURRENT_SOURCE_DIR}/platform/Linux/src.Linux"
     "${CMAKE_CURRENT_SOURCE_DIR}/platform/Linux/src.Linux/include"
     "${CMAKE_CURRENT_SOURCE_DIR}/."

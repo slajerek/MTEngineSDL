@@ -2,7 +2,7 @@
 #define _SOUNDENGINE_H_
 
 #include <list>
-#include "SDL.h"
+#include <SDL.h>
 
 #define SOUND_SAMPLE_RATE 44100
 #define SOUND_BUFFER_SIZE 48000
