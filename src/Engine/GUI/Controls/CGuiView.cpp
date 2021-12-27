@@ -64,8 +64,8 @@ bool CGuiView::IsInside(float x, float y)
 	if (!this->visible)
 		return false;
 	
-	if (x >= this->windowPosX && x <= this->windowPosEndX
-		&& y >= this->windowPosY && y <= this->windowPosEndY)
+	if (x >= this->posX && x <= this->posEndX
+		&& y >= this->posY && y <= this->posEndY)
 	{
 		return true;
 	}
