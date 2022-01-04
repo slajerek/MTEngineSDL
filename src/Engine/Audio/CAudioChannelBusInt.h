@@ -12,7 +12,7 @@ class CAudioChannelBusInt : public CAudioChannel
 {
 public:
 	CAudioChannelBusInt(u16 numChannels);
-	~CAudioChannelBusInt();
+	virtual ~CAudioChannelBusInt();
 
 	virtual void Mix(int *mixBuffer, u32 numSamples);
 

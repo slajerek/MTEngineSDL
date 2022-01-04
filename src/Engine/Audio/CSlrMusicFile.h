@@ -13,7 +13,7 @@ class CSlrMusicFile : public CAudioChannel, public CSlrResourceBase
 public:
 	u8 type;
 	CSlrMusicFile();
-	~CSlrMusicFile();
+	virtual ~CSlrMusicFile();
 
 	virtual void Play();
 	virtual void Pause();

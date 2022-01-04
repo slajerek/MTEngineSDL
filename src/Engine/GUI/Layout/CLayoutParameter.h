@@ -17,7 +17,7 @@ class CLayoutParameter
 {
 public:
 	CLayoutParameter(const char *name);
-	~CLayoutParameter();
+	virtual ~CLayoutParameter();
 	
 	const char *name;
 	

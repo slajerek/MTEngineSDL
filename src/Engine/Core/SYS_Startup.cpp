@@ -95,10 +95,13 @@ void SYS_MTEngineStartup()
 
 	// shutdown
 	ImGuiContext& g = *GImGui;
-	ImGui::SaveIniSettingsToDisk(g.IO.IniFilename);
-
-	if (guiMain->layoutManager->currentLayout)
+	if (guiMain->IsViewFullScreen() == false && 
+		guiMain->layoutManager->currentLayout)
 	{
+		// store ImGui layout
+		ImGui::SaveIniSettingsToDisk(g.IO.IniFilename);
+
+		// serialize current layout to workspaces
 		guiMain->layoutManager->currentLayout->serializedLayoutBuffer->Clear();
 		
 		// note, we can just serialize layout as the frame has been rendered, normally we would need to call async serialize

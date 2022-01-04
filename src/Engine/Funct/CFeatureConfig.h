@@ -14,7 +14,7 @@ class CFeatureConfig
 {
 public:
 	CFeatureConfig();
-	~CFeatureConfig();
+	virtual ~CFeatureConfig();
 	
 	virtual void SetFeatureRootFolderPath(CSlrString *path);
 	virtual void InitConfig(const char *featureName);

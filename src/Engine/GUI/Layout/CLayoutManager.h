@@ -16,7 +16,7 @@ class CLayoutData
 public:
 	CLayoutData();
 	CLayoutData(const char *layoutName, CByteBuffer *serializedLayout, bool doNotUpdateViewsPosition, CSlrKeyboardShortcut *keyShortcut);
-	~CLayoutData();
+	virtual ~CLayoutData();
 	
 	char *layoutName;
 	bool doNotUpdateViewsPositions;	// shall we always save views position on layout change, or not (i.e. always restore original positions)

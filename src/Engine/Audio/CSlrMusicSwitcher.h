@@ -15,7 +15,7 @@ class CSlrMusicSwitcher : public CGlobalLogicCallback
 {
 public:
 	CSlrMusicSwitcher();	//CSlrMusicPlayerCallback *callback
-	~CSlrMusicSwitcher();
+	virtual ~CSlrMusicSwitcher();
 
 	CSlrMusicFile *prevMusic;
 	CSlrMusicFile *currentMusic;

@@ -17,7 +17,7 @@ class CSlrTexture
 {
 public:
 	CSlrTexture(CSlrImage *image, float startPosX, float startPosY, float endPosX, float endPosY);
-	~CSlrTexture();
+	virtual ~CSlrTexture();
 
 	float startPosX;
 	float startPosY;

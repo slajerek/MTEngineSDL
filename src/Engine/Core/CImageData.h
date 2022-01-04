@@ -61,7 +61,7 @@ public:
 	CImageData(int width, int height, u8 type, bool allocTemp, bool allocResult);
 	CImageData(int width, int height, u8 type, u8 *data);
 	CImageData(CImageData *src);
-	~CImageData();
+	virtual ~CImageData();
 
 #ifdef USE_BUFFER_OFFSETS
 	CBufferOffsets *bufferOffsets;

@@ -30,7 +30,7 @@ class CAudioChannelMusicPlayer : public CAudioChannel
 {
 public:
 	CAudioChannelMusicPlayer();
-	~CAudioChannelMusicPlayer();
+	virtual ~CAudioChannelMusicPlayer();
 	
 	// overwrites buffer
 	virtual void Mix(int *mixBuffer, u32 numSamples);

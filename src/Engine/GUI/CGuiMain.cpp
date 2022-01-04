@@ -100,13 +100,20 @@ CGuiMain::CGuiMain()
 
 	viewResourceManager = NULL;
 	layoutForThisFrame = NULL;
+	layoutStoreOrRestore = true;
 	layoutJustRestored = false;
 	layoutStoreCurrentInSettings = false;
-	
+
 	messageBoxTitle = NULL;
 	messageBoxText = NULL;
 	beginMessageBoxPopup = false;
-
+	
+	currentLayoutBeforeFullScreen = NULL;
+	temporaryLayoutToGoBackFromFullScreen = new CLayoutData();
+	viewFullScreen = NULL;
+	appWasFullScreenBeforeViewFullScreen = false;
+	isChangingFullScreenState = false;
+	
 	keyboardShortcuts = new CSlrKeyboardShortcuts();
 
 	mouseScrollWheelScaleX = 1.0f;
@@ -502,7 +509,7 @@ bool CGuiMain::KeyUp(u32 keyCode)
 	if (this->focusElement)
 	{
 		// consumed?
-		LOGD("keyUp focusElement=%s", this->focusElement->name);
+//		LOGI("keyUp focusElement=%s", this->focusElement->name);
 		if (this->focusElement->KeyUp(keyCode, isShiftPressed, isAltPressed, isControlPressed, isSuperPressed))
 		{
 			return true;
@@ -697,9 +704,6 @@ bool CGuiMain::DoFinishTap(float x, float y)
 
 	return false;
 }
-
-
-
 
 bool CGuiMain::DoRightClick(float x, float y)
 {
@@ -1168,6 +1172,7 @@ void CGuiMain::RenderImGui()
 			}
 
 			this->DeserializeLayout(layoutForThisFrame->serializedLayoutBuffer);
+			
 			layoutManager->currentLayout = layoutForThisFrame;
 			layoutForThisFrame = NULL;
 			layoutJustRestored = true;
@@ -1204,6 +1209,11 @@ void CGuiMain::RenderImGui()
 		}
 		ImGui::PopStyleVar();
 	}
+}
+
+void CGuiMain::PostRenderEndFrame()
+{
+//	LOGD("CGuiMain::PostRenderEndFrame");
 	
 	// check UI tasks
 	uiThreadTasksMutex->Lock();
@@ -1214,7 +1224,10 @@ void CGuiMain::RenderImGui()
 		taskCallback->RunUIThreadTask();
 	}
 	uiThreadTasksMutex->Unlock();
+
+//	LOGD("CGuiMain::PostRenderEndFrame DONE");
 }
+
 
 void CGuiMain::StoreLayoutInSettingsAtEndOfThisFrame()
 {
@@ -1330,6 +1343,11 @@ void CGuiMain::NotifyGlobalDropFileCallbacks(char *filePath, bool consumedByView
 	}
 }
 
+void CGuiMain::CreateUiFontsTexture()
+{
+	ImGui_ImplOpenGL3_CreateFontsTexture();
+}
+
 //
 
 bool CGlobalKeyboardCallback::GlobalKeyDownCallback(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper)
@@ -1411,7 +1429,12 @@ CUiThreadTaskSetMouseCursorVisible::CUiThreadTaskSetMouseCursorVisible(bool mous
 	
 void CUiThreadTaskSetMouseCursorVisible::RunUIThreadTask()
 {
-//	LOGD(" CUiThreadTaskSetMouseCursorVisible::RunUIThreadTask");
+	LOGD(" CUiThreadTaskSetMouseCursorVisible::RunUIThreadTask: VID_IsMouseCursorVisible=%d, set=%d", VID_IsMouseCursorVisible(), mouseCursorVisible);
+	if (VID_IsMouseCursorVisible() == mouseCursorVisible)
+	{
+		return;
+	}
+	
 	if (mouseCursorVisible)
 	{
 		VID_ShowMouseCursor();
@@ -1422,16 +1445,6 @@ void CUiThreadTaskSetMouseCursorVisible::RunUIThreadTask()
 	}
 	
 	guiMain->isMouseCursorVisible = mouseCursorVisible;
-}
-
-CUiThreadTaskSetFullScreen::CUiThreadTaskSetFullScreen(bool isFullScreen)
-{
-	this->isFullScreen = isFullScreen;
-}
-	
-void CUiThreadTaskSetFullScreen::RunUIThreadTask()
-{
-	// TODO: VID_SetWindowFullScreen(isFullScreen);
 }
 
 CUiThreadTaskSetAlwaysOnTop::CUiThreadTaskSetAlwaysOnTop(bool isAlwaysOnTop)
@@ -1451,12 +1464,23 @@ void CGuiMain::SetFocus(CGuiElement *element)
 
 void CGuiMain::SetMouseCursorVisible(bool isVisible)
 {
-//	LOGTODO("CGuiMain::SetMouseCursorVisible NOT IMPLEMENTED");
+	CUiThreadTaskSetMouseCursorVisible *task = new CUiThreadTaskSetMouseCursorVisible(isVisible);
+	AddUiThreadTask(task);
+}
+
+bool CGuiMain::IsMouseCursorVisible()
+{
+	return VID_IsMouseCursorVisible();
+}
+
+bool CGuiMain::IsApplicationWindowFullScreen()
+{
+	return VID_IsMainApplicationWindowFullScreen();
 }
 
 void CGuiMain::SetApplicationWindowFullScreen(bool isFullScreen)
 {
-	LOGTODO("CGuiMain::SetApplicationWindowFullScreen NOT IMPLEMENTED");
+	VID_SetMainApplicationWindowFullScreen(isFullScreen);
 }
 
 void CGuiMain::SetApplicationWindowAlwaysOnTop(bool alwaysOnTop)
@@ -1468,3 +1492,147 @@ void CGuiMain::RemoveAllViews()
 {
 	LOGTODO("CGuiMain::RemoveAllViews NOT IMPLEMENTED");
 }
+
+// TODO: fullscreen: there may be a situation that layout was not stored and async task loop was started between render unlock and renderPostEndFrame. check on other platforms. remove debug logs when it is confirmed working
+
+// go fullscreen with one view (for example emulator screen), or get back to windowed mode when view is NULL
+void CGuiMain::SetViewFullScreen(CGuiView *view)
+{
+	SetViewFullScreen(view, view ? view->sizeX : 0, view ? view->sizeY : 0);
+}
+
+void CGuiMain::SetViewFullScreen(CGuiView *view, float fullScreenSizeX, float fullScreenSizeY)
+{
+	LOGD("CGuiMain::SetViewFullScreen: view=%s", view ? view->name : "NULL");
+
+	if (view != NULL)
+	{
+		if (IsViewFullScreen())
+		{
+			LOGError("CGuiMain::SetViewFullScreen: %s is already fullscreen", view->name);
+			return;
+		}
+		
+		if (currentLayoutBeforeFullScreen != NULL)
+		{
+			LOGError("CGuiMain::SetViewFullScreen: currentLayoutBeforeFullScreen != NULL");
+			return;
+		}
+		
+		guiMain->LockMutex();
+		
+		isChangingFullScreenState = true;
+		
+		// when going full screen a layout is saved and restored when going back to windowed mode.
+		// because currentLayout may have doNotUpdateViewsPositions we make a temporary copy
+		// this is backup of currentLayout (may have the doNotUpdateViewsPositions set to true)
+		currentLayoutBeforeFullScreen = layoutManager->currentLayout;
+		layoutManager->currentLayout = NULL;
+		
+		// create a temporary layout to hold views to go back to windowed mode
+		layoutForThisFrame = temporaryLayoutToGoBackFromFullScreen;
+		layoutStoreOrRestore = true;	// store
+		
+		// note, the fullscreen mode will be started after layout is stored in async task
+		CUiThreadTaskSetViewFullScreen *task = new CUiThreadTaskSetViewFullScreen(view, fullScreenSizeX, fullScreenSizeY);
+		AddUiThreadTask(task);
+				
+		guiMain->UnlockMutex();
+	}
+	else
+	{
+		// go back to windowed mode
+		if (temporaryLayoutToGoBackFromFullScreen == NULL)
+		{
+			LOGError("CGuiMain::SetViewFullScreen: temporaryLayoutToGoBackFromFullScreen == NULL");
+			return;
+		}
+		
+		guiMain->LockMutex();
+
+		layoutForThisFrame = temporaryLayoutToGoBackFromFullScreen;
+		layoutStoreOrRestore = false;	// restore
+		
+		// note, the window mode will be restored after layout is restored in async task
+		CUiThreadTaskSetViewFullScreen *task = new CUiThreadTaskSetViewFullScreen(NULL, 0, 0);
+		AddUiThreadTask(task);
+		
+		guiMain->UnlockMutex();
+	}
+}
+
+bool CGuiMain::IsViewFullScreen()
+{
+	return (viewFullScreen != NULL) || isChangingFullScreenState;
+}
+
+CUiThreadTaskSetViewFullScreen::CUiThreadTaskSetViewFullScreen(CGuiView *view, float fullScreenSizeX, float fullScreenSizeY)
+{
+	this->view = view;
+	this->fullScreenSizeX = fullScreenSizeX;
+	this->fullScreenSizeY = fullScreenSizeY;
+}
+	
+void CUiThreadTaskSetViewFullScreen::RunUIThreadTask()
+{
+	LOGD("CUiThreadTaskSetViewFullScreen::RunUIThreadTask");
+	
+	//
+	if (view != NULL)
+	{
+		// go fullscreen
+		
+		LOGD("CUiThreadTaskSetViewFullScreen: fullscreen, view=%s", view->name);
+
+		guiMain->viewFullScreen = view;
+		view->visible = true;
+		view->SetFullScreenViewSize(fullScreenSizeX, fullScreenSizeY);
+		
+		// make all other views invisible
+		for (std::list<CGuiView *>::iterator it = guiMain->views.begin(); it != guiMain->views.end(); it++)
+		{
+			CGuiView *itView = *it;
+			if (itView == view)
+			{
+				continue;
+			}
+			itView->SetVisible(false);
+		}
+				
+		// note, the fullscreen mode is started after frame has been rendered and layout stored
+		if (VID_IsMainApplicationWindowFullScreen())
+		{
+			LOGD("set appWasFullScreenBeforeViewFullScreen true");
+			// main window is already in fullscreen
+			guiMain->appWasFullScreenBeforeViewFullScreen = true;
+		}
+		else
+		{
+			LOGD("set appWasFullScreenBeforeViewFullScreen false, go fullscreen");
+			guiMain->appWasFullScreenBeforeViewFullScreen = false;
+
+			VID_SetMainApplicationWindowFullScreen(true);
+		}
+	}
+	else
+	{
+		LOGD("CUiThreadTaskSetViewFullScreen: to back to windowed");
+		
+		if (guiMain->appWasFullScreenBeforeViewFullScreen == false)
+		{
+			LOGD("appWasFullScreenBeforeViewFullScreen is false, go to window");
+			
+			// the fullscreen mode is stopped before layout is restored
+			VID_SetMainApplicationWindowFullScreen(false);
+		}
+		
+		LOGD(".......... in PostRenderEndFrame set BACK currentLayout to currentLayoutBeforeFullScreen");
+
+		guiMain->layoutManager->currentLayout = guiMain->currentLayoutBeforeFullScreen;
+		guiMain->currentLayoutBeforeFullScreen = NULL;
+				
+		guiMain->viewFullScreen = NULL;
+		guiMain->isChangingFullScreenState = false;
+	}
+}
+

@@ -53,9 +53,12 @@ void CGuiView::Init(const char *name, float posX, float posY, float posZ, float 
 
 	previousPosX = -1;
 	previousPosY = -1;
-
+	
 	SetWindowPositionAndSize(posX, posY, sizeX, sizeY);
 	//mousePosX = mousePosY = -1;
+	
+	fullScreenSizeX = -1;
+	fullScreenSizeY = -1;
 }
 
 
@@ -1126,32 +1129,89 @@ void CGuiView::RenderImGui()
 	}
 }
 
+void CGuiView::SetFullScreenViewSize(float sx, float sy)
+{
+	this->fullScreenSizeX = sx;
+	this->fullScreenSizeY = sy;
+}
+
 void CGuiView::PreRenderImGui()
 {
 	ImGuiContext& g = *GImGui;
-		
-	// setup startup parameters of this window
-	ImGui::SetNextWindowPos(ImGui::GetMainViewport()->Pos + ImVec2(this->posX, this->posY), ImGuiCond_FirstUseEver);
-	ImGui::SetNextWindowSize(ImVec2(this->sizeX, this->sizeY), ImGuiCond_FirstUseEver);
-
-	// should we keep aspect ratio?
-	// Note, below is workaround for imGuiWindowKeepAspectRatio bug. without this makes the window resize/wobbly during move
-	if (imGuiWindowKeepAspectRatio)
+	
+	bool isFullScreen = (guiMain->viewFullScreen == this);
+	
+	if (isFullScreen)
 	{
-//		LOGD("imGuiWindowKeepAspectRatio: name=%s", this->name);
+		// fullscreen
+		ImGuiViewport* viewport = ImGui::GetMainViewport();
 		
-		// window is being moved?
-		if (previousPosX != this->posX || previousPosY != this->posY
-			|| guiMain->layoutJustRestored)
+		ImVec2 realFullScreenPos;	// = viewport->WorkPos;
+		ImVec2 realFullScreenSize;	// = viewport->WorkSize;
+		
+		float vW = (float) viewport->WorkSize.x;
+		float vH = (float) viewport->WorkSize.y;
+		float A = (float) imGuiWindowKeepAspectRatio ? imGuiWindowAspectRatio : this->fullScreenSizeX / (float) this->fullScreenSizeY;
+		float vA = (vW / vH);
+
+		if (A > vA)
 		{
-			// do not set constraint on window move
-			previousPosX = this->posX;
-			previousPosY = this->posY;
+			realFullScreenPos.x = 0;
+			realFullScreenPos.y = (vH * 0.5) - ((vW / A) * 0.5);
+			realFullScreenSize.x = vW;
+			realFullScreenSize.y = (vW / A);
 		}
 		else
 		{
-			ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(FLT_MAX, FLT_MAX),
-												ImGuiWindowSizeConstraints::KeepContentAspect, (void*)&imGuiWindowAspectRatio);
+			if (A < vA)
+			{
+				realFullScreenPos.x = (vW * 0.5) - ((vH * A) * 0.5);
+				realFullScreenPos.y = 0;
+				realFullScreenSize.x = (vH * A);
+				realFullScreenSize.y = vH;
+			}
+			else
+			{
+				realFullScreenPos.x = 0;
+				realFullScreenPos.y = 0;
+				realFullScreenSize.x = vW;
+				realFullScreenSize.y = vH;
+			}
+		}
+
+		ImGui::SetNextWindowPos(realFullScreenPos);
+		ImGui::SetNextWindowSize(realFullScreenSize);
+		ImGui::SetNextWindowViewport(viewport->ID);
+		
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+		
+	}
+	else
+	{
+		// not fullscreen, setup startup parameters of this window
+		ImGui::SetNextWindowPos(ImGui::GetMainViewport()->Pos + ImVec2(this->posX, this->posY), ImGuiCond_FirstUseEver);
+		ImGui::SetNextWindowSize(ImVec2(this->sizeX, this->sizeY), ImGuiCond_FirstUseEver);
+		
+		// should we keep aspect ratio?
+		// Note, below is workaround for imGuiWindowKeepAspectRatio bug. without this makes the window resize/wobbly during move
+//		LOGD("imGuiWindowKeepAspectRatio: name=%s", this->name);
+		
+		if (imGuiWindowKeepAspectRatio)
+		{
+			// window is being moved?
+			if (previousPosX != this->posX || previousPosY != this->posY
+				|| guiMain->layoutJustRestored)
+			{
+				// do not set constraint on window move
+				previousPosX = this->posX;
+				previousPosY = this->posY;
+			}
+			else
+			{
+				ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(FLT_MAX, FLT_MAX),
+													ImGuiWindowSizeConstraints::KeepContentAspect, (void*)&imGuiWindowAspectRatio);
+			}
 		}
 	}
 
@@ -1162,17 +1222,19 @@ void CGuiView::PreRenderImGui()
 
 	if (imGuiNoScrollbar)
 	{
-		ImGui::Begin(this->name, &(this->visible), ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+		ImGui::Begin(this->name, &(this->visible), ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse
+					 | (isFullScreen ? ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoResize : 0));
 	}
 	else
 	{
-		ImGui::Begin(this->name, &(this->visible));
+		ImGui::Begin(this->name, &(this->visible), (isFullScreen ? ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoResize : 0));
 	}
 
 	ImGuiWindow* window = ImGui::GetCurrentWindow();
 	
 	// remember me
 	window->userData = this;
+	this->imGuiWindow = window;
 
 	// InnerRect is window size without decorations and scrollbars
 	float sx = window->InnerRect.GetSize().x-1;
@@ -1211,6 +1273,13 @@ void CGuiView::PostRenderImGui()
 	}
 		
 	ImGui::End();
+	
+	bool isFullScreen = (guiMain->viewFullScreen != NULL);
+
+	if (isFullScreen)
+	{
+		ImGui::PopStyleVar(2);
+	}
 }
 
 bool CGuiView::HasContextMenuItems()

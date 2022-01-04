@@ -27,6 +27,8 @@ class CUiThreadTaskCallback
 public:
 	CUiThreadTaskCallback();
 	void *uiThreadTaskUserData;
+	
+	// warning: the render mutex is unlocked!
 	virtual void RunUIThreadTask();
 };
 
@@ -162,9 +164,37 @@ public:
 	CSlrMutex *uiThreadTasksMutex;
 	void AddUiThreadTask(CUiThreadTaskCallback *taskCallback);
 	
+	//
+	void CreateUiFontsTexture();
+	
+	// when going full screen a layout is saved and restored when going back to windowed mode.
+	// because currentLayout may have doNotUpdateViewsPositions we make a temporary copy
+	CLayoutData *temporaryLayoutToGoBackFromFullScreen;
+	
+	// this is backup of currentLayout (may have the doNotUpdateViewsPositions set to true)
+	CLayoutData *currentLayoutBeforeFullScreen;
+
+	// view that is now full screen (NULL=windowed mode)
+	CGuiView *viewFullScreen;
+	
+	bool appWasFullScreenBeforeViewFullScreen;
+	
+	bool isChangingFullScreenState;
+
+	// go full screen
+	void SetViewFullScreen(CGuiView *view, float fullScreenSizeX, float fullScreenSizeY);
+	void SetViewFullScreen(CGuiView *view);
+	bool IsViewFullScreen();
+	
+	//
 	void SetApplicationWindowAlwaysOnTop(bool alwaysOnTop);
+	
+	bool IsApplicationWindowFullScreen();
 	void SetApplicationWindowFullScreen(bool isFullScreen);
+	
+	bool IsMouseCursorVisible();
 	void SetMouseCursorVisible(bool isVisible);
+	
 	void SetFocus(CGuiElement *element);
 	
 	//
@@ -185,6 +215,7 @@ public:
 	
 	//
 	void RenderImGui();
+	void PostRenderEndFrame();
 
 	//
 	void LockMutex();
@@ -226,12 +257,13 @@ public:
 	virtual void RunUIThreadTask();
 };
 
-class CUiThreadTaskSetFullScreen : public CUiThreadTaskCallback
+class CUiThreadTaskSetViewFullScreen : public CUiThreadTaskCallback
 {
 public:
-	CUiThreadTaskSetFullScreen(bool isFullScreen);
+	CUiThreadTaskSetViewFullScreen(CGuiView *view, float fullScreenSizeX, float fullScreenSizeY);
 	
-	bool isFullScreen;
+	CGuiView *view;
+	float fullScreenSizeX, fullScreenSizeY;
 	virtual void RunUIThreadTask();
 };
 
@@ -241,6 +273,13 @@ public:
 	CUiThreadTaskSetAlwaysOnTop(bool isAlwaysOnTop);
 	
 	bool isAlwaysOnTop;
+	virtual void RunUIThreadTask();
+};
+
+class CUiThreadTaskRecreateUiFonts : public CUiThreadTaskCallback
+{
+public:
+	CUiThreadTaskRecreateUiFonts();
 	virtual void RunUIThreadTask();
 };
 

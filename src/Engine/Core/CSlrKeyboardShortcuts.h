@@ -16,7 +16,7 @@ class CSlrKeyboardShortcut
 public:
 	CSlrKeyboardShortcut(CByteBuffer *serializedBuffer, CSlrKeyboardShortcutCallback *callback);
 	CSlrKeyboardShortcut(u32 zone, const char *name, i32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper, CSlrKeyboardShortcutCallback *callback);
-	~CSlrKeyboardShortcut();
+	virtual ~CSlrKeyboardShortcut();
 
 	u32 zone;
 	char *name;

@@ -228,27 +228,27 @@ void CSlrFontProportional::StoreFontDataToByteBuffer(CByteBuffer *byteBuffer, u8
 	
 	byteBuffer->PutByte(proportionalFontType);
 	
-	LOGD("lineHeight=%d", this->lineHeight);
+//	LOGD("lineHeight=%d", this->lineHeight);
 	byteBuffer->putShort(this->lineHeight);
 	byteBuffer->putShort(this->base);
 	byteBuffer->putShort(this->width);
 	byteBuffer->putShort(this->height);
 	byteBuffer->putShort(this->pages);
 	byteBuffer->putShort(this->outline);
-	LOGD("KernCount=%d", this->kerning.size());
+//	LOGD("KernCount=%d", this->kerning.size());
 	byteBuffer->putShort(this->kerning.size());
 	
 	for (std::vector<KerningInfo *>::iterator it = this->kerning.begin(); it != this->kerning.end(); it++)
 	{
 		KerningInfo *kerningInfo = *it;
-		LOGD("%d %d %d", kerningInfo->first, kerningInfo->second, kerningInfo->amount);
+//		LOGD("%d %d %d", kerningInfo->first, kerningInfo->second, kerningInfo->amount);
 		byteBuffer->putShort(kerningInfo->first);
 		byteBuffer->putShort(kerningInfo->second);
 		byteBuffer->putShort(kerningInfo->amount);
 	}
 	
 	byteBuffer->putShort(this->chars.size());
-	LOGD("Chars.size=%d", this->chars.size());
+//	LOGD("Chars.size=%d", this->chars.size());
 	for (std::map<int, CharDescriptor *>::iterator it = this->chars.begin(); it != chars.end(); it++)
 	{
 		CharDescriptor *ch = (*it).second;
@@ -265,7 +265,7 @@ void CSlrFontProportional::StoreFontDataToByteBuffer(CByteBuffer *byteBuffer, u8
 		byteBuffer->putShort(ch->xAdvance);
 		byteBuffer->putShort(ch->page);
 		
-		LOGD("chVal=%d | %d %d %d %d %d %d %d %d", chVal, ch->x, ch->y, ch->width, ch->height, ch->xOffset, ch->yOffset, ch->xAdvance, ch->page);
+//		LOGD("chVal=%d | %d %d %d %d %d %d %d %d", chVal, ch->x, ch->y, ch->width, ch->height, ch->xOffset, ch->yOffset, ch->xAdvance, ch->page);
 	}
 }
 

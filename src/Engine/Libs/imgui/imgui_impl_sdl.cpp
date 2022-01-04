@@ -104,12 +104,6 @@ static ImGui_ImplSDL2_Data* ImGui_ImplSDL2_GetBackendData()
     return ImGui::GetCurrentContext() ? (ImGui_ImplSDL2_Data*)ImGui::GetIO().BackendPlatformUserData : NULL;
 }
 
-SDL_Window* imgui_impl_sdl_get_main_window()
-{
-	ImGui_ImplSDL2_Data *data = ImGui_ImplSDL2_GetBackendData();
-	return data->Window;
-}
-
 // Forward Declarations
 static void ImGui_ImplSDL2_UpdateMonitors();
 static void ImGui_ImplSDL2_InitPlatformInterface(SDL_Window* window, void* sdl_gl_context);

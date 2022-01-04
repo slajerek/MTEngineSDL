@@ -5,6 +5,7 @@
 #include "VID_Blits.h"
 #include "VID_ImageBinding.h"
 #include <GL/gl3w.h>
+#include <SDL.h>
 
 extern int SCREEN_WIDTH;
 extern int SCREEN_HEIGHT;
@@ -27,6 +28,7 @@ extern int SCREEN_TICK_PER_FRAME;
 void VID_Init();
 const char *VID_GetGlSlVersion();
 void VID_SetupShaders();
+SDL_Window *VID_GetMainSDLWindow();
 void VID_RenderLoop();
 void VID_StopEventsLoop();
 void VID_Shutdown();
@@ -40,7 +42,10 @@ bool VID_IsWindowAlwaysOnTop();
 void VID_SetWindowAlwaysOnTop(bool isOnTop);
 void VID_SetWindowAlwaysOnTopTemporary(bool isOnTop);
 
-bool VID_IsWindowFullScreen();
+bool VID_IsMainApplicationWindowFullScreen();
+void VID_SetMainApplicationWindowFullScreen(bool isFullScreen);
+
+bool VID_IsMouseCursorVisible();
 void VID_ShowMouseCursor();
 void VID_HideMouseCursor();
 

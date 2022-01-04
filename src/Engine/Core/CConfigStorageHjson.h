@@ -10,7 +10,7 @@ class CConfigStorageHjson
 {
 public:
 	CConfigStorageHjson(const char *configFileName);
-	~CConfigStorageHjson();
+	virtual ~CConfigStorageHjson();
 	
 	CSlrString *configFileName;
 	

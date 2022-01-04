@@ -34,7 +34,7 @@ public:
 #if defined(IOS)
 	CSlrString(NSString *nsString);
 #endif
-	~CSlrString();
+	virtual ~CSlrString();
 
 	void Serialize(CByteBuffer *byteBuffer);
 	void Deserialize(CByteBuffer *byteBuffer);

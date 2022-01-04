@@ -8,7 +8,7 @@ class CGuiViewMovingPane : public CGuiView
 {
 public:
 	CGuiViewMovingPane(float posX, float posY, float posZ, float sizeX, float sizeY);
-	~CGuiViewMovingPane();
+	virtual ~CGuiViewMovingPane();
 	
 	virtual void SetPosition(float posX, float posY, float posZ, float sizeX, float sizeY);
 
