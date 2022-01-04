@@ -13,6 +13,7 @@
 #include "CGuiElement.h"
 #include "CSlrImage.h"
 #include "SYS_Main.h"
+#include "GUI_Main.h"
 
 class CLayoutParameter;
 
@@ -148,6 +149,8 @@ public:
 		
 	virtual void InitImGuiView(const char *name);
 	
+	ImGuiWindow *imGuiWindow;
+	
 	bool imGuiWindowSkipFocusCheck;
 	bool imGuiNoWindowPadding;
 	bool imGuiNoScrollbar;
@@ -193,6 +196,9 @@ public:
 	float windowPosX, windowPosY;
 	float windowSizeX, windowSizeY;
 	float windowPosEndX, windowPosEndY;
+	
+	float fullScreenSizeX, fullScreenSizeY;
+	void SetFullScreenViewSize(float sx, float sy);
 	
 private:
 	float previousZ;

@@ -112,13 +112,11 @@ DWORD windowShowCmd, windowLeft, windowRight, windowTop, windowBottom;
 int windowWidth;
 int windowHeight;
 
-SDL_Window* imgui_impl_sdl_get_main_window();
-
 void VID_StoreMainWindowPosition()
 {
 	//LOGD("VID_StoreMainWindowPosition");
 	
-	SDL_Window* sdlWindow = imgui_impl_sdl_get_main_window();
+	SDL_Window* sdlWindow = VID_GetMainSDLWindow();
 	
 	char* DEFAULT_REG_KEY = SYS_GetCharBuf();
 	sprintf(DEFAULT_REG_KEY, "SOFTWARE\\%s", MT_GetSettingsFolderName());
@@ -155,7 +153,7 @@ void VID_GetStartupMainWindowPosition(int* x, int* y, int* width, int* height)
 	SCREEN_WIDTH = *width;
 	SCREEN_HEIGHT = *height;
 
-	SDL_Window* sdlWindow = imgui_impl_sdl_get_main_window();
+	SDL_Window* sdlWindow = VID_GetMainSDLWindow();
 
 	char* DEFAULT_REG_KEY = SYS_GetCharBuf();
 	sprintf(DEFAULT_REG_KEY, "SOFTWARE\\%s", MT_GetSettingsFolderName());
@@ -235,3 +233,36 @@ extern "C" {
   __declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
 }
 */
+
+// fix for broken SDL_ShowCursor
+static volatile bool VID_isMouseCursorVisible = true;
+void VID_ShowMouseCursor()
+{
+        ShowCursor(TRUE);
+        VID_isMouseCursorVisible = true;
+}
+
+void VID_HideMouseCursor()
+{
+        LOGD("VID_HideMouseCursor");
+
+        // rule #1: don't ever trust microsoft
+        //while(ShowCursor(FALSE)>=0);
+
+        for (int i = 0; i < 1000; i++)
+        {
+                int result = ShowCursor(FALSE);
+                LOGD("ShowCursor(FALSE): result=%d", result);
+                if (result < 0)
+                        break;
+        }
+        
+        VID_isMouseCursorVisible = false;
+        LOGD("VID_HideMouseCursor finished");
+}
+
+bool VID_IsMouseCursorVisible()
+{
+	return VID_isMouseCursorVisible;
+}
+

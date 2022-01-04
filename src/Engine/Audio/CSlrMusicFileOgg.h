@@ -13,7 +13,7 @@ public:
 	CSlrMusicFileOgg();
 	CSlrMusicFileOgg(const char *fileName, bool seekable, bool fromResources);
 	CSlrMusicFileOgg(CSlrFile *file, bool seekable);
-	~CSlrMusicFileOgg();
+	virtual ~CSlrMusicFileOgg();
 
 	bool Init(const char *fileName, bool seekable, bool fromResources);
 	bool Init(CSlrFile *file, bool seekable);

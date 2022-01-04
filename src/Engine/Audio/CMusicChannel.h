@@ -8,7 +8,7 @@ class CMusicChannel : public CAudioChannel
 {
 public:
 	CMusicChannel(CSlrMusicFile *musicFile);
-	~CMusicChannel();
+	virtual ~CMusicChannel();
 
 	// overwrites buffer
 	virtual void Mix(int *mixBuffer, u32 numSamples);

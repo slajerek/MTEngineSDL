@@ -53,16 +53,13 @@ void CGuiViewConsole::SetLineHeight(float height)
 
 void CGuiViewConsole::SetFontScale(float fontScale)
 {
-	LOGD("CGuiViewConsole::SetFontScale: %f", fontScale);
+//	LOGD("CGuiViewConsole::SetFontScale: %f", fontScale);
 	this->fontScale = fontScale;
 
 	promptWidth = this->font->GetTextWidth(this->prompt, fontScale);
 	lineHeight = font->GetCharHeight('@', fontScale); // * 8.0f;
-	LOGD("lineHeight=%f", lineHeight);
 	
 	this->SetNumLines(floor( ((float)sizeY / (float)lineHeight) - 1.5f) );
-
-	LOGD("DONE");
 }
 
 void CGuiViewConsole::SetNumLines(int numLines)

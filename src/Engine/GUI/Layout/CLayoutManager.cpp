@@ -71,10 +71,17 @@ void CLayoutManager::AddLayout(CLayoutData *layoutData)
 
 void CLayoutManager::RemoveLayout(CLayoutData *layoutData)
 {
+	if (currentLayout == layoutData)
+	{
+		currentLayout = NULL;
+	}
+	
 	layouts.remove(layoutData);
 
 	u64 hash = GetHashCode64(layoutData->layoutName);
 	layoutsByHash.erase(hash);
+	
+	delete layoutData;
 }
 
 void CLayoutManager::DeleteAllLayouts()

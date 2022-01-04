@@ -28,7 +28,7 @@ class CRecentlyOpenedFiles
 {
 public:
 	CRecentlyOpenedFiles(CSlrString *settingsFileName, CRecentlyOpenedFilesCallback *callback);
-	~CRecentlyOpenedFiles();
+	virtual ~CRecentlyOpenedFiles();
 	
 	CSlrString *settingsFileName;
 	CRecentlyOpenedFilesCallback *callback;

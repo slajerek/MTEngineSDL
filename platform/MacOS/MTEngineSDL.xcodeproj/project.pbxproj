@@ -22,8 +22,6 @@
 		410CB04F2397A62E009DA199 /* AudioToolbox.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 41E691DE238D947700B33E68 /* AudioToolbox.framework */; };
 		4110F6FB239FA2D300C478B8 /* CGuiMain.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4110F6F9239FA2D300C478B8 /* CGuiMain.cpp */; };
 		4110F6FC239FA2D300C478B8 /* CGuiMain.h in Headers */ = {isa = PBXBuildFile; fileRef = 4110F6FA239FA2D300C478B8 /* CGuiMain.h */; };
-		4113CE8F25F7F4A800FB1236 /* imgui_freetype.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4113CE8B25F7F39C00FB1236 /* imgui_freetype.cpp */; };
-		4113CE9025F7F4A800FB1236 /* imgui_freetype.h in Sources */ = {isa = PBXBuildFile; fileRef = 4113CE8A25F7F39C00FB1236 /* imgui_freetype.h */; };
 		4116AFBD263AB895001477AD /* CLayoutParameter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4116AFB9263AB894001477AD /* CLayoutParameter.cpp */; };
 		4116AFBE263AB895001477AD /* CLayoutManager.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4116AFBA263AB894001477AD /* CLayoutManager.cpp */; };
 		4116AFBF263AB895001477AD /* CLayoutManager.h in Headers */ = {isa = PBXBuildFile; fileRef = 4116AFBB263AB894001477AD /* CLayoutManager.h */; };
@@ -307,7 +305,7 @@
 		41BB0A08239CBC800035DB9F /* utf8_unchecked.h in Headers */ = {isa = PBXBuildFile; fileRef = 41BB0A04239CBC800035DB9F /* utf8_unchecked.h */; };
 		41BB0A09239CBC800035DB9F /* utf8.h in Headers */ = {isa = PBXBuildFile; fileRef = 41BB0A05239CBC800035DB9F /* utf8.h */; };
 		41BBDFAF26BFED5F006ADD98 /* CFeatureConfig.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 41BBDFAD26BFEA7B006ADD98 /* CFeatureConfig.cpp */; };
-		41C650A32651B798003A405E /* SYS_Platform.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 41C650A12651B798003A405E /* SYS_Platform.cpp */; };
+		41C650A32651B798003A405E /* SYS_Platform.mm in Sources */ = {isa = PBXBuildFile; fileRef = 41C650A12651B798003A405E /* SYS_Platform.mm */; };
 		41C650A42651B798003A405E /* SYS_Platform.h in Headers */ = {isa = PBXBuildFile; fileRef = 41C650A22651B798003A405E /* SYS_Platform.h */; };
 		41CD448B25AF12F30029C2C7 /* imgui_tables.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 412791DD25AF0EAD005F448A /* imgui_tables.cpp */; };
 		41CEFE4E23A53D290036A52D /* CSlrImage.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 41CEFE4C23A53D290036A52D /* CSlrImage.cpp */; };
@@ -535,8 +533,6 @@
 		410CAEF12397A470009DA199 /* libMTEngineSDL.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libMTEngineSDL.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		4110F6F9239FA2D300C478B8 /* CGuiMain.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CGuiMain.cpp; path = GUI/CGuiMain.cpp; sourceTree = "<group>"; };
 		4110F6FA239FA2D300C478B8 /* CGuiMain.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CGuiMain.h; path = GUI/CGuiMain.h; sourceTree = "<group>"; };
-		4113CE8A25F7F39C00FB1236 /* imgui_freetype.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = imgui_freetype.h; sourceTree = "<group>"; };
-		4113CE8B25F7F39C00FB1236 /* imgui_freetype.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = imgui_freetype.cpp; sourceTree = "<group>"; };
 		4116AFB9263AB894001477AD /* CLayoutParameter.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CLayoutParameter.cpp; sourceTree = "<group>"; };
 		4116AFBA263AB894001477AD /* CLayoutManager.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CLayoutManager.cpp; sourceTree = "<group>"; };
 		4116AFBB263AB894001477AD /* CLayoutManager.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CLayoutManager.h; sourceTree = "<group>"; };
@@ -912,7 +908,7 @@
 		41BB0A05239CBC800035DB9F /* utf8.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = utf8.h; path = utf8/utf8.h; sourceTree = "<group>"; };
 		41BBDFAC26BFEA7B006ADD98 /* CFeatureConfig.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CFeatureConfig.h; sourceTree = "<group>"; };
 		41BBDFAD26BFEA7B006ADD98 /* CFeatureConfig.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = CFeatureConfig.cpp; sourceTree = "<group>"; };
-		41C650A12651B798003A405E /* SYS_Platform.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = SYS_Platform.cpp; path = src.MacOS/SYS_Platform.cpp; sourceTree = "<group>"; };
+		41C650A12651B798003A405E /* SYS_Platform.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = SYS_Platform.mm; path = src.MacOS/SYS_Platform.mm; sourceTree = "<group>"; };
 		41C650A22651B798003A405E /* SYS_Platform.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SYS_Platform.h; path = src.MacOS/SYS_Platform.h; sourceTree = "<group>"; };
 		41CEFE4C23A53D290036A52D /* CSlrImage.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CSlrImage.cpp; sourceTree = "<group>"; };
 		41CEFE4D23A53D290036A52D /* CSlrImage.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CSlrImage.h; sourceTree = "<group>"; };
@@ -1118,6 +1114,7 @@
 		41DAE4B123BA18C90011FEA9 /* SYS_MacOS.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = SYS_MacOS.mm; path = src.MacOS/SYS_MacOS.mm; sourceTree = "<group>"; };
 		41DAE4B223BA18C90011FEA9 /* SYS_Memory.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SYS_Memory.h; path = src.MacOS/SYS_Memory.h; sourceTree = "<group>"; };
 		41DAE4B323BA18C90011FEA9 /* SYS_Memory.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = SYS_Memory.mm; path = src.MacOS/SYS_Memory.mm; sourceTree = "<group>"; };
+		41DC657C2778D57100A06BCF /* TODO.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = TODO.txt; path = ../../TODO.txt; sourceTree = "<group>"; };
 		41E691DC238D945800B33E68 /* CoreAudio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreAudio.framework; path = System/Library/Frameworks/CoreAudio.framework; sourceTree = SDKROOT; };
 		41E691DE238D947700B33E68 /* AudioToolbox.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AudioToolbox.framework; path = System/Library/Frameworks/AudioToolbox.framework; sourceTree = SDKROOT; };
 		41E691E1238D94AC00B33E68 /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
@@ -1245,7 +1242,7 @@
 		415EE8B3238E91FE00C0A32A /* src.MacOS */ = {
 			isa = PBXGroup;
 			children = (
-				41C650A12651B798003A405E /* SYS_Platform.cpp */,
+				41C650A12651B798003A405E /* SYS_Platform.mm */,
 				41C650A22651B798003A405E /* SYS_Platform.h */,
 				41DAE49E23BA18C90011FEA9 /* main.mm */,
 				41DAE49D23BA18C90011FEA9 /* SYS_FileSystem.mm */,
@@ -1481,8 +1478,6 @@
 		415EE8F7238EB93800C0A32A /* imgui */ = {
 			isa = PBXGroup;
 			children = (
-				4113CE8B25F7F39C00FB1236 /* imgui_freetype.cpp */,
-				4113CE8A25F7F39C00FB1236 /* imgui_freetype.h */,
 				415EE8F8238EB93800C0A32A /* imconfig.h */,
 				415EE8F9238EB93800C0A32A /* imgui.cpp */,
 				415EE8FA238EB93800C0A32A /* imgui.h */,
@@ -1976,8 +1971,8 @@
 				41D5E300239D895F00143F1C /* FUN_CSVParser.cpp */,
 				41D5E301239D895F00143F1C /* FUN_CSVParser.h */,
 				41D5E302239D895F00143F1C /* CGuiViewDataTable.cpp */,
-				41D5E303239D895F00143F1C /* CDataTable.cpp */,
 				41D5E304239D895F00143F1C /* CGuiViewDataTable.h */,
+				41D5E303239D895F00143F1C /* CDataTable.cpp */,
 				41D5E305239D895F00143F1C /* CDataTable.h */,
 			);
 			name = DataTable;
@@ -2148,6 +2143,7 @@
 		41EEA363238D923E0078ED73 = {
 			isa = PBXGroup;
 			children = (
+				41DC657C2778D57100A06BCF /* TODO.txt */,
 				41326024239E7B850061FC82 /* MT_API.h */,
 				4129AA822397A310003E7C88 /* MT_VERSION.h */,
 				415EEAE6238ECE0900C0A32A /* Embedded */,
@@ -2449,8 +2445,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				41BBDFAF26BFED5F006ADD98 /* CFeatureConfig.cpp in Sources */,
-				4113CE8F25F7F4A800FB1236 /* imgui_freetype.cpp in Sources */,
-				4113CE9025F7F4A800FB1236 /* imgui_freetype.h in Sources */,
 				4173997A23A4E67B008764F9 /* ioapi.c in Sources */,
 				41D5E2E9239D891200143F1C /* CSlrImageTexture.cpp in Sources */,
 				41DAE4C323BA18C90011FEA9 /* CSlrFileFromResources.mm in Sources */,
@@ -2596,7 +2590,7 @@
 				4154FF992397A94700EB6387 /* rdgif.c in Sources */,
 				41D5E228239D890700143F1C /* CGuiRichTextLabel.cpp in Sources */,
 				4154FF9A2397A94700EB6387 /* rdppm.c in Sources */,
-				41C650A32651B798003A405E /* SYS_Platform.cpp in Sources */,
+				41C650A32651B798003A405E /* SYS_Platform.mm in Sources */,
 				41D5E2CB239D891200143F1C /* CContinuousParamSinHalf.cpp in Sources */,
 				4154FF9B2397A94700EB6387 /* rdrle.c in Sources */,
 				4173996D23A4E67B008764F9 /* JSONValidator.cpp in Sources */,
@@ -2760,10 +2754,10 @@
 		410CAEF32397A470009DA199 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ARCHS = "$(ARCHS_STANDARD)";
+				ARCHS = x86_64;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++17";
 				DEVELOPMENT_TEAM = APV7Y7Q9JY;
-				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
 				EXECUTABLE_PREFIX = lib;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"$(inherited)",
@@ -2786,10 +2780,10 @@
 		410CAEF42397A470009DA199 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ARCHS = "$(ARCHS_STANDARD)";
+				ARCHS = x86_64;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++17";
 				DEVELOPMENT_TEAM = APV7Y7Q9JY;
-				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
 				EXECUTABLE_PREFIX = lib;
 				GCC_PREPROCESSOR_DEFINITIONS = MACOS;
 				HEADER_SEARCH_PATHS = (

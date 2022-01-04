@@ -9,7 +9,6 @@
 #include "SYS_KeyCodes.h"
 
 #include <GL/gl3w.h>
-#include <SDL.h>
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui.h"
 #include "imgui_internal.h"
@@ -21,6 +20,7 @@
 
 void GUI_Init();
 void GUI_Render();
+void GUI_PostRenderEndFrame();
 void GUI_LockMutex();
 void GUI_UnlockMutex();
 

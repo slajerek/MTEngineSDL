@@ -49,7 +49,7 @@ public:
 	CByteBuffer(const char *filePath, uint8 fileType);
 	CByteBuffer(bool fromResources, const char *filePath, uint8 fileType);
 	CByteBuffer(bool fromResources, const char *filePath, uint8 fileType, bool readHeader);
-	~CByteBuffer();
+	virtual ~CByteBuffer();
 
 	bool error;
 

@@ -24,7 +24,7 @@ public:
 	CSlrAnimation(char *fileName, int numFrames, u8 animType, bool linearScaling);
 ///	CSlrAnimation(UTFString *fileName, int numFrames, u8 animType, bool linearScaling);
 //	CSlrAnimation(NSString *fileName, NSString *fileExt, bool linearScaling);
-	~CSlrAnimation();
+	virtual ~CSlrAnimation();
 
 	CSlrImage **frames;
 

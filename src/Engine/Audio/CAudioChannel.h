@@ -7,7 +7,7 @@ class CAudioChannel
 {
 public:
 	CAudioChannel();
-	~CAudioChannel();
+	virtual ~CAudioChannel();
 
 	char name[32];
 

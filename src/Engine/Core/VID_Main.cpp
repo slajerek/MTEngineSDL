@@ -31,12 +31,13 @@ int SCREEN_HEIGHT;
 int SCREEN_FPS = 50;
 int SCREEN_TICK_PER_FRAME = 1000 / SCREEN_FPS;
 
-//float SCREEN_SCALE;
-//float SCREEN_ASPECT_RATIO;
-
 SDL_GLContext glContext;
 SDL_Window* gMainWindow = NULL;
-//SDL_Renderer* gMainRenderer = NULL;
+
+SDL_Window *VID_GetMainSDLWindow()
+{
+	return gMainWindow;
+}
 
 //
 //https://en.wikibooks.org/wiki/OpenGL_Programming/Modern_OpenGL_Introduction
@@ -52,23 +53,6 @@ void VID_Init()
 {
 //	SCREEN_FPS = MT_GetDefaultFPS();
 
-//	const char *windowTitle = MT_GetMainWindowTitle();
-//	gMainWindow = SDL_CreateWindow( windowTitle, //"MTEngineSDL v" MT_VERSION_STRING,
-//								   SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-//								   SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_OPENGL| SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
-//	if(gMainWindow == NULL)
-//	{
-//		LOGError( "Window could not be created! %s\n", SDL_GetError() );
-//		return;
-//	}
-	
-	//	gMainRenderer = SDL_CreateRenderer(gMainWindow, -1, SDL_RENDERER_ACCELERATED);
-	//	if(gMainRenderer == NULL)
-	//	{
-	//		LOGError("Renderer could not be created! SDL Error: %s\n", SDL_GetError() );
-	//		return;
-	//	}
-	
 	const char *glslVersion = VID_GetGlSlVersion();
 	
 	LOGD("request %s", glslVersion);
@@ -87,6 +71,8 @@ void VID_Init()
 	SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
 	SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
 	gMainWindow = SDL_CreateWindow(windowTitle, x, y, width, height, window_flags);
+	
+	LOGD("gMainWindow is %x", gMainWindow);
 	
 	if (gMainWindow == NULL)
 	{
@@ -274,7 +260,16 @@ int countedLogicFrames = 0;
 void VID_Render()
 {
 //	long t1 = SYS_GetCurrentTimeInMillis();
-	ImVec4 clearColor = ImVec4(11.0f/256.0f, 34.0f/256.0f, 44.0f/255.0f, 1.0f); //0.45f, 0.55f, 0.60f, 1.00f);
+	ImVec4 clearColor;
+	
+	if (guiMain->IsViewFullScreen() == false)
+	{
+		clearColor = ImVec4(11.0f/256.0f, 34.0f/256.0f, 44.0f/255.0f, 1.0f); //0.45f, 0.55f, 0.60f, 1.00f);
+	}
+	else
+	{
+		clearColor = ImVec4(0.0f, 0.0f, 0.0f, 1.0f);
+	}
 	
 	float avgFPS = countedRenderFrames / ((SDL_GetTicks() - startTicks) / 1000.f);
 	if( avgFPS > 2000000 )
@@ -333,9 +328,7 @@ void VID_Render()
 	}
 
 	SDL_GL_SwapWindow(gMainWindow);
-	
-	//		SDL_RenderPresent(gMainRenderer);
-	
+		
 	// TODO: LOGIC & RENDER
 	countedRenderFrames += 1;
 	
@@ -354,13 +347,21 @@ void VID_Render()
 	
 //	long t2 = SYS_GetCurrentTimeInMillis();
 //	LOGD("render took %dms", t2-t1);
-	
-	MT_PostRenderEndFrame();
 }
 
-//https://stackoverflow.com/questions/34967628/sdl2-window-turns-black-on-resize
-int SDL_filterEventCallback(void *userdata, SDL_Event * event) {
-	if (event->type == SDL_WINDOWEVENT && event->window.event == SDL_WINDOWEVENT_RESIZED) {
+// TODO: VID_isChangingFullScreenState is required because SDL_filterEventCallback is called on SDL PUSH event during SDL_SetWindowFullscreen and that causes GUI_PostRenderEndFrame tasks to be run twice. This should be fixed by splitting rendering and UI async tasks loop in guiMain->PostRenderEndFrame
+bool VID_isChangingFullScreenState = false;
+
+// This is still not fixed in SDL 2.0.18.
+// Workaround for: https://stackoverflow.com/questions/34967628/sdl2-window-turns-black-on-resize
+// Note, this is also called during going FULL SCREEN, thus the CGuiView::PostRenderEndFrame is called twice
+int SDL_filterEventCallback(void *userdata, SDL_Event * event)
+{
+	if (VID_isChangingFullScreenState)
+		return 1;
+	
+	if (event->type == SDL_WINDOWEVENT && event->window.event == SDL_WINDOWEVENT_RESIZED)
+	{
 		//convert userdata pointer to yours and trigger your own draw function
 		//this is called very often now
 		
@@ -777,6 +778,8 @@ void VID_RenderLoop()
 		
 		VID_Render();
 		
+		GUI_PostRenderEndFrame();
+		
 		if (eventsLoopWithFpsCap)
 		{
 			// manual sync
@@ -844,6 +847,48 @@ unsigned long VID_GetTickCount()
 bool VID_IsWindowAlwaysOnTop()
 {
 	LOGTODO("VID_IsWindowAlwaysOnTop TODO");
+	
+	/*
+	 -// Helper structure we store in the void* PlatformUserData field of each ImGuiViewport to easily retrieve our backend data.
+	 -struct ImGui_ImplSDL2_ViewportData
+	 -{
+	 -       SDL_Window*     Window;
+	 -       Uint32          WindowID;
+	 -       bool            WindowOwned;
+	 -       SDL_GLContext   GLContext;
+	 -
+	 -       ImGui_ImplSDL2_ViewportData() { Window = NULL; WindowID = 0; WindowOwned = false; GLContext = NULL; }
+	 -       ~ImGui_ImplSDL2_ViewportData() { IM_ASSERT(Window == NULL && GLContext == NULL); }
+	 -};
+	 -
+	  //@returns is consumed
+	  bool CViewAtariScreen::DoTap(float x, float y)
+	  {
+			 LOGG("CViewAtariScreen::DoTap:  x=%f y=%f", x, y);
+	 -
+	 -//     static bool isFullscreen = false;
+	 -
+	 -       isFullscreen = !isFullscreen;
+	 -
+	 -//     ImGuiWindow *window = this->imGuiWindow;
+	 -//
+	 -//     ImGui_ImplSDL2_ViewportData *viewportData = (ImGui_ImplSDL2_ViewportData *)window->Viewport->PlatformUserData;
+	 -//
+	 -//     SDL_Window *sdlWindow = viewportData->Window;
+	 -//
+	 -//     if (isFullscreen == false)
+	 -//     {
+	 -//             SDL_SetWindowFullscreen(sdlWindow, SDL_WINDOW_FULLSCREEN);
+	 -//             isFullscreen = true;
+	 -//     }
+	 -//     else
+	 -//     {
+	 -//             SDL_SetWindowFullscreen(sdlWindow, 0);
+	 -//             isFullscreen = false;
+	 -//     }
+	 -
+
+	 */
 	return false;
 }
 
@@ -897,27 +942,61 @@ void GUI_GetRealScreenPixelSizes(double *pixelSizeX, double *pixelSizeY)
 //	LOGD("GUI_GetRealScreenPixelSizes done");
 }
 
-bool VID_IsWindowFullScreen()
+bool VID_IsMainApplicationWindowFullScreen()
 {
-//	return [glView isWindowFullScreen];
+	if (SDL_GetWindowFlags(gMainWindow) & SDL_WINDOW_FULLSCREEN)
+		return true;
+	
+	if (SDL_GetWindowFlags(gMainWindow) & SDL_WINDOW_FULLSCREEN_DESKTOP)
+		return true;
+	
+#if defined(MACOS)
+	if (MACOS_IsApplicationFullScreen())
+		return true;
+#endif
+	
 	return false;
 }
 
-void VID_ShowMouseCursor()
+void VID_SetMainApplicationWindowFullScreen(bool isFullScreen)
 {
-//	LOGM("VID_ShowMouseCursor");
-//	dispatch_async(dispatch_get_main_queue(), ^{
-//		[NSCursor unhide];
-//	});
+	VID_isChangingFullScreenState = true;
+	
+	if (isFullScreen)
+	{
+		SDL_SetWindowFullscreen(gMainWindow, SDL_WINDOW_FULLSCREEN_DESKTOP);
+	}
+	else
+	{
+		SDL_SetWindowFullscreen(gMainWindow, 0);
+	}
+	
+	VID_isChangingFullScreenState = false;
 }
 
-void VID_HideMouseCursor()
-{
-//	LOGM("VID_HideMouseCursor");
-//	dispatch_async(dispatch_get_main_queue(), ^{
-//		[NSCursor hide];
-//	});
-}
+// BUG: SDL_ShowCursor does not work. This is implemented in SYS_Platform
+//void VID_ShowMouseCursor()
+//{
+//	LOGD("VID_ShowMouseCursor");
+//	SDL_ShowCursor(SDL_ENABLE);
+//}
+//
+//void VID_HideMouseCursor()
+//{
+//	LOGD("VID_HideMouseCursor");
+//	SDL_ShowCursor(SDL_DISABLE);
+//}
+
+//bool VID_IsMouseCursorVisible()
+//{
+//	if (SDL_ShowCursor(SDL_QUERY) == SDL_ENABLE)
+//	{
+//		return true;
+//	}
+//
+//	return false;
+//}
+
 
 void VID_LockRenderMutex()
 {
