@@ -1274,7 +1274,7 @@ void CGuiView::PostRenderImGui()
 		
 	ImGui::End();
 	
-	bool isFullScreen = (guiMain->viewFullScreen != NULL);
+	bool isFullScreen = (guiMain->viewFullScreen == this);
 
 	if (isFullScreen)
 	{
