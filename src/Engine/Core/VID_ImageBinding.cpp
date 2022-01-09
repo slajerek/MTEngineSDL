@@ -42,6 +42,7 @@ void VID_InitImageBindings()
 	if (bindingMutex == NULL)
 	{
 		bindingMutex = new CSlrMutex("bindingMutex");
+		LOGD("bindingMutex=%x", bindingMutex);
 	}
 }
 
