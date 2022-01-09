@@ -69,9 +69,6 @@ void SYS_MTEngineStartup()
 	RES_Init(2048);
 
 	VID_Init();
-
-	
-	//getInfo();
 	
 	IM_ASSERT(ImGui::GetCurrentContext() != NULL && "Missing dear imgui context. Refer to examples app!"); // Exceptionally add an extra assert here for people confused with initial dear imgui setup
 
