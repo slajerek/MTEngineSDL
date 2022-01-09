@@ -6,12 +6,6 @@
 //  Copyright © 2019 Marcin Skoczylas. All rights reserved.
 //
 
-#include <iostream>
-#include <string>
-#include <SDL.h>
-#include <sys/types.h>
-#include <sys/sysctl.h>
-#include "SYS_FileSystem.h"
 #include "DBG_Log.h"
 #include "SYS_Startup.h"
 #include "SYS_CommandLine.h"

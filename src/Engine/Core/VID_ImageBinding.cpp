@@ -33,11 +33,16 @@ public:
 
 std::list<CBindingImageData *> imageBindings;
 
-CSlrMutex* bindingMutex;
+CSlrMutex* bindingMutex = NULL;
 
 void VID_InitImageBindings()
 {
-	bindingMutex = new CSlrMutex("bindingMutex");
+	LOGD("VID_InitImageBindings()");
+	
+	if (bindingMutex == NULL)
+	{
+		bindingMutex = new CSlrMutex("bindingMutex");
+	}
 }
 
 void VID_LockImageBindingMutex()
