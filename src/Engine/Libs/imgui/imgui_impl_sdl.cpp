@@ -502,7 +502,7 @@ static void ImGui_ImplSDL2_UpdateMonitors()
 #endif
 #if __APPLE__
 		monitor.DpiScale = MACOS_GetBackingScaleFactor(n);
-#elif SDL_HAS_PER_MONITOR_DPI
+#else 
         float dpi = 0.0f;
         if (!SDL_GetDisplayDPI(n, &dpi, NULL, NULL))
             monitor.DpiScale = dpi / 96.0f;
