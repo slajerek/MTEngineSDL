@@ -159,13 +159,8 @@ void CGuiViewMenu::SelectPrev()
 	guiMain->UnlockMutex();
 }
 
-///// AAAAAAAAAAAAAAAAAAA THIS LOCKED ALL move to async
 void CGuiViewMenu::SelectNext()
 {
-	return;
-	
-	/*
-	
 	guiMain->LockMutex();
 	
 	std::list<CGuiViewMenuItem *>::iterator it = selectedItem;
@@ -189,6 +184,7 @@ void CGuiViewMenu::SelectNext()
 	
 	// check if new selected item is outside screen and scroll down firstVisibleItem if needed
 	bool isItemVisible = false;
+	int i = 0;
 	while (true)
 	{
 		float py = posY;
@@ -217,10 +213,19 @@ void CGuiViewMenu::SelectNext()
 		if (isItemVisible)
 			break;
 		
+		if (firstVisibleItem == menuItems.end())
+			break;
+		
+		std::list<CGuiViewMenuItem *>::iterator nextVisibleItem = firstVisibleItem;
+		nextVisibleItem++;
+		
+		if (nextVisibleItem == menuItems.end())
+			break;
+		
 		firstVisibleItem++;
 	}
 	
-	guiMain->UnlockMutex();*/
+	guiMain->UnlockMutex();
 }
 
 bool CGuiViewMenu::DoScrollWheel(float deltaX, float deltaY)

@@ -81,7 +81,7 @@ void CFeatureConfig::LoadConfig(CSlrString *path)
 		}
 		catch(const std::exception& e)
 		{
-			LOGError("C64DebuggerPluginParallax::InitFromHjson error: %s", e.what());
+			LOGError("CFeatureConfig::InitFromHjson error: %s", e.what());
 			sprintf(featureErrorText, "Config file not correct, %s", e.what());
 			hjsonRoot.clear();
 			delete [] jsonText;

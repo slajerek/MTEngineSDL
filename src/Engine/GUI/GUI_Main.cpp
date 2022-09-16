@@ -4,7 +4,6 @@
 #include "CConfigStorage.h"
 
 CGuiMain *guiMain = NULL;
-CConfigStorage *globalConfig = NULL;
 
 void GUI_Init()
 {
@@ -15,7 +14,8 @@ void GUI_Init()
 void GUI_Render()
 {
 //	LOGD("GUI_Render");
-
+	
+	ImGui::DockSpaceOverViewport(ImGui::GetMainViewport());
 	guiMain->RenderImGui();
 	MT_Render();
 }

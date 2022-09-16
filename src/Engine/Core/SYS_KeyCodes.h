@@ -97,6 +97,7 @@
 
 class CSlrString;
 
+CSlrString *SYS_KeyName(u32 keyCode);
 CSlrString *SYS_KeyUpperCodeToString(u32 keyCode);
 CSlrString *SYS_KeyCodeToString(u32 keyCode);
 CSlrString *SYS_KeyCodeToString(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper);

@@ -84,8 +84,8 @@ void SYS_InitFileSystem()
 	LOGD("pathToDocuments=%s", gPathToDocuments);
 
 	gPathToTemp = new char[PATH_MAX];
-//	sprintf(gPathToTemp, "./Temp/");
-	sprintf(gPathToTemp, "./Documents/");
+//	sprintf(gPathToTemp, "./Temp");
+	sprintf(gPathToTemp, "/tmp");
 	gCPathToTemp = gPathToTemp;
 	gUTFPathToTemp = new CSlrString(gCPathToTemp);
 	LOGD("gPathToTemp=%s", gPathToTemp);
@@ -174,14 +174,22 @@ bool compare_CFileItem_nocase (CFileItem *first, CFileItem *second)
 
 std::vector<CFileItem *> *SYS_GetFilesInFolder(char *directoryPath, std::list<char *> *extensions)
 {
+	return SYS_GetFilesInFolder(directoryPath, extensions, true);
+}
+
+std::vector<CFileItem *> *SYS_GetFilesInFolder(char *directoryPath, std::list<char *> *extensions, bool withFolders)
+{
 	LOGD("SYS_GetFilesInFolder::GetFiles: directoryPath=%s", directoryPath);
 	std::vector<CFileItem *> *files = new std::vector<CFileItem *>();
 
 	DIR *dp;
     struct dirent *dirp;
 
-    if((dp  = opendir(directoryPath)) == NULL)	//dir.c_str()
-    	SYS_FatalExit("Error opening dir: %s", directoryPath);
+    if((dp  = opendir(directoryPath)) == NULL)
+    {
+    	LOGError("Error opening dir: %s", directoryPath);
+    	return files;
+    }
 
     while((dirp = readdir(dp)) != NULL)
     {
@@ -199,13 +207,16 @@ std::vector<CFileItem *> *SYS_GetFilesInFolder(char *directoryPath, std::list<ch
 
     	if (S_ISDIR(st.st_mode))
     	{
-    		LOGD("<DIR> %s", dirp->d_name);
+			if (withFolders)
+			{
+				LOGD("<DIR> %s", dirp->d_name);
 
-    		char *fileNameDup = strdup(dirp->d_name);
-			char *modDateDup = strdup("");
+				char *fileNameDup = strdup(dirp->d_name);
+				char *modDateDup = strdup("");
 
-			CFileItem *item = new CFileItem(fileNameDup, buf, modDateDup, true);
-			files->push_back(item);
+				CFileItem *item = new CFileItem(fileNameDup, buf, modDateDup, true);
+				files->push_back(item);
+			}
     	}
     	else if (dirp->d_type == DT_REG || dirp->d_type == DT_UNKNOWN)
 		{

@@ -158,21 +158,9 @@ u32 CSlrFileFromOS::Read(u8 *data, u32 numBytes)
 	return fread(data, 1, numBytes, fp);
 }
 
-u8 CSlrFileFromOS::ReadByte()
-{
-	u8 b;
-	fread(&b, 1, 1, fp);
-	return b;
-}
-
 u32 CSlrFileFromOS::Write(u8 *data, u32 numBytes)
 {
 	return fwrite(data, 1, numBytes, fp);
-}
-
-void CSlrFileFromOS::WriteByte(u8 data)
-{
-	fwrite(&data, 1, 1, fp);
 }
 
 int CSlrFileFromOS::Seek(u32 newFilePos)
@@ -203,14 +191,20 @@ bool CSlrFileFromOS::Eof()
 void CSlrFileFromOS::Close()
 {
 	//LOGR("CSlrFileFromOS::Close()");
-	if (fp != NULL)
-		fclose(fp);
-
+	
+	if (fileMode == SLR_FILE_MODE_READ || fileMode == SLR_FILE_MODE_WRITE)
+	{
+		if (fp != NULL)
+			fclose(fp);
+		fileMode = SLR_FILE_MODE_NOT_OPENED;
+	}
 	fp = NULL;
 }
 
 CSlrFileFromOS::~CSlrFileFromOS()
 {
-	this->Close();
+	if (fileMode != SLR_FILE_MODE_NOT_OPENED)
+		Close();
 }
+
 

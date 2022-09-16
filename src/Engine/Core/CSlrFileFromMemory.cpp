@@ -15,6 +15,7 @@ CSlrFileFromMemory::CSlrFileFromMemory(uint8 *data, int dataLength)
 	this->fileData = data;
 	this->fileSize = dataLength;
 	this->filePos = 0;
+	this->fileMode = SLR_FILE_MODE_READ;
 }
 
 CSlrFileFromMemory::CSlrFileFromMemory(CByteBuffer *byteBuffer)
@@ -22,6 +23,7 @@ CSlrFileFromMemory::CSlrFileFromMemory(CByteBuffer *byteBuffer)
 	this->fileData = byteBuffer->data;
 	this->fileSize = byteBuffer->length;
 	this->filePos = byteBuffer->index;
+	this->fileMode = SLR_FILE_MODE_READ;
 }
 
 void CSlrFileFromMemory::Open(const char *fileName)
@@ -74,11 +76,6 @@ u32 CSlrFileFromMemory::Write(u8 *data, u32 numBytes)
 	return 0;
 }
 
-void CSlrFileFromMemory::WriteByte(u8 data)
-{
-	SYS_FatalExit("CSlrFileFromMemory::WriteByte");
-	
-}
 int CSlrFileFromMemory::Seek(u32 newFilePos)
 {
 	if (newFilePos > this->fileSize)

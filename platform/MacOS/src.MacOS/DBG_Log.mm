@@ -167,6 +167,22 @@ void LOG_SetLevel(unsigned int level, bool isOn)
 	}
 }
 
+static int backupLogLevel = 0;
+void LOG_BackupCurrentLogLevel()
+{
+	backupLogLevel = logger_currentLogLevel;
+}
+
+void LOG_RestoreBackupLogLevel()
+{
+	logger_currentLogLevel = backupLogLevel;
+}
+
+void LOG_SetCurrentLogLevel(int level)
+{
+	logger_currentLogLevel = level;
+}
+
 void LOG_Shutdown(void)
 {
 	fprintf(stderr, "LOG_Shutdown: bye\n");
@@ -506,6 +522,9 @@ const char *getLevelStr(unsigned int level)
 
 void LOG_Init(void) {}
 void LOG_SetLevel(unsigned int level, bool isOn) {}
+void LOG_SetCurrentLogLevel(int level) {}
+void LOG_BackupCurrentLogLevel() {}
+void LOG_RestoreBackupLogLevel() {}
 void LOG_Shutdown(void) {}
 
 #endif

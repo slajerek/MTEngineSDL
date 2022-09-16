@@ -145,6 +145,15 @@
     <Filter Include="Source Files\src\Engine\Libs\hjson">
       <UniqueIdentifier>{5dacc4f1-46ba-40a6-b061-740f27e5675e}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\src\Engine\Audio\MIDI">
+      <UniqueIdentifier>{96e3aaeb-a0aa-4541-9ea7-a512a6e9c644}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Libs\rtmidi">
+      <UniqueIdentifier>{70d20571-c47f-4216-8481-3d8c49d5ee15}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Core\Render">
+      <UniqueIdentifier>{44307418-9531-4be6-934d-137a75349233}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\Embedded\RES_Embedded.cpp">
@@ -744,9 +753,6 @@
     <ClCompile Include="..\..\..\src\Engine\Libs\imguiext\imguifilesystem.cpp">
       <Filter>Source Files\src\Engine\Libs\imguiext</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\Engine\Libs\imguiext\imguihelper.cpp">
-      <Filter>Source Files\src\Engine\Libs\imguiext</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\Libs\nfd\nfd_common.c">
       <Filter>Source Files\src\Engine\Libs\nfd</Filter>
     </ClCompile>
@@ -921,15 +927,6 @@
     <ClCompile Include="..\..\..\src\Engine\Core\SYS_Startup.cpp">
       <Filter>Source Files\src\Engine\Core</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\Engine\Core\VID_Blits.cpp">
-      <Filter>Source Files\src\Engine\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\Engine\Core\VID_ImageBinding.cpp">
-      <Filter>Source Files\src\Engine\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\Engine\Core\VID_Main.cpp">
-      <Filter>Source Files\src\Engine\Core</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\Core\SYS_Threading.cpp">
       <Filter>Source Files\src\Engine\Core</Filter>
     </ClCompile>
@@ -1031,6 +1028,39 @@
     </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\CRecentlyOpenedFiles.cpp">
       <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Audio\MIDI\CMidiInKeyboard.cpp">
+      <Filter>Source Files\src\Engine\Audio\MIDI</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\rtmidi\RtMidi.cpp">
+      <Filter>Source Files\src\Engine\Libs\rtmidi</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewUiDebug.cpp">
+      <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\Render\CRenderBackend.cpp">
+      <Filter>Source Files\src\Engine\Core\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\Render\CRenderBackendOpenGL3.cpp">
+      <Filter>Source Files\src\Engine\Core\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\Render\VID_Blits.cpp">
+      <Filter>Source Files\src\Engine\Core\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\Render\VID_ImageBinding.cpp">
+      <Filter>Source Files\src\Engine\Core\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\Render\VID_Main.cpp">
+      <Filter>Source Files\src\Engine\Core\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewMessages.cpp">
+      <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewProgressBarWindow.cpp">
+      <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\SYS_DefaultConfig.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1523,9 +1553,6 @@
     <ClInclude Include="..\..\..\src\Engine\Libs\imguiext\imguifilesystem.h">
       <Filter>Source Files\src\Engine\Libs\imguiext</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\Engine\Libs\imguiext\imguihelper.h">
-      <Filter>Source Files\src\Engine\Libs\imguiext</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\Libs\nfd\nfd.h">
       <Filter>Source Files\src\Engine\Libs\nfd</Filter>
     </ClInclude>
@@ -1790,15 +1817,6 @@
     <ClInclude Include="..\..\..\src\Engine\Core\SYS_Types.h">
       <Filter>Source Files\src\Engine\Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\Engine\Core\VID_Blits.h">
-      <Filter>Source Files\src\Engine\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\Engine\Core\VID_ImageBinding.h">
-      <Filter>Source Files\src\Engine\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\Engine\Core\VID_Main.h">
-      <Filter>Source Files\src\Engine\Core</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\Core\SYS_Threading.h">
       <Filter>Source Files\src\Engine\Core</Filter>
     </ClInclude>
@@ -1888,6 +1906,39 @@
     </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\CRecentlyOpenedFiles.h">
       <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Audio\MIDI\CMidiInKeyboard.h">
+      <Filter>Source Files\src\Engine\Audio\MIDI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\rtmidi\RtMidi.h">
+      <Filter>Source Files\src\Engine\Libs\rtmidi</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewUiDebug.h">
+      <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\Render\CRenderBackend.h">
+      <Filter>Source Files\src\Engine\Core\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\Render\CRenderBackendOpenGL3.h">
+      <Filter>Source Files\src\Engine\Core\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\Render\VID_Blits.h">
+      <Filter>Source Files\src\Engine\Core\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\Render\VID_ImageBinding.h">
+      <Filter>Source Files\src\Engine\Core\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\Render\VID_Main.h">
+      <Filter>Source Files\src\Engine\Core\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewMessages.h">
+      <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewProgressBarWindow.h">
+      <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\SYS_DefaultConfig.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

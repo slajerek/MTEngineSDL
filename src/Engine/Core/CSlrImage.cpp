@@ -817,7 +817,7 @@ CSlrImage::~CSlrImage()
 
 	if (this->isFromAtlas == false && this->isBound == true)
 	{
-		glDeleteTextures(1, &textureId);
+		gRenderBackend->DeleteTexture(this);
 	}
 }
 
@@ -852,8 +852,7 @@ void CSlrImage::BindImage()
 
 	//	[EAGLContext setCurrentContext:[gMainContext in EAGLView] ];
 
-	glGenTextures(1, &textureId);
-	glBindTexture(GL_TEXTURE_2D, textureId);
+	gRenderBackend->CreateTexture(this);
 
 	isBound = true;
 	isActive = true;
@@ -861,44 +860,12 @@ void CSlrImage::BindImage()
 	resourceIsActive = true;
 	resourceState = RESOURCE_STATE_LOADED;
 
-	
-	if (this->linearScaling)
-	{
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
-	}
-	else
-	{
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
-	}
-
-	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-	glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, rasterWidth, rasterHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, loadImageData->getRGBAResultData());
-
 }
 
 void CSlrImage::SetLinearScaling(bool isLinearScaling)
 {
 	this->linearScaling = isLinearScaling;
-	
-	glBindTexture(GL_TEXTURE_2D, this->textureId);
-	if (this->linearScaling)
-	{
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
-	}
-	else
-	{
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
-	}
+	gRenderBackend->UpdateTextureLinearScaling(this);
 }
 
 void CSlrImage::ReBindImage()
@@ -912,28 +879,8 @@ void CSlrImage::ReBindImage()
 		return;
 	}
 #endif
-	glBindTexture(GL_TEXTURE_2D, textureId);
-	
-	if (this->linearScaling)
-	{
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
-	}
-	else
-	{
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
-	}
-	
-	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	
-//	glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-//	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, rasterWidth, rasterHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, loadImageData->getRGBAResultData());
-	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, loadImageData->width, loadImageData->height, GL_RGBA, GL_UNSIGNED_BYTE, loadImageData->getRGBAResultData());
+
+	gRenderBackend->ReBindTexture(this);
 }
 
 
@@ -960,7 +907,9 @@ void CSlrImage::Deallocate()
 //	RES_DebugPrintMemory();
 
 	this->FreeLoadImage();
-	glDeleteTextures(1, &textureId);
+
+	gRenderBackend->DeleteTexture(this);
+
 	this->isBound = false;
 
 //	LOGD("CSlrImage::Deallocate: done");

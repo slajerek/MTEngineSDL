@@ -4,23 +4,29 @@
 #include "CSlrString.h"
 #include "SYS_FileSystem.h"
 
+#define FILES_REFRESH_NUM_FRAMES 50
+
 CRecentlyOpenedFiles::CRecentlyOpenedFiles(CSlrString *settingsFileName, CRecentlyOpenedFilesCallback *callback)
 {
 	this->settingsFileName = settingsFileName;
 	this->callback = callback;
-	
-	maxNumberOfFiles = 20;
+	filesListMutex = new CSlrMutex("CRecentlyOpenedFiles::filesListMutex");
+		
+	maxNumberOfFiles = 40;
+	countFilesAvailableRefresh = FILES_REFRESH_NUM_FRAMES-1;
 	RestoreFromSettings();
 }
 
 void CRecentlyOpenedFiles::Clear()
 {
+	filesListMutex->Lock();
 	while(!listOfFiles.empty())
 	{
 		CRecentFile *file = listOfFiles.back();
 		listOfFiles.pop_back();
 		delete file;
 	}
+	filesListMutex->Unlock();
 }
 
 void CRecentlyOpenedFiles::Add(CSlrString *filePath)
@@ -28,6 +34,8 @@ void CRecentlyOpenedFiles::Add(CSlrString *filePath)
 	LOGD("CRecentlyOpenedFiles::Add:");
 	filePath->DebugPrint("filePath=");
 	
+	filesListMutex->Lock();
+
 	// check if filePath was already added, if yes then move to beginning
 	for (std::list<CRecentFile *>::iterator it = listOfFiles.begin(); it != listOfFiles.end(); it++)
 	{
@@ -36,8 +44,9 @@ void CRecentlyOpenedFiles::Add(CSlrString *filePath)
 		{
 			listOfFiles.remove(file);
 			listOfFiles.push_front(file);
-			
+
 			StoreToSettings();
+			filesListMutex->Unlock();
 			return;
 		}
 	}
@@ -53,34 +62,75 @@ void CRecentlyOpenedFiles::Add(CSlrString *filePath)
 	}
 	
 	StoreToSettings();
+	filesListMutex->Unlock();
 }
 
 bool CRecentlyOpenedFiles::IsMostRecentFilePathAvailable()
 {
-	return !listOfFiles.empty();
+	filesListMutex->Lock();
+
+	if (listOfFiles.empty())
+	{
+		filesListMutex->Unlock();
+		return false;
+	}
+
+	CRecentFile *file = listOfFiles.front();
+	if (file->isAvailable)
+	{
+		filesListMutex->Unlock();
+		return true;
+	}
+	
+	filesListMutex->Unlock();
+	return false;
 }
 
 CSlrString *CRecentlyOpenedFiles::GetMostRecentFilePath()
 {
+	filesListMutex->Lock();
+
 	if (listOfFiles.empty())
+	{
+		filesListMutex->Unlock();
 		return NULL;
+	}
 	
 	CRecentFile *file = listOfFiles.front();
-	return new CSlrString(file->filePath);
+	
+	CSlrString *path = new CSlrString(file->filePath);
+	filesListMutex->Unlock();
+
+	return path;
 }
 
 CSlrString *CRecentlyOpenedFiles::GetCurrentOpenedFolder()
 {
+	filesListMutex->Lock();
+
 	if (listOfFiles.empty())
+	{
+		filesListMutex->Unlock();
 		return gUTFPathToDocuments;
+	}
 	
 	CRecentFile *file = listOfFiles.front();
 	CSlrString *folderPath = file->filePath->GetFilePathWithoutFileNameComponentFromPath();
+	
+	filesListMutex->Unlock();
 	return folderPath;
 }
 
 void CRecentlyOpenedFiles::RenderImGuiMenu(char *menuItemLabel)
 {
+	if (++countFilesAvailableRefresh >= FILES_REFRESH_NUM_FRAMES)
+	{
+		RefreshAreFilesAvailable();
+		countFilesAvailableRefresh = 0;
+	}
+	
+	filesListMutex->Lock();
+
 	bool enabled = listOfFiles.size() > 0 ? true : false;
 	
 	CRecentFile *fileSelected = NULL;
@@ -89,7 +139,7 @@ void CRecentlyOpenedFiles::RenderImGuiMenu(char *menuItemLabel)
 		for (std::list<CRecentFile *>::iterator it = listOfFiles.begin(); it != listOfFiles.end(); it++)
 		{
 			CRecentFile *file = *it;
-			if (ImGui::MenuItem(file->fileName))
+			if (ImGui::MenuItem(file->fileName, "", false, file->isAvailable))
 			{
 				fileSelected = file;
 			}
@@ -101,6 +151,8 @@ void CRecentlyOpenedFiles::RenderImGuiMenu(char *menuItemLabel)
 	{
 		callback->RecentlyOpenedFilesCallbackSelectedMenuItem(fileSelected->filePath);
 	}
+	
+	filesListMutex->Unlock();
 }
 
 #define RECENTLY_OPENED_FILES_MARKER	'R'
@@ -148,14 +200,20 @@ bool CRecentlyOpenedFiles::Deserialize(CByteBuffer *byteBuffer)
 
 void CRecentlyOpenedFiles::StoreToSettings()
 {
+	filesListMutex->Lock();
+
 	CByteBuffer *b = new CByteBuffer();
 	Serialize(b);
 	b->storeToSettings(settingsFileName);
 	delete b;
+
+	filesListMutex->Unlock();
 }
 
 void CRecentlyOpenedFiles::RestoreFromSettings()
 {
+	filesListMutex->Lock();
+
 	Clear();
 	CByteBuffer *b = new CByteBuffer();
 	b->loadFromSettings(settingsFileName);
@@ -164,6 +222,69 @@ void CRecentlyOpenedFiles::RestoreFromSettings()
 		Deserialize(b);
 	}
 	delete b;
+
+	filesListMutex->Unlock();
+}
+
+void CRecentlyOpenedFiles::ThreadRun(void *passData)
+{
+	u64 i = 0;
+	
+	while (true)
+	{
+		filesListMutex->Lock();
+		u64 s = listOfFiles.size();
+
+		if (i < s)
+		{
+			std::list<CRecentFile *>::iterator it = listOfFiles.begin();
+			std::advance(it, i);
+			
+			CRecentFile *file = *it;
+			CSlrString *filePath = new CSlrString(file->filePath);
+			
+			filesListMutex->Unlock();
+			
+			// this is async check with mutex unlocked (as this is blocking operation)
+			bool fileExists = SYS_FileExists(filePath);
+			
+			filesListMutex->Lock();
+			
+			s = listOfFiles.size();
+			if (i < s)
+			{
+				std::list<CRecentFile *>::iterator it = listOfFiles.begin();
+				std::advance(it, i);
+				
+				CRecentFile *file = *it;
+				
+				// the same file? note, if we fail as the list changed then that's not bad - subsequent refresh will fix that
+				if (file->filePath->CompareWith(filePath))
+				{
+					file->isAvailable = fileExists;
+				}
+			}
+			
+			delete filePath;
+		}
+
+		filesListMutex->Unlock();
+		SYS_Sleep(10);
+		i++;
+		
+		if (i >= s)
+			break;
+	}
+}
+
+void CRecentlyOpenedFiles::RefreshAreFilesAvailable()
+{
+	if (this->isRunning)
+	{
+		return;
+	}
+	
+	SYS_StartThread(this);
 }
 
 CRecentlyOpenedFiles::~CRecentlyOpenedFiles()
@@ -174,6 +295,7 @@ CRecentlyOpenedFiles::~CRecentlyOpenedFiles()
 CRecentFile::CRecentFile(CSlrString *filePath)
 {
 	this->filePath = new CSlrString(filePath);
+	isAvailable = true;
 	
 	CSlrString *fn = this->filePath->GetFileNameComponentFromPath();
 	this->fileName = fn->GetStdASCII();

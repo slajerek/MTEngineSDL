@@ -64,6 +64,11 @@ void CGuiEditHex::UpdateValue()
 	delete hexStr;
 }
 
+void CGuiEditHex::CancelEntering()
+{
+	FinalizeEntering(MTKEY_NOTHING, true);
+}
+
 void CGuiEditHex::FinalizeEntering(u32 keyCode, bool isCancelled)
 {
 	UpdateValue();

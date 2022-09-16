@@ -131,21 +131,9 @@ u32 CSlrFileFromDocuments::Read(u8 *data, u32 numBytes)
 	return fread(data, 1, numBytes, fp);
 }
 
-u8 CSlrFileFromDocuments::ReadByte()
-{
-	u8 b;
-	fread(&b, 1, 1, fp);
-	return b;
-}
-
 u32 CSlrFileFromDocuments::Write(u8 *data, u32 numBytes)
 {
 	return fwrite(data, 1, numBytes, fp);
-}
-
-void CSlrFileFromDocuments::WriteByte(u8 data)
-{
-	fwrite(&data, 1, 1, fp);
 }
 
 int CSlrFileFromDocuments::Seek(u32 newFilePos)

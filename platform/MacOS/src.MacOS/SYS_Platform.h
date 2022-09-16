@@ -6,6 +6,7 @@ void SYS_PlatformShutdown();
 void SYS_AttachConsole();
 
 bool MACOS_IsApplicationFullScreen();
+float MACOS_GetBackingScaleFactor(int screen);
 
 #define PLATFORM_SCANCODE_LCTRL	SDL_SCANCODE_LGUI
 #define PLATFORM_SCANCODE_RCTRL	SDL_SCANCODE_RGUI

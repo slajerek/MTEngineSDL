@@ -61,6 +61,7 @@ public:
 };
 
 std::vector<CFileItem *> *SYS_GetFilesInFolder(char *directoryPath, std::list<char *> *extensions);
+std::vector<CFileItem *> *SYS_GetFilesInFolder(char *directoryPath, std::list<char *> *extensions, bool withFolders);
 
 void SYS_RefreshFiles();
 

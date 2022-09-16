@@ -51,6 +51,11 @@ void CGuiView::Init(const char *name, float posX, float posY, float posZ, float 
 	imGuiWindowKeepAspectRatio = false;
 	imGuiWindowAspectRatio = 1.0f;
 
+	imGuiForceThisFrameNewPosition = false;
+	imGuiForceThisFrameNewSize = false;
+	thisFrameNewPosX = -1; thisFrameNewPosY = -1;
+	thisFrameNewSizeX = -1; thisFrameNewSizeY = -1;
+
 	previousPosX = -1;
 	previousPosY = -1;
 	
@@ -173,6 +178,20 @@ void CGuiView::PositionCenterOnParentView()
 	this->SetPosition(parentX - this->sizeX/2.0f, parentY - this->sizeY/2.0f);
 }
 
+void CGuiView::SetNewImGuiWindowPosition(float newPosX, float newPosY)
+{
+	this->thisFrameNewPosX = newPosX;
+	this->thisFrameNewPosY = newPosY;
+	this->imGuiForceThisFrameNewPosition = true;
+}
+
+void CGuiView::SetNewImGuiWindowSize(float newSizeX, float newSizeY)
+{
+	LOGD("CGuiView::SetNewImGuiWindowSize: %f %f", newSizeX, newSizeY);
+	this->thisFrameNewSizeX = newSizeX;
+	this->thisFrameNewSizeY = newSizeY;
+	this->imGuiForceThisFrameNewSize = true;
+}
 
 void CGuiView::RemoveGuiElements()
 {
@@ -1189,10 +1208,31 @@ void CGuiView::PreRenderImGui()
 	}
 	else
 	{
-		// not fullscreen, setup startup parameters of this window
-		ImGui::SetNextWindowPos(ImGui::GetMainViewport()->Pos + ImVec2(this->posX, this->posY), ImGuiCond_FirstUseEver);
-		ImGui::SetNextWindowSize(ImVec2(this->sizeX, this->sizeY), ImGuiCond_FirstUseEver);
+		// not fullscreen, setup parameters of this window
+		if (imGuiForceThisFrameNewPosition)
+		{
+			// force new position
+			ImGui::SetNextWindowPos(ImGui::GetMainViewport()->Pos + ImVec2(this->thisFrameNewPosX, this->thisFrameNewPosY), ImGuiCond_Always);
+			imGuiForceThisFrameNewPosition = false;
+		}
+		else
+		{
+			// startup window position
+			ImGui::SetNextWindowPos(ImGui::GetMainViewport()->Pos + ImVec2(this->posX, this->posY), ImGuiCond_FirstUseEver);
+		}
 		
+		if (imGuiForceThisFrameNewSize)
+		{
+			// force new size
+			ImGui::SetNextWindowSize(ImVec2(this->thisFrameNewSizeX, this->thisFrameNewSizeY), ImGuiCond_Always);
+			imGuiForceThisFrameNewSize = false;
+		}
+		else
+		{
+			// startup window size
+			ImGui::SetNextWindowSize(ImVec2(this->sizeX, this->sizeY), ImGuiCond_FirstUseEver);
+		}
+				
 		// should we keep aspect ratio?
 		// Note, below is workaround for imGuiWindowKeepAspectRatio bug. without this makes the window resize/wobbly during move
 //		LOGD("imGuiWindowKeepAspectRatio: name=%s", this->name);

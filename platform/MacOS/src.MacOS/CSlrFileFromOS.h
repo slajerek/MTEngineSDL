@@ -17,13 +17,11 @@ public:
 	virtual void Open(const char *filePath);
 	virtual void OpenForWrite(const char *filePath);
 	virtual u32 Write(u8 *data, u32 numBytes);
-	virtual void WriteByte(u8 data);
 	virtual void Reopen();
 	virtual void ReopenForWrite();
 	virtual bool Exists();
 	virtual u32 GetFileSize();
 	virtual u32 Read(u8 *data, u32 numBytes);
-	virtual u8 ReadByte();
 	virtual int Seek(u32 newFilePos);
 	virtual int Seek(long int offset, int origin);
 	virtual u32 Tell();

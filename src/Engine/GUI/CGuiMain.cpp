@@ -21,7 +21,6 @@ CGuiMain::CGuiMain()
 {
 	currentView = NULL;
 	
-	globalConfig = new CConfigStorage();
 	renderMutex = new CSlrMutex("CGuiMain::renderMutex");
 	uiThreadTasksMutex = new CSlrMutex("CGuiMain::uiThreadTasksMutex");
 	
@@ -107,6 +106,7 @@ CGuiMain::CGuiMain()
 	messageBoxTitle = NULL;
 	messageBoxText = NULL;
 	beginMessageBoxPopup = false;
+	messageBoxCallback = NULL;
 	
 	currentLayoutBeforeFullScreen = NULL;
 	temporaryLayoutToGoBackFromFullScreen = new CLayoutData();
@@ -182,6 +182,10 @@ bool CGuiMain::DeserializeLayout(CByteBuffer *byteBuffer)
 	u8 *data = byteBuffer->GetBytes(len);
 	
 	ImGui::LoadIniSettingsFromMemory((const char*)data);
+	
+//	FILE *fp = fopen("/Users/mars/imgui-ini.txt", "wb");
+//	fwrite(data, len, 1, fp);
+//	fclose(fp);
 	
 	delete [] data;
 	
@@ -1072,6 +1076,11 @@ void CGuiMain::SetWindowOnTop(CGuiElement *view)
 
 void CGuiMain::ShowMessageBox(const char *title, const char *message)
 {
+	ShowMessageBox(title, message, NULL);
+}
+
+void CGuiMain::ShowMessageBox(const char *title, const char *message, CUiMessageBoxCallback *messageBoxCallback)
+{
 	guiMain->LockMutex();
 	if (messageBoxTitle != NULL)
 		STRFREE(messageBoxTitle);
@@ -1080,19 +1089,8 @@ void CGuiMain::ShowMessageBox(const char *title, const char *message)
 	messageBoxTitle = STRALLOC(title);
 	messageBoxText = STRALLOC(message);
 	beginMessageBoxPopup = true;
+	this->messageBoxCallback = messageBoxCallback;
 	guiMain->UnlockMutex();
-}
-
-void CGuiMain::ShowMessage(const char *message)
-{
-	// TODO
-}
-
-void CGuiMain::ShowMessage(CSlrString *showMessage)
-{
-	char *cStr = showMessage->GetStdASCII();
-	this->ShowMessage(cStr);
-	delete [] cStr;
 }
 
 void CGuiMain::RenderImGui()
@@ -1204,11 +1202,19 @@ void CGuiMain::RenderImGui()
 				STRFREE(messageBoxTitle);
 				STRFREE(messageBoxText);
 				ImGui::CloseCurrentPopup();
+				
+				if (messageBoxCallback)
+				{
+					messageBoxCallback->MessageBoxCallback();
+				}
+				messageBoxCallback = NULL;
 			}
 			ImGui::EndPopup();
 		}
 		ImGui::PopStyleVar();
 	}
+	
+	//
 }
 
 void CGuiMain::PostRenderEndFrame()
@@ -1345,7 +1351,7 @@ void CGuiMain::NotifyGlobalDropFileCallbacks(char *filePath, bool consumedByView
 
 void CGuiMain::CreateUiFontsTexture()
 {
-	ImGui_ImplOpenGL3_CreateFontsTexture();
+	gRenderBackend->CreateFontsTexture();
 }
 
 //
@@ -1406,9 +1412,31 @@ void CGuiMain::UnlockMutex()
 	renderMutex->Unlock();
 }
 
+CUiMessageBoxCallback::CUiMessageBoxCallback()
+{
+	uiMessageBoxCallbackUserData = NULL;
+}
+
+CUiMessageBoxCallback::~CUiMessageBoxCallback()
+{
+}
+
+void CUiMessageBoxCallback::MessageBoxCallback()
+{
+}
+
+void CUiMessageBoxCallbackRestartApplication::MessageBoxCallback()
+{
+	SYS_RestartApplication();
+}
+
 CUiThreadTaskCallback::CUiThreadTaskCallback()
 {
-	uiThreadTaskUserData = NULL;
+	uiThreadTaskCallbackUserData = NULL;
+}
+	
+CUiThreadTaskCallback::~CUiThreadTaskCallback()
+{
 }
 
 void CUiThreadTaskCallback::RunUIThreadTask()
@@ -1483,6 +1511,23 @@ void CGuiMain::SetApplicationWindowFullScreen(bool isFullScreen)
 	VID_SetMainApplicationWindowFullScreen(isFullScreen);
 }
 
+void CGuiMain::SetImGuiStyleWindowFullScreenBackground()
+{
+	ImGuiCol_WindowBg_Backup = ImGui::GetStyle().Colors[ImGuiCol_WindowBg];
+	ImGuiCol_DockingEmptyBg_Backup = ImGui::GetStyle().Colors[ImGuiCol_DockingEmptyBg];
+
+	ImVec4 fullScreenBackgroundColor = ImVec4(0.0f, 0.0f, 0.0f, 1.0f);
+	ImGui::GetStyle().Colors[ImGuiCol_WindowBg] = fullScreenBackgroundColor;
+	ImGui::GetStyle().Colors[ImGuiCol_DockingEmptyBg] = fullScreenBackgroundColor;
+}
+
+void CGuiMain::SetImGuiStyleWindowBackupBackground()
+{
+	ImGui::GetStyle().Colors[ImGuiCol_WindowBg] = ImGuiCol_WindowBg_Backup;
+	ImGui::GetStyle().Colors[ImGuiCol_DockingEmptyBg] = ImGuiCol_DockingEmptyBg_Backup;
+}
+
+
 void CGuiMain::SetApplicationWindowAlwaysOnTop(bool alwaysOnTop)
 {
 	LOGTODO("CGuiMain::SetApplicationWindowAlwaysOnTop NOT IMPLEMENTED");
@@ -1533,7 +1578,7 @@ void CGuiMain::SetViewFullScreen(CGuiView *view, float fullScreenSizeX, float fu
 		layoutForThisFrame = temporaryLayoutToGoBackFromFullScreen;
 		layoutStoreOrRestore = true;	// store
 		
-		// note, the fullscreen mode will be started after layout is stored in async task
+		// the fullscreen mode will be started after layout is stored in an async task
 		CUiThreadTaskSetViewFullScreen *task = new CUiThreadTaskSetViewFullScreen(view, fullScreenSizeX, fullScreenSizeY);
 		AddUiThreadTask(task);
 				
@@ -1553,7 +1598,7 @@ void CGuiMain::SetViewFullScreen(CGuiView *view, float fullScreenSizeX, float fu
 		layoutForThisFrame = temporaryLayoutToGoBackFromFullScreen;
 		layoutStoreOrRestore = false;	// restore
 		
-		// note, the window mode will be restored after layout is restored in async task
+		// the window mode will be restored after layout is restored in async task
 		CUiThreadTaskSetViewFullScreen *task = new CUiThreadTaskSetViewFullScreen(NULL, 0, 0);
 		AddUiThreadTask(task);
 		
@@ -1598,8 +1643,11 @@ void CUiThreadTaskSetViewFullScreen::RunUIThreadTask()
 			}
 			itView->SetVisible(false);
 		}
-				
-		// note, the fullscreen mode is started after frame has been rendered and layout stored
+
+		// make black background
+		guiMain->SetImGuiStyleWindowFullScreenBackground();
+
+		// the fullscreen mode is started after frame has been rendered and layout stored
 		if (VID_IsMainApplicationWindowFullScreen())
 		{
 			LOGD("set appWasFullScreenBeforeViewFullScreen true");
@@ -1616,7 +1664,10 @@ void CUiThreadTaskSetViewFullScreen::RunUIThreadTask()
 	}
 	else
 	{
-		LOGD("CUiThreadTaskSetViewFullScreen: to back to windowed");
+		LOGD("CUiThreadTaskSetViewFullScreen: go back to windowed");
+		
+		// reset background to previous/backup from black background
+		guiMain->SetImGuiStyleWindowBackupBackground();
 		
 		if (guiMain->appWasFullScreenBeforeViewFullScreen == false)
 		{

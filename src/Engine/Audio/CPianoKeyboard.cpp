@@ -61,6 +61,9 @@ CPianoKeyboard::CPianoKeyboard(const char *name, float posX, float posY, float p
 	
 	AddLayoutParameter(new CLayoutParameterBool("Keys fade out", &doKeysFadeOut));
 	AddLayoutParameter(new CLayoutParameterFloat("Keys fade out speed", &keysFadeOutSpeedParameter));
+	
+	// TODO
+	midiInKeyboard = new CMidiInKeyboard(0, this);
 }
 
 void CPianoKeyboard::SetKeysFadeOut(bool doKeysFadeOut)
@@ -285,13 +288,13 @@ bool CPianoKeyboard::KeyDown(u32 keyCode, bool isShift, bool isAlt, bool isContr
 	LOGD("CPianoKeyboard::KeyDown: keyCode=%x", keyCode);
 	
 	// TODO: make via callback
-	if (keyCode == '[')
+	if (keyCode == '[' && isShift == false && isAlt == false && isControl == false && isSuper == false)
 	{
 		if (currentOctave > 0)
 			currentOctave--;
 		return true;
 	}
-	else if (keyCode == ']')
+	else if (keyCode == ']' && isShift == false && isAlt == false && isControl == false && isSuper == false)
 	{
 		if (currentOctave < numOctaves-2)
 			currentOctave++;
@@ -303,7 +306,11 @@ bool CPianoKeyboard::KeyDown(u32 keyCode, bool isShift, bool isAlt, bool isContr
 		for (std::list<CPianoNoteKeyCode *>::iterator it = notesKeyCodes.begin(); it != notesKeyCodes.end(); it++)
 		{
 			CPianoNoteKeyCode *noteKeyCode = *it;
-			if (keyCode == noteKeyCode->keyCode)
+			if (keyCode == noteKeyCode->keyCode
+				&& isShift == noteKeyCode->isShift
+				&& isAlt == noteKeyCode->isAlt
+				&& isControl == noteKeyCode->isControl
+				&& isSuper == noteKeyCode->isSuper)
 			{
 				this->callback->PianoKeyboardNotePressed(this, noteKeyCode->keyNote + currentOctave*12);
 				return true;
@@ -333,6 +340,25 @@ bool CPianoKeyboard::KeyUp(u32 keyCode, bool isShift, bool isAlt, bool isControl
 	}
 
 	return false;
+}
+
+
+void CPianoKeyboard::MidiInKeyboardCallbackNoteOn(int channel, int key, int pressure)
+{
+	LOGD("CPianoKeyboard::MidiInKeyboardCallbackNoteOn: channel=%d key=%d pressure=%d", channel, key, pressure);
+	if (this->callback)
+	{
+		this->callback->PianoKeyboardNotePressed(this, key); // + currentOctave*12);
+	}
+}
+
+void CPianoKeyboard::MidiInKeyboardCallbackNoteOff(int channel, int key, int pressure)
+{
+	LOGD("CPianoKeyboard::MidiInKeyboardCallbackNoteOff: channel=%d key=%d pressure=%d", channel, key, pressure);
+	if (this->callback)
+	{
+		this->callback->PianoKeyboardNoteReleased(this, key);
+	}
 }
 
 void CPianoKeyboard::AddDefaultKeyCodes()
@@ -394,4 +420,3 @@ CPianoKeyboard::~CPianoKeyboard()
 		delete keyCode;
 	}
 }
-

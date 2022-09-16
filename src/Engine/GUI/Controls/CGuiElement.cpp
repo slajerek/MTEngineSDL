@@ -60,17 +60,18 @@ void CGuiElement::UpdatePosition()
 	this->SetPosition(this->posX, this->posY, this->posZ, this->sizeX, this->sizeY);
 }
 
-void CGuiElement::SetPosition(float posX, float posY)
-{
-	this->SetPosition(posX, posY, this->posZ, sizeX, sizeY);
-}
-
+///
 void CGuiElement::SetSize(float sizeX, float sizeY)
 {
 	this->sizeX = sizeX;
 	this->sizeY = sizeY;
 	this->posEndX = posX + sizeX;
 	this->posEndY = posY + sizeY;
+}
+
+void CGuiElement::SetPosition(float posX, float posY)
+{
+	this->SetPosition(posX, posY, this->posZ, sizeX, sizeY);
 }
 
 void CGuiElement::SetPosition(float posX, float posY, float posZ)

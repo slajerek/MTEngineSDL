@@ -63,6 +63,7 @@ public:
 
 char* SYS_FileSystemGetExtension(char* fileName);
 std::vector<CFileItem *> *SYS_GetFilesInFolder(char *directoryPath, std::list<char *> *extensions);
+std::vector<CFileItem *> *SYS_GetFilesInFolder(char *directoryPath, std::list<char *> *extensions, bool withFolders);
 
 class compareFiles
 {

@@ -3,6 +3,8 @@
 #include "SYS_FileSystem.h"
 #include <algorithm>
 
+// Note, this is old style config storage that is not used anymore. Please use CConfigStorageHjson instead
+
 CConfigValue::CConfigValue()
 {
 	memset(name, 0x00, MAX_NAME_LEN);

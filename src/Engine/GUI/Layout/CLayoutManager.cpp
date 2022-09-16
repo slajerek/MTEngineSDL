@@ -53,8 +53,7 @@ void CLayoutManager::AddLayout(CLayoutData *layoutData)
 	if (layout != NULL)
 	{
 		LOGD("CLayoutManager::AddLayout: removed existing layout %s", layoutData->layoutName);
-		RemoveLayout(layout);
-		delete layout;
+		RemoveAndDeleteLayout(layout);
 	}
 	
 	layouts.push_back(layoutData);
@@ -69,7 +68,7 @@ void CLayoutManager::AddLayout(CLayoutData *layoutData)
 	}
 }
 
-void CLayoutManager::RemoveLayout(CLayoutData *layoutData)
+void CLayoutManager::RemoveAndDeleteLayout(CLayoutData *layoutData)
 {
 	if (currentLayout == layoutData)
 	{

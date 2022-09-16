@@ -180,6 +180,22 @@ void LOG_Init(void)
 #endif
 }
 
+static int backupLogLevel = 0;
+void LOG_BackupCurrentLogLevel()
+{
+//	backupLogLevel = logger_currentLogLevel;
+}
+
+void LOG_RestoreBackupLogLevel()
+{
+	//logger_currentLogLevel = backupLogLevel;
+}
+
+void LOG_SetCurrentLogLevel(int level)
+{
+//	logger_currentLogLevel = level;
+}
+
 void LOG_Shutdown(void)
 {
 	_LOGF(DBGLVL_MAIN, "closing stdlib & logfile\nbye!\n");

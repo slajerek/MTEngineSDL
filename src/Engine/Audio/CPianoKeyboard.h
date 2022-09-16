@@ -12,6 +12,7 @@
 
 #include "CSlrImage.h"
 #include "CGuiView.h"
+#include "CMidiInKeyboard.h"
 
 class CPianoKeyboard;
 
@@ -48,17 +49,23 @@ public:
 class CPianoNoteKeyCode
 {
 public:
-	CPianoNoteKeyCode(u32 keyCode, int keyNote) { this->keyCode = keyCode; this->keyNote = keyNote; }
+	CPianoNoteKeyCode(u32 keyCode, int keyNote) { this->keyCode = keyCode; this->keyNote = keyNote; this->isShift = false; this->isAlt = false; this->isControl = false; this->isSuper = false; }
 	u32 keyCode;
 	int keyNote;
+	bool isShift;
+	bool isAlt;
+	bool isControl;
+	bool isSuper;
 };
 
-class CPianoKeyboard : public CGuiView
+class CPianoKeyboard : public CGuiView, public CMidiInKeyboardCallback
 {
 public:
 	CPianoKeyboard(const char *name, float posX, float posY, float posZ, float sizeX, float sizeY, CPianoKeyboardCallback *callback);
 	~CPianoKeyboard();
 	
+	CMidiInKeyboard *midiInKeyboard;
+
 	int numOctaves;
 	
 	virtual void InitKeys();
@@ -107,6 +114,11 @@ public:
 	std::list<CPianoNoteKeyCode *> notesKeyCodes;
 	
 	int currentOctave;
+
+	// MIDI
+	virtual void MidiInKeyboardCallbackNoteOn(int channel, int key, int pressure);
+	virtual void MidiInKeyboardCallbackNoteOff(int channel, int key, int pressure);
+
 };
 
 #endif //_SLRPIANOKEYBOARD_

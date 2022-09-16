@@ -8,13 +8,11 @@
 #include "CSlrString.h"
 #include "SYS_KeyCodes.h"
 
-#include <GL/gl3w.h>
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui.h"
 #include "imgui_internal.h"
 #include "imguihelper.h"
 #include "imgui_impl_sdl.h"
-#include "imgui_impl_opengl3.h"
 
 #define GUI_GAP_WIDTH 2
 
@@ -30,8 +28,6 @@ void GUI_HideVirtualKeyboard();
 class CGuiMain;
 class CConfigStorage;
 extern CGuiMain *guiMain;
-extern CConfigStorage *globalConfig;
-
 
 struct ImGuiWindowSizeConstraints
 {

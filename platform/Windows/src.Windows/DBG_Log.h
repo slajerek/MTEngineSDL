@@ -52,6 +52,9 @@
 #define DBGLVL_PAINT		(1 << 28)
 
 void LOG_Init(void);
+void LOG_BackupCurrentLogLevel();
+void LOG_RestoreBackupLogLevel();
+void LOG_SetCurrentLogLevel(int level);
 void LOG_Shutdown(void);
 
 #if !defined(GLOBAL_DEBUG_OFF)
