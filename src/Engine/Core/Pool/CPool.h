@@ -7,9 +7,11 @@
 #define WORD u16
 #define BYTE u8
 
-// http://www.flipcode.com/archives/toolbox.shtml
+// Fast Allocation Pool
+// Submitted by Jon Creighton
 
 // taken from: http://www.flipcode.com/archives/Fast_Allocation_Pool.shtml
+// http://www.flipcode.com/archives/toolbox.shtml
 
 // CPool:
 // An optimised way of performing dynamic memory allocation, using a

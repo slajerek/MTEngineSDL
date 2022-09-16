@@ -35,6 +35,13 @@ void SYS_PlatformShutdown()
 {	
 }
 
+void SYS_RestartApplication()
+{
+ LOGM("SYS_RestartApplication");
+ SYS_PlatformShutdown();
+ exit(0);  	
+}
+
 void SYS_AttachConsole()
 {
 }

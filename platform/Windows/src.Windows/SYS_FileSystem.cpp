@@ -222,8 +222,12 @@ char* SYS_FileSystemGetExtension(char* fileName)
 }
 
 #define BUFSIZE 4096
-
 std::vector<CFileItem *> *SYS_GetFilesInFolder(char *directoryPath, std::list<char *> *extensions)
+{
+	return SYS_GetFilesInFolder(directoryPath, extensions, true);
+}
+
+std::vector<CFileItem *> *SYS_GetFilesInFolder(char *directoryPath, std::list<char *> *extensions, bool withFolders)
 {
 	LOGD("CFileSystem::GetFiles: %s", directoryPath);
 	std::vector<CFileItem *> *files = new std::vector<CFileItem *>();
@@ -244,7 +248,8 @@ std::vector<CFileItem *> *SYS_GetFilesInFolder(char *directoryPath, std::list<ch
 	StringCchLength(directoryPath, MAX_PATH, &length_of_arg);
 	if (length_of_arg > (MAX_PATH-3))
 	{
-		SYS_FatalExit("CFileSystem::GetFiles: directoryPath too long");
+		LOGError("CFileSystem::GetFiles: directoryPath too long");
+		return files;
 	}
 
 	StringCchCopy(szDir, MAX_PATH, directoryPath);
@@ -254,36 +259,41 @@ std::vector<CFileItem *> *SYS_GetFilesInFolder(char *directoryPath, std::list<ch
 
 	if (hFind == INVALID_HANDLE_VALUE)
 	{
-		SYS_FatalExit("CFileSystem::GetFiles: FindFirstFile");
+		LOGError("CFileSystem::GetFiles: FindFirstFile");
+		return files;
 	}
 
 	do
 	{
 		if (ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
 		{
-			LOGD("<DIR> %s", ffd.cFileName);
-
-			if (!strcmp(ffd.cFileName, ".") || !strcmp(ffd.cFileName, ".."))
+			if (withFolders)
 			{
-			}
-			else
-			{
-				// oh, I forgot that Windows is for retards (as Gideon said)
+				LOGD("<DIR> %s", ffd.cFileName);
 
-				retval = GetFullPathName(ffd.cFileName, BUFSIZE, buffer, lppPart);
-
-				if (retval == 0)
+				if (!strcmp(ffd.cFileName, ".") || !strcmp(ffd.cFileName, ".."))
 				{
-					// Handle an error condition.
-					LOGError("GetFullPathName failed (%d)\n", GetLastError());
-					return NULL;
 				}
-				LOGD("the full path name is %s", buffer);
+				else
+				{
+					// oh, I forgot that Windows is for retards (as Gideon said)
+					// this is not giving full path to file, but just random strings
+	/*				retval = GetFullPathName(ffd.cFileName, BUFSIZE, buffer, lppPart);
 
-				char *modDateDup = strdup("");
+					if (retval == 0)
+					{
+						// Handle an error condition.
+						LOGError("GetFullPathName failed (%d)\n", GetLastError());
+						return NULL;
+					}*/
+					sprintf(buffer, "%s\\%s", directoryPath, ffd.cFileName);
+					LOGD("the full path name is %s", buffer);
 
-				CFileItem *item = new CFileItem(ffd.cFileName, buffer, modDateDup, true);
-				files->push_back(item);
+					char *modDateDup = strdup("");
+
+					CFileItem *item = new CFileItem(ffd.cFileName, buffer, modDateDup, true);
+					files->push_back(item);
+				}
 			}
 		}
 		else
@@ -311,9 +321,9 @@ std::vector<CFileItem *> *SYS_GetFilesInFolder(char *directoryPath, std::list<ch
 
 							// note, this below is copy pasted on purpose, because on this shitty platform I fucking do not care (as Windows devs also do).
 
+							/*
 							// oh, I forgot that Windows is for retards (as Gideon said)
 							//char *fileFullPath = strdup(ffd.path)
-
 							retval = GetFullPathName(ffd.cFileName, BUFSIZE, buffer, lppPart);
 
 							if (retval == 0)
@@ -322,7 +332,9 @@ std::vector<CFileItem *> *SYS_GetFilesInFolder(char *directoryPath, std::list<ch
 								LOGError("GetFullPathName failed (%d)\n", GetLastError());
 								return NULL;
 							}
-							LOGD("the full path name is %s", buffer);
+							*/
+
+							sprintf(buffer, "%s\\%s", directoryPath, ffd.cFileName);
 
 							CFileItem *item = new CFileItem(ffd.cFileName, buffer, "", false);
 							files->push_back(item);
@@ -334,6 +346,7 @@ std::vector<CFileItem *> *SYS_GetFilesInFolder(char *directoryPath, std::list<ch
 			}
 			else
 			{
+				/*
 				retval = GetFullPathName(ffd.cFileName, BUFSIZE, buffer, lppPart);
 
 				if (retval == 0)
@@ -342,6 +355,9 @@ std::vector<CFileItem *> *SYS_GetFilesInFolder(char *directoryPath, std::list<ch
 					LOGError("GetFullPathName failed (%d)\n", GetLastError());
 					return NULL;
 				}
+				*/
+				sprintf(buffer, "%s\\%s", directoryPath, ffd.cFileName);
+
 				LOGD("the full path name is %s", buffer);
 
 				CFileItem *item = new CFileItem(ffd.cFileName, buffer, (char*)"<mod date>", false);

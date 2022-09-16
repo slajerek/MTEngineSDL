@@ -10,6 +10,7 @@ class CByteBuffer;
 class CSlrKeyboardShortcutCallback;
 
 #define MT_KEYBOARD_SHORTCUT_GLOBAL	0x01
+#define KBZONE_GLOBAL				MT_KEYBOARD_SHORTCUT_GLOBAL
 
 class CSlrKeyboardShortcut
 {

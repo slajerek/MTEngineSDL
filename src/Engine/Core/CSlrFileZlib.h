@@ -10,6 +10,7 @@ class CSlrFileZlib : public CSlrFile
 public:
 	CSlrFileZlib();
 	CSlrFileZlib(CSlrFile *file);
+	CSlrFileZlib(CSlrFile *file, int compressionLevel);
 	CSlrFileZlib(CSlrFile *file, bool shouldDeleteFilePointer);
 	CSlrFileZlib(CSlrFile *file, int fileSize, bool shouldDeleteFilePointer);
 
@@ -18,6 +19,7 @@ public:
 	virtual bool Exists();
 	virtual u32 GetFileSize();
 	virtual u32 Read(u8 *data, u32 numBytes);
+	virtual u32 Write(u8 *data, u32 numBytes);
 	virtual int Seek(u32 newFilePos);
 	virtual int Seek(long int offset, int origin);
 	virtual u32 Tell();
@@ -25,6 +27,7 @@ public:
 	virtual void Close();
 	virtual ~CSlrFileZlib();
 
+	int compressionLevel;
 	u8 *chunkBuf;
 	z_stream strm;
 	
@@ -32,6 +35,8 @@ public:
 	CSlrFile *file;
 	
 };
+
+void UNITTEST_TestZlib();
 
 #endif
 //_CSLRFILEZLIB_H_

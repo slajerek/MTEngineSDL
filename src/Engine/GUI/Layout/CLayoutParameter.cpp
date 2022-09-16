@@ -3,7 +3,8 @@
 #include "CByteBuffer.h"
 #include "CLayoutManager.h"
 
-// TODO: to properly store layouts on parameter change we need to do this async way after frame is rendered in CGuiMain
+// to properly store layouts on parameter change we need to do this async way after frame is rendered in CGuiMain.
+// see guiMain->StoreLayoutInSettingsAtEndOfThisFrame()
 
 CLayoutParameter::CLayoutParameter(const char *name)
 {
@@ -140,7 +141,6 @@ bool CLayoutParameterFloat::RenderImGui()
 	
 	char *buf = SYS_GetCharBuf();
 	sprintf(buf, "%s##float2", name);
-//	if (ImGui::SliderFloat(buf, value, 0.1, 66.60, format, flags))
 	if (ImGui::SliderFloat(buf, value, 0.1, 50, format, flags))
 	{
 		guiMain->StoreLayoutInSettingsAtEndOfThisFrame();

@@ -41,8 +41,6 @@
 		41326041239E81440061FC82 /* imguial_term.h in Headers */ = {isa = PBXBuildFile; fileRef = 4132602F239E81440061FC82 /* imguial_term.h */; };
 		41326042239E81440061FC82 /* imguifilesystem.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 41326030239E81440061FC82 /* imguifilesystem.cpp */; };
 		41326043239E81440061FC82 /* imguifilesystem.h in Headers */ = {isa = PBXBuildFile; fileRef = 41326031239E81440061FC82 /* imguifilesystem.h */; };
-		41326044239E81440061FC82 /* imguihelper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 41326032239E81440061FC82 /* imguihelper.cpp */; };
-		41326045239E81440061FC82 /* imguihelper.h in Headers */ = {isa = PBXBuildFile; fileRef = 41326033239E81440061FC82 /* imguihelper.h */; };
 		41326046239E81440061FC82 /* imguial_button.h in Headers */ = {isa = PBXBuildFile; fileRef = 41326034239E81440061FC82 /* imguial_button.h */; };
 		41326047239E81440061FC82 /* imgui_memory_editor.h in Headers */ = {isa = PBXBuildFile; fileRef = 41326035239E81440061FC82 /* imgui_memory_editor.h */; };
 		41326048239E81440061FC82 /* IconsMaterialDesign_c.h in Headers */ = {isa = PBXBuildFile; fileRef = 41326036239E81440061FC82 /* IconsMaterialDesign_c.h */; };
@@ -209,6 +207,8 @@
 		4154FFBF2397A94700EB6387 /* trees.c in Sources */ = {isa = PBXBuildFile; fileRef = 415EE934238EB93800C0A32A /* trees.c */; };
 		4154FFC02397A94700EB6387 /* uncompr.c in Sources */ = {isa = PBXBuildFile; fileRef = 415EE936238EB93800C0A32A /* uncompr.c */; };
 		4154FFC12397A94700EB6387 /* zutil.c in Sources */ = {isa = PBXBuildFile; fileRef = 415EE939238EB93800C0A32A /* zutil.c */; };
+		415E837228588E4200800162 /* CGuiViewMessages.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 415E837028588E4200800162 /* CGuiViewMessages.cpp */; };
+		415E837328588E4200800162 /* CGuiViewMessages.h in Headers */ = {isa = PBXBuildFile; fileRef = 415E837128588E4200800162 /* CGuiViewMessages.h */; };
 		4160E9C726314FB200210DEF /* CGuiEvent.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4160E9C526314FB200210DEF /* CGuiEvent.cpp */; };
 		4160E9C826314FB200210DEF /* CGuiEvent.h in Headers */ = {isa = PBXBuildFile; fileRef = 4160E9C626314FB200210DEF /* CGuiEvent.h */; };
 		4165798523C5355E0051CEFE /* SYS_Threading.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4165798323C5355E0051CEFE /* SYS_Threading.cpp */; };
@@ -288,6 +288,14 @@
 		4183456123A00D4F00BE5475 /* nfd.h in Headers */ = {isa = PBXBuildFile; fileRef = 4183455D23A00D4F00BE5475 /* nfd.h */; };
 		41866F85265D1B5200E7E638 /* CConfigStorageHjson.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 41866F83265D1B5100E7E638 /* CConfigStorageHjson.cpp */; };
 		41866F86265D1B5200E7E638 /* CConfigStorageHjson.h in Headers */ = {isa = PBXBuildFile; fileRef = 41866F84265D1B5100E7E638 /* CConfigStorageHjson.h */; };
+		4189FF9F2790AB98006432AE /* RtMidi.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4189FF9D2790AB98006432AE /* RtMidi.cpp */; };
+		4189FFA02790AB98006432AE /* RtMidi.h in Headers */ = {isa = PBXBuildFile; fileRef = 4189FF9E2790AB98006432AE /* RtMidi.h */; };
+		4189FFA52790AD6D006432AE /* CMidiInKeyboard.h in Headers */ = {isa = PBXBuildFile; fileRef = 4189FFA32790AD6D006432AE /* CMidiInKeyboard.h */; };
+		4189FFA62790AD6D006432AE /* CMidiInKeyboard.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4189FFA42790AD6D006432AE /* CMidiInKeyboard.cpp */; };
+		4189FFAD2790AD97006432AE /* rad2fft.h in Headers */ = {isa = PBXBuildFile; fileRef = 4189FFA92790AD97006432AE /* rad2fft.h */; };
+		4189FFAE2790AD97006432AE /* rad2fft.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4189FFAA2790AD97006432AE /* rad2fft.cpp */; };
+		4189FFAF2790AD97006432AE /* SpectrumAnalysis.h in Headers */ = {isa = PBXBuildFile; fileRef = 4189FFAB2790AD97006432AE /* SpectrumAnalysis.h */; };
+		4189FFB02790AD97006432AE /* SpectrumAnalysis.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4189FFAC2790AD97006432AE /* SpectrumAnalysis.cpp */; };
 		418D82EF2732FC7E00CFFD8E /* CContinuousParamBezier.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 418D82ED2732FC7D00CFFD8E /* CContinuousParamBezier.cpp */; };
 		418D82F02732FC7E00CFFD8E /* CContinuousParam.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 418D82EE2732FC7E00CFFD8E /* CContinuousParam.cpp */; };
 		4192C36F27661F54001D2913 /* CRecentlyOpenedFiles.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4192C36D27661F54001D2913 /* CRecentlyOpenedFiles.cpp */; };
@@ -299,6 +307,11 @@
 		41A2CE6D23A6DB8D00B68A26 /* CSlrTextParser.h in Headers */ = {isa = PBXBuildFile; fileRef = 41A2CE6B23A6DB8D00B68A26 /* CSlrTextParser.h */; };
 		41A2CE7423A6EBF200B68A26 /* SYS_CommandLine.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 41A2CE7223A6EBF200B68A26 /* SYS_CommandLine.cpp */; };
 		41A2CE7523A6EBF200B68A26 /* SYS_CommandLine.h in Headers */ = {isa = PBXBuildFile; fileRef = 41A2CE7323A6EBF200B68A26 /* SYS_CommandLine.h */; };
+		41A9C0E928553CBC00C66922 /* CRenderBackendMetal.mm in Sources */ = {isa = PBXBuildFile; fileRef = 41A9C0E728553CBC00C66922 /* CRenderBackendMetal.mm */; };
+		41A9C0EA28553CBC00C66922 /* CRenderBackendMetal.h in Headers */ = {isa = PBXBuildFile; fileRef = 41A9C0E828553CBC00C66922 /* CRenderBackendMetal.h */; };
+		41A9C0EE285543B000C66922 /* imgui_impl_metal.mm in Sources */ = {isa = PBXBuildFile; fileRef = 410723BE285207170030EA32 /* imgui_impl_metal.mm */; };
+		41B2A07528C0AED500FDBC9E /* SYS_DefaultConfig.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 41B2A07328C0AED500FDBC9E /* SYS_DefaultConfig.cpp */; };
+		41B2A07628C0AED500FDBC9E /* SYS_DefaultConfig.h in Headers */ = {isa = PBXBuildFile; fileRef = 41B2A07428C0AED500FDBC9E /* SYS_DefaultConfig.h */; };
 		41B403C22600F07D00C271F3 /* stb_sprintf.h in Headers */ = {isa = PBXBuildFile; fileRef = 41B403C12600F07D00C271F3 /* stb_sprintf.h */; };
 		41BB0A06239CBC800035DB9F /* utf8_checked.h in Headers */ = {isa = PBXBuildFile; fileRef = 41BB0A02239CBC800035DB9F /* utf8_checked.h */; };
 		41BB0A07239CBC800035DB9F /* utf8_core.h in Headers */ = {isa = PBXBuildFile; fileRef = 41BB0A03239CBC800035DB9F /* utf8_core.h */; };
@@ -489,6 +502,8 @@
 		41D5E309239D895F00143F1C /* CDataTable.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 41D5E303239D895F00143F1C /* CDataTable.cpp */; };
 		41D5E30A239D895F00143F1C /* CGuiViewDataTable.h in Headers */ = {isa = PBXBuildFile; fileRef = 41D5E304239D895F00143F1C /* CGuiViewDataTable.h */; };
 		41D5E30B239D895F00143F1C /* CDataTable.h in Headers */ = {isa = PBXBuildFile; fileRef = 41D5E305239D895F00143F1C /* CDataTable.h */; };
+		41DA965128B52ECC009ADFB3 /* CGuiViewProgressBarWindow.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 41DA964F28B52ECC009ADFB3 /* CGuiViewProgressBarWindow.cpp */; };
+		41DA965228B52ECC009ADFB3 /* CGuiViewProgressBarWindow.h in Headers */ = {isa = PBXBuildFile; fileRef = 41DA965028B52ECC009ADFB3 /* CGuiViewProgressBarWindow.h */; };
 		41DAA18927638297006BC8DD /* CoreHaptics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 41DAA18827638297006BC8DD /* CoreHaptics.framework */; };
 		41DAA190276382DE006BC8DD /* GameController.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 41DAA18F276382DE006BC8DD /* GameController.framework */; };
 		41DAE4B423BA18C90011FEA9 /* SYS_FileSystem.mm in Sources */ = {isa = PBXBuildFile; fileRef = 41DAE49D23BA18C90011FEA9 /* SYS_FileSystem.mm */; };
@@ -512,6 +527,10 @@
 		41DAE4C823BA18C90011FEA9 /* SYS_MacOS.mm in Sources */ = {isa = PBXBuildFile; fileRef = 41DAE4B123BA18C90011FEA9 /* SYS_MacOS.mm */; };
 		41DAE4C923BA18C90011FEA9 /* SYS_Memory.h in Headers */ = {isa = PBXBuildFile; fileRef = 41DAE4B223BA18C90011FEA9 /* SYS_Memory.h */; };
 		41DAE4CA23BA18C90011FEA9 /* SYS_Memory.mm in Sources */ = {isa = PBXBuildFile; fileRef = 41DAE4B323BA18C90011FEA9 /* SYS_Memory.mm */; };
+		41E4CA97285343B6007509C3 /* CRenderBackend.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 41E4CA93285343B6007509C3 /* CRenderBackend.cpp */; };
+		41E4CA98285343B6007509C3 /* CRenderBackendOpenGL3.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 41E4CA94285343B6007509C3 /* CRenderBackendOpenGL3.cpp */; };
+		41E4CA99285343B6007509C3 /* CRenderBackendOpenGL3.h in Headers */ = {isa = PBXBuildFile; fileRef = 41E4CA95285343B6007509C3 /* CRenderBackendOpenGL3.h */; };
+		41E4CA9A285343B6007509C3 /* CRenderBackend.h in Headers */ = {isa = PBXBuildFile; fileRef = 41E4CA96285343B6007509C3 /* CRenderBackend.h */; };
 		41E87517263F5BDC00BEDCC8 /* IMG_SimpleSegmentation.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 41E87515263F5BDC00BEDCC8 /* IMG_SimpleSegmentation.cpp */; };
 		41E87518263F5BDC00BEDCC8 /* IMG_SimpleSegmentation.h in Headers */ = {isa = PBXBuildFile; fileRef = 41E87516263F5BDC00BEDCC8 /* IMG_SimpleSegmentation.h */; };
 		41E8C9472451D30800D70085 /* SYS_MacOSWrapper.mm in Sources */ = {isa = PBXBuildFile; fileRef = 41E8C9452451D30800D70085 /* SYS_MacOSWrapper.mm */; };
@@ -524,12 +543,16 @@
 		41F26A03264C0FBC0069862A /* hjson_encode.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 41F269FE264C0FBC0069862A /* hjson_encode.cpp */; };
 		41F26A04264C0FBC0069862A /* hjson.h in Headers */ = {isa = PBXBuildFile; fileRef = 41F269FF264C0FBC0069862A /* hjson.h */; };
 		41F26A05264C0FBC0069862A /* hjson_value.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 41F26A00264C0FBC0069862A /* hjson_value.cpp */; };
+		41F8CD08278DE4020015F0D4 /* CGuiViewUiDebug.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 41F8CD06278DE4020015F0D4 /* CGuiViewUiDebug.cpp */; };
+		41F8CD09278DE4020015F0D4 /* CGuiViewUiDebug.h in Headers */ = {isa = PBXBuildFile; fileRef = 41F8CD07278DE4020015F0D4 /* CGuiViewUiDebug.h */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		410272F82684D5C600890E34 /* libharfbuzz.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libharfbuzz.a; path = libs/libharfbuzz.a; sourceTree = "<group>"; };
 		410272FD2684DA7900890E34 /* libgraphite2.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libgraphite2.a; path = libs/libgraphite2.a; sourceTree = "<group>"; };
 		410273022684DBA300890E34 /* libbz2.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libbz2.a; path = libs/libbz2.a; sourceTree = "<group>"; };
+		410723BD285207170030EA32 /* imgui_impl_metal.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = imgui_impl_metal.h; sourceTree = "<group>"; };
+		410723BE285207170030EA32 /* imgui_impl_metal.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = imgui_impl_metal.mm; sourceTree = "<group>"; };
 		410CAEF12397A470009DA199 /* libMTEngineSDL.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libMTEngineSDL.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		4110F6F9239FA2D300C478B8 /* CGuiMain.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CGuiMain.cpp; path = GUI/CGuiMain.cpp; sourceTree = "<group>"; };
 		4110F6FA239FA2D300C478B8 /* CGuiMain.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CGuiMain.h; path = GUI/CGuiMain.h; sourceTree = "<group>"; };
@@ -554,8 +577,6 @@
 		4132602F239E81440061FC82 /* imguial_term.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = imguial_term.h; path = imguiext/imguial_term.h; sourceTree = "<group>"; };
 		41326030239E81440061FC82 /* imguifilesystem.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = imguifilesystem.cpp; path = imguiext/imguifilesystem.cpp; sourceTree = "<group>"; };
 		41326031239E81440061FC82 /* imguifilesystem.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = imguifilesystem.h; path = imguiext/imguifilesystem.h; sourceTree = "<group>"; };
-		41326032239E81440061FC82 /* imguihelper.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = imguihelper.cpp; path = imguiext/imguihelper.cpp; sourceTree = "<group>"; };
-		41326033239E81440061FC82 /* imguihelper.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = imguihelper.h; path = imguiext/imguihelper.h; sourceTree = "<group>"; };
 		41326034239E81440061FC82 /* imguial_button.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = imguial_button.h; path = imguiext/imguial_button.h; sourceTree = "<group>"; };
 		41326035239E81440061FC82 /* imgui_memory_editor.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = imgui_memory_editor.h; path = imguiext/imgui_memory_editor.h; sourceTree = "<group>"; };
 		41326036239E81440061FC82 /* IconsMaterialDesign_c.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = IconsMaterialDesign_c.h; path = imguiext/IconsMaterialDesign_c.h; sourceTree = "<group>"; };
@@ -586,6 +607,8 @@
 		4150B2E6245E2A38007DB292 /* ENET_Win32.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ENET_Win32.h; sourceTree = "<group>"; };
 		4150B2E7245E2A38007DB292 /* ENET_List.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ENET_List.cpp; sourceTree = "<group>"; };
 		4150B2E8245E2A38007DB292 /* ENET_Types.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ENET_Types.h; sourceTree = "<group>"; };
+		415E837028588E4200800162 /* CGuiViewMessages.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CGuiViewMessages.cpp; sourceTree = "<group>"; };
+		415E837128588E4200800162 /* CGuiViewMessages.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CGuiViewMessages.h; sourceTree = "<group>"; };
 		415EE8E4238EB93800C0A32A /* FUN_IntervalTree.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = FUN_IntervalTree.cpp; sourceTree = "<group>"; };
 		415EE8E5238EB93800C0A32A /* FUN_IntervalTree.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = FUN_IntervalTree.h; sourceTree = "<group>"; };
 		415EE8E7238EB93800C0A32A /* CImageKernel.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CImageKernel.cpp; sourceTree = "<group>"; };
@@ -888,6 +911,14 @@
 		4183455D23A00D4F00BE5475 /* nfd.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = nfd.h; path = nfd/nfd.h; sourceTree = "<group>"; };
 		41866F83265D1B5100E7E638 /* CConfigStorageHjson.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CConfigStorageHjson.cpp; sourceTree = "<group>"; };
 		41866F84265D1B5100E7E638 /* CConfigStorageHjson.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CConfigStorageHjson.h; sourceTree = "<group>"; };
+		4189FF9D2790AB98006432AE /* RtMidi.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = RtMidi.cpp; sourceTree = "<group>"; };
+		4189FF9E2790AB98006432AE /* RtMidi.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = RtMidi.h; sourceTree = "<group>"; };
+		4189FFA32790AD6D006432AE /* CMidiInKeyboard.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CMidiInKeyboard.h; sourceTree = "<group>"; };
+		4189FFA42790AD6D006432AE /* CMidiInKeyboard.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CMidiInKeyboard.cpp; sourceTree = "<group>"; };
+		4189FFA92790AD97006432AE /* rad2fft.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = rad2fft.h; sourceTree = "<group>"; };
+		4189FFAA2790AD97006432AE /* rad2fft.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = rad2fft.cpp; sourceTree = "<group>"; };
+		4189FFAB2790AD97006432AE /* SpectrumAnalysis.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SpectrumAnalysis.h; sourceTree = "<group>"; };
+		4189FFAC2790AD97006432AE /* SpectrumAnalysis.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = SpectrumAnalysis.cpp; sourceTree = "<group>"; };
 		418D82ED2732FC7D00CFFD8E /* CContinuousParamBezier.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CContinuousParamBezier.cpp; sourceTree = "<group>"; };
 		418D82EE2732FC7E00CFFD8E /* CContinuousParam.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CContinuousParam.cpp; sourceTree = "<group>"; };
 		4192C36D27661F54001D2913 /* CRecentlyOpenedFiles.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CRecentlyOpenedFiles.cpp; sourceTree = "<group>"; };
@@ -900,7 +931,11 @@
 		41A2CE6B23A6DB8D00B68A26 /* CSlrTextParser.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CSlrTextParser.h; sourceTree = "<group>"; };
 		41A2CE7223A6EBF200B68A26 /* SYS_CommandLine.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = SYS_CommandLine.cpp; sourceTree = "<group>"; };
 		41A2CE7323A6EBF200B68A26 /* SYS_CommandLine.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SYS_CommandLine.h; sourceTree = "<group>"; };
+		41A9C0E728553CBC00C66922 /* CRenderBackendMetal.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = CRenderBackendMetal.mm; sourceTree = "<group>"; };
+		41A9C0E828553CBC00C66922 /* CRenderBackendMetal.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CRenderBackendMetal.h; sourceTree = "<group>"; };
 		41AA0939238E6F6F00C1ED49 /* libSDL2.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libSDL2.a; path = libs/libSDL2.a; sourceTree = "<group>"; };
+		41B2A07328C0AED500FDBC9E /* SYS_DefaultConfig.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = SYS_DefaultConfig.cpp; sourceTree = "<group>"; };
+		41B2A07428C0AED500FDBC9E /* SYS_DefaultConfig.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SYS_DefaultConfig.h; sourceTree = "<group>"; };
 		41B403C12600F07D00C271F3 /* stb_sprintf.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = stb_sprintf.h; sourceTree = "<group>"; };
 		41BB0A02239CBC800035DB9F /* utf8_checked.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = utf8_checked.h; path = utf8/utf8_checked.h; sourceTree = "<group>"; };
 		41BB0A03239CBC800035DB9F /* utf8_core.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = utf8_core.h; path = utf8/utf8_core.h; sourceTree = "<group>"; };
@@ -1091,6 +1126,8 @@
 		41D5E303239D895F00143F1C /* CDataTable.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CDataTable.cpp; path = DataTable/CDataTable.cpp; sourceTree = "<group>"; };
 		41D5E304239D895F00143F1C /* CGuiViewDataTable.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CGuiViewDataTable.h; path = DataTable/CGuiViewDataTable.h; sourceTree = "<group>"; };
 		41D5E305239D895F00143F1C /* CDataTable.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CDataTable.h; path = DataTable/CDataTable.h; sourceTree = "<group>"; };
+		41DA964F28B52ECC009ADFB3 /* CGuiViewProgressBarWindow.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CGuiViewProgressBarWindow.cpp; sourceTree = "<group>"; };
+		41DA965028B52ECC009ADFB3 /* CGuiViewProgressBarWindow.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CGuiViewProgressBarWindow.h; sourceTree = "<group>"; };
 		41DAA18827638297006BC8DD /* CoreHaptics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreHaptics.framework; path = System/Library/Frameworks/CoreHaptics.framework; sourceTree = SDKROOT; };
 		41DAA18F276382DE006BC8DD /* GameController.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = GameController.framework; path = System/Library/Frameworks/GameController.framework; sourceTree = SDKROOT; };
 		41DAE49D23BA18C90011FEA9 /* SYS_FileSystem.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = SYS_FileSystem.mm; path = src.MacOS/SYS_FileSystem.mm; sourceTree = "<group>"; };
@@ -1114,6 +1151,11 @@
 		41DAE4B123BA18C90011FEA9 /* SYS_MacOS.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = SYS_MacOS.mm; path = src.MacOS/SYS_MacOS.mm; sourceTree = "<group>"; };
 		41DAE4B223BA18C90011FEA9 /* SYS_Memory.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SYS_Memory.h; path = src.MacOS/SYS_Memory.h; sourceTree = "<group>"; };
 		41DAE4B323BA18C90011FEA9 /* SYS_Memory.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = SYS_Memory.mm; path = src.MacOS/SYS_Memory.mm; sourceTree = "<group>"; };
+		41DC657C2778D57100A06BCF /* TODO.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = TODO.txt; path = ../../TODO.txt; sourceTree = "<group>"; };
+		41E4CA93285343B6007509C3 /* CRenderBackend.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CRenderBackend.cpp; sourceTree = "<group>"; };
+		41E4CA94285343B6007509C3 /* CRenderBackendOpenGL3.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CRenderBackendOpenGL3.cpp; sourceTree = "<group>"; };
+		41E4CA95285343B6007509C3 /* CRenderBackendOpenGL3.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CRenderBackendOpenGL3.h; sourceTree = "<group>"; };
+		41E4CA96285343B6007509C3 /* CRenderBackend.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CRenderBackend.h; sourceTree = "<group>"; };
 		41E691DC238D945800B33E68 /* CoreAudio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreAudio.framework; path = System/Library/Frameworks/CoreAudio.framework; sourceTree = SDKROOT; };
 		41E691DE238D947700B33E68 /* AudioToolbox.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AudioToolbox.framework; path = System/Library/Frameworks/AudioToolbox.framework; sourceTree = SDKROOT; };
 		41E691E1238D94AC00B33E68 /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
@@ -1138,6 +1180,10 @@
 		41F269FE264C0FBC0069862A /* hjson_encode.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = hjson_encode.cpp; sourceTree = "<group>"; };
 		41F269FF264C0FBC0069862A /* hjson.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = hjson.h; sourceTree = "<group>"; };
 		41F26A00264C0FBC0069862A /* hjson_value.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = hjson_value.cpp; sourceTree = "<group>"; };
+		41F6277028C448F5003E91BB /* imguihelper.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = imguihelper.cpp; path = ../imguiext/imguihelper.cpp; sourceTree = "<group>"; };
+		41F6277128C44907003E91BB /* imguihelper.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = imguihelper.h; path = ../imguiext/imguihelper.h; sourceTree = "<group>"; };
+		41F8CD06278DE4020015F0D4 /* CGuiViewUiDebug.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CGuiViewUiDebug.cpp; sourceTree = "<group>"; };
+		41F8CD07278DE4020015F0D4 /* CGuiViewUiDebug.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CGuiViewUiDebug.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1201,8 +1247,6 @@
 				4132602F239E81440061FC82 /* imguial_term.h */,
 				41326030239E81440061FC82 /* imguifilesystem.cpp */,
 				41326031239E81440061FC82 /* imguifilesystem.h */,
-				41326032239E81440061FC82 /* imguihelper.cpp */,
-				41326033239E81440061FC82 /* imguihelper.h */,
 				41326034239E81440061FC82 /* imguial_button.h */,
 				41326035239E81440061FC82 /* imgui_memory_editor.h */,
 				41326036239E81440061FC82 /* IconsMaterialDesign_c.h */,
@@ -1286,6 +1330,7 @@
 		415EE8BC238EB93800C0A32A /* Core */ = {
 			isa = PBXGroup;
 			children = (
+				41E4CA9C28534501007509C3 /* Render */,
 				41866F83265D1B5100E7E638 /* CConfigStorageHjson.cpp */,
 				41866F84265D1B5100E7E638 /* CConfigStorageHjson.h */,
 				414DD3F4260202C200138569 /* GAM_GamePads.cpp */,
@@ -1306,16 +1351,12 @@
 				41CEFE4D23A53D290036A52D /* CSlrImage.h */,
 				41D5E266239D891200143F1C /* SYS_Funct.cpp */,
 				41D5E2A5239D891200143F1C /* SYS_Funct.h */,
-				41D5E2A6239D891200143F1C /* VID_Blits.cpp */,
-				41D5E269239D891200143F1C /* VID_Blits.h */,
 				41D5E265239D891200143F1C /* CSlrString.cpp */,
 				41D5E294239D891200143F1C /* CSlrString.h */,
 				41D5E24E239D891200143F1C /* SYS_Main.cpp */,
 				41D5E261239D891200143F1C /* SYS_Main.h */,
 				41D5E24F239D891200143F1C /* RES_ResourceManager.cpp */,
 				41D5E2A3239D891200143F1C /* RES_ResourceManager.h */,
-				41D5E251239D891200143F1C /* VID_Main.cpp */,
-				41D5E250239D891200143F1C /* VID_Main.h */,
 				41D5E252239D891200143F1C /* SYS_Startup.cpp */,
 				41D5E253239D891200143F1C /* CSlrAnimation.cpp */,
 				41D5E256239D891200143F1C /* CSlrAnimation.h */,
@@ -1324,6 +1365,8 @@
 				41D5E255239D891200143F1C /* SYS_Defs.h */,
 				41D5E257239D891200143F1C /* SYS_KeyCodes.cpp */,
 				41D5E258239D891200143F1C /* SYS_KeyCodes.h */,
+				41B2A07328C0AED500FDBC9E /* SYS_DefaultConfig.cpp */,
+				41B2A07428C0AED500FDBC9E /* SYS_DefaultConfig.h */,
 				41D5E259239D891200143F1C /* CConfigStorage.cpp */,
 				41D5E260239D891200143F1C /* CConfigStorage.h */,
 				41D5E25A239D891200143F1C /* CSlrKeyboardShortcuts.cpp */,
@@ -1336,8 +1379,6 @@
 				41D5E26A239D891200143F1C /* CByteBuffer.h */,
 				41D5E264239D891200143F1C /* CImageData.cpp */,
 				41D5E279239D891200143F1C /* CImageData.h */,
-				41D5E267239D891200143F1C /* VID_ImageBinding.cpp */,
-				41D5E268239D891200143F1C /* VID_ImageBinding.h */,
 				41D5E26B239D891200143F1C /* CCombinations.h */,
 				418D82EE2732FC7E00CFFD8E /* CContinuousParam.cpp */,
 				41D5E26C239D891200143F1C /* CContinuousParam.h */,
@@ -1401,6 +1442,7 @@
 		415EE8DC238EB93800C0A32A /* Funct */ = {
 			isa = PBXGroup;
 			children = (
+				4189FFA82790AD97006432AE /* FFT */,
 				41BBDFAD26BFEA7B006ADD98 /* CFeatureConfig.cpp */,
 				41BBDFAC26BFEA7B006ADD98 /* CFeatureConfig.h */,
 				41BB09FC239C89080035DB9F /* DataTable */,
@@ -1452,9 +1494,12 @@
 		415EE8F6238EB93800C0A32A /* Libs */ = {
 			isa = PBXGroup;
 			children = (
+				41326027239E81390061FC82 /* imguiext */,
+				4122B8E824BF3767001CFD64 /* implot */,
+				415EE8F7238EB93800C0A32A /* imgui */,
+				4189FF9C2790AB98006432AE /* rtmidi */,
 				41F269FB264C0FBC0069862A /* hjson */,
 				41B403C02600F07D00C271F3 /* stb */,
-				4122B8E824BF3767001CFD64 /* implot */,
 				4150B2D6245E2A38007DB292 /* ENet */,
 				4173990D23A4E67B008764F9 /* libjson */,
 				4173993C23A4E67B008764F9 /* md5 */,
@@ -1465,8 +1510,6 @@
 				415EEA8A238EC32300C0A32A /* tremor */,
 				415EEA76238EC2CC00C0A32A /* mtrand */,
 				415EE979238EBA3600C0A32A /* jpeg */,
-				41326027239E81390061FC82 /* imguiext */,
-				415EE8F7238EB93800C0A32A /* imgui */,
 				415EE906238EB93800C0A32A /* libpng */,
 				415EE91D238EB93800C0A32A /* lodepng */,
 				415EE920238EB93800C0A32A /* zlib */,
@@ -1477,6 +1520,8 @@
 		415EE8F7238EB93800C0A32A /* imgui */ = {
 			isa = PBXGroup;
 			children = (
+				41F6277128C44907003E91BB /* imguihelper.h */,
+				41F6277028C448F5003E91BB /* imguihelper.cpp */,
 				415EE8F8238EB93800C0A32A /* imconfig.h */,
 				415EE8F9238EB93800C0A32A /* imgui.cpp */,
 				415EE8FA238EB93800C0A32A /* imgui.h */,
@@ -1484,6 +1529,8 @@
 				415EE8FC238EB93800C0A32A /* imgui_draw.cpp */,
 				415EE8FD238EB93800C0A32A /* imgui_impl_opengl3.cpp */,
 				415EE8FE238EB93800C0A32A /* imgui_impl_opengl3.h */,
+				410723BE285207170030EA32 /* imgui_impl_metal.mm */,
+				410723BD285207170030EA32 /* imgui_impl_metal.h */,
 				415EE8FF238EB93800C0A32A /* imgui_impl_sdl.cpp */,
 				415EE900238EB93800C0A32A /* imgui_impl_sdl.h */,
 				415EE901238EB93800C0A32A /* imgui_internal.h */,
@@ -1662,6 +1709,7 @@
 		415EEA56238EC29D00C0A32A /* Audio */ = {
 			isa = PBXGroup;
 			children = (
+				4189FFA22790AD6D006432AE /* MIDI */,
 				4166F18225E520060066DB71 /* CPianoKeyboard.cpp */,
 				4166F18125E520060066DB71 /* CPianoKeyboard.h */,
 				415EEABD238EC37200C0A32A /* SND_SoundEngine.cpp */,
@@ -1939,6 +1987,35 @@
 			name = nfd;
 			sourceTree = "<group>";
 		};
+		4189FF9C2790AB98006432AE /* rtmidi */ = {
+			isa = PBXGroup;
+			children = (
+				4189FF9D2790AB98006432AE /* RtMidi.cpp */,
+				4189FF9E2790AB98006432AE /* RtMidi.h */,
+			);
+			path = rtmidi;
+			sourceTree = "<group>";
+		};
+		4189FFA22790AD6D006432AE /* MIDI */ = {
+			isa = PBXGroup;
+			children = (
+				4189FFA42790AD6D006432AE /* CMidiInKeyboard.cpp */,
+				4189FFA32790AD6D006432AE /* CMidiInKeyboard.h */,
+			);
+			path = MIDI;
+			sourceTree = "<group>";
+		};
+		4189FFA82790AD97006432AE /* FFT */ = {
+			isa = PBXGroup;
+			children = (
+				4189FFAA2790AD97006432AE /* rad2fft.cpp */,
+				4189FFA92790AD97006432AE /* rad2fft.h */,
+				4189FFAC2790AD97006432AE /* SpectrumAnalysis.cpp */,
+				4189FFAB2790AD97006432AE /* SpectrumAnalysis.h */,
+			);
+			path = FFT;
+			sourceTree = "<group>";
+		};
 		41A5739D239C7BF6004D8756 /* GUI */ = {
 			isa = PBXGroup;
 			children = (
@@ -1991,6 +2068,12 @@
 		41D5E19D239D890700143F1C /* Helpers */ = {
 			isa = PBXGroup;
 			children = (
+				41DA964F28B52ECC009ADFB3 /* CGuiViewProgressBarWindow.cpp */,
+				41DA965028B52ECC009ADFB3 /* CGuiViewProgressBarWindow.h */,
+				415E837028588E4200800162 /* CGuiViewMessages.cpp */,
+				415E837128588E4200800162 /* CGuiViewMessages.h */,
+				41F8CD06278DE4020015F0D4 /* CGuiViewUiDebug.cpp */,
+				41F8CD07278DE4020015F0D4 /* CGuiViewUiDebug.h */,
 				4192C36D27661F54001D2913 /* CRecentlyOpenedFiles.cpp */,
 				4192C36E27661F54001D2913 /* CRecentlyOpenedFiles.h */,
 				41425B67270CA62300785D85 /* CGuiViewImageWithLayer.cpp */,
@@ -2113,6 +2196,25 @@
 			path = GUI/Controls;
 			sourceTree = "<group>";
 		};
+		41E4CA9C28534501007509C3 /* Render */ = {
+			isa = PBXGroup;
+			children = (
+				41D5E2A6239D891200143F1C /* VID_Blits.cpp */,
+				41D5E269239D891200143F1C /* VID_Blits.h */,
+				41D5E251239D891200143F1C /* VID_Main.cpp */,
+				41D5E250239D891200143F1C /* VID_Main.h */,
+				41D5E267239D891200143F1C /* VID_ImageBinding.cpp */,
+				41D5E268239D891200143F1C /* VID_ImageBinding.h */,
+				41E4CA93285343B6007509C3 /* CRenderBackend.cpp */,
+				41E4CA96285343B6007509C3 /* CRenderBackend.h */,
+				41A9C0E728553CBC00C66922 /* CRenderBackendMetal.mm */,
+				41A9C0E828553CBC00C66922 /* CRenderBackendMetal.h */,
+				41E4CA94285343B6007509C3 /* CRenderBackendOpenGL3.cpp */,
+				41E4CA95285343B6007509C3 /* CRenderBackendOpenGL3.h */,
+			);
+			path = Render;
+			sourceTree = "<group>";
+		};
 		41E691D9238D942F00B33E68 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
@@ -2142,6 +2244,7 @@
 		41EEA363238D923E0078ED73 = {
 			isa = PBXGroup;
 			children = (
+				41DC657C2778D57100A06BCF /* TODO.txt */,
 				41326024239E7B850061FC82 /* MT_API.h */,
 				4129AA822397A310003E7C88 /* MT_VERSION.h */,
 				415EEAE6238ECE0900C0A32A /* Embedded */,
@@ -2182,6 +2285,7 @@
 				4173997D23A4E67B008764F9 /* mztools.h in Headers */,
 				41D5E227239D890700143F1C /* CGuiRadio.h in Headers */,
 				4150B2F0245E2A38007DB292 /* ENET_Protocol.h in Headers */,
+				41F8CD09278DE4020015F0D4 /* CGuiViewUiDebug.h in Headers */,
 				41DAE4BE23BA18C90011FEA9 /* CSlrFileFromDocuments.h in Headers */,
 				4165798623C5355E0051CEFE /* SYS_Threading.h in Headers */,
 				41D5E2DE239D891200143F1C /* CSlrFont.h in Headers */,
@@ -2199,7 +2303,6 @@
 				41D5E20C239D890700143F1C /* CGuiButton.h in Headers */,
 				41D5E22D239D890700143F1C /* CGuiTheme.h in Headers */,
 				41D5E2DA239D891200143F1C /* CSlrFileMemory.h in Headers */,
-				41326045239E81440061FC82 /* imguihelper.h in Headers */,
 				41D5E223239D890700143F1C /* CGuiList.h in Headers */,
 				4132604A239E81440061FC82 /* IconsFontAwesome_c.h in Headers */,
 				41D5E2B8239D891200143F1C /* ConstantsAndMacros.h in Headers */,
@@ -2224,6 +2327,7 @@
 				41D5E1F5239D890700143F1C /* GUI_Main.h in Headers */,
 				417C865A245E2BA8001D67E9 /* CNetClient.h in Headers */,
 				4173995923A4E67B008764F9 /* GNU_C.h in Headers */,
+				41DA965228B52ECC009ADFB3 /* CGuiViewProgressBarWindow.h in Headers */,
 				4173996C23A4E67B008764F9 /* JSONStream.h in Headers */,
 				4173998123A4E67B008764F9 /* zip.h in Headers */,
 				4173996223A4E67B008764F9 /* JSONMemoryPool.h in Headers */,
@@ -2235,6 +2339,7 @@
 				41D5E2FE239D891200143F1C /* SYS_Funct.h in Headers */,
 				41D5E2F9239D891200143F1C /* MTH_Random.h in Headers */,
 				41DAE4BA23BA18C90011FEA9 /* SYS_FileSystem.h in Headers */,
+				41B2A07628C0AED500FDBC9E /* SYS_DefaultConfig.h in Headers */,
 				41D5E2D1239D891200143F1C /* CGlobalOSWindowChangedCallback.h in Headers */,
 				41D5E2F6239D891200143F1C /* MTH_FixedPoint.h in Headers */,
 				4173995C23A4E67B008764F9 /* Visual_C.h in Headers */,
@@ -2243,6 +2348,7 @@
 				41D5E2EF239D891200143F1C /* CSlrTexture.h in Headers */,
 				417C8656245E2BA8001D67E9 /* CNetClientData.h in Headers */,
 				41D5E1FC239D890700143F1C /* CGuiViewConsole.h in Headers */,
+				4189FFA52790AD6D006432AE /* CMidiInKeyboard.h in Headers */,
 				41DAE4B723BA18C90011FEA9 /* SYS_MacOS.h in Headers */,
 				41D5E221239D890700143F1C /* CGuiLabel.h in Headers */,
 				4150B2FA245E2A38007DB292 /* ENET_Types.h in Headers */,
@@ -2264,6 +2370,7 @@
 				4173994F23A4E67B008764F9 /* mempool.h in Headers */,
 				4173995B23A4E67B008764F9 /* Unknown_C.h in Headers */,
 				41D5E202239D890700143F1C /* CGuiViewBaseLoadingScreen.h in Headers */,
+				41E4CA99285343B6007509C3 /* CRenderBackendOpenGL3.h in Headers */,
 				41BB0A06239CBC800035DB9F /* utf8_checked.h in Headers */,
 				41D5E2F3239D891200143F1C /* MTH_FastMathSinTab.h in Headers */,
 				41D5E212239D890700143F1C /* CGuiButtonText.h in Headers */,
@@ -2272,7 +2379,10 @@
 				41A2CE7523A6EBF200B68A26 /* SYS_CommandLine.h in Headers */,
 				41D5E243239D890700143F1C /* CGuiViewSelectFolder.h in Headers */,
 				41326043239E81440061FC82 /* imguifilesystem.h in Headers */,
+				4189FFAD2790AD97006432AE /* rad2fft.h in Headers */,
+				41E4CA9A285343B6007509C3 /* CRenderBackend.h in Headers */,
 				4173995A23A4E67B008764F9 /* Strings_Defs.h in Headers */,
+				4189FFAF2790AD97006432AE /* SpectrumAnalysis.h in Headers */,
 				41326047239E81440061FC82 /* imgui_memory_editor.h in Headers */,
 				41D5E2B7239D891200143F1C /* CDataAdapter.h in Headers */,
 				41D5E2C4239D891200143F1C /* CCombinations.h in Headers */,
@@ -2331,6 +2441,7 @@
 				4173995123A4E67B008764F9 /* internalJSONNode.h in Headers */,
 				41D5E2DC239D891200143F1C /* CSlrFileZlib.h in Headers */,
 				41D5E21F239D890700143F1C /* CGuiFolderFavorite.h in Headers */,
+				41A9C0EA28553CBC00C66922 /* CRenderBackendMetal.h in Headers */,
 				4173998223A4E67B008764F9 /* pugiconfig.h in Headers */,
 				417C865B245E2BA8001D67E9 /* NET_Includes.h in Headers */,
 				41D5E208239D890700143F1C /* CGuiViewResourceManager.h in Headers */,
@@ -2365,8 +2476,10 @@
 				41326048239E81440061FC82 /* IconsMaterialDesign_c.h in Headers */,
 				4122B8ED24BF3775001CFD64 /* implot.h in Headers */,
 				41D5E2CC239D891200143F1C /* CContinuousParamSinHalf.h in Headers */,
+				415E837328588E4200800162 /* CGuiViewMessages.h in Headers */,
 				41D5E247239D890700143F1C /* CGuiViewToolBox.h in Headers */,
 				4173997023A4E67B008764F9 /* JSONWorker.h in Headers */,
+				4189FFA02790AB98006432AE /* RtMidi.h in Headers */,
 				41D5E2D8239D891200143F1C /* CSlrFileFromMemory.h in Headers */,
 				41DAE4C923BA18C90011FEA9 /* SYS_Memory.h in Headers */,
 				41B403C22600F07D00C271F3 /* stb_sprintf.h in Headers */,
@@ -2442,6 +2555,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				41A9C0EE285543B000C66922 /* imgui_impl_metal.mm in Sources */,
 				41BBDFAF26BFED5F006ADD98 /* CFeatureConfig.cpp in Sources */,
 				4173997A23A4E67B008764F9 /* ioapi.c in Sources */,
 				41D5E2E9239D891200143F1C /* CSlrImageTexture.cpp in Sources */,
@@ -2460,8 +2574,10 @@
 				41D5E2BC239D891200143F1C /* CByteBuffer.cpp in Sources */,
 				41F26A03264C0FBC0069862A /* hjson_encode.cpp in Sources */,
 				4154FF5E2397A94700EB6387 /* tremor-mapping0.c in Sources */,
+				4189FFA62790AD6D006432AE /* CMidiInKeyboard.cpp in Sources */,
 				41D5E220239D890700143F1C /* CGuiLabel.cpp in Sources */,
 				4173997C23A4E67B008764F9 /* mztools.c in Sources */,
+				41E4CA98285343B6007509C3 /* CRenderBackendOpenGL3.cpp in Sources */,
 				41D5E2B5239D891200143F1C /* CSlrAnimationState.cpp in Sources */,
 				41D5E22C239D890700143F1C /* CGuiTheme.cpp in Sources */,
 				4110F6FB239FA2D300C478B8 /* CGuiMain.cpp in Sources */,
@@ -2490,6 +2606,7 @@
 				41D5E219239D890700143F1C /* CGuiEditBoxText.cpp in Sources */,
 				4154FF682397A94700EB6387 /* cdjpeg.c in Sources */,
 				4154FF692397A94700EB6387 /* jaricom.c in Sources */,
+				415E837228588E4200800162 /* CGuiViewMessages.cpp in Sources */,
 				41D5E2C9239D891200143F1C /* CContinuousParamSin.cpp in Sources */,
 				4173996623A4E67B008764F9 /* JSONPreparse.cpp in Sources */,
 				4166F18425E520060066DB71 /* CPianoKeyboard.cpp in Sources */,
@@ -2540,6 +2657,7 @@
 				41D5E2A7239D891200143F1C /* SYS_Main.cpp in Sources */,
 				4154FF7F2397A94700EB6387 /* jdcoefct.c in Sources */,
 				4154FF802397A94700EB6387 /* jdcolor.c in Sources */,
+				4189FF9F2790AB98006432AE /* RtMidi.cpp in Sources */,
 				4154FF812397A94700EB6387 /* jddctmgr.c in Sources */,
 				4154FF822397A94700EB6387 /* jdhuff.c in Sources */,
 				4154FF832397A94700EB6387 /* jdinput.c in Sources */,
@@ -2552,12 +2670,12 @@
 				41D5E213239D890700143F1C /* CGuiEditBoxFloat.cpp in Sources */,
 				4154FF872397A94700EB6387 /* jdmerge.c in Sources */,
 				4150B2F2245E2A38007DB292 /* ENET_Protocol.cpp in Sources */,
-				41326044239E81440061FC82 /* imguihelper.cpp in Sources */,
 				4154FF882397A94700EB6387 /* jdpostct.c in Sources */,
 				41D5E2DD239D891200143F1C /* CSlrFont.cpp in Sources */,
 				4154FF892397A94700EB6387 /* jdsample.c in Sources */,
 				4132603E239E81440061FC82 /* imguial_log.cpp in Sources */,
 				4154FF8A2397A94700EB6387 /* jdtrans.c in Sources */,
+				41A9C0E928553CBC00C66922 /* CRenderBackendMetal.mm in Sources */,
 				4150B2F3245E2A38007DB292 /* ENET_Peer.cpp in Sources */,
 				41E8C9472451D30800D70085 /* SYS_MacOSWrapper.mm in Sources */,
 				4154FF8B2397A94700EB6387 /* jerror.c in Sources */,
@@ -2567,6 +2685,7 @@
 				4154FF8E2397A94700EB6387 /* jfdctint.c in Sources */,
 				4154FF8F2397A94700EB6387 /* jidctflt.c in Sources */,
 				4173997223A4E67B008764F9 /* libjson.cpp in Sources */,
+				4189FFAE2790AD97006432AE /* rad2fft.cpp in Sources */,
 				41D5E2C0239D891200143F1C /* VID_ImageBinding.cpp in Sources */,
 				4154FF902397A94700EB6387 /* jidctfst.c in Sources */,
 				41D5E209239D890700143F1C /* CGuiBackground.cpp in Sources */,
@@ -2614,6 +2733,7 @@
 				4154FFA92397A94700EB6387 /* pngread.c in Sources */,
 				4154FFAA2397A94700EB6387 /* pngrio.c in Sources */,
 				4154FFAB2397A94700EB6387 /* pngrtran.c in Sources */,
+				41DA965128B52ECC009ADFB3 /* CGuiViewProgressBarWindow.cpp in Sources */,
 				4154FFAC2397A94700EB6387 /* pngrutil.c in Sources */,
 				418D82EF2732FC7E00CFFD8E /* CContinuousParamBezier.cpp in Sources */,
 				4154FFAD2397A94700EB6387 /* pngset.c in Sources */,
@@ -2639,6 +2759,7 @@
 				41D5E23A239D890700143F1C /* CGuiViewMessageBox.cpp in Sources */,
 				41D5E2E3239D891200143F1C /* CSlrImageBase.cpp in Sources */,
 				41D5E226239D890700143F1C /* CGuiRadio.cpp in Sources */,
+				41B2A07528C0AED500FDBC9E /* SYS_DefaultConfig.cpp in Sources */,
 				41D5E230239D890700143F1C /* CGuiViewFade.cpp in Sources */,
 				4154FFB52397A94700EB6387 /* crc32.c in Sources */,
 				4154FFB62397A94700EB6387 /* deflate.c in Sources */,
@@ -2680,6 +2801,7 @@
 				4154FF1A2397A93A00EB6387 /* CAudioChannel.cpp in Sources */,
 				4154FF1B2397A93A00EB6387 /* CAudioChannelBusFloat.cpp in Sources */,
 				4154FF1C2397A93A00EB6387 /* CAudioChannelBusInt.cpp in Sources */,
+				41F8CD08278DE4020015F0D4 /* CGuiViewUiDebug.cpp in Sources */,
 				4154FF1D2397A93A00EB6387 /* CAudioChannelMusicPlayer.cpp in Sources */,
 				41DAE4C123BA18C90011FEA9 /* CSlrFileFromOS.mm in Sources */,
 				41D5E240239D890700143F1C /* CGuiViewSelectFile.cpp in Sources */,
@@ -2694,6 +2816,7 @@
 				41F26A05264C0FBC0069862A /* hjson_value.cpp in Sources */,
 				41DAE4C723BA18C90011FEA9 /* gl3w.c in Sources */,
 				41DAE4BB23BA18C90011FEA9 /* nfd_cocoa.m in Sources */,
+				41E4CA97285343B6007509C3 /* CRenderBackend.cpp in Sources */,
 				41D5E309239D895F00143F1C /* CDataTable.cpp in Sources */,
 				41D5E22E239D890700143F1C /* CGuiView.cpp in Sources */,
 				4154FF1E2397A93A00EB6387 /* CMusicChannel.cpp in Sources */,
@@ -2728,6 +2851,7 @@
 				4154FF4F2397A93A00EB6387 /* JPEGWriter.cpp in Sources */,
 				4154FF502397A93A00EB6387 /* imgui.cpp in Sources */,
 				4154FF512397A93A00EB6387 /* imgui_demo.cpp in Sources */,
+				4189FFB02790AD97006432AE /* SpectrumAnalysis.cpp in Sources */,
 				4154FF522397A93A00EB6387 /* imgui_draw.cpp in Sources */,
 				4154FF532397A93A00EB6387 /* imgui_impl_opengl3.cpp in Sources */,
 				41D5E222239D890700143F1C /* CGuiList.cpp in Sources */,

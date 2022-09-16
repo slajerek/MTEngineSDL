@@ -1,13 +1,17 @@
 #include "CSlrFileZlib.h"
 #include "DBG_Log.h"
 #include "SYS_Main.h"
+#include "MTH_Random.h"
 #include <assert.h>
+
+#include "CSlrFileFromOS.h"
 
 #define ZLIB_CHUNK_SIZE 1024*1024
 
 CSlrFileZlib::CSlrFileZlib()
 {
 	this->fileMode = SLR_FILE_MODE_NOT_OPENED;
+	this->compressionLevel = Z_BEST_COMPRESSION;
 	this->shouldDeleteFilePointer = false;
 }
 
@@ -15,6 +19,15 @@ CSlrFileZlib::CSlrFileZlib(CSlrFile *file)
 {
 	LOGR("CSlrFileZlib::CSlrFileZlib");
 	this->shouldDeleteFilePointer = false;
+	this->compressionLevel = Z_BEST_COMPRESSION;
+	this->Open(file);
+}
+
+CSlrFileZlib::CSlrFileZlib(CSlrFile *file, int compressionLevel)
+{
+	LOGR("CSlrFileZlib::CSlrFileZlib");
+	this->shouldDeleteFilePointer = false;
+	this->compressionLevel = compressionLevel;
 	this->Open(file);
 }
 
@@ -22,6 +35,7 @@ CSlrFileZlib::CSlrFileZlib(CSlrFile *file, bool shouldDeleteFilePointer)
 {
 	LOGR("CSlrFileZlib::CSlrFileZlib");
 	this->shouldDeleteFilePointer = shouldDeleteFilePointer;
+	this->compressionLevel = Z_BEST_COMPRESSION;
 	this->Open(file);
 }
 
@@ -29,6 +43,7 @@ CSlrFileZlib::CSlrFileZlib(CSlrFile *file, int fileSize, bool shouldDeleteFilePo
 {
 	LOGR("CSlrFileZlib::CSlrFileZlib");
 	this->shouldDeleteFilePointer = shouldDeleteFilePointer;
+	this->compressionLevel = Z_BEST_COMPRESSION;
 	this->Open(file);
 	this->fileSize = fileSize;
 }
@@ -38,7 +53,7 @@ void CSlrFileZlib::Open(CSlrFile *file)
 	LOGR("CSlrFileZlib::Open");
 
 	this->file = file;
-	this->fileMode = SLR_FILE_MODE_READ;
+	this->fileMode = file->fileMode;
 	this->filePos = 0;
 	
 	strm.zalloc = Z_NULL;
@@ -46,13 +61,24 @@ void CSlrFileZlib::Open(CSlrFile *file)
 	strm.opaque = Z_NULL;
 	strm.avail_in = 0;
 	strm.next_in = Z_NULL;
-	int ret = inflateInit(&strm);
-	if (ret != Z_OK)
-	{
-		SYS_FatalExit("inflateInit failed");
-	}
-
 	chunkBuf = new u8[ZLIB_CHUNK_SIZE];
+
+	if (fileMode == SLR_FILE_MODE_READ)
+	{
+		int ret = inflateInit(&strm);
+		if (ret != Z_OK)
+		{
+			SYS_FatalExit("inflateInit failed");
+		}
+	}
+	else if (fileMode == SLR_FILE_MODE_WRITE)
+	{
+		int ret = deflateInit(&strm, compressionLevel);
+		if (ret != Z_OK)
+		{
+			SYS_FatalExit("deflateInit2 failed");
+		}
+	}
 }
 
 void CSlrFileZlib::Reopen()
@@ -160,47 +186,85 @@ u32 CSlrFileZlib::Read(u8 *dataBuf, u32 numBytes)
 		}
 	}
 	while (numBytes != 0);
-
-//	// debug dump stream:
-//	static unsigned int debugZlibBufNum = 0;
-//	char *buf = BytesToHexString(dataBuf, 0, numBytesInflated, " ");
-//	LOGD("CSlrFileZlib::Read: read=%s", buf);
-//	delete buf;
-//	
-//	char buf2[64];
-//	sprintf(buf2, "/Users/mars/BUFS/ZL-%08d", debugZlibBufNum++);
-//	
-//	FILE *fp = fopen(buf2, "wb");
-//	fwrite(dataBuf, 1, numBytesInflated, fp);
-//	fclose(fp);
-//	//
-	
 	
 	//LOGD("CSlrFileZlib::Read: numBytesInflated=%d", numBytesInflated);
 	return numBytesInflated;
 }
 
-//int CSlrFileZlib::Write()
-//{
-//		uLong outBufferSize = compressBound(numBytes);
-//		u8 *outBuffer = new u8[outBufferSize];
-//
-//		int result = compress2(outBuffer, &outBufferSize, imageBuffer, numBytes, 9);
-//
-//		if (result != Z_OK)
-//		{
-//			delete [] outBuffer;
-//			SYS_FatalExit("zlib error: %d", result);
-//		}
-//
-//		u32 outSize = (u32)outBufferSize;
-//
-//		LOGD("..original size=%d compressed=%d", numBytes, outSize);
-//
-//		byteBuffer->PutU32(outSize);
-//		byteBuffer->PutBytes(outBuffer, outSize);
-//		delete [] outBuffer;
-//}
+u32 CSlrFileZlib::Write(u8 *data, u32 numBytes)
+{
+	strm.total_out = 0;
+
+	strm.next_in = data;
+	strm.avail_in = numBytes;
+
+	do
+	{
+		strm.avail_out = ZLIB_CHUNK_SIZE;
+		strm.next_out = chunkBuf;
+
+		int ret = deflate(&strm, Z_NO_FLUSH);
+		if (ret != Z_OK)
+		{
+			LOGError("CSlrFileZlib::Write deflate error=%d", ret);
+			SYS_FatalExit("deflate failed");
+		}
+		
+		int len = ZLIB_CHUNK_SIZE - strm.avail_out;
+		if (len > 0)
+		{
+			file->Write(chunkBuf, len);
+		}
+	}
+	while (strm.avail_out == 0);
+	
+	return numBytes;
+}
+
+void CSlrFileZlib::Close()
+{
+	if (fileMode == SLR_FILE_MODE_READ)
+	{
+		inflateEnd(&strm);
+		fileMode = SLR_FILE_MODE_NOT_OPENED;
+	}
+	else if (fileMode == SLR_FILE_MODE_WRITE)
+	{
+		int ret;
+		
+		do
+		{
+			strm.avail_out = ZLIB_CHUNK_SIZE;
+			strm.next_out = chunkBuf;
+
+			ret = deflate(&strm, Z_FINISH);
+			int len = ZLIB_CHUNK_SIZE - strm.avail_out;
+			file->Write(chunkBuf, len);
+			
+			if (ret != Z_STREAM_END)
+			{
+				LOGError("CSlrFileZlib::Close: deflate returned %d", ret);
+				SYS_FatalExit("CSlrFileZlib::Close: deflate returned %d", ret);
+			}
+		}
+		while (ret != Z_STREAM_END);
+
+		deflateEnd(&strm);
+		fileMode = SLR_FILE_MODE_NOT_OPENED;
+	}
+
+	LOGD("CSlrFileZlib::Close: done");
+}
+
+CSlrFileZlib::~CSlrFileZlib()
+{
+	if (fileMode != SLR_FILE_MODE_NOT_OPENED)
+		Close();
+	
+	delete [] chunkBuf;
+	if (shouldDeleteFilePointer)
+		delete file;
+}
 
 int CSlrFileZlib::Seek(u32 newFilePos)
 {
@@ -222,21 +286,55 @@ u32 CSlrFileZlib::Tell()
 
 bool CSlrFileZlib::Eof()
 {
-	if (filePos >= this->fileSize)
-		return true;
+	// TODO: CSlrFileZlib, EOF not supported
 	return false;
 }
 
-void CSlrFileZlib::Close()
+void UNITTEST_TestZlib()
 {
-}
+	LOGM("UNITTEST_TestZlib");
 
-CSlrFileZlib::~CSlrFileZlib()
-{
-	delete [] chunkBuf;
-	inflateEnd(&strm);
+	const char *fileName = "/Users/mars/Downloads2/test";
+	const int numTries = 4;
 	
-	if (shouldDeleteFilePointer)
-		delete file;
-}
+	int size = 1024*1024*16;
+	u8 *dataSave = new u8[size];
+	u8 *dataRead = new u8[size];
+	for (int i = 0; i < size; i++)
+	{
+		dataSave[i] = (u8)Uniform(0, 255) & 0xFF;
+	}
+	
+	LOGD("UNITTEST_TestZlib: store");
+	CSlrFileFromOS *file = new CSlrFileFromOS(fileName, SLR_FILE_MODE_WRITE);
+	CSlrFileZlib *zlib = new CSlrFileZlib(file);
+	
+	for (int t = 0; t < numTries; t++)
+	{
+		zlib->Write(dataSave, size);
+	}
+	delete zlib;
+	delete file;
+	
+	LOGD("UNITTEST_TestZlib: read");
+	
+	file = new CSlrFileFromOS(fileName, SLR_FILE_MODE_READ);
+	zlib = new CSlrFileZlib(file);
 
+	for (int t = 0; t < numTries; t++)
+	{
+		zlib->Read(dataRead, size);
+		for (int i = 0; i < size; i++)
+		{
+			if (dataRead[i] != dataSave[i])
+			{
+				LOGError("UNITTEST_TestZlib: data at %d should be 0x%02x but is 0x%02x", i, dataRead[i], dataSave[i]);
+			}
+		}
+	}
+
+	delete zlib;
+	delete file;
+	
+	LOGM("UNITTEST_TestZlib: finished, test correct");
+}

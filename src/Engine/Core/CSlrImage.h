@@ -69,14 +69,7 @@ public:
 	bool isFromAtlas;
 	CSlrImage *imgAtlas;
 
-	u32 textureId;
-	//byte keyR, keyG, keyB;
-
-	//unsigned char *dataBuffer;
-	//unsigned char *alphaBuffer;
-
-	//CAppView *appView;
-	//CXFiles *xFiles;
+	void  *texturePtr;
 
 	float rasterHeight;
 	float rasterWidth;

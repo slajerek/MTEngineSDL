@@ -51,7 +51,7 @@ CSlrFileFromOS::CSlrFileFromOS(CSlrString* filePath, u8 fileMode)
     }
     else SYS_FatalExit("unknown file mode %d", fileMode);
 
-    delete cFilePath;
+    STRFREE(cFilePath);
 }
 
 void CSlrFileFromOS::Open(const char *filePath)

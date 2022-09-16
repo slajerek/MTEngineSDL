@@ -640,8 +640,8 @@ int CByteBuffer::getInt()
 	LOGD("getInt()");
 #endif
 
-	int i = getShort();
-	int ret = ((i << 16) & 0xFFFF0000) | (getShort() & 0x0000FFFF);
+	unsigned int i = getUnsignedShort();
+	int ret = (int)((i << 16) & 0xFFFF0000) | ((unsigned int)getUnsignedShort() & 0x0000FFFF);
 
 #ifdef PRINT_BUFFER_OPS
 	LOGD("getInt: ret=%d", ret);

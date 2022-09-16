@@ -1,14 +1,13 @@
 #include "DBG_Log.h"
 #include "SYS_Main.h"
 
-#include <GL/gl3w.h>
 #include <SDL.h>
 #include "imgui.h"
 #include "imgui_impl_sdl.h"
-#include "imgui_impl_opengl3.h"
 
 #include "VID_Main.h"
 #include "NET_Main.h"
+#include "SYS_DefaultConfig.h"
 #include "RES_ResourceManager.h"
 #include "SND_SoundEngine.h"
 #include "CLayoutManager.h"
@@ -45,6 +44,7 @@ void SYS_MTEngineStartup()
 	SYS_InitCharBufPool();
 	SYS_InitStrings();
 	SYS_InitFileSystem();
+	SYS_InitApplicationDefaultConfig();
 	SYS_InitApplicationPauseResume();
 	
 	MT_PreInit();
@@ -54,9 +54,10 @@ void SYS_MTEngineStartup()
 
 	SDL_VERSION(&compiled);
 	SDL_GetVersion(&linked);
-	LOGM("MTEngineSDL compiled SDL %d.%d.%d, linked with %d.%d.%d",
+	LOGM("MTEngineSDL: SDL compiled %d.%d.%d, linked with %d.%d.%d",
 		   compiled.major, compiled.minor, compiled.patch,
 		   linked.major, linked.minor, linked.patch);
+	LOGM("             ImGui version %s (%d)", IMGUI_VERSION, IMGUI_VERSION_NUM);
 	
 	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER | SDL_INIT_HAPTIC) != 0)
 	{
@@ -108,6 +109,7 @@ void SYS_MTEngineStartup()
 		guiMain->layoutManager->StoreLayouts();
 	}
 	
+	SYS_ApplicationShutdown();
 	SYS_PlatformShutdown();
 	
 	_exit(0);

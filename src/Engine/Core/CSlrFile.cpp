@@ -36,7 +36,7 @@ u32 CSlrFile::Write(u8 *data, u32 numBytes)
 
 void CSlrFile::WriteByte(u8 data)
 {
-	SYS_FatalExit("abstract CSlrFile::WriteByte");
+	this->Write(&data, 1);
 }
 
 void CSlrFile::Reopen()
@@ -139,9 +139,19 @@ bool CSlrFile::ReadLineNoComment(char *buf, u32 bufLen)
 
 u8 CSlrFile::ReadByte()
 {
-	u8 b;
-	this->Read(&b, 1);
-	return b;
+	u8 data;
+	this->Read(&data, 1);
+	return data;
+}
+
+void CSlrFile::WriteBool(bool b)
+{
+	WriteByte(b ? 1 : 0);
+}
+
+bool CSlrFile::ReadBool()
+{
+	return (ReadByte() == 0) ? false : true;
 }
 
 u16 CSlrFile::ReadUnsignedShort()
@@ -152,6 +162,15 @@ u16 CSlrFile::ReadUnsignedShort()
 	return s;
 }
 
+void CSlrFile::WriteUnsignedShort(u16 val)
+{
+	u8 v1 = (val & 0xFF00) >> 8;
+	u8 v2 =  val & 0x00FF;
+	
+	WriteByte(v1);
+	WriteByte(v2);
+}
+
 u32 CSlrFile::ReadUnsignedInt()
 {
 	unsigned int i = ReadUnsignedShort();
@@ -159,7 +178,93 @@ u32 CSlrFile::ReadUnsignedInt()
 	return ret;
 }
 
-CByteBuffer *CSlrFile::GetByteBuffer()
+void CSlrFile::WriteUnsignedInt(u32 val)
+{
+	u16 v1 = (val & 0xFFFF0000) >> 16;
+	u16 v2 =  val & 0x0000FFFF;
+	
+	WriteUnsignedShort(v1);
+	WriteUnsignedShort(v2);
+}
+
+void CSlrFile::WriteUnsignedLong(u64 val)
+{
+	u32 v1 = (val & 0xFFFFFFFF00000000) >> 32;
+	u32 v2 =  val & 0x00000000FFFFFFFF;
+	
+	WriteUnsignedInt(v1);
+	WriteUnsignedInt(v2);
+}
+
+u64 CSlrFile::ReadUnsignedLong()
+{
+	u32 i = ReadUnsignedInt();
+	u64 ret = ((i << 32) & 0xFFFFFFFF00000000) | (ReadUnsignedInt() & 0x00000000FFFFFFFF);
+	return ret;
+}
+
+void CSlrFile::WriteU8(u8 data)
+{
+	WriteByte(data);
+}
+
+u8 CSlrFile::ReadU8()
+{
+	return ReadByte();
+}
+
+void CSlrFile::WriteU16(u16 val)
+{
+	WriteUnsignedShort(val);
+}
+
+u16 CSlrFile::ReadU16()
+{
+	return ReadUnsignedShort();
+}
+
+void CSlrFile::WriteU32(u32 val)
+{
+	WriteUnsignedInt(val);
+}
+
+u32 CSlrFile::ReadU32()
+{
+	return ReadUnsignedInt();
+}
+
+void CSlrFile::WriteU64(u64 val)
+{
+	WriteUnsignedLong(val);
+}
+
+u64 CSlrFile::ReadU64()
+{
+	return ReadUnsignedLong();
+}
+
+void CSlrFile::WriteByteBuffer(CByteBuffer *byteBuffer)
+{
+	WriteUnsignedInt(byteBuffer->length);
+	if (byteBuffer->length != 0)
+	{
+		Write(byteBuffer->data, byteBuffer->length);
+	}
+}
+
+void CSlrFile::ReadByteBuffer(CByteBuffer *byteBuffer)
+{
+	unsigned int len = ReadUnsignedInt();
+	if (len != 0)
+	{
+		byteBuffer->EnsureDataBufferSize(len);
+		byteBuffer->Rewind();
+		Read(byteBuffer->data, len);
+	}
+	byteBuffer->length = len;
+}
+
+CByteBuffer *CSlrFile::GetWholeFileAsByteBuffer()
 {
 	CByteBuffer *byteBuffer = new CByteBuffer(this, false);
 	return byteBuffer;
@@ -168,10 +273,12 @@ CByteBuffer *CSlrFile::GetByteBuffer()
 
 void CSlrFile::Close()
 {
-	SYS_FatalExit("abstract CSlrFile::Close");
+//	SYS_FatalExit("abstract CSlrFile::Close");
 }
 
 CSlrFile::~CSlrFile()
 {
+	if (fileMode != SLR_FILE_MODE_NOT_OPENED)
+		Close();
 }
 

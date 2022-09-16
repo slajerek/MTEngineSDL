@@ -1,6 +1,8 @@
 #ifndef _CCONFIG_READER_H_
 #define _CCONFIG_READER_H_
 
+// Note, this is old style config storage that is not used anymore. Please use CConfigStorageHjson instead
+
 #include "SYS_Defs.h"
 #include "CSlrFile.h"
 #include <vector>

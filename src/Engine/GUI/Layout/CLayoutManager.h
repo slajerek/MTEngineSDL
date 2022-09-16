@@ -34,7 +34,7 @@ public:
 	virtual void SetLayoutAsync(CLayoutData *layoutData, bool saveCurrentLayout);
 	
 	virtual void AddLayout(CLayoutData *layoutData);
-	virtual void RemoveLayout(CLayoutData *layoutData);
+	virtual void RemoveAndDeleteLayout(CLayoutData *layoutData);
 	
 	virtual void SerializeLayouts(CByteBuffer *byteBuffer);
 	virtual void DeserializeLayouts(CByteBuffer *byteBuffer, u16 version);

@@ -26,10 +26,29 @@ class CUiThreadTaskCallback
 {
 public:
 	CUiThreadTaskCallback();
-	void *uiThreadTaskUserData;
+	virtual ~CUiThreadTaskCallback();
+	
+	void *uiThreadTaskCallbackUserData;
 	
 	// warning: the render mutex is unlocked!
 	virtual void RunUIThreadTask();
+};
+
+class CUiMessageBoxCallback
+{
+public:
+	CUiMessageBoxCallback();
+	virtual ~CUiMessageBoxCallback();
+
+	void *uiMessageBoxCallbackUserData;
+	
+	virtual void MessageBoxCallback();
+};
+
+class CUiMessageBoxCallbackRestartApplication : public CUiMessageBoxCallback
+{
+public:
+	virtual void MessageBoxCallback();
 };
 
 class CGuiMain
@@ -84,15 +103,13 @@ public:
 
 	CGuiView *viewResourceManager;
 
-	// async show message
-	void ShowMessage(CSlrString *showMessage);
-	void ShowMessage(const char *message);
-
 	// modal dialog
 	void ShowMessageBox(const char *title, const char *message);
+	void ShowMessageBox(const char *title, const char *message, CUiMessageBoxCallback *messageBoxCallback);
 	bool beginMessageBoxPopup;
 	char *messageBoxTitle;
 	char *messageBoxText;
+	CUiMessageBoxCallback *messageBoxCallback;
 	
 	volatile bool isShiftPressed;
 	volatile bool isControlPressed;
@@ -192,6 +209,11 @@ public:
 	bool IsApplicationWindowFullScreen();
 	void SetApplicationWindowFullScreen(bool isFullScreen);
 	
+	ImVec4 ImGuiCol_WindowBg_Backup;
+	ImVec4 ImGuiCol_DockingEmptyBg_Backup;
+	void SetImGuiStyleWindowFullScreenBackground();
+	void SetImGuiStyleWindowBackupBackground();
+
 	bool IsMouseCursorVisible();
 	void SetMouseCursorVisible(bool isVisible);
 	

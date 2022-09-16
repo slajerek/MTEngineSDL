@@ -311,7 +311,12 @@ std::vector<CFileItem *> *SYS_GetFilesInFolder(char *directoryPath, std::list<ch
 }
  */
 
-std::vector<CFileItem *> *SYS_GetFilesInFolder(char *folderPath, std::list<char *> *extensions)
+std::vector<CFileItem *> *SYS_GetFilesInFolder(char *directoryPath, std::list<char *> *extensions)
+{
+	return SYS_GetFilesInFolder(directoryPath, extensions, true);
+}
+
+std::vector<CFileItem *> *SYS_GetFilesInFolder(char *folderPath, std::list<char *> *extensions, bool withFolders)
 {
 	LOGD("CFileSystem::GetFiles: folderPath=%s", folderPath);
 	std::vector<CFileItem *> *files = new std::vector<CFileItem *>();
@@ -331,8 +336,11 @@ std::vector<CFileItem *> *SYS_GetFilesInFolder(char *folderPath, std::list<char 
 	DIR *dp;
 	struct dirent *dirp;
 	
-	if((dp  = opendir(folderPath)) == NULL)  //dir.c_str()
-		SYS_FatalExit("Error opening folder: %s", folderPath);
+	if((dp  = opendir(folderPath)) == NULL)
+	{
+		LOGError("Error opening folder: %s", folderPath);
+		return files;
+	}
 	
 	while((dirp = readdir(dp)) != NULL)
 	{
@@ -350,9 +358,11 @@ std::vector<CFileItem *> *SYS_GetFilesInFolder(char *folderPath, std::list<char 
 		if (S_ISDIR(st.st_mode))
 		{
 			//LOGD("<DIR> %s", dirp->d_name);
-			
-			CFileItem *item = new CFileItem(dirp->d_name, buf, (char*)"<mod date>", true);
-			files->push_back(item);
+			if (withFolders)
+			{
+				CFileItem *item = new CFileItem(dirp->d_name, buf, (char*)"<mod date>", true);
+				files->push_back(item);
+			}
 		}
 		else if (dirp->d_type == DT_REG || dirp->d_type == DT_UNKNOWN)
 		{

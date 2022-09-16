@@ -151,6 +151,14 @@ public:
 	
 	ImGuiWindow *imGuiWindow;
 	
+	bool imGuiForceThisFrameNewPosition;
+	float thisFrameNewPosX, thisFrameNewPosY;
+	virtual void SetNewImGuiWindowPosition(float newPosX, float newPosY);
+	
+	bool imGuiForceThisFrameNewSize;
+	float thisFrameNewSizeX, thisFrameNewSizeY;
+	virtual void SetNewImGuiWindowSize(float newSizeX, float newSizeY);
+
 	bool imGuiWindowSkipFocusCheck;
 	bool imGuiNoWindowPadding;
 	bool imGuiNoScrollbar;

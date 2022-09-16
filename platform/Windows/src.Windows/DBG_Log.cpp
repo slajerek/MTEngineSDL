@@ -66,10 +66,15 @@ bool logThisLevel(int level)
 
 #else
 
+bool shouldLog = true;
+
 bool logThisLevel(int level)
 {
 //	if (level == DBGLVL_RES) return true;
 //	return false;
+
+	if (shouldLog == false)
+		return false;
 
 //		return true;
 	if (level == DBGLVL_MAIN) return true; 
@@ -262,6 +267,23 @@ void LOG_Init(void)
 #endif
 
 	//currentLogLevel = DBGLVL_HTTP;
+}
+
+void LOG_BackupCurrentLogLevel()
+{
+	//backupLogLevel = logger_currentLogLevel;
+}
+
+void LOG_RestoreBackupLogLevel()
+{
+	//logger_currentLogLevel = backupLogLevel;
+	shouldLog = true;
+}
+
+void LOG_SetCurrentLogLevel(int level)
+{
+	shouldLog = false;
+	//logger_currentLogLevel = level;
 }
 
 void LOG_Shutdown(void)
@@ -1485,6 +1507,9 @@ void SYS_Errorf(const char *fmt, ... )
 
 void LOG_Init(void) {}
 void LOG_SetLevel(unsigned int level, bool isOn) {}
+void LOG_BackupCurrentLogLevel() {}
+void LOG_RestoreBackupLogLevel() {}
+void LOG_SetCurrentLogLevel(int level) {}
 void LOG_Shutdown(void) {}
 
 #endif

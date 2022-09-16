@@ -131,8 +131,6 @@ void SYS_CleanExit()
 	exit(0);
 }
 
-
-
 ////////////
 
 void SYS_Assert(bool condition, const char *fmt, ...)

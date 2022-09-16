@@ -24,6 +24,10 @@ void SYS_FatalExit(const char *fmt, ... );
 void SYS_CleanExit();
 void SYS_CleanExit(char *fmt, ... );
 void SYS_CleanExit(const char *fmt, ... );
+
+// Note, this should be implemented per platform in SYS_Platform
+void SYS_RestartApplication();
+
 void SYS_Print(const char *format, ...);
 void SYS_PrintError(const char *format, ...);
 

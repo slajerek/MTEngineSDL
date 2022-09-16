@@ -79,8 +79,8 @@ void CGuiViewResourceManager::DoReturnView()
 	}
 	else
 	{
-		guiMain->ShowMessage("return view NULL");
-		LOGError("return view NULL");
+		guiMain->ShowMessageBox("Error", "CGuiViewResourceManager: return view NULL");
+		LOGError("CGuiViewResourceManager: return view NULL");
 	}
 }
 
@@ -121,7 +121,7 @@ bool CGuiViewResourceManager::ButtonPressed(CGuiButton *button)
 	{
 		if (returnView == NULL)
 		{
-			guiMain->ShowMessage("no return view");
+			guiMain->ShowMessageBox("Error", "CGuiViewResourceManager: no return view");
 			return true;
 		}
 		LOGD("returnView='%s'", returnView->name);
@@ -134,20 +134,20 @@ bool CGuiViewResourceManager::ButtonPressed(CGuiButton *button)
 //		guiMain->SetView((CGuiView*)guiMain->viewAnimationEditor);
 //		GUI_SetPressConsumed(true);
 		
-		guiMain->ShowMessage("view is not anim");
+		guiMain->ShowMessageBox("Error", "CGuiViewResourceManager: view is not anim");
 		return true;
 	}
 	else if (button == btnGameEditor)
 	{
 		if (gameEditorCallback == NULL)
 		{
-			guiMain->ShowMessage("game editor not supported");
+			guiMain->ShowMessageBox("Error", "CGuiViewResourceManager: game editor not supported");
 			return true;
 		}
 
 		if (returnView == NULL)
 		{
-			guiMain->ShowMessage("no return view");
+			guiMain->ShowMessageBox("Error", "CGuiViewResourceManager: no return view");
 			return true;
 		}
 		LOGD("returnView='%s'", returnView->name);

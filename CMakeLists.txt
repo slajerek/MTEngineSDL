@@ -16,6 +16,7 @@ link_directories(${GTK3_LIBRARY_DIRS})
 add_definitions(${GTK3_CFLAGS_OTHER})
 find_package(SDL2 REQUIRED)
 include_directories(${SDL2_INCLUDE_DIRS})
+find_package(ALSA REQUIRED)
 
 include_directories(
     "${CMAKE_CURRENT_BINARY_DIR}/../libclipboard/include"
@@ -26,8 +27,10 @@ include_directories(
     "${CMAKE_CURRENT_SOURCE_DIR}/./src"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Embedded"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Audio"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Audio/MIDI"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Audio/WAV"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/Render"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/Net"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/Pool"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Funct"
@@ -60,6 +63,7 @@ include_directories(
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/mtrand"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/nfd"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/pugixml"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/rtmidi"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/stb"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/tremor"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/tremor/Ogg"
@@ -71,6 +75,7 @@ add_library(MTEngineSDL STATIC
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Embedded/RES_Embedded.cpp"
 
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Audio/WAV/SND_WavReader.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Audio/MIDI/CMidiInKeyboard.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Audio/CAudioChannel.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Audio/CAudioChannelBusFloat.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Audio/CAudioChannelBusInt.cpp"
@@ -90,6 +95,12 @@ add_library(MTEngineSDL STATIC
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/Net/NET_Main.cpp"
 
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/Pool/CPool.cpp"
+
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/Render/VID_Blits.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/Render/VID_Main.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/Render/VID_ImageBinding.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/Render/CRenderBackend.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/Render/CRenderBackendOpenGL3.cpp"
 
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/CByteBuffer.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/CConfigStorage.cpp"
@@ -127,6 +138,7 @@ add_library(MTEngineSDL STATIC
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/RES_DeployFile.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/RES_ResourceManager.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/SYS_CommandLine.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/SYS_DefaultConfig.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/SYS_Funct.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/SYS_KeyCodes.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/SYS_Main.cpp"
@@ -134,9 +146,6 @@ add_library(MTEngineSDL STATIC
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/SYS_PauseResume.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/SYS_Startup.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/SYS_Threading.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/VID_Blits.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/VID_ImageBinding.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/VID_Main.cpp"
 
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Funct/DataTable/CDataTable.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Funct/DataTable/CGuiViewDataTable.cpp"
@@ -194,6 +203,9 @@ add_library(MTEngineSDL STATIC
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/GUI/Helpers/ResourceManager/CGuiViewBaseResourceManager.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/GUI/Helpers/ResourceManager/CGuiViewResourceManager.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/GUI/Helpers/CRecentlyOpenedFiles.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/GUI/Helpers/CGuiViewUiDebug.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/GUI/Helpers/CGuiViewMessages.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/GUI/Helpers/CGuiViewProgressBarWindow.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/GUI/Helpers/CGuiViewConsole.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/GUI/Helpers/CGuiViewDummy.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/GUI/Helpers/CGuiViewImageWithLayer.cpp"
@@ -234,7 +246,6 @@ add_library(MTEngineSDL STATIC
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/imguiext/imguial_term.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/imguiext/imguiComboFilter.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/imguiext/imguifilesystem.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/imguiext/imguihelper.cpp"
 
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/implot/implot_demo.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/implot/implot.cpp"
@@ -348,6 +359,8 @@ add_library(MTEngineSDL STATIC
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/nfd/nfd_common.c"
 
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/pugixml/pugixml.cpp"
+
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/rtmidi/RtMidi.cpp"
 
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/stb/stb_sprintf.cpp"
 

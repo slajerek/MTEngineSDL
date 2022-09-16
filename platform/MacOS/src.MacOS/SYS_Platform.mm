@@ -15,6 +15,26 @@ void SYS_AttachConsole()
 {
 }
 
+void SYS_RestartApplication()
+{
+	LOGM("SYS_RestartApplication");
+	SYS_PlatformShutdown();
+	
+	NSString *path = [NSBundle mainBundle].resourcePath;
+	NSLog(@"path=%@", path);
+	
+	NSString *appPath = [[path stringByDeletingLastPathComponent] stringByDeletingLastPathComponent];
+	NSLog(@"appPath=%@", appPath);
+	
+	NSArray *arguments = [NSArray arrayWithObjects: appPath, nil];
+	NSTask *task = [[NSTask alloc] init];
+	[task setLaunchPath: @"/usr/bin/open"];
+	[task setArguments:arguments];
+	[task launch];
+	
+	exit(0);
+}
+
 bool MACOS_IsApplicationFullScreen()
 {
 	NSApplicationPresentationOptions opts = [[NSApplication sharedApplication ] presentationOptions];

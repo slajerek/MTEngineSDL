@@ -7,10 +7,8 @@
 
 // How many times a second to refresh the screen
 #if TARGET_OS_IPHONE && !TARGET_IPHONE_SIMULATOR
-//#define kRenderingFrequency             FRAMES_PER_SECOND
 #define kInactiveRenderingFrequency     5.0
 #else
-//#define kRenderingFrequency             FRAMES_PER_SECOND
 #define kInactiveRenderingFrequency     3.0
 #endif
 // For setting up perspective, define near, far, and angle of view

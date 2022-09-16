@@ -687,6 +687,25 @@ CImageData *IMG_CropImageRGBA(CImageData *image, int posX, int posY, int width, 
 	return result;
 }
 
+CImageData *IMG_CropImageRGB(CImageData *image, int posX, int posY, int width, int height)
+{
+	CImageData *result = new CImageData(width, height, IMG_TYPE_RGB);
+	result->AllocImage(false, true);
+	
+	for (int x = 0; x < width; x++)
+	{
+		for (int y = 0; y < height; y++)
+		{
+			u8 r,g,b;
+			
+			image->GetPixelResultRGB(posX + x, posY + y, &r, &g, &b);
+			result->SetPixelResultRGB(x, y, r, g, b);
+		}
+	}
+	return result;
+}
+
+
 CImageData *IMG_CropSupersampleImageRGBA(CImageData *image, int supersamplingFactor, int posX, int posY, int width, int height)
 {
 	CImageData *result = new CImageData(width, height, IMG_TYPE_RGBA);

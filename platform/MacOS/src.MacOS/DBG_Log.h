@@ -26,7 +26,7 @@
 #define __DBG_LOGF_H__
 
 
-#define GLOBAL_DEBUG_OFF
+#define GLOBAL_ADEBUG_OFF
 
 
 #define DBGLVL_DEBUG		(1 << 0)
@@ -64,6 +64,10 @@
 
 void LOG_Init(void);
 void LOG_SetLevel(unsigned int level, bool isOn);
+void LOG_BackupCurrentLogLevel();
+void LOG_RestoreBackupLogLevel();
+void LOG_SetCurrentLogLevel(int level);
+
 void LOG_Shutdown(void);
 
 #if !defined(GLOBAL_DEBUG_OFF)
