@@ -2584,6 +2584,11 @@ void CImageData::SaveScaled(const char *fileName, short int min, short int max)
 
 }
 
+const char *CImageData::GetLoadError()
+{
+	return stbi_failure_reason();
+}
+
 bool CImageData::Load(const char *fileName, bool dealloc)
 {
 	LOGR("CImageData::Load: %s", fileName);

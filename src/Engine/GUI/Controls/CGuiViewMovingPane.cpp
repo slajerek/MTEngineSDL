@@ -5,83 +5,24 @@
 #include "SYS_KeyCodes.h"
 #include "VID_ImageBinding.h"
 
-CGuiViewMovingPane::CGuiViewMovingPane(float posX, float posY, float posZ, float sizeX, float sizeY)
-: CGuiView(posX, posY, posZ, sizeX, sizeY)
+CGuiViewMovingPane::CGuiViewMovingPane(const char *name, float posX, float posY, float posZ, float sizeX, float sizeY, float paneWidth, float paneHeight)
+: CGuiView(name, posX, posY, posZ, sizeX, sizeY)
 {
-	this->name = "CGuiViewMovingPane";
+	this->paneWidth = paneWidth;
+	this->paneHeight = paneHeight;
 
-	this->isBeingMoved = false;
-	this->isForcedMovingMap = false;
+	isBeingMoved = false;
+	isForcedMovingMap = false;
 
-	this->font = NULL;
-	this->fontScale = 0.11f;
-	
-	//
-	shouldDeallocImage = false;
-	
 	useMultiTouch = false;
 	mouseInvert = false;
 
 	cursorInside = false;
-	cursorX = cursorY = 0.5f;
-	
-	imageWidth = 0;
-	imageHeight = 0;
-	rasterWidth = 0;
-	rasterHeight = 0;
-	
-	imageData = NULL;
-	image = NULL;
-
-	imageChanged = false;
-	
+	zoomCursorX = zoomCursorY = 0.5f;
+		
+	minZoom = 1.0f;
+	maxZoom = 60.0f;
 	ClearZoom();
-	
-	// derived constructor should load image and call InitImage()
-}
-
-void CGuiViewMovingPane::InitImage()
-{
-	imageData = NULL;
-	
-	CreateImageData();
-	
-	if (imageData == NULL)
-		return;
-
-	shouldDeallocImage = true;
-	image = new CSlrImage(true, false);
-	image->LoadImageForRebinding(imageData, RESOURCE_PRIORITY_STATIC);
-	VID_PostImageBinding(image, NULL, BINDING_MODE_DONT_FREE_IMAGEDATA);
-
-	renderTextureStartX = 0.0f;
-	renderTextureEndX = ((float)imageWidth / (float)rasterWidth);
-	renderTextureStartY = 0.0f;
-	renderTextureEndY = ((float)imageHeight / (float)rasterHeight);
-}
-
-void CGuiViewMovingPane::CreateImageData()
-{
-	imageData = NULL;
-//	CreateEmptyImageData(256, 256);
-}
-
-bool CGuiViewMovingPane::UpdateImageData()
-{
-	// this is virtual method to fill changed image data, returns true when image was changed.
-	return imageChanged;
-}
-
-void CGuiViewMovingPane::CreateEmptyImageData(int imageWidth, int imageHeight)
-{
-	// images
-	this->imageWidth = imageWidth;
-	this->imageHeight = imageHeight;
-	
-	rasterWidth = NextPow2(imageWidth);
-	rasterHeight = NextPow2(imageHeight);
-	imageData = new CImageData(rasterWidth, rasterHeight, IMG_TYPE_RGBA);
-	imageData->AllocImage(false, true);
 }
 
 CGuiViewMovingPane::~CGuiViewMovingPane()
@@ -89,97 +30,12 @@ CGuiViewMovingPane::~CGuiViewMovingPane()
 	
 }
 
-void CGuiViewMovingPane::SetImageData(CImageData *imageIn)
-{
-	guiMain->LockMutex();
-	
-	if (this->image && shouldDeallocImage)
-	{
-		VID_PostImageDealloc(this->image);
-	}
-	this->image = NULL;
-	
-	if (this->imageData)
-		delete this->imageData;
-	this->imageData = NULL;
-	
-	if (imageIn == NULL)
-	{
-		guiMain->UnlockMutex();
-		return;
-	}
-
-	this->imageWidth = imageIn->width;
-	this->imageHeight = imageIn->height;
-	
-	rasterWidth = NextPow2(imageWidth);
-	rasterHeight = NextPow2(imageHeight);
-	imageData = new CImageData(rasterWidth, rasterHeight, IMG_TYPE_RGBA);
-	imageData->AllocImage(false, true);
-	
-	for (int x = 0; x < imageWidth; x++)
-	{
-		for (int y = 0; y < imageHeight; y++)
-		{
-			u8 r,g,b,a;
-			imageIn->GetPixel(x, y, &r, &g, &b, &a);
-			imageData->SetPixel(x, y, r, g, b, a);
-		}
-	}
-
-	shouldDeallocImage = true;
-	image = new CSlrImage(true, false);
-	image->LoadImageForRebinding(imageData, RESOURCE_PRIORITY_STATIC);
-	
-	VID_PostImageBinding(image, NULL, BINDING_MODE_DONT_FREE_IMAGEDATA);
-
-	renderTextureStartX = 0.0f;
-	renderTextureEndX = ((float)imageWidth / (float)rasterWidth);
-	renderTextureStartY = 0.0f;
-	renderTextureEndY = ((float)imageHeight / (float)rasterHeight);
-
-	ClearZoom();
-	
-	guiMain->UnlockMutex();
-}
-
-void CGuiViewMovingPane::SetImage(CSlrImage *setImage)
-{
-	guiMain->LockMutex();
-	if (shouldDeallocImage && this->image)
-	{
-		VID_PostImageDealloc(this->image);
-	}
-
-	// we are not owner of this image
-	shouldDeallocImage = false;
-	this->image = setImage;
-	
-	imageWidth = image->width;
-	imageHeight = image->height;
-	rasterWidth = image->rasterWidth;
-	rasterHeight = image->rasterHeight;
-
-	renderTextureStartX = 0.0f;
-	renderTextureEndX = ((float)imageWidth / (float)rasterWidth);
-	renderTextureStartY = 0.0f;
-	renderTextureEndY = ((float)imageHeight / (float)rasterHeight);
-
-	guiMain->UnlockMutex();
-}
-
 void CGuiViewMovingPane::SetPosition(float posX, float posY, float posZ, float sizeX, float sizeY)
 {
 //	LOGD("CGuiViewMovingPane::SetPosition");
-	
 	CGuiView::SetPosition(posX, posY, posZ, sizeX, sizeY);
 	
-	UpdateMapPosition();
-}
-
-void CGuiViewMovingPane::DoLogic()
-{
-	////
+	UpdatePositionAndZoom();
 }
 
 bool CGuiViewMovingPane::DoScrollWheel(float deltaX, float deltaY)
@@ -204,11 +60,11 @@ bool CGuiViewMovingPane::DoScrollWheel(float deltaX, float deltaY)
 		
 		currentZoom = currentZoom + deltaY / 5.0f * cellSizeX * 0.1f;
 		
-		if (currentZoom < 1.0f)
-			currentZoom = 1.0f;
+		if (currentZoom < minZoom)
+			currentZoom = minZoom;
 		
-		if (currentZoom > 60.0f)
-			currentZoom = 60.0f;
+		if (currentZoom > maxZoom)
+			currentZoom = maxZoom;
 		
 		this->ZoomMap(currentZoom);
 		
@@ -240,11 +96,11 @@ bool CGuiViewMovingPane::DoZoomBy(float x, float y, float zoomValue, float diffe
 		
 		currentZoom = currentZoom + difference / 5.0f;
 		
-		if (currentZoom < 1.0f)
-			currentZoom = 1.0f;
+		if (currentZoom < minZoom)
+			currentZoom = minZoom;
 		
-		if (currentZoom > 60.0f)
-			currentZoom = 60.0f;
+		if (currentZoom > maxZoom)
+			currentZoom = maxZoom;
 		
 		this->ZoomMap(currentZoom);
 		
@@ -252,22 +108,6 @@ bool CGuiViewMovingPane::DoZoomBy(float x, float y, float zoomValue, float diffe
 	}
 	
 	return false;
-}
-
-bool CGuiViewMovingPane::DoMove(float x, float y, float distX, float distY, float diffX, float diffY)
-{
-//	LOGD("CGuiViewMovingPane::DoMove: x=%5.2f y=%5.2f distX=%5.2f distY=%5.2f diffX=%5.2f diffY=%5.2f",
-//		 x, y, distX, distY, diffX, diffY);
-	
-	return true;
-}
-
-bool CGuiViewMovingPane::FinishMove(float x, float y, float distX, float distY, float accelerationX, float accelerationY)
-{
-//	LOGD("CGuiViewMovingPane::DoMove: x=%5.2f y=%5.2f distX=%5.2f distY=%5.2f accelerationX=%5.2f accelerationY=%5.2f",
-//		 x, y, distX, distY, accelerationX, accelerationY);
-
-	return true;
 }
 
 bool CGuiViewMovingPane::DoRightClick(float x, float y)
@@ -317,7 +157,7 @@ bool CGuiViewMovingPane::FinishRightClickMove(float x, float y, float distX, flo
 
 bool CGuiViewMovingPane::DoNotTouchedMove(float x, float y)
 {
-//	LOGG("CGuiViewMovingPane::DoNotTouchedMove: x=%f y=%f", x, y);
+	LOGG("CGuiViewMovingPane::DoNotTouchedMove: x=%f y=%f", x, y);
 	
 	if (isForcedMovingMap)
 	{
@@ -348,8 +188,8 @@ bool CGuiViewMovingPane::DoNotTouchedMove(float x, float y)
 		return false;
 	}
 	
-	cursorX = px;
-	cursorY = py;
+	zoomCursorX = px;
+	zoomCursorY = py;
 	
 	cursorInside = true;
 	
@@ -359,21 +199,18 @@ bool CGuiViewMovingPane::DoNotTouchedMove(float x, float y)
 void CGuiViewMovingPane::ClearZoom()
 {
 	currentZoom = 1.0f;
-//	textureStartX = textureStartY = 0.0f;
-//	textureEndX = textureEndY = 1.0f;
-//	UpdateTexturePosition(textureStartX, textureStartY, textureEndX, textureEndY);
 	mapPosX = 0.0f;
 	mapPosY = 0.0f;
 	mapSizeX = 1.0f;
 	mapSizeY = 1.0f;
-	UpdateMapPosition();
+	UpdatePositionAndZoom();
 }
 
 void CGuiViewMovingPane::ZoomMap(float zoom)
 {
 //	LOGD("CGuiViewMovingPane::ZoomMap: %f", zoom);
 	
-	if (zoom < 1.0f)
+	if (zoom < minZoom)
 	{
 		ClearZoom();
 		return;
@@ -381,19 +218,19 @@ void CGuiViewMovingPane::ZoomMap(float zoom)
 	
 //	LOGD("cursorX=%f cursorY=%f", cursorX, cursorY);
 
-	float fcx = (-mapPosX + cursorX) / mapSizeX;
+	float fcx = (-mapPosX + zoomCursorX) / mapSizeX;
 //	LOGD("fcx=%f", fcx);
 	
 	mapSizeX = 1.0f*zoom;
-	mapPosX = -fcx*mapSizeX + cursorX;
+	mapPosX = -fcx*mapSizeX + zoomCursorX;
 	
-	float fcy = (-mapPosY + cursorY) / mapSizeY;
+	float fcy = (-mapPosY + zoomCursorY) / mapSizeY;
 //	LOGD("fcy=%f", fcy);
 
 	mapSizeY = 1.0f*zoom;
-	mapPosY = -fcy*mapSizeY + cursorY;
+	mapPosY = -fcy*mapSizeY + zoomCursorY;
 
-	UpdateMapPosition();
+	UpdatePositionAndZoom();
 }
 
 void CGuiViewMovingPane::MoveMap(float diffX, float diffY)
@@ -401,24 +238,24 @@ void CGuiViewMovingPane::MoveMap(float diffX, float diffY)
 	mapPosX += diffX*0.2f / mapSizeX;
 	mapPosY += diffY*0.2f / mapSizeY;
 	
-	UpdateMapPosition();
+	UpdatePositionAndZoom();
 }
 
-void CGuiViewMovingPane::UpdateMapPosition()
+void CGuiViewMovingPane::UpdatePositionAndZoom()
 {
 	// convert (0.0, 1.0) to screen pos/size
 	
-	if (mapPosX > 0.0f)
-		mapPosX = 0.0f;
-	
-	if (mapPosY > 0.0f)
-		mapPosY = 0.0f;
-	
-	if (mapPosX - 1.0f < -mapSizeX)
-		mapPosX = -mapSizeX+1.0f;
-	
-	if (mapPosY - 1.0f < -mapSizeY)
-		mapPosY = -mapSizeY+1.0f;
+//	if (mapPosX > 0.0f)
+//		mapPosX = 0.0f;
+//	
+//	if (mapPosY > 0.0f)
+//		mapPosY = 0.0f;
+//	
+//	if (mapPosX - 1.0f < -mapSizeX)
+//		mapPosX = -mapSizeX+1.0f;
+//	
+//	if (mapPosY - 1.0f < -mapSizeY)
+//		mapPosY = -mapSizeY+1.0f;
 	
 	
 	guiMain->LockMutex(); //"CViewMemoryMap::UpdateMapPosition");
@@ -441,14 +278,19 @@ void CGuiViewMovingPane::UpdateMapPosition()
 		renderMapValues = false;
 	}
 
-	float iw = (float)imageWidth;
-	float ih = (float)imageHeight;
+	float iw = (float)paneWidth;
+	float ih = (float)paneHeight;
 	
 	float fsx = (mapSizeX / iw);
 	float fsy = (mapSizeY / ih);
 	
+//	LOGD("msx=%f msy=%f", mapSizeX, mapSizeY);
+//	LOGD("iw=%f ih=%f fsx=%f fsy=%f", iw, ih, fsx, fsy);
+	
 	cellSizeX = fsx * sx;
 	cellSizeY = fsy * sy;
+	
+//	LOGD("cellSizeX=%f y=%f", cellSizeX, cellSizeY);
 	
 	float cx = floor( (-mapPosX) / fsx);
 	float cy = floor( (-mapPosY) / fsy);
@@ -465,25 +307,18 @@ void CGuiViewMovingPane::UpdateMapPosition()
 	numCellsInHeight = (int)(ny+1);
 	
 	////
-	currentFontDataScale = fontScale * cellSizeX;
-	
 	guiMain->UnlockMutex(); //"CGuiViewMovingPane::UpdateMapPosition");
 	
 //	LOGD("UpdateMapPosition: mapSize=%5.2f %5.2f", mapSizeX, mapSizeY);
 }
 
-void CGuiViewMovingPane::PostRenderMovingPaneCustom()
+void CGuiViewMovingPane::RenderCustomMovingPane()
 {
 }
 
 void CGuiViewMovingPane::RenderImGui()
 {
-	if (image == NULL)
-		return;
-	
 	PreRenderImGui();
-	
-	bool renderMapValuesInThisFrame = renderMapValues;
 	
 //	frameCounter++;
 		
@@ -494,179 +329,21 @@ void CGuiViewMovingPane::RenderImGui()
 	// blit
 	
 	VID_SetClipping(posX, posY, sizeX, sizeY);
-	
-	
+		
 	//	LOGD("renderTextureStartX=%f renderTextureEndX=%f renderTextureStartY=%f renderTextureEndY=%f",
 	//		 renderTextureStartX, renderTextureEndX, renderTextureStartY, renderTextureEndY);
 
-	if (UpdateImageData())
-	{
-		image->ReBindImage();
-	}
+//	if (image->isBound)
+//	{
+//		Blit(image, renderMapPosX, renderMapPosY, -1, renderMapSizeX, renderMapSizeY,
+//			 renderTextureStartX,
+//			 renderTextureStartY,
+//			 renderTextureEndX,
+//			 renderTextureEndY);
+//	}
+	
+	RenderCustomMovingPane();
 
-	if (image->isBound)
-	{
-		Blit(image, renderMapPosX, renderMapPosY, -1, renderMapSizeX, renderMapSizeY,
-			 renderTextureStartX,
-			 renderTextureStartY,
-			 renderTextureEndX,
-			 renderTextureEndY);
-	}
-	
-	PostRenderMovingPaneCustom();
-
-	//
-	
-	
-	/*
-	if (renderMapValuesInThisFrame)
-	{
-		float cx, cy;
-		
-		char buf[128];
-		
-		cy = cellStartY;
-		int lineAddr = cellStartIndex;
-		for (int iy = 0; iy < numCellsInHeight; iy++)
-		{
-			cx = cellStartX;
-			int addr = lineAddr;
-			for (int ix = 0; ix < numCellsInWidth; ix++)
-			{
-				if (addr > ramSize)
-					continue;
-				
-				CViewMemoryMapCell *cell = memoryCells[addr];
-				
-				float z = 1.0f - (cell->sr + cell->sg + cell->sb)/2.5f;
-				
-				float tcr = z; //1.0f - cell->sr;
-				float tcg = z; //1.0f - cell->sg;
-				float tcb = z; //1.0f - cell->sb;
-				
-				
-				
-				float px = cx + textAddrGapX;
-				float py = cy + textAddrGapY;
-				sprintf(buf, "%04X", addr);
-				font->BlitTextColor(buf, px, py, posZ, currentFontAddrScale, tcr, tcg, tcb, 1.0f);
-				
-				px = cx + textDataGapX;
-				py = cy + textDataGapY;
-				
-				uint8 val = memoryBuffer[addr];
-				sprintf(buf, "%02X", val);
-				font->BlitTextColor(buf, px, py, posZ, currentFontDataScale, tcr, tcg, tcb, 1.0f);
-				
-				px = cx + textCodeCenterX;
-				py = cy + textCodeGapY;
-				
-				if (cell->isExecuteCode)
-				{
-					int mode = opcodes[val].addressingMode;
-					const char *name = opcodes[val].name;
-					
-					buf[0] = name[0];
-					buf[1] = name[1];
-					buf[2] = name[2];
-					
-					char *buf3 = buf+3;
-					
-					switch(mode)
-					{
-						default:
-						case ADDR_IMP:
-							*buf3 = 0x00;
-							px -= textCodeWidth3h;
-							break;
-						case ADDR_IMM:
-							strcpy(buf3, " #..");
-							px -= textCodeWidth7h;
-							break;
-						case ADDR_ZP:
-							strcpy(buf3, " ..");
-							px -= textCodeWidth6h;
-							break;
-						case ADDR_ZPX:
-							strcpy(buf3, " ..,X");
-							px -= textCodeWidth8h;
-							break;
-						case ADDR_ZPY:
-							strcpy(buf3, " ..,Y");
-							px -= textCodeWidth8h;
-							break;
-						case ADDR_IZX:
-							strcpy(buf3, " (..,X)");
-							px -= textCodeWidth10h;
-							break;
-						case ADDR_IZY:
-							strcpy(buf3, " (..),Y");
-							px -= textCodeWidth10h;
-							break;
-						case ADDR_ABS:
-							strcpy(buf3, " ....");
-							px -= textCodeWidth8h;
-							break;
-						case ADDR_ABX:
-							strcpy(buf3, " ....,X");
-							px -= textCodeWidth10h;
-							break;
-						case ADDR_ABY:
-							strcpy(buf3, " ....,Y");
-							px -= textCodeWidth10h;
-							break;
-						case ADDR_IND:
-							strcpy(buf3, " (....)");
-							px -= textCodeWidth10h;
-							break;
-						case ADDR_REL:
-							strcpy(buf3, " ....");
-							px -= textCodeWidth8h;
-							break;
-					}
-					font->BlitTextColor(buf, px, py, posZ, currentFontCodeScale, tcr, tcg, tcb, 1.0f);
-				}
-				else
-				{
-					HexDigitToBinary(((val >> 4) & 0x0F), buf);
-					buf[4] = ' ';
-					HexDigitToBinary((val & 0x0F), buf + 5);
-					buf[9] = 0x00;
-					font->BlitTextColor(buf, px - textCodeWidth9h, py, posZ, currentFontCodeScale, tcr, tcg, tcb, 1.0f);
-				}
-				
-				addr++;
-				cx += cellSizeX;
-			}
-			
-			lineAddr += imageWidth;
-			
-			if (lineAddr > ramSize)
-				break;
-			
-			cy += cellSizeY;
-		}
-		
-		// paint grid
-		cy = cellStartY;
-		for (int iy = 0; iy < numCellsInHeight; iy++)
-		{
-			BlitLine(posX, cy, posEndX, cy, posZ, 1.0f, 0.0f, 1.0f, 0.9f);
-			cy += cellSizeY;
-		}
-		
-		cx = cellStartX;
-		for (int ix = 0; ix < numCellsInWidth; ix++)
-		{
-			BlitLine(cx, posY, cx, posEndY, posZ, 1.0f, 0.0f, 0.0f, 0.9f);
-			cx += cellSizeX;
-		}
-	}
-		*/
-	
-	//
-	
-	
 	VID_ResetClipping();
 	
 	//	// debug cursor
@@ -677,7 +354,7 @@ void CGuiViewMovingPane::RenderImGui()
 	PostRenderImGui();
 }
 
-void CGuiViewMovingPane::ScreenPosToImagePos(float screenX, float screenY, int *imageX, int *imageY)
+void CGuiViewMovingPane::ScreenPosToPanePos(float screenX, float screenY, int *imageX, int *imageY)
 {
 	float px = (screenX - posX) - (cellStartX - posX);
 	float py = (screenY - posY) - (cellStartY - posY);
@@ -686,8 +363,8 @@ void CGuiViewMovingPane::ScreenPosToImagePos(float screenX, float screenY, int *
 	*imageY = floor((py / cellSizeY) + cellStartIndexY);
 }
 
-bool CGuiViewMovingPane::DoTap(float x, float y)
-{
+//bool CGuiViewMovingPane::DoTap(float x, float y)
+//{
 //	LOGD("CGuiViewMovingPane::DoTap: x=%f y=%f", x, y);
 	
 	/*
@@ -720,7 +397,7 @@ bool CGuiViewMovingPane::DoTap(float x, float y)
 					if (time < c64SettingsDoubleClickMS)
 					{
 						// double click
-						viewDataDump->viewDisassemble->ScrollToAddress(addr);
+						viewDataDump->viewDisassembly->ScrollToAddress(addr);
 					}
 				}
 				
@@ -735,7 +412,7 @@ bool CGuiViewMovingPane::DoTap(float x, float y)
 					{
 						if (cell->readPC != -1)
 						{
-							viewDataDump->viewDisassemble->ScrollToAddress(cell->readPC);
+							viewDataDump->viewDisassembly->ScrollToAddress(cell->readPC);
 						}
 						
 						if (guiMain->isAltPressed)
@@ -751,7 +428,7 @@ bool CGuiViewMovingPane::DoTap(float x, float y)
 					{
 						if (cell->writePC != -1)
 						{
-							viewDataDump->viewDisassemble->ScrollToAddress(cell->writePC);
+							viewDataDump->viewDisassembly->ScrollToAddress(cell->writePC);
 						}
 						
 						if (guiMain->isAltPressed)
@@ -783,8 +460,8 @@ bool CGuiViewMovingPane::DoTap(float x, float y)
 	}
 	*/
 	
-	return false;
-}
+//	return false;
+//}
 
 bool CGuiViewMovingPane::KeyDown(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper)
 {

@@ -34,7 +34,7 @@ public:
 
 	virtual void LoadingFinishedSetView(CGuiView *nextView);
 	
-	virtual void SetLoadingText(char *text);
+	virtual void SetLoadingText(const char *text);
 	
 	char loadingText[GUIVIEWLOADINGSCREEN_TEXT_LEN];
 	

@@ -19,11 +19,19 @@
 #include "SYS_CommandLine.h"
 #include "MT_VERSION.h"
 
+#if !defined(GLOBAL_DEBUG_OFF)
+#include "CGuiViewDebugLog.h"
+#endif
+
 const char *SYS_ExecSystemCommand(const char *command);
 
 int main(int argc, const char * argv[])
 {
 	LOG_Init();
+#if !defined(GLOBAL_DEBUG_OFF)
+	guiViewDebugLog = new CGuiViewDebugLog("Debug Log", 50, 50, -1, 200, 200);
+#endif
+	
 	LOGM("MTEngineSDL v" MT_VERSION_STRING " compiled on " __DATE__ " " __TIME__);
 	
 	{

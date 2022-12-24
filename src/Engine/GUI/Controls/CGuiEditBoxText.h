@@ -30,20 +30,20 @@ class CGuiEditBoxText : public CGuiView
 {
 public:
 	CGuiEditBoxText(float posX, float posY, float posZ, float fontWidth, float fontHeight,
-			  char *defaultText, u16 maxNumChars, bool readOnly,
+					const char *defaultText, u16 maxNumChars, bool readOnly,
 					CGuiEditBoxTextCallback *callback);
 
 	CGuiEditBoxText(float posX, float posY, float posZ,
 					float sizeX, float sizeY,
-					char *defaultText, u16 maxNumChars,
+					const char *defaultText, u16 maxNumChars,
 					CSlrFont *textFont, float fontScale, bool readOnly, CGuiEditBoxTextCallback *callback);
 
 	CGuiEditBoxText(float posX, float posY, float posZ,
 					float sizeX,
-					char *defaultText, u16 maxNumChars,
+					const char *defaultText, u16 maxNumChars,
 					CSlrFont *textFont, float fontScale, bool readOnly, CGuiEditBoxTextCallback *callback);
 
-	void Initialize(char *defaultText, u16 maxNumChars, bool readOnly,
+	void Initialize(const char *defaultText, u16 maxNumChars, bool readOnly,
 					CGuiEditBoxTextCallback *callback);
 
 	volatile bool enabled;
@@ -92,13 +92,13 @@ public:
 	virtual void DoLogic();
 	virtual bool InitZoom();
 	virtual bool DoZoomBy(float x, float y, float zoomValue, float difference);
-	virtual void FocusReceived();
-	virtual void FocusLost();
+	virtual bool FocusReceived();
+	virtual bool FocusLost();
 
 	virtual bool KeyDown(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper);	// repeats
 
-	virtual void SetText(char *setText);
-	virtual char *GetText();
+	virtual void SetText(const char *setText);
+	virtual const char *GetText();
 
 	float colorR;
 	float colorG;

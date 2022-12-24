@@ -8,8 +8,13 @@
 #include <pthread.h>
 #include <sys/time.h>
 #include <sys/stat.h>
+#include "SYS_Main.h"
 
 #if !defined(GLOBAL_DEBUG_OFF)
+
+#if defined(USE_DEBUG_LOG_TO_VIEW)
+#include "CGuiViewDebugLog.h"
+#endif
 
 #define MAX_BUFFER_LENGTH	40960
 
@@ -18,8 +23,31 @@
 //#define DEBUG_OFF
 //#define FULL_LOG
 
-static int currentLogLevel;
+static int logger_currentLogLevel = 0;
 pthread_mutex_t loggerMutex;
+
+bool LOG_IsSetLevel(unsigned int level)
+{
+	return IS_SET(logger_currentLogLevel, level);
+}
+
+int  LOG_GetCurrentLogLevel()
+{
+	return logger_currentLogLevel;
+}
+
+void LOG_SetLevel(unsigned int level, bool isOn)
+{
+	if (isOn)
+	{
+		SET_BIT(logger_currentLogLevel, level);
+	}
+	else
+	{
+		REMOVE_BIT(logger_currentLogLevel, level);
+	}
+}
+
 
 #ifdef LOG_FILE
 FILE *fpLog = NULL;
@@ -37,44 +65,7 @@ bool logThisLevel(unsigned int level)
 
 bool logThisLevel(unsigned int level)
 {
-//	return false;
-	if (level == DBGLVL_ERROR) return true;	// always
-	if (level == DBGLVL_WARN) return true;	// always
-
-	if (level == DBGLVL_INPUT) return false;
-	//return false;
-
-	if (level == DBGLVL_AUDIO) return false;
-	if (level == DBGLVL_LEVEL) return false;
-//	return false;
-
-	if (level == DBGLVL_MAIN) return true;
-	if (level == DBGLVL_DEBUG) return true;
-	if (level == DBGLVL_DEBUG2) return false;
-	if (level == DBGLVL_RES) return false;
-	if (level == DBGLVL_GUI) return false; //	true	false
-	if (level == DBGLVL_HTTP) return true;
-	if (level == DBGLVL_DATABASE) return true;
-	if (level == DBGLVL_XMPLAYER) return true;
-	if (level == DBGLVL_TODO) return true;
-	if (level == DBGLVL_MEMORY) return false;
-	if (level == DBGLVL_ANIMATION) return false;
-	if (level == DBGLVL_SCRIPT) return true;
-	if (level == DBGLVL_NET) return true;
-	if (level == DBGLVL_NET_SERVER) return true;
-	if (level == DBGLVL_NET_CLIENT) return true;
-
-	if (level == DBGLVL_VICE_DEBUG) return true;
-	if (level == DBGLVL_VICE_MAIN) return true;
-	if (level == DBGLVL_VICE_VERBOSE) return true;
-	
-	if (level == DBGLVL_ATARI_DEBUG) return true;
-	if (level == DBGLVL_ATARI_MAIN) return true;
-	
-	if (level == currentLogLevel)
-		return true;
-
-	return false;
+	return LOG_IsSetLevel(level);
 }
 
 #endif // FULL_LOG
@@ -160,6 +151,13 @@ void LOG_Init(void)
 {
 	pthread_mutex_init(&loggerMutex, NULL);
 
+	LOG_SetLevel(DBGLVL_MAIN, true);
+	LOG_SetLevel(DBGLVL_DEBUG, true);
+	LOG_SetLevel(DBGLVL_DEBUG2, true);
+	LOG_SetLevel(DBGLVL_TODO, true);
+	LOG_SetLevel(DBGLVL_ERROR, true);
+	LOG_SetLevel(DBGLVL_WARN, true);
+
 #ifdef LOG_FILE
 	time_t rawtime;
 	struct tm * timeinfo;
@@ -183,17 +181,17 @@ void LOG_Init(void)
 static int backupLogLevel = 0;
 void LOG_BackupCurrentLogLevel()
 {
-//	backupLogLevel = logger_currentLogLevel;
+	backupLogLevel = logger_currentLogLevel;
 }
 
 void LOG_RestoreBackupLogLevel()
 {
-	//logger_currentLogLevel = backupLogLevel;
+	logger_currentLogLevel = backupLogLevel;
 }
 
 void LOG_SetCurrentLogLevel(int level)
 {
-//	logger_currentLogLevel = level;
+	logger_currentLogLevel = level;
 }
 
 void LOG_Shutdown(void)
@@ -207,12 +205,12 @@ void LOG_Shutdown(void)
 
 }
 
-void LockLoggerMutex()
+void LOG_LockMutex()
 {
 	pthread_mutex_lock(&loggerMutex);
 }
 
-void UnlockLoggerMutex()
+void LOG_UnlockMutex()
 {
 	pthread_mutex_unlock(&loggerMutex);
 }
@@ -323,7 +321,8 @@ void DBG_SendLog(int debugLevel, char *message)
 			break;
 	}
 #endif
-
+	
+	static char buf[MAX_BUFFER_LENGTH];
 	struct timeval  tv;
 	struct timezone tz;
 	struct tm      *tm;
@@ -334,27 +333,33 @@ void DBG_SendLog(int debugLevel, char *message)
 	unsigned int threadId = 0; //valgrind complains: (long int)syscall(224);
 
 	int ms = tv.tv_usec/10000;
+	
+	sprintf(buf, "%02d:%02d:%02d,%03d %4.4X %s %s\n",
+				tm->tm_hour, tm->tm_min, tm->tm_sec, ms,
+				threadId, getLevelStr(debugLevel), message);
+	
 #ifdef LOG_FILE
 	//03:22:07,127 000010B4 [DEBUG] CGuiList::CGuiList done
 	if (fpLog != NULL)
 	{
-		fprintf(fpLog, "%02d:%02d:%02d,%03d %4.4X %s %s\n",
-			tm->tm_hour, tm->tm_min, tm->tm_sec, ms,
-			threadId, getLevelStr(debugLevel), message);
+		fprintf(fpLog, buf);
 		fflush(fpLog);
 	}
 #endif
 
-	fprintf(stdout, "%02d:%02d:%02d,%03d %4.4X %s %s\n",
-				tm->tm_hour, tm->tm_min, tm->tm_sec, ms,
-				threadId, getLevelStr(debugLevel), message);
+#if defined(USE_DEBUG_LOG_TO_VIEW)
+		if (guiViewDebugLog)
+			guiViewDebugLog->AddLog(buf);
+#endif
+
+	fprintf(stdout, buf);
 	fflush(stdout);
 
 }
 
 void DBG_PrintBytes(void *data, unsigned int numBytes)
 {
-	LockLoggerMutex();
+	LOG_LockMutex();
 
 	for (unsigned int i = 0; i < numBytes; i++)
 	{
@@ -362,7 +367,7 @@ void DBG_PrintBytes(void *data, unsigned int numBytes)
 		printf("%2.2x ", c);
 	}
 	fflush(stdout);
-	UnlockLoggerMutex();
+	LOG_UnlockMutex();
 }
 
 void LOGT(unsigned int level, char *what)
@@ -390,11 +395,11 @@ void _LOGF(unsigned int level, char *fmt, ... )
     vsprintf(buffer, fmt, args);
     va_end(args);
 
-	LockLoggerMutex();
+	LOG_LockMutex();
 
 	DBG_SendLog(level, buffer);
 
-	UnlockLoggerMutex();
+	LOG_UnlockMutex();
 
 }
 
@@ -417,11 +422,11 @@ void _LOGF(unsigned int level, const char *fmt, ... )
     vsprintf(buffer, fmt, args);
     va_end(args);
 
-	LockLoggerMutex();
+	LOG_LockMutex();
 
 	DBG_SendLog(level, buffer);
 
-	UnlockLoggerMutex();
+	LOG_UnlockMutex();
 }
 
 ////////LOGG
@@ -439,11 +444,11 @@ void LOGG(char *fmt, ... )
     vsprintf(buffer, fmt, args);
     va_end(args);
 
-	LockLoggerMutex();
+	LOG_LockMutex();
 
 	DBG_SendLog(DBGLVL_GUI, buffer);
 
-	UnlockLoggerMutex();
+	LOG_UnlockMutex();
 }
 
 void LOGG(std::string what)
@@ -467,11 +472,11 @@ void LOGG(const char *fmt, ... )
     vsprintf(buffer, fmt, args);
     va_end(args);
 
-	LockLoggerMutex();
+	LOG_LockMutex();
 
 	DBG_SendLog(DBGLVL_GUI, buffer);
 
-	UnlockLoggerMutex();
+	LOG_UnlockMutex();
 }
 ///////////// LOGG
 
@@ -490,11 +495,11 @@ void LOGD(char *fmt, ... )
     vsprintf(buffer, fmt, args);
     va_end(args);
 
-	LockLoggerMutex();
+	LOG_LockMutex();
 
 	DBG_SendLog(DBGLVL_DEBUG, buffer);
 
-	UnlockLoggerMutex();
+	LOG_UnlockMutex();
 
 }
 
@@ -519,11 +524,11 @@ void LOGD(const char *fmt, ... )
     vsprintf(buffer, fmt, args);
     va_end(args);
 
-	LockLoggerMutex();
+	LOG_LockMutex();
 
 	DBG_SendLog(DBGLVL_DEBUG, buffer);
 
-	UnlockLoggerMutex();
+	LOG_UnlockMutex();
 }
 ///////////// LOGD
 
@@ -542,11 +547,11 @@ void LOGD2(char *fmt, ... )
     vsprintf(buffer, fmt, args);
     va_end(args);
 
-	LockLoggerMutex();
+	LOG_LockMutex();
 
 	DBG_SendLog(DBGLVL_DEBUG2, buffer);
 
-	UnlockLoggerMutex();
+	LOG_UnlockMutex();
 
 }
 
@@ -571,11 +576,11 @@ void LOGD2(const char *fmt, ... )
     vsprintf(buffer, fmt, args);
     va_end(args);
 
-	LockLoggerMutex();
+	LOG_LockMutex();
 
 	DBG_SendLog(DBGLVL_DEBUG2, buffer);
 
-	UnlockLoggerMutex();
+	LOG_UnlockMutex();
 }
 ///////////// LOGD2
 
@@ -594,11 +599,11 @@ void LOGI(char *fmt, ... )
     vsprintf(buffer, fmt, args);
     va_end(args);
 
-	LockLoggerMutex();
+	LOG_LockMutex();
 
 	DBG_SendLog(DBGLVL_INPUT, buffer);
 
-	UnlockLoggerMutex();
+	LOG_UnlockMutex();
 
 }
 
@@ -623,11 +628,11 @@ void LOGI(const char *fmt, ... )
     vsprintf(buffer, fmt, args);
     va_end(args);
 
-	LockLoggerMutex();
+	LOG_LockMutex();
 
 	DBG_SendLog(DBGLVL_INPUT, buffer);
 
-	UnlockLoggerMutex();
+	LOG_UnlockMutex();
 }
 ///////////// LOGI
 
@@ -647,11 +652,11 @@ void LOGM(char *fmt, ... )
     vsprintf(buffer, fmt, args);
     va_end(args);
 
-	LockLoggerMutex();
+	LOG_LockMutex();
 
 	DBG_SendLog(DBGLVL_MAIN, buffer);
 
-	UnlockLoggerMutex();
+	LOG_UnlockMutex();
 
 }
 
@@ -676,11 +681,11 @@ void LOGM(const char *fmt, ... )
     vsprintf(buffer, fmt, args);
     va_end(args);
 
-	LockLoggerMutex();
+	LOG_LockMutex();
 
 	DBG_SendLog(DBGLVL_MAIN, buffer);
 
-	UnlockLoggerMutex();
+	LOG_UnlockMutex();
 }
 ///////////// LOGM
 
@@ -699,11 +704,11 @@ void LOGL(char *fmt, ... )
     vsprintf(buffer, fmt, args);
     va_end(args);
 
-	LockLoggerMutex();
+	LOG_LockMutex();
 
 	DBG_SendLog(DBGLVL_LEVEL, buffer);
 
-	UnlockLoggerMutex();
+	LOG_UnlockMutex();
 
 }
 
@@ -728,11 +733,11 @@ void LOGL(const char *fmt, ... )
     vsprintf(buffer, fmt, args);
     va_end(args);
 
-	LockLoggerMutex();
+	LOG_LockMutex();
 
 	DBG_SendLog(DBGLVL_MAIN, buffer);
 
-	UnlockLoggerMutex();
+	LOG_UnlockMutex();
 }
 ///////////// LOGL
 
@@ -751,11 +756,11 @@ void LOGS(char *fmt, ... )
     vsprintf(buffer, fmt, args);
     va_end(args);
 
-	LockLoggerMutex();
+	LOG_LockMutex();
 
 	DBG_SendLog(DBGLVL_SCRIPT, buffer);
 
-	UnlockLoggerMutex();
+	LOG_UnlockMutex();
 
 }
 
@@ -780,11 +785,11 @@ void LOGS(const char *fmt, ... )
     vsprintf(buffer, fmt, args);
     va_end(args);
 
-	LockLoggerMutex();
+	LOG_LockMutex();
 
 	DBG_SendLog(DBGLVL_MAIN, buffer);
 
-	UnlockLoggerMutex();
+	LOG_UnlockMutex();
 }
 ///////////// LOGS
 
@@ -803,11 +808,11 @@ void LOGN(char *fmt, ... )
     vsprintf(buffer, fmt, args);
     va_end(args);
 
-	LockLoggerMutex();
+	LOG_LockMutex();
 
 	DBG_SendLog(DBGLVL_ANIMATION, buffer);
 
-	UnlockLoggerMutex();
+	LOG_UnlockMutex();
 
 }
 
@@ -832,11 +837,11 @@ void LOGN(const char *fmt, ... )
     vsprintf(buffer, fmt, args);
     va_end(args);
 
-	LockLoggerMutex();
+	LOG_LockMutex();
 
 	DBG_SendLog(DBGLVL_ANIMATION, buffer);
 
-	UnlockLoggerMutex();
+	LOG_UnlockMutex();
 }
 ///////////// LOGN
 ////////LOGA
@@ -854,11 +859,11 @@ void LOGA(char *fmt, ... )
     vsprintf(buffer, fmt, args);
     va_end(args);
 
-	LockLoggerMutex();
+	LOG_LockMutex();
 
 	DBG_SendLog(DBGLVL_AUDIO, buffer);
 
-	UnlockLoggerMutex();
+	LOG_UnlockMutex();
 }
 
 void LOGA(std::string what)
@@ -882,11 +887,11 @@ void LOGA(const char *fmt, ... )
     vsprintf(buffer, fmt, args);
     va_end(args);
 
-	LockLoggerMutex();
+	LOG_LockMutex();
 
 	DBG_SendLog(DBGLVL_AUDIO, buffer);
 
-	UnlockLoggerMutex();
+	LOG_UnlockMutex();
 }
 ///////////// LOGA
 
@@ -905,11 +910,11 @@ void LOGC(char *fmt, ... )
     vsprintf(buffer, fmt, args);
     va_end(args);
 
-	LockLoggerMutex();
+	LOG_LockMutex();
 
 	DBG_SendLog(DBGLVL_NET, buffer);
 
-	UnlockLoggerMutex();
+	LOG_UnlockMutex();
 }
 
 void LOGC(std::string what)
@@ -933,11 +938,11 @@ void LOGC(const char *fmt, ... )
     vsprintf(buffer, fmt, args);
     va_end(args);
 
-	LockLoggerMutex();
+	LOG_LockMutex();
 
 	DBG_SendLog(DBGLVL_NET, buffer);
 
-	UnlockLoggerMutex();
+	LOG_UnlockMutex();
 }
 ///////////// LOGC
 
@@ -956,11 +961,11 @@ void LOGCC(char *fmt, ... )
     vsprintf(buffer, fmt, args);
     va_end(args);
 
-	LockLoggerMutex();
+	LOG_LockMutex();
 
 	DBG_SendLog(DBGLVL_NET_CLIENT, buffer);
 
-	UnlockLoggerMutex();
+	LOG_UnlockMutex();
 }
 
 void LOGCC(std::string what)
@@ -984,11 +989,11 @@ void LOGCC(const char *fmt, ... )
     vsprintf(buffer, fmt, args);
     va_end(args);
 
-	LockLoggerMutex();
+	LOG_LockMutex();
 
 	DBG_SendLog(DBGLVL_NET_CLIENT, buffer);
 
-	UnlockLoggerMutex();
+	LOG_UnlockMutex();
 }
 ///////////// LOGCC
 
@@ -1007,11 +1012,11 @@ void LOGCS(char *fmt, ... )
     vsprintf(buffer, fmt, args);
     va_end(args);
 
-	LockLoggerMutex();
+	LOG_LockMutex();
 
 	DBG_SendLog(DBGLVL_NET_SERVER, buffer);
 
-	UnlockLoggerMutex();
+	LOG_UnlockMutex();
 }
 
 void LOGCS(std::string what)
@@ -1035,11 +1040,11 @@ void LOGCS(const char *fmt, ... )
     vsprintf(buffer, fmt, args);
     va_end(args);
 
-	LockLoggerMutex();
+	LOG_LockMutex();
 
 	DBG_SendLog(DBGLVL_NET_SERVER, buffer);
 
-	UnlockLoggerMutex();
+	LOG_UnlockMutex();
 }
 ///////////// LOGCS
 
@@ -1059,11 +1064,11 @@ void LOGX(char *fmt, ... )
     vsprintf(buffer, fmt, args);
     va_end(args);
 
-	LockLoggerMutex();
+	LOG_LockMutex();
 
 	DBG_SendLog(DBGLVL_XMPLAYER, buffer);
 
-	UnlockLoggerMutex();
+	LOG_UnlockMutex();
 }
 
 void LOGX(std::string what)
@@ -1087,13 +1092,65 @@ void LOGX(const char *fmt, ... )
     vsprintf(buffer, fmt, args);
     va_end(args);
 
-	LockLoggerMutex();
+	LOG_LockMutex();
 
 	DBG_SendLog(DBGLVL_XMPLAYER, buffer);
 
-	UnlockLoggerMutex();
+	LOG_UnlockMutex();
 }
 ///////////// LOGX
+
+////////LOGP
+
+void LOGP(char *fmt, ... )
+{
+	if (!logThisLevel(DBGLVL_PLUGIN))
+		return;
+
+    char buffer[MAX_BUFFER_LENGTH] = {0};
+
+    va_list args;
+
+    va_start(args, fmt);
+    vsprintf(buffer, fmt, args);
+    va_end(args);
+
+	LOG_LockMutex();
+
+	DBG_SendLog(DBGLVL_PLUGIN, buffer);
+
+	LOG_UnlockMutex();
+}
+
+void LOGP(std::string what)
+{
+	if (!logThisLevel(DBGLVL_PLUGIN))
+		return;
+
+	_LOGF(DBGLVL_PLUGIN, what.c_str());
+}
+
+void LOGP(const char *fmt, ... )
+{
+	if (!logThisLevel(DBGLVL_PLUGIN))
+		return;
+
+    char buffer[MAX_BUFFER_LENGTH] = {0};
+
+    va_list args;
+
+    va_start(args, fmt);
+    vsprintf(buffer, fmt, args);
+    va_end(args);
+
+	LOG_LockMutex();
+
+	DBG_SendLog(DBGLVL_PLUGIN, buffer);
+
+	LOG_UnlockMutex();
+}
+///////////// LOGP
+
 
 
 ////////LOGR
@@ -1111,11 +1168,11 @@ void LOGR(char *fmt, ... )
     vsprintf(buffer, fmt, args);
     va_end(args);
 
-	LockLoggerMutex();
+	LOG_LockMutex();
 
 	DBG_SendLog(DBGLVL_RES, buffer);
 
-	UnlockLoggerMutex();
+	LOG_UnlockMutex();
 }
 
 void LOGR(std::string what)
@@ -1139,11 +1196,11 @@ void LOGR(const char *fmt, ... )
     vsprintf(buffer, fmt, args);
     va_end(args);
 
-	LockLoggerMutex();
+	LOG_LockMutex();
 
 	DBG_SendLog(DBGLVL_RES, buffer);
 
-	UnlockLoggerMutex();
+	LOG_UnlockMutex();
 }
 ///////////// LOGR
 
@@ -1164,11 +1221,11 @@ void LOG_Atari_Main(char *fmt, ... )
 	vsprintf(buffer, fmt, args);
 	va_end(args);
 	
-	LockLoggerMutex();
+	LOG_LockMutex();
 	
 	DBG_SendLog(DBGLVL_ATARI_MAIN, buffer);
 	
-	UnlockLoggerMutex();
+	LOG_UnlockMutex();
 }
 
 void LOG_Atari_Main(std::string what)
@@ -1192,11 +1249,11 @@ void LOG_Atari_Main(const char *fmt, ... )
 	vsprintf(buffer, fmt, args);
 	va_end(args);
 	
-	LockLoggerMutex();
+	LOG_LockMutex();
 	
 	DBG_SendLog(DBGLVL_ATARI_MAIN, buffer);
 	
-	UnlockLoggerMutex();
+	LOG_UnlockMutex();
 }
 ///////////// LOG_Atari_Main
 
@@ -1215,11 +1272,11 @@ void LOG_Atari_Debug(char *fmt, ... )
 	vsprintf(buffer, fmt, args);
 	va_end(args);
 	
-	LockLoggerMutex();
+	LOG_LockMutex();
 	
 	DBG_SendLog(DBGLVL_ATARI_DEBUG, buffer);
 	
-	UnlockLoggerMutex();
+	LOG_UnlockMutex();
 }
 
 void LOG_Atari_Debug(std::string what)
@@ -1243,11 +1300,11 @@ void LOG_Atari_Debug(const char *fmt, ... )
 	vsprintf(buffer, fmt, args);
 	va_end(args);
 	
-	LockLoggerMutex();
+	LOG_LockMutex();
 	
 	DBG_SendLog(DBGLVL_ATARI_DEBUG, buffer);
 	
-	UnlockLoggerMutex();
+	LOG_UnlockMutex();
 }
 ///////////// LOG_Atari_Debug
 
@@ -1266,11 +1323,11 @@ void LOGMEM(char *fmt, ... )
     vsprintf(buffer, fmt, args);
     va_end(args);
 
-	LockLoggerMutex();
+	LOG_LockMutex();
 
 	DBG_SendLog(DBGLVL_MEMORY, buffer);
 
-	UnlockLoggerMutex();
+	LOG_UnlockMutex();
 }
 
 void LOGMEM(std::string what)
@@ -1294,11 +1351,11 @@ void LOGMEM(const char *fmt, ... )
     vsprintf(buffer, fmt, args);
     va_end(args);
 
-	LockLoggerMutex();
+	LOG_LockMutex();
 
 	DBG_SendLog(DBGLVL_MEMORY, buffer);
 
-	UnlockLoggerMutex();
+	LOG_UnlockMutex();
 }
 ///////////// LOGMEM
 
@@ -1317,9 +1374,9 @@ void LOGTODO(char *fmt, ... )
     vsprintf(buffer, fmt, args);
     va_end(args);
 
-	LockLoggerMutex();
+	LOG_LockMutex();
 	DBG_SendLog(DBGLVL_TODO, buffer);
-	UnlockLoggerMutex();
+	LOG_UnlockMutex();
 
 }
 
@@ -1344,9 +1401,9 @@ void LOGTODO(const char *fmt, ... )
     vsprintf(buffer, fmt, args);
     va_end(args);
 
-	LockLoggerMutex();
+	LOG_LockMutex();
 	DBG_SendLog(DBGLVL_TODO, buffer);
-	UnlockLoggerMutex();
+	LOG_UnlockMutex();
 }
 ///////////// LOGTODO
 void LOGError(char *fmt, ... )
@@ -1362,11 +1419,11 @@ void LOGError(char *fmt, ... )
     vsprintf(buffer, fmt, args);
     va_end(args);
 
-	LockLoggerMutex();
+	LOG_LockMutex();
 
 	DBG_SendLog(DBGLVL_ERROR, buffer);
 
-	UnlockLoggerMutex();
+	LOG_UnlockMutex();
 
 }
 
@@ -1391,11 +1448,11 @@ void LOGError(const char *fmt, ... )
     vsprintf(buffer, fmt, args);
     va_end(args);
 
-	LockLoggerMutex();
+	LOG_LockMutex();
 
 	DBG_SendLog(DBGLVL_ERROR, buffer);
 
-	UnlockLoggerMutex();
+	LOG_UnlockMutex();
 }
 /////////////
 
@@ -1413,11 +1470,11 @@ void LOGWarning(char *fmt, ... )
     vsprintf(buffer, fmt, args);
     va_end(args);
 
-	LockLoggerMutex();
+	LOG_LockMutex();
 
 	DBG_SendLog(DBGLVL_WARN, buffer);
 
-	UnlockLoggerMutex();
+	LOG_UnlockMutex();
 
 }
 
@@ -1442,11 +1499,11 @@ void LOGWarning(const char *fmt, ... )
     vsprintf(buffer, fmt, args);
     va_end(args);
 
-	LockLoggerMutex();
+	LOG_LockMutex();
 
 	DBG_SendLog(DBGLVL_WARN, buffer);
 
-	UnlockLoggerMutex();
+	LOG_UnlockMutex();
 }
 /////////////
 
@@ -1465,11 +1522,11 @@ void SYS_Errorf(char *fmt, ... )
     vsprintf(buffer, fmt, args);
     va_end(args);
 
-	LockLoggerMutex();
+	LOG_LockMutex();
 
 	DBG_SendLog(DBGLVL_ERROR, buffer);
 
-	UnlockLoggerMutex();
+	LOG_UnlockMutex();
 }
 
 void SYS_Errorf(const char *fmt, ... )
@@ -1484,11 +1541,11 @@ void SYS_Errorf(const char *fmt, ... )
     vsprintf(buffer, fmt, args);
     va_end(args);
 
-	LockLoggerMutex();
+	LOG_LockMutex();
 
 	DBG_SendLog(DBGLVL_ERROR, buffer);
 
-	UnlockLoggerMutex();
+	LOG_UnlockMutex();
 }
 
 #else

@@ -1,6 +1,7 @@
 //#import <Foundation/Foundation.h>
 #include "SYS_Threading.h"
 #include "SYS_Main.h"
+#include "SYS_Platform.h"
 #include <SDL.h>
 
 #if !defined(WIN32)
@@ -101,7 +102,7 @@ CSlrThread::CSlrThread(char *setThreadName)
 	strcpy(this->threadName, setThreadName);
 };
 
-void CSlrThread::ThreadSetName(char *name)
+void CSlrThread::ThreadSetName(const char *name)
 {
 	strcpy(this->threadName, name);
 	SYS_SetThreadName(name);
@@ -129,15 +130,9 @@ void SYS_SetThreadPriority(float priority)
 //#endif
 }
 
-void SYS_SetThreadName(char *name)
+void SYS_SetThreadName(const char *name)
 {
-//#if defined(IOS) || defined(MACOS)
-//	
-//	[[NSThread currentThread] setName:[NSString stringWithUTF8String:name]];
-//
-//#else
-	LOGTODO("SYS_SetThreadName");
-//#endif
+	PLATFORM_SetThreadName(name);
 }
 
 CSlrMutex::CSlrMutex(const char *name)

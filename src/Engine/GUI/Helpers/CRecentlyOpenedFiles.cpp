@@ -11,7 +11,7 @@ CRecentlyOpenedFiles::CRecentlyOpenedFiles(CSlrString *settingsFileName, CRecent
 	this->settingsFileName = settingsFileName;
 	this->callback = callback;
 	filesListMutex = new CSlrMutex("CRecentlyOpenedFiles::filesListMutex");
-		
+
 	maxNumberOfFiles = 40;
 	countFilesAvailableRefresh = FILES_REFRESH_NUM_FRAMES-1;
 	RestoreFromSettings();
@@ -121,7 +121,7 @@ CSlrString *CRecentlyOpenedFiles::GetCurrentOpenedFolder()
 	return folderPath;
 }
 
-void CRecentlyOpenedFiles::RenderImGuiMenu(char *menuItemLabel)
+void CRecentlyOpenedFiles::RenderImGuiMenu(const char *menuItemLabel)
 {
 	if (++countFilesAvailableRefresh >= FILES_REFRESH_NUM_FRAMES)
 	{
@@ -139,9 +139,22 @@ void CRecentlyOpenedFiles::RenderImGuiMenu(char *menuItemLabel)
 		for (std::list<CRecentFile *>::iterator it = listOfFiles.begin(); it != listOfFiles.end(); it++)
 		{
 			CRecentFile *file = *it;
-			if (ImGui::MenuItem(file->fileName, "", false, file->isAvailable))
+			// TODO: replace below with const char *menuLabelText = guiMain->isAltPressed ? file->filePath : file->fileName;
+			if (guiMain->isAltPressed)
 			{
-				fileSelected = file;
+				char *cstr = file->filePath->GetStdASCII();
+				if (ImGui::MenuItem(cstr, "", false, file->isAvailable))
+				{
+					fileSelected = file;
+				}
+				STRFREE(cstr);
+			}
+			else
+			{
+				if (ImGui::MenuItem(file->fileName, "", false, file->isAvailable))
+				{
+					fileSelected = file;
+				}
 			}
 		}
 		ImGui::EndMenu();

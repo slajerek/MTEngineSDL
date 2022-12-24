@@ -399,3 +399,13 @@ float CSlrFontBitmap::GetTextWidth(const char *text, float scale)
 	return (len*scale);
 }
 
+float CSlrFontBitmap::GetCharWidth(char ch, float scale)
+{
+	return scale;
+}
+
+float CSlrFontBitmap::GetCharHeight(char ch, float scale)
+{
+	return scale;
+}
+

@@ -2,15 +2,14 @@
 #include "SYS_Main.h"
 #include "SND_SoundEngine.h"
 
-CAudioChannelBusInt::CAudioChannelBusInt(u16 numChannels)
+CAudioChannelBusInt::CAudioChannelBusInt(const char *name, u16 numChannels)
+: CAudioChannel(name)
 {
 	this->numChannels = numChannels;
 	
 	this->isActive = false;
 	this->bypass = false;
 	this->destroyMe = false;
-
-	sprintf(name, "bus int");
 }
 
 CAudioChannelBusInt::~CAudioChannelBusInt()

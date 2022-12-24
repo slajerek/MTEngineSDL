@@ -8,6 +8,9 @@
 CGuiViewProgressBarWindow::CGuiViewProgressBarWindow(const char *name, float posX, float posY, float posZ, float sizeX, float sizeY, CGuiViewProgressBarWindowCallback *callback)
 : CGuiView(name, posX, posY, posZ, sizeX, sizeY)
 {
+	imGuiNoWindowPadding = true;
+	imGuiNoScrollbar = true;
+
 	this->userData = NULL;
 	this->callback = callback;
 	this->currentProgress = 0.0f;
@@ -58,9 +61,10 @@ void CGuiViewProgressBarWindow::RenderImGui()
 		center.y = center.y * 0.5f;
 		ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, ImVec2(400, 75));
-			
-		bool popen = true;
-		if (ImGui::BeginPopupModal(name, &popen, ImGuiWindowFlags_AlwaysAutoResize))
+		
+		// TODO: add cancel progressbar popup callback
+//		bool popen = true;	// note:BeginPopupModal(name, popen, ... when popen changes to false means popup was closed
+		if (ImGui::BeginPopupModal(name, NULL, ImGuiWindowFlags_AlwaysAutoResize))
 		{
 //			ImGui::Text(name);
 			//ProgressBar(float fraction, const ImVec2& size_arg, const char* overlay)
@@ -94,11 +98,14 @@ void CGuiViewProgressBarWindow::ShowProgressBar(const char *windowTitle, CGuiVie
 	this->callback = callback;
 	SetName(windowTitle);
 	currentProgress = 0.0f;
+	
+	guiMain->AddViewSkippingLayout(this);
 }
 
 void CGuiViewProgressBarWindow::HideProgressBar()
 {
 	showProgressBar = false;
+	guiMain->RemoveViewSkippingLayout(this);
 }
 
 bool CGuiViewProgressBarWindow::ButtonClicked(CGuiButton *button)

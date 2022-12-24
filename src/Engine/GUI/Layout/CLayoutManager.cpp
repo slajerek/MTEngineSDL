@@ -10,6 +10,8 @@ CLayoutData::CLayoutData()
 	this->serializedLayoutBuffer = new CByteBuffer();
 	this->doNotUpdateViewsPositions = false;
 	this->keyShortcut = NULL;
+	this->isFullScreenLayout = false;
+	this->parentLayout = NULL;
 }
 
 CLayoutData::CLayoutData(const char *layoutName, CByteBuffer *serializedLayout, bool doNotUpdateViewsPosition, CSlrKeyboardShortcut *keyShortcut)
@@ -22,6 +24,8 @@ CLayoutData::CLayoutData(const char *layoutName, CByteBuffer *serializedLayout, 
 	{
 		keyShortcut->userData = this;
 	}
+	this->isFullScreenLayout = false;
+	this->parentLayout = NULL;
 }
 
 CLayoutData::~CLayoutData()
@@ -36,6 +40,9 @@ CLayoutData::~CLayoutData()
 		guiMain->RemoveKeyboardShortcut(keyShortcut);
 		delete keyShortcut;
 	}
+	
+	if (parentLayout)
+		delete parentLayout;
 }
 
 CLayoutManager::CLayoutManager(CGuiMain *guiMain)
@@ -93,24 +100,29 @@ void CLayoutManager::DeleteAllLayouts()
 	}
 }
 
+void CLayoutManager::SerializeLayout(CLayoutData *layoutData, CByteBuffer *byteBuffer)
+{
+	byteBuffer->PutString(layoutData->layoutName);
+	byteBuffer->PutByteBuffer(layoutData->serializedLayoutBuffer);
+	byteBuffer->PutBool(layoutData->doNotUpdateViewsPositions);
+	if (layoutData->keyShortcut)
+	{
+		byteBuffer->PutBool(true);
+		layoutData->keyShortcut->Serialize(byteBuffer);
+	}
+	else
+	{
+		byteBuffer->PutBool(false);
+	}
+}
+
 void CLayoutManager::SerializeLayouts(CByteBuffer *byteBuffer)
 {
 	byteBuffer->PutU32(layouts.size());
 	for (std::list<CLayoutData *>::iterator it = layouts.begin(); it != layouts.end(); it++)
 	{
 		CLayoutData *layoutData = *it;
-		byteBuffer->PutString(layoutData->layoutName);
-		byteBuffer->PutByteBuffer(layoutData->serializedLayoutBuffer);
-		byteBuffer->PutBool(layoutData->doNotUpdateViewsPositions);
-		if (layoutData->keyShortcut)
-		{
-			byteBuffer->PutBool(true);
-			layoutData->keyShortcut->Serialize(byteBuffer);
-		}
-		else
-		{
-			byteBuffer->PutBool(false);
-		}
+		SerializeLayout(layoutData, byteBuffer);
 	}
 	
 	if (currentLayout)
@@ -123,6 +135,26 @@ void CLayoutManager::SerializeLayouts(CByteBuffer *byteBuffer)
 	}
 }
 
+CLayoutData *CLayoutManager::DeserializeLayout(CByteBuffer *byteBuffer, u16 version)
+{
+	char *layoutName = byteBuffer->GetString();
+	CByteBuffer *serializedLayout = byteBuffer->GetByteBuffer();
+	bool isStatic = byteBuffer->GetBool();
+	CSlrKeyboardShortcut *keyShortcut = NULL;
+	
+	if (version >= 0x0002)
+	{
+		bool hasKeyShortcut = byteBuffer->GetBool();
+		if (hasKeyShortcut)
+		{
+			keyShortcut = new CSlrKeyboardShortcut(byteBuffer, this);
+		}
+	}
+	
+	CLayoutData *layoutData = new CLayoutData(layoutName, serializedLayout, isStatic, keyShortcut);
+	return layoutData;
+}
+
 void CLayoutManager::DeserializeLayouts(CByteBuffer *byteBuffer, u16 version)
 {
 	DeleteAllLayouts();
@@ -130,21 +162,7 @@ void CLayoutManager::DeserializeLayouts(CByteBuffer *byteBuffer, u16 version)
 	u32 numLayouts = byteBuffer->GetU32();
 	for (u32 i = 0; i < numLayouts; i++)
 	{
-		char *layoutName = byteBuffer->GetString();
-		CByteBuffer *serializedLayout = byteBuffer->GetByteBuffer();
-		bool isStatic = byteBuffer->GetBool();
-		CSlrKeyboardShortcut *keyShortcut = NULL;
-		
-		if (version >= 0x0002)
-		{
-			bool hasKeyShortcut = byteBuffer->GetBool();
-			if (hasKeyShortcut)
-			{
-				keyShortcut = new CSlrKeyboardShortcut(byteBuffer, this);
-			}
-		}
-		
-		CLayoutData *layoutData = new CLayoutData(layoutName, serializedLayout, isStatic, keyShortcut);
+		CLayoutData *layoutData = DeserializeLayout(byteBuffer, version);
 		AddLayout(layoutData);
 	}
 	
@@ -243,10 +261,71 @@ void CLayoutManager::LoadLayouts()
 	delete byteBuffer;
 }
 
+void CLayoutManager::StoreLayout(CLayoutData *layoutData, CSlrString *filePath)
+{
+	CByteBuffer *byteBuffer = new CByteBuffer();
+	
+	byteBuffer->PutU8('L');
+	byteBuffer->PutU8('T');
+	byteBuffer->PutU16(LAYOUTS_FILE_VERSION);
+
+	// just one layout
+	byteBuffer->PutU32(1);
+
+	SerializeLayout(layoutData, byteBuffer);
+	
+	byteBuffer->storeToFile(filePath);
+	
+	delete byteBuffer;
+}
+
+CLayoutData *CLayoutManager::LoadLayout(CSlrString *filePath)
+{
+	CByteBuffer *byteBuffer = new CByteBuffer();
+
+	bool available = byteBuffer->readFromFile(filePath);
+	
+	if (available)
+	{
+		u8 b1 = byteBuffer->GetU8();
+		u8 b2 = byteBuffer->GetU8();
+		
+		if (b1 != 'L' || b2 != 'T')
+		{
+			LOGError("CLayoutManager::LoadLayout: LT magic not found");
+		}
+		else
+		{
+			u16 version = byteBuffer->GetU16();
+			if (version != LAYOUTS_FILE_VERSION)
+			{
+				LOGError("CLayoutManager::LoadLayout: version %04x not supported", version);
+			}
+			else
+			{
+				u32 numLayouts = byteBuffer->GetU32(); // skip
+				if (numLayouts != 1)
+				{
+					LOGWarning("CLayoutManager::LoadLayout: numLayouts in file is %d, loading first layout only", numLayouts);
+				}
+				CLayoutData *layoutData = DeserializeLayout(byteBuffer, version);
+				delete byteBuffer;
+				return layoutData;
+			}
+		}
+	}
+	
+	// failed to load layout
+	delete byteBuffer;
+	return NULL;
+}
+
+
+//
 void CLayoutManager::SerializeLayoutAsync(CLayoutData *layoutData)
 {
 	guiMain->LockMutex();
-	guiMain->layoutStoreOrRestore = true;		// store
+	guiMain->layoutStoreOrRestore = LayoutStorageTask::StoreLayout;
 	guiMain->layoutForThisFrame = layoutData;
 	guiMain->UnlockMutex();
 }
@@ -267,7 +346,7 @@ void CLayoutManager::SetLayoutAsync(CLayoutData *layoutData, bool saveCurrentLay
 		}
 		
 		layoutData->serializedLayoutBuffer->Rewind();
-		guiMain->layoutStoreOrRestore = false;	// restore
+		guiMain->layoutStoreOrRestore = LayoutStorageTask::RestoreLayout;
 		guiMain->layoutForThisFrame = layoutData;
 	}
 	guiMain->UnlockMutex();

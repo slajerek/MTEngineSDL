@@ -51,6 +51,8 @@ public:
 	void BlitChar(char chr, float posX, float posY, float posZ, float size, float alpha);
 
 	virtual float GetTextWidth(const char *text, float scale);
+	virtual float GetCharWidth(char ch, float scale);
+	virtual float GetCharHeight(char ch, float scale);
 
 	float width, height, pitchX, pitchY;
 	CSlrImage *image;

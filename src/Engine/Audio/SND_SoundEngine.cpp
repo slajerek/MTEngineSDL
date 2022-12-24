@@ -4,6 +4,7 @@
 #include "SND_Main.h"
 #include "SYS_FileSystem.h"
 #include "CSlrString.h"
+#include "SYS_DefaultConfig.h"
 
 //#define WRITE_AUDIO_OUT_TO_FILE
 
@@ -39,6 +40,7 @@ void playCallback(void *udata, Uint8 *mixBuffer, int len)
 	fwrite(outBuffer, numSamples, 4, fpMainAudioOutWriter);
 #endif
 
+//	LOGD("playCallback completed");
 }
 
 void SND_Init()
@@ -53,6 +55,11 @@ void SND_Init()
 	gSoundEngine->StartPlaying();
 	
 	LOGA("SDL_OpenAudio OK");
+}
+
+void SND_Start()
+{
+	// now sound is started with SND_Init, ideally we would like to init everything and then start the sound. This is TODO.
 }
 
 void SND_Shutdown()
@@ -80,6 +87,7 @@ CSoundEngine::CSoundEngine()
 	LOGM("CSoundEngine: storing audio out to file %s", fpath);
 #endif
 
+	this->deviceOutName[0] = 0;
 	this->currentAudioDevice = 0;
 	this->isPlaybackOn = false;
 }
@@ -119,28 +127,34 @@ bool CSoundEngine::SetOutputAudioDevice(const char *deviceName)
 {
 	LOGM("CSoundEngine::SetOutputAudioDevice: deviceName=%s", deviceName ? deviceName : "NULL");
 	
-	this->LockMutex("CSoundEngine::SetOutputAudioDevice");
-	
+	// Note, we first pause playback as per comment
 	bool wasPlaybackOn = isPlaybackOn;
 	if (isPlaybackOn)
 	{
 		this->StopPlaying();
 	}
+
+	this->LockMutex("CSoundEngine::SetOutputAudioDevice");
 	
-	if (currentAudioDevice)
-	{
-		SDL_CloseAudioDevice(currentAudioDevice);
-		SDL_CloseAudio();
-		currentAudioDevice = 0;
-	}
+	SDL_CloseAudioDevice(currentAudioDevice);
+	SDL_CloseAudio();
+	currentAudioDevice = 0;
 	
 	SDL_AudioSpec wanted;
+	
+	int bufferNumSamples = 512; //1024;  // Good low-latency value for callback
+	gApplicationDefaultConfig->GetInt("AudioBufferNumSamples", &bufferNumSamples, 512);
+	
+	if (bufferNumSamples > 8192)
+		bufferNumSamples = 8192;
+	if (bufferNumSamples < 16)
+		bufferNumSamples = 16;
 	
 	// Set the audio format
 	wanted.freq = 44100;
 	wanted.format = AUDIO_S16LSB;
 	wanted.channels = 2;    // 1 = mono, 2 = stereo
-	wanted.samples = 512;//1024;  // Good low-latency value for callback
+	wanted.samples = bufferNumSamples;
 	wanted.callback = playCallback;
 	wanted.userdata = NULL;
 
@@ -151,10 +165,12 @@ bool CSoundEngine::SetOutputAudioDevice(const char *deviceName)
 			LOGError("Couldn't open audio: %s\n", SDL_GetError());
 			SYS_FatalExit();
 		}
+		deviceOutName[0] = 0;
 		currentAudioDevice = 1;
 	}
 	else
 	{
+		strcpy(deviceOutName, deviceName);
 		currentAudioDevice = SDL_OpenAudioDevice(deviceName, false, &wanted, NULL, 0);
 		if (currentAudioDevice == 0)
 		{
@@ -186,15 +202,27 @@ bool CSoundEngine::SetOutputAudioDevice(const char *deviceName)
 	return true;;
 }
 
+void CSoundEngine::RestartAudioDevice()
+{
+	if (deviceOutName[0] == 0)
+	{
+		SetOutputAudioDevice(NULL);
+	}
+	else
+	{
+		SetOutputAudioDevice(deviceOutName);
+	}
+}
+
 void CSoundEngine::StartPlaying()
 {
-	SDL_PauseAudio(0);
+	SDL_PauseAudioDevice(currentAudioDevice, 0);
 	isPlaybackOn = true;
 }
 
 void CSoundEngine::StopPlaying()
 {
-	SDL_PauseAudio(1);
+	SDL_PauseAudioDevice(currentAudioDevice, 1);
 	isPlaybackOn = false;
 }
 

@@ -10,6 +10,9 @@ CGuiViewConsole::CGuiViewConsole(float posX, float posY, float posZ, float sizeX
 								 CSlrFont *font, float fontScale, int numLines, bool hasCommandLine, CGuiViewConsoleCallback *callback)
 : CGuiView(posX, posY, posZ, sizeX, sizeY)
 {
+	imGuiNoWindowPadding = true;
+	imGuiNoScrollbar = true;
+
 	this->font = font;
 	this->prompt[0] = 0x00;
 	this->commandLine[0] = 0x00;
@@ -279,26 +282,51 @@ bool CGuiViewConsole::KeyDown(u32 keyCode)
 	else
 	{
 		consumed = true;
-		LOGD("commandLine=%s", commandLine);
-		if (commandLine[commandLineCursorPos] == 0x00)
-		{
-			commandLine[commandLineCursorPos+1] = 0x00;
-		}
-		else
-		{
-			// move chars right
-			for (int i = MAX_CONSOLE_LINE_LENGTH-2; i >= commandLineCursorPos; i--)
-			{
-				commandLine[i+1] = commandLine[i];
-			}
-		}
-		commandLine[commandLineCursorPos] = keyCode;
-		if (commandLineCursorPos < MAX_CONSOLE_LINE_LENGTH-3)
-			commandLineCursorPos++;
+//		LOGD("commandLine=%s", commandLine);
+//		if (commandLine[commandLineCursorPos] == 0x00)
+//		{
+//			commandLine[commandLineCursorPos+1] = 0x00;
+//		}
+//		else
+//		{
+//			// move chars right
+//			for (int i = MAX_CONSOLE_LINE_LENGTH-2; i >= commandLineCursorPos; i--)
+//			{
+//				commandLine[i+1] = commandLine[i];
+//			}
+//		}
+//		commandLine[commandLineCursorPos] = keyCode;
+//		if (commandLineCursorPos < MAX_CONSOLE_LINE_LENGTH-3)
+//			commandLineCursorPos++;
 	}
 	
 	mutex->Unlock();
 	return consumed;
+}
+
+bool CGuiViewConsole::KeyTextInput(const char *text)
+{
+	mutex->Lock();
+	u8 keyCode = text[0];
+	LOGD("commandLine=%s", commandLine);
+	if (commandLine[commandLineCursorPos] == 0x00)
+	{
+		commandLine[commandLineCursorPos+1] = 0x00;
+	}
+	else
+	{
+		// move chars right
+		for (int i = MAX_CONSOLE_LINE_LENGTH-2; i >= commandLineCursorPos; i--)
+		{
+			commandLine[i+1] = commandLine[i];
+		}
+	}
+	commandLine[commandLineCursorPos] = keyCode;
+	if (commandLineCursorPos < MAX_CONSOLE_LINE_LENGTH-3)
+		commandLineCursorPos++;
+
+	mutex->Unlock();
+	return true;
 }
 
 void CGuiViewConsole::Render()

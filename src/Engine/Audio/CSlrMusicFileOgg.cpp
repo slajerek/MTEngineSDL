@@ -59,8 +59,8 @@ static ov_callbacks OV_CALLBACKS_MTENGINE_NOT_SEEKABLE =
 };
 
 
-CSlrMusicFileOgg::CSlrMusicFileOgg()
-: CSlrMusicFile()
+CSlrMusicFileOgg::CSlrMusicFileOgg(const char *channelName)
+: CSlrMusicFile(channelName)
 {
 	this->type = MUSIC_TYPE_OGG;
 	oggFileMutex = new CSlrMutex("CSlrMusicFileOgg");
@@ -71,12 +71,10 @@ CSlrMusicFileOgg::CSlrMusicFileOgg()
 	oggVorbisData = NULL;
 
 	this->resourcePriority = RESOURCE_PRIORITY_STATIC;
-
-	sprintf(name, "music ogg");
 }
 
-CSlrMusicFileOgg::CSlrMusicFileOgg(const char *fileName, bool seekable, bool fromResources)
-: CSlrMusicFile()
+CSlrMusicFileOgg::CSlrMusicFileOgg(const char *channelName, const char *fileName, bool seekable, bool fromResources)
+: CSlrMusicFile(channelName)
 {
 	this->type = MUSIC_TYPE_OGG;
 	oggFileMutex = new CSlrMutex("CSlrMusicFileOgg");
@@ -92,8 +90,8 @@ CSlrMusicFileOgg::CSlrMusicFileOgg(const char *fileName, bool seekable, bool fro
 	this->resourcePriority = RESOURCE_PRIORITY_STATIC;
 }
 
-CSlrMusicFileOgg::CSlrMusicFileOgg(CSlrFile *file, bool seekable)
-: CSlrMusicFile()
+CSlrMusicFileOgg::CSlrMusicFileOgg(const char *channelName, CSlrFile *file, bool seekable)
+: CSlrMusicFile(channelName)
 {
 	this->type = MUSIC_TYPE_OGG;
 	oggFileMutex = new CSlrMutex("CSlrMusicFileOgg");

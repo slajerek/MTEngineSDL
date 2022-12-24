@@ -12,6 +12,7 @@
 #include "imgui.h"
 #include "imgui_internal.h"
 #include "imguihelper.h"
+#include "imgui_toggle.h"
 #include "imgui_impl_sdl.h"
 
 #define GUI_GAP_WIDTH 2
@@ -46,18 +47,7 @@ struct ImGuiWindowSizeConstraints
 	}
 };
 
-
-//// TODO: code review this
-//#define UTFString char
-//#define MAKEUTF(val) val
-//#define UTFALLOC(val) strdup(val)
-//#define UTFALLOCFROMC(val) strdup(val)
-//#define UTFTOC(val) (val)
-//#define UTFRELEASE(val) free(val)
-//
-
 void GUI_SetPressConsumed(bool isConsumed);
-
 
 #endif
  

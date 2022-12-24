@@ -30,6 +30,7 @@
 #include <vector>
 
 #include "GUI_Main.h"
+#include "CGuiViewDebugLog.h"
 #include "SYS_FileSystem.h"
 #include "SYS_PauseResume.h"
 #include "CSlrString.h"
@@ -45,8 +46,11 @@ void SYS_MTEngineStartup()
 	SYS_InitStrings();
 	SYS_InitFileSystem();
 	SYS_InitApplicationDefaultConfig();
+	SYS_InitApplicationGuiLogger();
 	SYS_InitApplicationPauseResume();
 	
+	SYS_SetThreadName("Main");
+
 	MT_PreInit();
 
 	SDL_version compiled;
@@ -64,19 +68,17 @@ void SYS_MTEngineStartup()
 		LOGError("SDL_Init error: %s", SDL_GetError());
 		return;
 	}
-
+	
 	// this is the order of startup:
 	
 	RES_Init(2048);
 
 	VID_Init();
 	
-	IM_ASSERT(ImGui::GetCurrentContext() != NULL && "Missing dear imgui context. Refer to examples app!"); // Exceptionally add an extra assert here for people confused with initial dear imgui setup
+	IM_ASSERT(ImGui::GetCurrentContext() != NULL && "Dear ImGui context failed to create");
 
 	SND_Init();
 	
-	VID_RestoreMainWindowPosition();
-
 	// init the application
 	GUI_Init();
 	
@@ -86,9 +88,15 @@ void SYS_MTEngineStartup()
 	LOGTODO("NET_Initialize(); windows");
 #endif
 	
+	PLATFORM_UpdateMenus();
+	
 	MT_PostInit();
 	
-	// first rendered frame is here:
+	SND_Start();
+
+	VID_PostInit();
+	
+	// First rendered frame is here and whole Render Loop
 	VID_RenderLoop();
 
 	// shutdown
@@ -102,8 +110,8 @@ void SYS_MTEngineStartup()
 		// serialize current layout to workspaces
 		guiMain->layoutManager->currentLayout->serializedLayoutBuffer->Clear();
 		
-		// note, we can just serialize layout as the frame has been rendered, normally we would need to call async serialize
-		guiMain->SerializeLayout(guiMain->layoutManager->currentLayout->serializedLayoutBuffer);
+		// note, we can just serialize layout now because the frame has been rendered, normally we would need to call async serialize
+		guiMain->SerializeLayout(guiMain->layoutManager->currentLayout);
 		
 		// save all layouts
 		guiMain->layoutManager->StoreLayouts();
@@ -112,16 +120,16 @@ void SYS_MTEngineStartup()
 	SYS_ApplicationShutdown();
 	SYS_PlatformShutdown();
 	
+	LOG_Shutdown();
 	_exit(0);
 
 	// this below takes ages sometimes (~1-2sec) and is not needed on modern systems
 	SND_Shutdown();
-	
 	VID_Shutdown();
-	
 	SDL_Quit();
 	
 	LOG_Shutdown();
+	_exit(0);
 }
 
 void SYS_Shutdown()

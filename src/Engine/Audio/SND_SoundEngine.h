@@ -26,6 +26,7 @@ public:
 	
 	std::list<const char *> *EnumerateAvailableOutputDevices();
 	bool SetOutputAudioDevice(const char *deviceName);
+	void RestartAudioDevice();
 	
 	char deviceOutName[512];
 	int deviceOutIndex;
@@ -40,6 +41,7 @@ private:
 };
 
 void SND_Init();
+void SND_Start();
 void SND_Shutdown();
 
 extern CSoundEngine *gSoundEngine;

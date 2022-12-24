@@ -9,6 +9,7 @@
 #include "SYS_Platform.h"
 #include "SYS_SharedMemory.h"
 #include "CRenderBackendOpenGL3.h"
+#include "CGuiView.h"
 
 #if defined(MACOS)
 #include "SYS_MacOSWrapper.h"
@@ -31,12 +32,14 @@
 
 CRenderBackend *gRenderBackend = NULL;
 
+// TODO: remove these below, we need dynamic access to this
 int SCREEN_WIDTH;
 int SCREEN_HEIGHT;
 
-SDL_GLContext glContext;
+SDL_GLContext glContext = NULL;
 SDL_Window* gMainWindow = NULL;
-u64 gCurrentFrameTime;
+u64 gCurrentFrameTime = 0;
+u64 gCurrentFrameNumber = 0;
 
 bool gViewportsEnableInitAtStartup = false;
 
@@ -47,6 +50,7 @@ SDL_Window *VID_GetMainSDLWindow()
 
 //https://ourmachinery.com/post/dpi-aware-imgui/
 
+bool initWindowMaxmized = false;
 
 void VID_SetupShaders();
 
@@ -66,11 +70,11 @@ void VID_Init()
 
 	int x = SDL_WINDOWPOS_CENTERED;
 	int y = SDL_WINDOWPOS_CENTERED;
-	int width = 640;
-	int height = 35;
-	VID_GetStartupMainWindowPosition(&x, &y, &width, &height);
+	int width = 800;
+	int height = 450;	// floating windows: 35;
+	VID_GetStartupMainWindowPosition(&x, &y, &width, &height, &initWindowMaxmized);
 	
-	gMainWindow = gRenderBackend->CreateSDLWindow(windowTitle, x, y, width, height);	
+	gMainWindow = gRenderBackend->CreateSDLWindow(windowTitle, x, y, width, height, initWindowMaxmized);
 	LOGD("gMainWindow is %x", gMainWindow);
 	
 	if (gMainWindow == NULL)
@@ -78,7 +82,7 @@ void VID_Init()
 		LOGError( "Failed to create SDL Window. This is fatal! Error=%s\n", SDL_GetError() );
 		return;
 	}
-
+		
 	//	SDL_DisplayMode current;
 	//	SDL_GetCurrentDisplayMode(0, &current);
 	
@@ -103,10 +107,14 @@ void VID_Init()
 	LOGM("ImGui ini settings path=%s", iniFileName);
 	io.IniFilename = (const char*)iniFileName;
 	
+	
 //	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;       // Enable Keyboard Controls
 	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;           // Enable Docking
-	if (VID_GetViewportsEnable())
+	
+	io.ConfigDockingWithShift = gApplicationDefaultConfig->GetBool("uiDockingWithShift", true);
+	
+	if (VID_IsViewportsEnable())
 	{
 		io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;         // Enable Multi-Viewport / Platform Windows
 		gViewportsEnableInitAtStartup = true;
@@ -117,7 +125,7 @@ void VID_Init()
 		gViewportsEnableInitAtStartup = false;
 	}
 	//io.ConfigFlags |= ImGuiConfigFlags_ViewportsNoTaskBarIcons;
-	//io.ConfigFlags |= ImGuiConfigFlags_ViewportsNoMerge;
+//	io.ConfigFlags |= ImGuiConfigFlags_ViewportsNoMerge;
 //	io.ConfigFlags |= ImGuiConfigFlags_DpiEnableScaleViewports;
 //	io.ConfigFlags |= ImGuiConfigFlags_DpiEnableScaleFonts;
 	io.ConfigWindowsMoveFromTitleBarOnly = true;
@@ -142,6 +150,30 @@ void VID_Init()
 #if defined(WIN32)
 	SDL_EventState(SDL_SYSWMEVENT, SDL_ENABLE);
 #endif
+	
+	// Note, SDL_CaptureMouse breaks ImGui starting from SDL 2.0.22. We actually need to capture mouse to have a DoNotTouchedMove event to GUIs
+//	SDL_CaptureMouse(SDL_TRUE);
+//	SDL_SetHint(SDL_HINT_MOUSE_AUTO_CAPTURE, "0");
+
+	//
+	SDL_StartTextInput();
+	
+	//
+	gCurrentFrameNumber = 0;
+}
+
+void VID_PostInit()
+{
+	LOGM("VID_PostInit: show window, restore position");
+	
+	if (initWindowMaxmized)
+	{
+		SDL_MaximizeWindow(gMainWindow);
+	}
+	SDL_ShowWindow(gMainWindow);
+	VID_RestoreMainWindowPosition();
+
+	LOGD("VID_PostInit: completed");
 }
 
 void VID_SetViewportsEnable(bool viewportsEnable)
@@ -178,10 +210,10 @@ void VID_ResetImGuiStyle()
 	VID_SetImGuiStyle(style);
 }
 
-bool VID_GetViewportsEnable()
+bool VID_IsViewportsEnable()
 {
-	bool viewportsEnable = true;
-	gApplicationDefaultConfig->GetBool("uiViewportsEnable", &viewportsEnable, true);
+	bool viewportsEnable = false;
+	gApplicationDefaultConfig->GetBool("uiViewportsEnable", &viewportsEnable, false);
 	return viewportsEnable;
 }
 
@@ -206,11 +238,14 @@ int countedLogicFrames = 0;
 
 void VID_Render()
 {
-//	long t1 = SYS_GetCurrentTimeInMillis();
+//	SDL_CaptureMouse(SDL_TRUE);
+
+	long t1 = SYS_GetCurrentTimeInMillis();
 	ImVec4 clearColor;
 	
 	if (guiMain->IsViewFullScreen() == false)
 	{
+		clearColor = ImVec4(11.0f/256.0f, 34.0f/256.0f, 44.0f/255.0f, 1.0f); //0.45f, 0.55f, 0.60f, 1.00f);
 		clearColor = ImVec4(11.0f/256.0f, 34.0f/256.0f, 44.0f/255.0f, 1.0f); //0.45f, 0.55f, 0.60f, 1.00f);
 	}
 	else
@@ -226,6 +261,7 @@ void VID_Render()
 	// Start the Dear ImGui frame
 
 	// OPENGL3
+	
 	gRenderBackend->NewFrame(clearColor);
 	
 	ImGui_ImplSDL2_NewFrame(gMainWindow);
@@ -241,11 +277,10 @@ void VID_Render()
 	VID_BindImages();
 	
 	gCurrentFrameTime = VID_GetTickCount();
+	gCurrentFrameNumber++;
 	
 	GUI_Render();
-	
 	ImGui::EndFrame();
-	
 	ImGui::Render();
 	
 	VID_UnlockRenderMutex();
@@ -259,8 +294,15 @@ void VID_Render()
 	//		doLogic();
 	countedLogicFrames += 1;
 
-	//	long t2 = SYS_GetCurrentTimeInMillis();
+		long t2 = SYS_GetCurrentTimeInMillis();
 //	LOGD("render took %dms", t2-t1);
+	
+	// TODO: remove me when confirmed it is working OK
+	if (SDL_IsTextInputActive() == SDL_FALSE)
+	{
+		LOGError("SDL_IsTextInputActive returned false");
+		SDL_StartTextInput();
+	}
 }
 
 // TODO: VID_isChangingFullScreenState is required because SDL_filterEventCallback is called on SDL PUSH event during SDL_SetWindowFullscreen and that causes GUI_PostRenderEndFrame tasks to be run twice. This should be fixed by splitting rendering and UI async tasks loop in guiMain->PostRenderEndFrame
@@ -378,19 +420,46 @@ void VID_SetFPS(float fps)
 volatile bool mtQuitApplication = false;
 volatile bool mtEventLoopRunning = false;
 
+// Workaround for a Bug in SDL2, SDL_CaptureMouse does not work since 2.0.22, let's do our own mouse move events
+static int prevGlobalMousePosX = 0;
+static int prevGlobalMousePosY = 0;
+
 void VID_ProcessEvents()
 {
-//	printf("%d VID_ProcessEvents\n", SYS_GetTickCount());
+//	LOGD("%d VID_ProcessEvents\n", SYS_GetTickCount());
 	
-	SDL_CaptureMouse(SDL_TRUE);
 //			SDL_Window *window = SDL_GetWindowFromID(event.motion.windowID);
 //			SDL_GetWindowPosition(window, &windowX, &windowX);
 
 //	SDL_StopTextInput();
-	
+
 	// not let event processing starve rendering
 	long tFrameMax = SYS_GetTickCount() + frameMaxTimeInMillis;
-	
+		
+	// check MouseMotion event
+	int posX, posY;
+	u32 button = VID_GetMousePos(&posX, &posY);
+	if (posX != prevGlobalMousePosX || posY != prevGlobalMousePosY)
+	{
+//		LOGI("VID_ProcessEvents: DoNotTouchedMove: (%d %d) left=%d right=%d", posX, posY,
+//			 button & SDL_BUTTON(SDL_BUTTON_LEFT), button & SDL_BUTTON(SDL_BUTTON_RIGHT));
+		
+		prevGlobalMousePosX = posX;
+		prevGlobalMousePosY = posY;
+		
+		guiMain->DoNotTouchedMove(posX, posY);
+		
+		if (button & SDL_BUTTON(SDL_BUTTON_LEFT))
+		{
+			guiMain->DoMove(posX, posY);
+		}
+
+		if (button & SDL_BUTTON(SDL_BUTTON_RIGHT))
+		{
+			guiMain->DoRightClickMove(posX, posY);
+		}
+	}
+
 	SDL_Event event;
 	while (SDL_PollEvent(&event))
 	{
@@ -398,17 +467,21 @@ void VID_ProcessEvents()
 //		LOGI("SDL_IsTextInputActive=%s", STRBOOL(SDL_IsTextInputActive()));
 		if (event.type == SDL_QUIT)
 		{
+//			LOGM("SDL_QUIT");
 			mtQuitApplication = true;
 		}
 		
 		else if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(gMainWindow))
 		{
+//			LOGM("SDL_WINDOWEVENT_CLOSE");
 			mtQuitApplication = true;
 		}
 
 		else if (event.type == SDL_TEXTINPUT)
 		{
+			// https://wiki.libsdl.org/Tutorials-TextInput
 			LOGI("VID_ProcessEvents: SDL_TEXTINPUT: %d %x '%s'", event.text.text[0], event.text.text[0], event.text.text);
+			guiMain->KeyTextInput(event.text.text);
 		}
 
 		else if (event.type == SDL_TEXTEDITING)
@@ -438,7 +511,7 @@ void VID_ProcessEvents()
 			guiMain->isLeftSuperPressed = ((SDL_GetModState() & PLATFORM_KMOD_LGUI) != 0);
 			guiMain->isRightSuperPressed = ((SDL_GetModState() & PLATFORM_KMOD_RGUI) != 0);
 			
-			// this does not work either
+			// this code below also bugs in SDL2 and does not work either
 //#if defined(MACOS)
 //#define PLATFORM_SCANCODE_LCTRL	SDL_SCANCODE_LGUI
 //#define PLATFORM_SCANCODE_RCTRL	SDL_SCANCODE_RGUI
@@ -559,9 +632,10 @@ void VID_ProcessEvents()
 			
 //			LOGD("VID_ProcessEvents: key consumed");
 		}
+		
 		else if (event.type == SDL_MOUSEBUTTONDOWN)
 		{
-//			LOGI("%d SDL_MOUSEBUTTONDOWN button=%d", SYS_GetTickCount(), event.button.button);
+			LOGI("%lu SDL_MOUSEBUTTONDOWN button=%d", SYS_GetTickCount(), event.button.button);
 			
 			int posX, posY;
 			VID_GetMousePos(&posX, &posY);
@@ -580,7 +654,7 @@ void VID_ProcessEvents()
 		{
 			int posX, posY;
 			VID_GetMousePos(&posX, &posY);
-//			LOGD("SDL_MOUSEBUTTONUP: %d %d (%d %d)", event.motion.x, event.motion.y, posX, posY);
+			LOGI("SDL_MOUSEBUTTONUP: %d %d (%d %d)", event.motion.x, event.motion.y, posX, posY);
 			
 			if (event.button.button == SDL_BUTTON_LEFT)
 			{
@@ -593,21 +667,11 @@ void VID_ProcessEvents()
 		}
 		else if (event.type == SDL_MOUSEMOTION)
 		{
-			ImGuiIO& io = ImGui::GetIO();
-
-			int posX, posY;
-			u32 button = VID_GetMousePos(&posX, &posY);
-//			LOGD("SDL_MOUSEMOTION: %d %d (%d %d)", event.motion.x, event.motion.y, posX, posY);
-						
-			guiMain->DoNotTouchedMove(posX, posY);
-			
-			if (button & SDL_BUTTON(SDL_BUTTON_LEFT))
-			{
-				guiMain->DoMove(posX, posY);
-			}
+			// Oh, why should we use clunky SDL2's events
 		}
 		else if (event.type == SDL_MOUSEWHEEL)
 		{
+			LOGI("SDL_MOUSEWHEEL");
 			guiMain->DoScrollWheel((float)event.wheel.x, (float)event.wheel.y);
 		}
 		else if (event.type == SDL_WINDOWEVENT)
@@ -622,12 +686,14 @@ void VID_ProcessEvents()
 		}
 		else if (event.type == SDL_DROPFILE)
 		{
-			LOGD("SDL_DROPFILE: event.drop.windowId=%d file=%s", event.drop.windowID, event.drop.file);
+			LOGM("SDL_DROPFILE: event.drop.windowId=%d file=%s", event.drop.windowID, event.drop.file);
 			guiMain->DoDropFile(event.drop.windowID, event.drop.file);
 			SDL_free(event.drop.file);
 		}
 		
-		// TODO: bug? for some reason these do not work on macOS. is this related? https://discourse.libsdl.org/t/events-dont-fire-sdl-multigesture-sdl-mousewheel-osx-10-14-6/27900
+		// TODO: bug? for some reason these do not work on macOS. is this implemented at all?
+	// TODO: copy paste old MTEngine code with proper implementation of the events queue
+//	https://discourse.libsdl.org/t/events-dont-fire-sdl-multigesture-sdl-mousewheel-osx-10-14-6/27900
 		else if (event.type == SDL_FINGERDOWN)
 		{
 			LOGD("SDL_FINGERDOWN X=%g Y=%g ID=%lld dx=%g dy=%g",
@@ -671,7 +737,10 @@ void VID_ProcessEvents()
 //			LOGWarning("Unknown event.type=%d", event.type);
 		}
 		
+		long t1 = SYS_GetTickCount();
 		ImGui_ImplSDL2_ProcessEvent(&event);
+		long t2 = SYS_GetTickCount();
+//		LOGD("ImGui_ImplSDL2_ProcessEvent took %dms", t2-t1);
 		
 		long tFrame = SYS_GetTickCount();
 		if (tFrame > tFrameMax)
@@ -682,6 +751,7 @@ void VID_ProcessEvents()
 
 void VID_RenderLoop()
 {
+	LOGM("VID_RenderLoop");
 	mtEventLoopRunning = true;
 	
 	SDL_SetEventFilter(SDL_filterEventCallback, NULL);
@@ -719,6 +789,7 @@ void VID_RenderLoop()
 				VID_ProcessEvents();
 			}
 		}
+		SYS_Sleep(1);
 	}
 	
 	mtEventLoopRunning = false;
@@ -777,6 +848,28 @@ unsigned long VID_GetTickCount()
 	return GetTickCount();
 #endif
 
+}
+
+SDL_Window *ImGui_ImplSDL2_ImGuiViewportToSDLWindow(ImGuiViewport *imGuiViewport);
+// this needs to be moved to imgui_impl_sdl.cpp
+//SDL_Window *ImGui_ImplSDL2_ImGuiViewportToSDLWindow(ImGuiViewport *imGuiViewport)
+//{
+//	ImGui_ImplSDL2_ViewportData *viewportData = (ImGui_ImplSDL2_ViewportData *)imGuiViewport->PlatformUserData;
+//	SDL_Window *sdlWindow = viewportData->Window;
+//	return sdlWindow;
+//}
+
+SDL_Window *VID_GetSDLWindowFromCGuiView(CGuiView *view)
+{
+	if (!view->imGuiWindow)
+		return NULL;
+	
+	ImGuiViewport *imGuiViewport = view->imGuiWindow->Viewport;
+
+	if (!imGuiViewport)
+		return NULL;
+
+	return ImGui_ImplSDL2_ImGuiViewportToSDLWindow(imGuiViewport);
 }
 
 bool VID_IsWindowAlwaysOnTop()
@@ -857,6 +950,11 @@ void VID_ResetLogicClock()
 	LOGTODO("void VID_ResetLogicClock();");
 }
 
+u64 VID_GetCurrentFrameNumber()
+{
+	return gCurrentFrameNumber;
+}
+
 void GUI_GetRealScreenPixelSizes(double *pixelSizeX, double *pixelSizeY)
 {
 	SYS_FatalExit("TODO: GUI_GetRealScreenPixelSizes");
@@ -932,6 +1030,10 @@ void VID_SetMainApplicationWindowFullScreen(bool isFullScreen)
 //	return false;
 //}
 
+void VID_RaiseMainWindow()
+{
+	SDL_RaiseWindow(gMainWindow);
+}
 
 void VID_LockRenderMutex()
 {
@@ -945,12 +1047,22 @@ void VID_UnlockRenderMutex()
 
 float VID_GetScreenWidth()
 {
-	return SCREEN_WIDTH;
+	int displayNum = 0;
+	
+//	SDL_Rect r1;
+//	SDL_GetDisplayBounds(n, &r1);
+//
+	SDL_Rect r2;
+	SDL_GetDisplayUsableBounds(displayNum, &r2);
+	return r2.w;
 }
 
 float VID_GetScreenHeight()
 {
-	return SCREEN_HEIGHT;
+	int displayNum = 0;
+	SDL_Rect r2;
+	SDL_GetDisplayUsableBounds(displayNum, &r2);
+	return r2.h;
 }
 
 ImGuiStyleType VID_GetDefaultImGuiStyle()

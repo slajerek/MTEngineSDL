@@ -22,6 +22,30 @@ class CGuiElement;
 class CGuiView;
 class CGamePad;
 
+enum ImGuiToastType_
+{
+	ImGuiToastType_None,
+	ImGuiToastType_Success,
+	ImGuiToastType_Warning,
+	ImGuiToastType_Error,
+	ImGuiToastType_Info,
+	ImGuiToastType_COUNT
+};
+
+enum SetFullScreenMode
+{
+	ViewEnterFullScreen,
+	ViewLeaveFullScreen,
+	MainWindowEnterFullScreen,
+	MainWindowLeaveFullScreen
+};
+
+enum LayoutStorageTask
+{
+	StoreLayout,
+	RestoreLayout
+};
+
 class CUiThreadTaskCallback
 {
 public:
@@ -59,9 +83,7 @@ public:
 	CLayoutManager *layoutManager;
 	
 	CGuiTheme *theme;
-	
-	CGuiElement *focusElement;
-	
+		
 	CSlrFontBitmap *fntConsole;
 	CSlrImage *imgConsoleFonts;
 	CSlrFontBitmap *fntConsoleInverted;
@@ -79,28 +101,39 @@ public:
 	// currently available views
 	std::list<CGuiView *> views;
 	void AddView(CGuiView *view);
+	void AddViewSkippingLayout(CGuiView *view);
 	void RemoveView(CGuiView *view);
+	void RemoveViewSkippingLayout(CGuiView *view);
 	void RemoveAllViews();
 
 	// layout views are views that should serialize layouts but may not be available (not in views), identified by u64 hash from name
 	std::map<u64, CGuiView *> layoutViews;
-	void AddLayoutView(CGuiView *view);
-	void RemoveLayoutView(CGuiView *view);
+	void AddViewToLayout(CGuiView *view);
+	void RemoveViewFromLayout(CGuiView *view);
 
+	void DebugPrintViews();
+	
 	//
 	CLayoutData *layoutForThisFrame;
-	bool layoutStoreOrRestore;
+	LayoutStorageTask layoutStoreOrRestore;
 	bool layoutStoreCurrentInSettings;
-	void SerializeLayout(CByteBuffer *byteBuffer);
-	bool DeserializeLayout(CByteBuffer *byteBuffer);
+	void SerializeLayout(CLayoutData *layout);
+	bool DeserializeLayout(CLayoutData *layout);
 	bool layoutJustRestored;
 	void StoreLayoutInSettingsAtEndOfThisFrame();
 	
 	void SetView(CGuiView *view);
-	void SetViewFocus(CGuiElement *view);
-	void ClearViewFocus();
-	void SetWindowOnTop(CGuiElement *view);
 
+	CGuiView *focusedView;
+	void SetFocus(CGuiView *view);
+	void SetInternalViewFocus(CGuiView *view);
+	bool ClearInternalViewFocus();
+
+	void RaiseMainWindow();
+	void SetWindowOnTop(CGuiView *view);
+
+	void CloseCurrentImGuiWindow();
+	
 	CGuiView *viewResourceManager;
 
 	// modal dialog
@@ -110,6 +143,10 @@ public:
 	char *messageBoxTitle;
 	char *messageBoxText;
 	CUiMessageBoxCallback *messageBoxCallback;
+	
+	// notification toast
+	void ShowNotification(const char *title, const char *message);
+	void ShowNotification(ImGuiToastType_ toastType, int dismissTime, const char *title, const char *message);
 	
 	volatile bool isShiftPressed;
 	volatile bool isControlPressed;
@@ -129,16 +166,23 @@ public:
 	volatile bool isRightControlPressed;
 	volatile bool isRightSuperPressed;
 	volatile bool isRightAltPressed;
+	
+	volatile bool isLeftMouseButtonPressed;
+	volatile bool isRightMouseButtonPressed;
 
+	bool CheckKeyboardShortcut(u32 keyCode);
 	bool KeyDown(u32 keyCode);
 	bool KeyDownRepeat(u32 keyCode);
 	bool KeyUp(u32 keyCode);
+	bool KeyTextInput(const char *text);
+	
 	bool DoTap(float x, float y);
 	bool DoFinishTap(float x, float y);
 	bool DoRightClick(float x, float y);
 	bool DoFinishRightClick(float x, float y);
 	
 	bool DoMove(float x, float y);
+	bool DoRightClickMove(float x, float y);
 	void DoNotTouchedMove(float x, float y);
 	void DoScrollWheel(float deltaX, float deltaY);
 
@@ -182,7 +226,12 @@ public:
 	void AddUiThreadTask(CUiThreadTaskCallback *taskCallback);
 	
 	//
-	void CreateUiFontsTexture();
+	CGuiView *FindTopWindow(float x, float y);
+	bool IsViewHidden(CGuiView *view);
+	
+	//
+	void MergeIconsWithLatestFont(float fontSize);
+	void CreateUiFontsTexture(float fontSize);
 	
 	// when going full screen a layout is saved and restored when going back to windowed mode.
 	// because currentLayout may have doNotUpdateViewsPositions we make a temporary copy
@@ -199,8 +248,8 @@ public:
 	bool isChangingFullScreenState;
 
 	// go full screen
-	void SetViewFullScreen(CGuiView *view, float fullScreenSizeX, float fullScreenSizeY);
-	void SetViewFullScreen(CGuiView *view);
+	void SetViewFullScreen(SetFullScreenMode setFullScreenMode, CGuiView *view, float fullScreenSizeX, float fullScreenSizeY);
+	void SetViewFullScreen(SetFullScreenMode setFullScreenMode, CGuiView *view);
 	bool IsViewFullScreen();
 	
 	//
@@ -216,9 +265,7 @@ public:
 
 	bool IsMouseCursorVisible();
 	void SetMouseCursorVisible(bool isVisible);
-	
-	void SetFocus(CGuiElement *element);
-	
+		
 	//
 	CSlrKeyboardShortcuts *keyboardShortcuts;
 	void AddKeyboardShortcut(CSlrKeyboardShortcut *keyboardShortcut);
@@ -246,6 +293,7 @@ public:
 	
 private:
 	CSlrMutex *renderMutex;
+	CSlrMutex *notificationMutex;
 };
 
 // TODO: MOVE ME TO CPP
@@ -282,8 +330,9 @@ public:
 class CUiThreadTaskSetViewFullScreen : public CUiThreadTaskCallback
 {
 public:
-	CUiThreadTaskSetViewFullScreen(CGuiView *view, float fullScreenSizeX, float fullScreenSizeY);
+	CUiThreadTaskSetViewFullScreen(SetFullScreenMode setFullScreenMode, CGuiView *view, float fullScreenSizeX, float fullScreenSizeY);
 	
+	SetFullScreenMode setFullScreenMode;
 	CGuiView *view;
 	float fullScreenSizeX, fullScreenSizeY;
 	virtual void RunUIThreadTask();
@@ -302,6 +351,12 @@ class CUiThreadTaskRecreateUiFonts : public CUiThreadTaskCallback
 {
 public:
 	CUiThreadTaskRecreateUiFonts();
+	virtual void RunUIThreadTask();
+};
+
+class CUiThreadTaskRaiseMainWindow : public CUiThreadTaskCallback
+{
+public:
 	virtual void RunUIThreadTask();
 };
 

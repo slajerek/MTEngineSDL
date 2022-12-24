@@ -5,6 +5,9 @@ void SYS_PlatformInit();
 void SYS_PlatformShutdown();
 void SYS_AttachConsole();
 
+void PLATFORM_SetThreadName(const char *name);
+void PLATFORM_UpdateMenus();
+
 bool MACOS_IsApplicationFullScreen();
 float MACOS_GetBackingScaleFactor(int screen);
 

@@ -190,6 +190,7 @@ void SYS_ApplicationShutdown()
 	UnlockPauseResumeListenersListMutex();
 	
 	VID_StoreMainWindowPosition();
+	LOGM("SYS_ApplicationShutdown completed");
 }
 
 void SYS_ApplicationSystemSettingsUpdated(void *settingsData)

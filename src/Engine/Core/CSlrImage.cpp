@@ -865,7 +865,8 @@ void CSlrImage::BindImage()
 void CSlrImage::SetLinearScaling(bool isLinearScaling)
 {
 	this->linearScaling = isLinearScaling;
-	gRenderBackend->UpdateTextureLinearScaling(this);
+	if (isBound)
+		gRenderBackend->UpdateTextureLinearScaling(this);
 }
 
 void CSlrImage::ReBindImage()

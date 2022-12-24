@@ -85,4 +85,13 @@ void VID_HideMouseCursor()
         X11ShowCursor(false);
 }
 
+void PLATFORM_SetThreadName(const char *name)
+{
+ LOGTODO("Linux: PLATFORM_SetThreadName");
+}
+
+
+void PLATFORM_UpdateMenus()
+{
+}
 

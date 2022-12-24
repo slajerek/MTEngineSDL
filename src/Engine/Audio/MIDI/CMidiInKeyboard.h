@@ -34,6 +34,7 @@ public:
 
 	char deviceName[512];
 	static std::list<CSlrString *> *EnumerateAvailablePorts(CSlrString **errorString);
+	static std::list<char *> *EnumerateAvailablePorts();
 };
 
 #endif

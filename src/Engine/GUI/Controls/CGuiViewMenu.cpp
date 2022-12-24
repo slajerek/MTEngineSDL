@@ -267,6 +267,8 @@ void CGuiViewMenu::DoLogic()
 
 void CGuiViewMenu::Render()
 {
+//	LOGD("CGuiViewMenu::Render");
+	
 	guiMain->LockMutex();
 	
 	if (this->currentSubMenu != NULL)
@@ -294,9 +296,11 @@ void CGuiViewMenu::Render()
 	for ( ; it != menuItems.end(); it++)
 	{
 		m = *it;
-		
+
 		float npy = py + m->height;
-		
+
+//		LOGD("           py=%f npy=%f posEndY=%f", py, npy, posEndY);
+
 		if (npy > posEndY)
 			break;
 		

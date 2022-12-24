@@ -2,7 +2,8 @@
 #include "SYS_Main.h"
 #include "SND_SoundEngine.h"
 
-CAudioChannelBusFloat::CAudioChannelBusFloat(u16 numChannels)
+CAudioChannelBusFloat::CAudioChannelBusFloat(const char *name, u16 numChannels)
+: CAudioChannel(name)
 {
 	this->numChannels = numChannels;
 
@@ -17,14 +18,14 @@ CAudioChannelBusFloat::CAudioChannelBusFloat(u16 numChannels)
 	oggAudioChannelsPool = new CSlrMusicFileOgg *[numChannels];
 	oggAudioFilesPool = new CSlrFileMemory *[numChannels];
 
+	char *buf = SYS_GetCharBuf();
 	for (u16 i = 0; i < numChannels; i++)
 	{
-		oggAudioChannelsPool[i] = new CSlrMusicFileOgg();
+		sprintf(buf, "%s-%d", name, i);
+		oggAudioChannelsPool[i] = new CSlrMusicFileOgg(buf);
 		oggAudioFilesPool[i] = new CSlrFileMemory();
 	}
-
-	sprintf(name, "bus float");
-
+	SYS_ReleaseCharBuf(buf);
 }
 
 CAudioChannelBusFloat::~CAudioChannelBusFloat()

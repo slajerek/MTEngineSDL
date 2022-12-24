@@ -523,7 +523,7 @@ void CGuiRichTextLabel::Parse()
 	//LOGD("...");
 }
 
-bool CGuiRichTextLabel::TagExists(char *tagName)
+bool CGuiRichTextLabel::TagExists(const char *tagName)
 {
 	for (std::list<CSlrString *>::iterator itTags = tags.begin(); itTags != tags.end(); itTags++)
 	{
@@ -536,7 +536,7 @@ bool CGuiRichTextLabel::TagExists(char *tagName)
 	return false;
 }
 
-CSlrString *CGuiRichTextLabel::GetValueForTag(char *tagName)
+CSlrString *CGuiRichTextLabel::GetValueForTag(const char *tagName)
 {
 	std::list<CSlrString *>::iterator itVals = vals.begin();
 	for (std::list<CSlrString *>::iterator itTags = tags.begin(); itTags != tags.end(); itTags++, itVals++)
@@ -553,7 +553,7 @@ CSlrString *CGuiRichTextLabel::GetValueForTag(char *tagName)
 	return NULL;
 }
 
-float CGuiRichTextLabel::GetFloatValueForTag(char *tagName, float defaultValue)
+float CGuiRichTextLabel::GetFloatValueForTag(const char *tagName, float defaultValue)
 {
 	CSlrString *val = GetValueForTag(tagName);
 	if (val == NULL)
@@ -564,7 +564,7 @@ float CGuiRichTextLabel::GetFloatValueForTag(char *tagName, float defaultValue)
 	return val->ToFloat();
 }
 
-int CGuiRichTextLabel::GetIntValueForTag(char *tagName, int defaultValue)
+int CGuiRichTextLabel::GetIntValueForTag(const char *tagName, int defaultValue)
 {
 	CSlrString *val = GetValueForTag(tagName);
 	if (val == NULL)

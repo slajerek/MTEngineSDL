@@ -6,6 +6,7 @@
 #include "win-registry.h"
 #include "MT_API.h"
 #include "VID_Main.h"
+#include "SYS_DefaultConfig.h"
 
 void SYS_PlatformInit()
 {
@@ -116,69 +117,73 @@ void SYS_SetMainProcessPriority(int priority)
     }
 }
 
-DWORD windowShowCmd, windowLeft, windowRight, windowTop, windowBottom;
-int windowWidth;
-int windowHeight;
-
 void VID_StoreMainWindowPosition()
 {
 	//LOGD("VID_StoreMainWindowPosition");
-	
-	SDL_Window* sdlWindow = VID_GetMainSDLWindow();
-	
-	char* DEFAULT_REG_KEY = SYS_GetCharBuf();
-	sprintf(DEFAULT_REG_KEY, "SOFTWARE\\%s", MT_GetSettingsFolderName());
+	SDL_Window* sdlMainWindow = VID_GetMainSDLWindow();
 
 	int x, y, width, height;
-	SDL_GetWindowPosition(sdlWindow, &x, &y);
-	SDL_GetWindowSize(sdlWindow, &width, &height);
-
-	CreateRegistryKey(HKEY_CURRENT_USER, DEFAULT_REG_KEY);
+	SDL_GetWindowPosition(sdlMainWindow, &x, &y);
+	SDL_GetWindowSize(sdlMainWindow, &width, &height);
 
 	int hb = GetSystemMetrics(SM_CYCAPTION);
+	y -= hb;
 
-	width = SDL_GetWindowSurface(sdlWindow)->w;
-	height = SDL_GetWindowSurface(sdlWindow)->h + hb;
+	width = SDL_GetWindowSurface(sdlMainWindow)->w;
+	height = SDL_GetWindowSurface(sdlMainWindow)->h + hb;
 
-	WriteDwordInRegistry(HKEY_CURRENT_USER, DEFAULT_REG_KEY, "x", x);
-	WriteDwordInRegistry(HKEY_CURRENT_USER, DEFAULT_REG_KEY, "y", y);
-	WriteDwordInRegistry(HKEY_CURRENT_USER, DEFAULT_REG_KEY, "width", width);
-	WriteDwordInRegistry(HKEY_CURRENT_USER, DEFAULT_REG_KEY, "height", height);
+	bool maximized = (SDL_GetWindowFlags(sdlMainWindow) & SDL_WINDOW_MAXIMIZED);
+	//LOGD("VID_StoreMainWindowPosition: maximized=%s", STRBOOL(maximized));
 
-	//LOGD("  showCmd=%d left=%d right=%d top=%d bottom=%d", wp.showCmd, wp.rcNormalPosition.left, wp.rcNormalPosition.right, wp.rcNormalPosition.top, wp.rcNormalPosition.bottom);
-	
-	SYS_ReleaseCharBuf(DEFAULT_REG_KEY);
+	//
+	if (!maximized)
+	{
+		gApplicationDefaultConfig->SetInt("MainWindowX", &x);
+		gApplicationDefaultConfig->SetInt("MainWindowY", &y);
+		gApplicationDefaultConfig->SetInt("MainWindowWidth", &width);
+		gApplicationDefaultConfig->SetInt("MainWindowHeight", &height);
+	}
+	gApplicationDefaultConfig->SetBool("MainWindowMaximized", &maximized);
 }
 
 void VID_RestoreMainWindowPosition()
 {
+	// this does not work on Windows
+	return;
 }
 
-void VID_GetStartupMainWindowPosition(int* x, int* y, int* width, int* height)
+void VID_GetStartupMainWindowPosition(int* x, int* y, int* width, int* height, bool *maximized)
 {
-	// default values
-	MT_GetDefaultWindowPositionAndSize(x, y, width, height);
-	SCREEN_WIDTH = *width;
-	SCREEN_HEIGHT = *height;
+	DWORD windowLeft, windowRight, windowTop, windowBottom;
+	int windowWidth;
+	int windowHeight;
 
-	SDL_Window* sdlWindow = VID_GetMainSDLWindow();
-
-	char* DEFAULT_REG_KEY = SYS_GetCharBuf();
-	sprintf(DEFAULT_REG_KEY, "SOFTWARE\\%s", MT_GetSettingsFolderName());
-
-	DWORD widthStored, heightStored;
-
-	if ( (readDwordValueRegistry(HKEY_CURRENT_USER, DEFAULT_REG_KEY, "x", &windowLeft) != TRUE)
-		|| (readDwordValueRegistry(HKEY_CURRENT_USER, DEFAULT_REG_KEY, "y", &windowTop) != TRUE)
-		|| (readDwordValueRegistry(HKEY_CURRENT_USER, DEFAULT_REG_KEY, "width", &widthStored) != TRUE)
-		|| (readDwordValueRegistry(HKEY_CURRENT_USER, DEFAULT_REG_KEY, "height", &heightStored) != TRUE))
+	if (!gApplicationDefaultConfig->E_x_i_s_t_s("MainWindowX"))
 	{
-		SYS_ReleaseCharBuf(DEFAULT_REG_KEY);
+		// default values
+		MT_GetDefaultWindowPositionAndSize(x, y, width, height, maximized);
 		return;
 	}
 
-	windowRight = windowLeft + widthStored;
-	windowBottom = windowTop + heightStored;
+	int storedLeft, storedTop, storedWidth, storedHeight;
+
+	//
+	int defaultX, defaultY, defaultWidth, defaultHeight;
+	bool defaultMaximized;
+	MT_GetDefaultWindowPositionAndSize(&defaultX, &defaultY, &defaultWidth, &defaultHeight, &defaultMaximized);
+
+	gApplicationDefaultConfig->GetBool("MainWindowMaximized", maximized, defaultMaximized);
+	gApplicationDefaultConfig->GetInt("MainWindowX", &storedLeft, defaultX);
+	gApplicationDefaultConfig->GetInt("MainWindowY", &storedTop, defaultY);
+	gApplicationDefaultConfig->GetInt("MainWindowWidth", &storedWidth, defaultWidth);
+	gApplicationDefaultConfig->GetInt("MainWindowHeight", &storedHeight, defaultHeight);
+
+	windowLeft = storedLeft;
+	windowTop = storedTop;
+
+	///
+	windowRight = windowLeft + storedWidth;
+	windowBottom = windowTop + storedHeight;
 
 	// the following correction is needed when the taskbar is
 	// at the left or top and it is not "auto-hidden"
@@ -196,7 +201,6 @@ void VID_GetStartupMainWindowPosition(int* x, int* y, int* width, int* height)
 		|| windowTop < minY)
 	{
 		LOGError("Main window outside visible area: left=%d minX=%d top=%d minY=%d", windowLeft, minX, windowTop, minY);
-		SYS_ReleaseCharBuf(DEFAULT_REG_KEY);
 		return;
 	}
 
@@ -204,7 +208,6 @@ void VID_GetStartupMainWindowPosition(int* x, int* y, int* width, int* height)
 		|| windowTop > maxY)
 	{
 		LOGError("Main window outside visible area: left=%d maxX=%d top=%d maxY=%d", windowLeft, maxX, windowTop, maxY);
-		SYS_ReleaseCharBuf(DEFAULT_REG_KEY);
 		return;
 	}
 
@@ -228,7 +231,6 @@ void VID_GetStartupMainWindowPosition(int* x, int* y, int* width, int* height)
 	*height = windowHeight;
 
 	//LOGD("x=%d y=%d width=%d height=%d", *x, *y, *width, *height);
-	SYS_ReleaseCharBuf(DEFAULT_REG_KEY);
 }
 
 /* note, it seems this below gives virus false positives on windows defender
@@ -272,5 +274,54 @@ void VID_HideMouseCursor()
 bool VID_IsMouseCursorVisible()
 {
 	return VID_isMouseCursorVisible;
+}
+
+/*
+std::string ConvertWideToANSI(const std::wstring& wstr)
+{
+	int count = WideCharToMultiByte(CP_ACP, 0, wstr.c_str(), wstr.length(), NULL, 0, NULL, NULL);
+	std::string str(count, 0);
+	WideCharToMultiByte(CP_ACP, 0, wstr.c_str(), -1, &str[0], count, NULL, NULL);
+	return str;
+}
+
+std::wstring ConvertAnsiToWide(const std::string& str)
+{
+	int count = MultiByteToWideChar(CP_ACP, 0, str.c_str(), str.length(), NULL, 0);
+	std::wstring wstr(count, 0);
+	MultiByteToWideChar(CP_ACP, 0, str.c_str(), str.length(), &wstr[0], count);
+	return wstr;
+}
+
+std::string ConvertWideToUtf8(const std::wstring& wstr)
+{
+	int count = WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), wstr.length(), NULL, 0, NULL, NULL);
+	std::string str(count, 0);
+	WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), -1, &str[0], count, NULL, NULL);
+	return str;
+}
+
+std::wstring ConvertUtf8ToWide(const std::string& str)
+{
+	int count = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), str.length(), NULL, 0);
+	std::wstring wstr(count, 0);
+	MultiByteToWideChar(CP_UTF8, 0, str.c_str(), str.length(), &wstr[0], count);
+	return wstr;
+}
+*/
+
+void PLATFORM_SetThreadName(const char *name)
+{
+	WCHAR threadName[256];
+	MultiByteToWideChar(0, 0, name, strlen(name), threadName, 256);
+	HRESULT hr = SetThreadDescription(GetCurrentThread(), threadName);
+	if (FAILED(hr))
+	{
+		LOGError("PLATFORM_SetThreadName: failed to set name '%s'", name);
+	}
+}
+
+void PLATFORM_UpdateMenus()
+{
 }
 

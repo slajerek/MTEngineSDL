@@ -1,8 +1,8 @@
 #include "CSlrMusicFile.h"
 #include "SYS_Main.h"
 
-CSlrMusicFile::CSlrMusicFile()
-: CAudioChannel()
+CSlrMusicFile::CSlrMusicFile(const char *channelName)
+: CAudioChannel(channelName)
 {
 	this->resourceType = RESOURCE_TYPE_MUSIC;
 	this->type = MUSIC_TYPE_UNKNOWN;

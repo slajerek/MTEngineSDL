@@ -65,6 +65,9 @@ inline int MTH_NormalizeAngle(int angle)
 	return (fix) ? angle - (360 * (fix)) : angle;
 }
 
+int FUN_FuzzyScore( const char *str1, const char *str2 );
+int FUN_FuzzySearch( const char *str, int num, const char *words[] );
+
 /*
  double **d = allocate2DArray< double >(10000, 10000);
  d[0][0] = 10.0;
@@ -107,6 +110,7 @@ void free2DArray(T** Array)
 #define UMAX(a, b)		((a) > (b) ? (a) : (b))
 //#define max(x,y) ((x>y)?x:y)
 //#define min(x,y) ((x<y)?x:y)
+// URANGE(min, value, max)
 #define URANGE(a, b, c)		((b) < (a) ? (a) : ((b) > (c) ? (c) : (b)))
 #define LOWER(c)		((c) >= 'A' && (c) <= 'Z' ? (c)+'a'-'A' : (c))
 #define UPPER(c)		((c) >= 'a' && (c) <= 'z' ? (c)+'A'-'a' : (c))

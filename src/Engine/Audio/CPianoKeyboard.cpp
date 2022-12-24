@@ -11,6 +11,7 @@
 #include "VID_Main.h"
 #include "CGuiMain.h"
 #include "CLayoutParameter.h"
+#include "CMidiInKeyboard.h"
 
 #define OCT_NAME_FONT_SIZE_X 8.0
 #define OCT_NAME_FONT_SIZE_Y 8.0
@@ -19,11 +20,11 @@
 
 const char *pianoKeyboardKeyNames = "CDEFGAB";
 
-void CPianoKeyboardCallback::PianoKeyboardNotePressed(CPianoKeyboard *pianoKeyboard, u8 note)
+void CPianoKeyboardCallback::PianoKeyboardNotePressed(CPianoKeyboard *pianoKeyboard, CPianoKey *pianoKey)
 {
 }
 
-void CPianoKeyboardCallback::PianoKeyboardNoteReleased(CPianoKeyboard *pianoKeyboard, u8 note)
+void CPianoKeyboardCallback::PianoKeyboardNoteReleased(CPianoKeyboard *pianoKeyboard, CPianoKey *pianoKey)
 {
 }
 
@@ -31,6 +32,14 @@ void CPianoKeyboardCallback::PianoKeyboardNoteReleased(CPianoKeyboard *pianoKeyb
 CPianoKeyboard::CPianoKeyboard(const char *name, float posX, float posY, float posZ, float sizeX, float sizeY, CPianoKeyboardCallback *callback)
 :CGuiView(name, posX, posY, posZ, sizeX, sizeY)
 {
+	mutex = new CSlrMutex("CPianoKeyboard");
+	
+	imGuiNoWindowPadding = true;
+	imGuiNoScrollbar = true;
+
+	midiPortNum = -1;
+	midiChannel = 0;
+	
 	keyWhiteWidth = 1.0/7.0;
 	keyBlackOffset = keyWhiteWidth * (3.0f/4.0f);
 	keyBlackWidth = keyWhiteWidth * (2.0f/4.0f);
@@ -53,17 +62,20 @@ CPianoKeyboard::CPianoKeyboard(const char *name, float posX, float posY, float p
 	SetKeysFadeOutSpeed(0.40f);
 
 	currentOctave = 4;
-	AddDefaultKeyCodes();
 	
 	this->callback = callback;
 	
 	this->InitKeys();
 	
 	AddLayoutParameter(new CLayoutParameterBool("Keys fade out", &doKeysFadeOut));
-	AddLayoutParameter(new CLayoutParameterFloat("Keys fade out speed", &keysFadeOutSpeedParameter));
+	AddLayoutParameter(new CLayoutParameterFloat("Keys fade out speed", &keysFadeOutSpeedParameter, 0.0f, 20.0f));
 	
 	// TODO
 	midiInKeyboard = new CMidiInKeyboard(0, this);
+	if (midiInKeyboard->midiIn->isPortOpen())
+	{
+		midiPortNum = 0;
+	}
 }
 
 void CPianoKeyboard::SetKeysFadeOut(bool doKeysFadeOut)
@@ -105,6 +117,8 @@ CPianoKey::CPianoKey(u8 keyNote, u8 keyOctave, const char *keyName, double x, do
 
 void CPianoKeyboard::InitKeys()
 {
+	AddDefaultKeyCodes();
+
 	char *keyName = SYS_GetCharBuf();
 
 	double fOctaveStep = 1 / (double)numOctaves;
@@ -202,28 +216,99 @@ void CPianoKeyboard::DoLogic()
 	}
 }
 
-bool CPianoKeyboard::DoTap(float x, float y)
+bool CPianoKeyboard::AddKeyToPressed(CPianoKey *key)
 {
-	LOGG("CPianoKeyboard::DoTap: x=%f y=%f posX=%f posY=%f sizeX=%f sizeY=%f", x, y, posX, posY, sizeX, sizeY);
-
-//	this->pressedNote = GetPressedNote(x, y);
-//	
-//	if (pressedNote != NOTE_NONE)
-//	{
-//		if (callback != NULL)
-//			callback->PianoKeyboardNotePressed(pressedNote + editNoteOctave*12);	//this->selectedInstrument,
-//	}
+	bool found = false;
+	for (std::list<CPianoKey *>::iterator it = pressedKeys.begin(); it != pressedKeys.end(); it++)
+	{
+		if (key == *it)
+		{
+			// note is already pressed
+			found = true;
+			break;
+		}
+	}
+			
+	if (!found)
+	{
+		// note was not pressed, add
+		pressedKeys.push_back(key);
+	}
 	
-//	LOGG("pressed note=%d", pressedNote);
-//	if (pressedNote != NOTE_NONE)
-//		return true;
+	return found;
+}
+
+bool CPianoKeyboard::RemoveKeyFromPressed(CPianoKey *key)
+{
+	for (std::list<CPianoKey *>::iterator it = pressedKeys.begin(); it != pressedKeys.end(); it++)
+	{
+		if (*it == key)
+		{
+			pressedKeys.erase(it);
+			return true;
+		}
+	}
 	
 	return false;
 }
 
-u8 CPianoKeyboard::GetPressedNote(float x, float y)
+bool CPianoKeyboard::DoTap(float x, float y)
 {
-	return -1;
+	LOGG("CPianoKeyboard::DoTap: x=%f y=%f posX=%f posY=%f sizeX=%f sizeY=%f", x, y, posX, posY, sizeX, sizeY);
+
+	mutex->Lock();
+	CPianoKey *pressedKey = GetPianoKey(x, y);
+	
+	if (pressedKey != NULL)
+	{
+		AddKeyToPressed(pressedKey);
+		
+		tappedKey = pressedKey;
+
+	//	u8 pressedNoteKey = currentNotePressed->keyNote + editNoteOctave*12;
+		
+		if (callback != NULL)
+			callback->PianoKeyboardNotePressed(this, pressedKey);
+	}
+	mutex->Unlock();
+	
+	return (pressedKey != NULL);
+}
+
+bool CPianoKeyboard::IsInsideKey(float x, float y, CPianoKey *key)
+{
+	float lx = this->posX + key->x * this->sizeX;
+	float ly = this->posY + key->y * this->sizeY;
+	float rx = lx + key->sizeX * this->sizeX;
+	float ry = ly + key->sizeY * this->sizeY;
+
+	if (x >= lx && x < rx
+		&& y >= ly && y < ry)
+	{
+		return true;
+	}
+	return false;
+}
+
+CPianoKey *CPianoKeyboard::GetPianoKey(float x, float y)
+{
+	for (std::vector<CPianoKey *>::iterator it = pianoBlackKeys.begin(); it != pianoBlackKeys.end(); it++)
+	{
+		CPianoKey *key = *it;
+		if (IsInsideKey(x, y, key))
+		{
+			return key;
+		}
+	}
+	for (std::vector<CPianoKey *>::iterator it = pianoWhiteKeys.begin(); it != pianoWhiteKeys.end(); it++)
+	{
+		CPianoKey *key = *it;
+		if (IsInsideKey(x, y, key))
+		{
+			return key;
+		}
+	}
+	return NULL;
 }
 
 bool CPianoKeyboard::DoDoubleTap(float x, float y)
@@ -233,9 +318,26 @@ bool CPianoKeyboard::DoDoubleTap(float x, float y)
 
 bool CPianoKeyboard::DoFinishTap(float x, float y)
 {
-	if (IsInsideNonVisible(x, y))
+	if (IsInsideView(x, y))
+	{
+		CPianoKey *releasedKey = GetPianoKey(x, y);
+		
+		mutex->Lock();
+		if (releasedKey != NULL)
+		{
+			if (RemoveKeyFromPressed(releasedKey))
+			{
+				if (callback != NULL)
+					callback->PianoKeyboardNoteReleased(this, releasedKey);
+			}
+		}
+		
+		if (tappedKey == releasedKey)
+			tappedKey = NULL;
+		
+		mutex->Unlock();
 		return true;
-
+	}
 	return false;
 }
 
@@ -248,36 +350,38 @@ bool CPianoKeyboard::DoMove(float x, float y, float distX, float distY, float di
 {
 	LOGG("CPianoKeyboard::DoMove");
 	
+	if (!IsInsideView(x, y))
+		return false;
 	
-//	if (x < SCREEN_WIDTH-menuButtonSizeX)
-//	{
-//		u8 bPressedNote = this->GetPressedNote(x, y);
-//		LOGG("bPressedNote=%d", bPressedNote);
-//		
-//		if (bPressedNote != this->pressedNote)
-//		{
-//			this->pressedNote = bPressedNote;
-//
-//			if (bPressedNote != NOTE_NONE)
-//			{
-//				if (callback != NULL)
-//					callback->PianoKeyboardNotePressed(bPressedNote + editNoteOctave*12);	//this->selectedInstrument,
-//			}
-//			LOGG("pressed note=%d", pressedNote);
-//		}
-//
-//		if (pressedNote != NOTE_NONE)
-//		{
-//			return true;
-//		}
-//	}
+	CPianoKey *pianoKey = GetPianoKey(x, y);
 	
-	return false; //this->DoTap(x, y);
+	mutex->Lock();
+	
+	if (tappedKey != NULL && pianoKey != tappedKey)
+	{
+		if (RemoveKeyFromPressed(tappedKey))
+		{
+			if (callback != NULL)
+				callback->PianoKeyboardNoteReleased(this, tappedKey);
+		}
+	}
+	
+	if (pianoKey != NULL)
+	{
+		AddKeyToPressed(pianoKey);
+		tappedKey = pianoKey;
+		if (callback != NULL)
+			callback->PianoKeyboardNotePressed(this, pianoKey);
+	}
+	
+	mutex->Unlock();
+	
+	return true; //this->DoTap(x, y);
 }
 
 bool CPianoKeyboard::FinishMove(float x, float y, float distX, float distY, float accelerationX, float accelerationY)
 {
-//	if (x < SCREEN_WIDTH-menuButtonSizeX)
+//	if (x < sizeX-menuButtonSizeX)
 //		return this->DoFinishTap(x, y);
 	
 	return false;
@@ -312,7 +416,13 @@ bool CPianoKeyboard::KeyDown(u32 keyCode, bool isShift, bool isAlt, bool isContr
 				&& isControl == noteKeyCode->isControl
 				&& isSuper == noteKeyCode->isSuper)
 			{
-				this->callback->PianoKeyboardNotePressed(this, noteKeyCode->keyNote + currentOctave*12);
+				int keyNum = noteKeyCode->keyNote + currentOctave*12;
+				if (keyNum >= 0 && keyNum < pianoKeys.size())
+				{
+					CPianoKey *pianoKey = pianoKeys[keyNum];
+					AddKeyToPressed(pianoKey);
+					this->callback->PianoKeyboardNotePressed(this, pianoKey);
+				}
 				return true;
 			}
 		}
@@ -331,9 +441,17 @@ bool CPianoKeyboard::KeyUp(u32 keyCode, bool isShift, bool isAlt, bool isControl
 		for (std::list<CPianoNoteKeyCode *>::iterator it = notesKeyCodes.begin(); it != notesKeyCodes.end(); it++)
 		{
 			CPianoNoteKeyCode *noteKeyCode = *it;
+			
+			// TODO: what to do with isShift, isAlt, etc? do we need that anyway?
 			if (keyCode == noteKeyCode->keyCode)
 			{
-				this->callback->PianoKeyboardNoteReleased(this, noteKeyCode->keyNote + currentOctave*12);
+				int keyNum = noteKeyCode->keyNote + currentOctave*12;
+				if (keyNum >= 0 && keyNum < pianoKeys.size())
+				{
+					CPianoKey *pianoKey = pianoKeys[keyNum];
+					RemoveKeyFromPressed(pianoKey);
+					this->callback->PianoKeyboardNoteReleased(this, pianoKey);
+				}
 				return true;
 			}
 		}
@@ -342,22 +460,49 @@ bool CPianoKeyboard::KeyUp(u32 keyCode, bool isShift, bool isAlt, bool isControl
 	return false;
 }
 
-
 void CPianoKeyboard::MidiInKeyboardCallbackNoteOn(int channel, int key, int pressure)
 {
 	LOGD("CPianoKeyboard::MidiInKeyboardCallbackNoteOn: channel=%d key=%d pressure=%d", channel, key, pressure);
 	if (this->callback)
 	{
-		this->callback->PianoKeyboardNotePressed(this, key); // + currentOctave*12);
+		if (channel == midiChannel)
+		{
+			if (key >= 0 && key < pianoKeys.size())
+			{
+				mutex->Lock();
+				CPianoKey *pianoKey = pianoKeys[key];
+				AddKeyToPressed(pianoKey);
+				this->callback->PianoKeyboardNotePressed(this, pianoKey);
+				mutex->Unlock();
+			}
+		}
 	}
 }
 
 void CPianoKeyboard::MidiInKeyboardCallbackNoteOff(int channel, int key, int pressure)
 {
 	LOGD("CPianoKeyboard::MidiInKeyboardCallbackNoteOff: channel=%d key=%d pressure=%d", channel, key, pressure);
+	
+//	// add array of pressed notes
+//	if (tappedKey)
+//	{
+//		if (tappedKey->keyNote != key)
+//			return;
+//	}
+	
 	if (this->callback)
 	{
-		this->callback->PianoKeyboardNoteReleased(this, key);
+		if (channel == midiChannel)
+		{
+			if (key >= 0 && key < pianoKeys.size())
+			{
+				mutex->Lock();
+				CPianoKey *pianoKey = pianoKeys[key];
+				RemoveKeyFromPressed(pianoKey);
+				this->callback->PianoKeyboardNoteReleased(this, pianoKey);
+				mutex->Unlock();
+			}
+		}
 	}
 }
 
@@ -420,3 +565,64 @@ CPianoKeyboard::~CPianoKeyboard()
 		delete keyCode;
 	}
 }
+
+// UI
+bool CPianoKeyboard::HasContextMenuItems()
+{
+	return true;
+}
+
+void CPianoKeyboard::RenderContextMenuItems()
+{
+	// TODO: add derived from base layout parameter that is rendering proper menu for midi in (yes, they are bound to the emu)
+	if (ImGui::BeginMenu("MIDI In"))
+	{
+		int p = 0;
+		std::list<char *> *midiInPort = CMidiInKeyboard::EnumerateAvailablePorts();
+		int numPorts = midiInPort->size();
+		
+//		if (numPorts > 5)
+//		{
+			//		if (ImGui::BeginMenu("Port"))
+//		{
+			
+			for (std::list<char *>::iterator it = midiInPort->begin(); it != midiInPort->end(); )
+			{
+				char *strMidiInPort = *it;
+				bool checked = (p == midiPortNum);
+				if (ImGui::MenuItem(strMidiInPort, NULL, &checked))
+				{
+					LOGD("SELECTED %s", strMidiInPort);
+					midiInKeyboard->midiIn->closePort();
+					midiInKeyboard->midiIn->openPort(p);
+					midiPortNum = p;
+				}
+				p++;
+				it++;
+				STRFREE(strMidiInPort);
+			}
+			
+			delete midiInPort;
+			
+//			ImGui::EndMenu();
+//		}
+		
+		if (numPorts == 0)
+		{
+			ImGui::MenuItem("No MIDI inputs available", NULL, false, false);
+		}
+		
+		if (numPorts > 0)
+		{
+			ImGui::Separator();
+
+			if (ImGui::InputInt("Channel", &midiChannel))
+			{
+			}
+		}
+		
+		ImGui::EndMenu();
+	}
+	ImGui::Separator();
+}
+

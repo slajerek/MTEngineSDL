@@ -62,9 +62,12 @@ class CLayoutParameterFloat : public CLayoutParameter
 {
 public:
 	CLayoutParameterFloat(const char *name, float *value);
-	CLayoutParameterFloat(const char *name, float *value, float step, float step_fast, const char* format, ImGuiInputTextFlags flags);
+	CLayoutParameterFloat(const char *name, float *value, float minValue, float maxValue);
+	CLayoutParameterFloat(const char *name, float *value, float minValue, float maxValue, float step, float step_fast, const char* format, ImGuiInputTextFlags flags);
 	float *value;
 
+	float minValue;
+	float maxValue;
 	float step;
 	float step_fast;
 	const char* format;

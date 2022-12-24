@@ -11,7 +11,7 @@ CGuiViewBaseLoadingScreen::~CGuiViewBaseLoadingScreen()
 {
 }
 
-void CGuiViewBaseLoadingScreen::SetLoadingText(char *text)
+void CGuiViewBaseLoadingScreen::SetLoadingText(const char *text)
 {
 }
 

@@ -1,18 +1,11 @@
-#include "VID_Main.h"
 #include "CGuiViewDummy.h"
 #include "CGuiMain.h"
 
-CGuiViewDummy::CGuiViewDummy(float posX, float posY, float posZ, float sizeX, float sizeY)
-: CGuiView(posX, posY, posZ, sizeX, sizeY)
+CGuiViewDummy::CGuiViewDummy(const char *name, float posX, float posY, float posZ, float sizeX, float sizeY)
+: CGuiView(name, posX, posY, posZ, sizeX, sizeY)
 {
-	this->name = "CGuiViewDummy";
-	
-	/*btnDone = new CGuiButton("DONE", posEndX - (guiButtonSizeX + guiButtonGapX), 
-							 posEndY - (guiButtonSizeY + guiButtonGapY), posZ + 0.04, 
-							 guiButtonSizeX, guiButtonSizeY, 
-							 BUTTON_ALIGNED_DOWN, this);
-	this->AddGuiElement(btnDone);	
-	 */
+//	imGuiNoWindowPadding = true;
+//	imGuiNoScrollbar = true;
 }
 
 CGuiViewDummy::~CGuiViewDummy()
@@ -26,7 +19,7 @@ void CGuiViewDummy::DoLogic()
 
 void CGuiViewDummy::Render()
 {
-	guiMain->fntConsole->BlitText("CGuiViewDummy", 0, 0, 0, 11, 1.0);
+	guiMain->fntConsole->BlitText("CGuiViewDummy", posX, posY, 0, 11, 1.0);
 
 	CGuiView::Render();
 }
@@ -38,16 +31,9 @@ void CGuiViewDummy::Render(float posX, float posY)
 
 void CGuiViewDummy::RenderImGui()
 {
-}
-
-bool CGuiViewDummy::ButtonClicked(CGuiButton *button)
-{
-	return false;
-}
-
-bool CGuiViewDummy::ButtonPressed(CGuiButton *button)
-{
-	return false;
+	PreRenderImGui();
+	this->Render();
+	PostRenderImGui();
 }
 
 //@returns is consumed
@@ -85,6 +71,31 @@ bool CGuiViewDummy::DoMove(float x, float y, float distX, float distY, float dif
 bool CGuiViewDummy::FinishMove(float x, float y, float distX, float distY, float accelerationX, float accelerationY)
 {
 	return CGuiView::FinishMove(x, y, distX, distY, accelerationX, accelerationY);
+}
+
+bool CGuiViewDummy::DoRightClick(float x, float y)
+{
+	return CGuiView::DoRightClick(x, y);
+}
+
+bool CGuiViewDummy::DoFinishRightClick(float x, float y)
+{
+	return CGuiView::CGuiElement::DoFinishRightClick(x, y);
+}
+
+bool CGuiViewDummy::DoRightClickMove(float x, float y, float distX, float distY, float diffX, float diffY)
+{
+	return CGuiView::DoRightClickMove(x, y, distX, distY, diffX, diffY);
+}
+
+bool CGuiViewDummy::FinishRightClickMove(float x, float y, float distX, float distY, float accelerationX, float accelerationY)
+{
+	return CGuiView::CGuiElement::FinishRightClickMove(x, y, distX, distY, accelerationX, accelerationY);
+}
+
+bool CGuiViewDummy::DoNotTouchedMove(float x, float y)
+{
+	return CGuiView::DoNotTouchedMove(x, y);
 }
 
 bool CGuiViewDummy::InitZoom()
@@ -130,6 +141,30 @@ bool CGuiViewDummy::KeyUp(u32 keyCode, bool isShift, bool isAlt, bool isControl,
 bool CGuiViewDummy::KeyPressed(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper)
 {
 	return CGuiView::KeyPressed(keyCode, isShift, isAlt, isControl, isSuper);
+}
+
+bool CGuiViewDummy::DoGamePadButtonDown(CGamePad *gamePad, u8 button)
+{
+	return CGuiView::DoGamePadButtonDown(gamePad, button);
+}
+
+bool CGuiViewDummy::DoGamePadButtonUp(CGamePad *gamePad, u8 button)
+{
+	return CGuiView::DoGamePadButtonUp(gamePad, button);
+}
+
+bool CGuiViewDummy::DoGamePadAxisMotion(CGamePad *gamePad, u8 axis, int value)
+{
+	return CGuiView::DoGamePadAxisMotion(gamePad, axis, value);
+}
+
+bool CGuiViewDummy::HasContextMenuItems()
+{
+	return false;
+}
+
+void CGuiViewDummy::RenderContextMenuItems()
+{
 }
 
 void CGuiViewDummy::ActivateView()

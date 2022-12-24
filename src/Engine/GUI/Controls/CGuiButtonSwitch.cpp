@@ -263,7 +263,7 @@ void CGuiButtonSwitch::RenderUTFButton(float posX, float posY)
 
 void CGuiButtonSwitch::Render(float posX, float posY)
 {
-	//LOGD("CGuiButtonSwitch='%s'", this->name);
+//	LOGD("CGuiButtonSwitch='%s' px=%f py=%f", this->name, posX, posY);
 
 	if (this->visible)
 	{

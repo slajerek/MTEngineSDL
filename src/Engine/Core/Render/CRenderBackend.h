@@ -15,7 +15,7 @@ public:
 	CRenderBackend(const char *name);
 	SDL_Window *mainWindow;
 	
-	virtual SDL_Window *CreateSDLWindow(const char *title, int x, int y, int w, int h);
+	virtual SDL_Window *CreateSDLWindow(const char *title, int x, int y, int w, int h, bool maximized);
 	virtual void CreateRenderContext();
 	virtual void InitRenderPipeline();
 	virtual void CreateFontsTexture();

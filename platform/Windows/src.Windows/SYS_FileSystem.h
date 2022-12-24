@@ -87,16 +87,7 @@ public:
 
 void SYS_RefreshFiles();
 
-class CSystemFileDialogCallback
-{
-public:
-	virtual void SystemDialogFileOpenSelected(CSlrString *path);
-	virtual void SystemDialogFileOpenCancelled();
-	virtual void SystemDialogFileSaveSelected(CSlrString *path);
-	virtual void SystemDialogFileSaveCancelled();
-	virtual void SystemDialogPickFolderSelected(CSlrString* path);
-	virtual void SystemDialogPickFolderCancelled();
-};
+#include "CSystemFileDialogCallback.h"
 
 void SYS_DialogOpenFile(CSystemFileDialogCallback *callback, std::list<CSlrString *> *extensions, CSlrString *defaultFolder, CSlrString *windowTitle);
 void SYS_DialogSaveFile(CSystemFileDialogCallback *callback, std::list<CSlrString *> *extensions, CSlrString *defaultFileName, CSlrString *defaultFolder, CSlrString *windowTitle);

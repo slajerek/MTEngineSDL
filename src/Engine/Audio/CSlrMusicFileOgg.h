@@ -10,9 +10,9 @@
 class CSlrMusicFileOgg : public CSlrMusicFile
 {
 public:
-	CSlrMusicFileOgg();
-	CSlrMusicFileOgg(const char *fileName, bool seekable, bool fromResources);
-	CSlrMusicFileOgg(CSlrFile *file, bool seekable);
+	CSlrMusicFileOgg(const char *channelName);
+	CSlrMusicFileOgg(const char *channelName, const char *fileName, bool seekable, bool fromResources);
+	CSlrMusicFileOgg(const char *channelName, CSlrFile *file, bool seekable);
 	virtual ~CSlrMusicFileOgg();
 
 	bool Init(const char *fileName, bool seekable, bool fromResources);

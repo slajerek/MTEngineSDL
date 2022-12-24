@@ -46,7 +46,7 @@ public:
 
 	~CSlrThread();
 
-	virtual void ThreadSetName(char *name);
+	virtual void ThreadSetName(const char *name);
 	virtual void ThreadRun(void *passData);
 };
 
@@ -56,8 +56,7 @@ void SYS_StartThread(CSlrThread *run);
 void SYS_KillThread(CSlrThread *run);
 
 void SYS_SetThreadPriority(float priority);
-void SYS_SetThreadName(char *name);
-
+void SYS_SetThreadName(const char *name);
 
 void SYS_SetMainProcessPriorityBoostDisabled(bool isPriorityBoostDisabled);
 void SYS_SetMainProcessPriority(int priority);

@@ -4,6 +4,9 @@
 void SYS_PlatformInit();
 void SYS_PlatformShutdown();
 
+void PLATFORM_SetThreadName(const char *name);
+void PLATFORM_UpdateMenus();
+
 void SYS_AttachConsole();
 void SYS_AttachWindowsConsoleToStdOutIfNotRedirected();
 void SYS_DetachWindowsConsole();

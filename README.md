@@ -51,7 +51,8 @@ Remember to have SDL2 library installed.
 This product would not have been created without the help of alpha testers:
 Euan Gamble, Robert Troughton, Jesper Rune Larsen, Steve West, Lukhash, 
 Markus Dano Burgstaller, Brush/Elysium, Alex Goldblat, Cescom,
-Isildur/Samar, Dkt/Samar, Mojzesh/Samar, Pajero/MadTeam^Samar, Yugorin/Samar
+Isildur/Samar, Dkt/Samar, Mojzesh/Samar, Pajero/MadTeam^Samar, Boogaloo/Horizon,
+zero211, Mr.Mouse/XeNTaX/Genesis Project, Yugorin/Samar
 
 And everyone who made a donation!
 

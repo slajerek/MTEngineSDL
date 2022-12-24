@@ -172,12 +172,12 @@ bool compare_CFileItem_nocase (CFileItem *first, CFileItem *second)
 	return false;
 }
 
-std::vector<CFileItem *> *SYS_GetFilesInFolder(char *directoryPath, std::list<char *> *extensions)
+std::vector<CFileItem *> *SYS_GetFilesInFolder(const char *directoryPath, std::list<char *> *extensions)
 {
 	return SYS_GetFilesInFolder(directoryPath, extensions, true);
 }
 
-std::vector<CFileItem *> *SYS_GetFilesInFolder(char *directoryPath, std::list<char *> *extensions, bool withFolders)
+std::vector<CFileItem *> *SYS_GetFilesInFolder(const char *directoryPath, std::list<char *> *extensions, bool withFolders)
 {
 	LOGD("SYS_GetFilesInFolder::GetFiles: directoryPath=%s", directoryPath);
 	std::vector<CFileItem *> *files = new std::vector<CFileItem *>();
@@ -229,7 +229,7 @@ std::vector<CFileItem *> *SYS_GetFilesInFolder(char *directoryPath, std::list<ch
 					for (std::list<char *>::iterator itExtensions = extensions->begin();
 									itExtensions !=  extensions->end(); itExtensions++)
 					{
-						char *extension = *itExtensions;
+						const char *extension = *itExtensions;
 
 						if (!strcmp(extension, fileExtension))
 						{
@@ -272,7 +272,7 @@ std::vector<CFileItem *> *SYS_GetFilesInFolder(char *directoryPath, std::list<ch
 	return files;
 }
 
-char *SYS_GetFileExtension(char *fileName)
+char *SYS_GetFileExtension(const char *fileName)
 {
 	LOGD("SYS_GetFileExtension: fileName=%s");
 	int index = -1;
@@ -313,7 +313,7 @@ char *SYS_GetFileExtension(char *fileName)
 	return buf;
 }
 
-char *SYS_GetFileName(char *filePath)
+char *SYS_GetFileName(const char *filePath)
 {
 	//	char *bname = basename(filePath);
 	
@@ -364,30 +364,6 @@ void SYS_RefreshFiles()
 		CHttpFileUploadedCallback *callback = *itCallback;
 		callback->HttpFileUploadedCallback();
 	}
-}
-
-void CSystemFileDialogCallback::SystemDialogFileOpenSelected(CSlrString *path)
-{
-}
-
-void CSystemFileDialogCallback::SystemDialogFileOpenCancelled()
-{
-}
-
-void CSystemFileDialogCallback::SystemDialogFileSaveSelected(CSlrString *path)
-{
-}
-
-void CSystemFileDialogCallback::SystemDialogFileSaveCancelled()
-{
-}
-
-void CSystemFileDialogCallback::SystemDialogPickFolderSelected(CSlrString *path)
-{
-}
-
-void CSystemFileDialogCallback::SystemDialogPickFolderCancelled()
-{
 }
 
 bool SYS_windowAlwaysOnTopBeforeFileDialog = false;
@@ -622,7 +598,7 @@ bool SYS_FileDirExists(CSlrString *path)
 	delete [] cPath;
 }
 
-uint8 *SYS_MapMemoryToFile(int memorySize, char *filePath, void **fileDescriptor)
+uint8 *SYS_MapMemoryToFile(int memorySize, const char *filePath, void **fileDescriptor)
 {
         int *fileHandle = (int*)malloc(sizeof(int));
         fileDescriptor = (void**)(&fileHandle);

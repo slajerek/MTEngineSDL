@@ -154,6 +154,15 @@
     <Filter Include="Source Files\src\Engine\Core\Render">
       <UniqueIdentifier>{44307418-9531-4be6-934d-137a75349233}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\src\Engine\Libs\imgui-notify">
+      <UniqueIdentifier>{b08dbe50-5cc7-4b71-9c40-e51b8ce257f1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\GUI\Waveform">
+      <UniqueIdentifier>{b88af3de-5729-4678-8159-58dc2b4f883c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\GUI\AudioMixer">
+      <UniqueIdentifier>{d4717988-4718-413d-bd7e-db53d0fd65fc}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\Embedded\RES_Embedded.cpp">
@@ -1062,6 +1071,33 @@
     <ClCompile Include="..\..\..\src\Engine\Core\SYS_DefaultConfig.cpp">
       <Filter>Source Files\src\Engine\Core</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\CSystemFileDialogCallback.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\imgui-notify\fa_solid_900.cpp">
+      <Filter>Source Files\src\Engine\Libs\imgui-notify</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Waveform\CViewWaveform.cpp">
+      <Filter>Source Files\src\Engine\GUI\Waveform</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Waveform\CWaveformData.cpp">
+      <Filter>Source Files\src\Engine\GUI\Waveform</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\VID_Fonts.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\AudioMixer\CViewAudioMixer.cpp">
+      <Filter>Source Files\src\Engine\GUI\AudioMixer</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewDebugLog.cpp">
+      <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\imguiext\imgui_toggle.cpp">
+      <Filter>Source Files\src\Engine\Libs\imguiext</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewSearch.cpp">
+      <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src.Windows\CLogByteBuffer.h">
@@ -1939,6 +1975,42 @@
     </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\Core\SYS_DefaultConfig.h">
       <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\CSystemFileDialogCallback.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\imgui-notify\fa_solid_900.h">
+      <Filter>Source Files\src\Engine\Libs\imgui-notify</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\imgui-notify\font_awesome_5.h">
+      <Filter>Source Files\src\Engine\Libs\imgui-notify</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\imgui-notify\imgui_notify.h">
+      <Filter>Source Files\src\Engine\Libs\imgui-notify</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\imgui-notify\tahoma.h">
+      <Filter>Source Files\src\Engine\Libs\imgui-notify</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Waveform\CViewWaveform.h">
+      <Filter>Source Files\src\Engine\GUI\Waveform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Waveform\CWaveformData.h">
+      <Filter>Source Files\src\Engine\GUI\Waveform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\VID_Fonts.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\AudioMixer\CViewAudioMixer.h">
+      <Filter>Source Files\src\Engine\GUI\AudioMixer</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewDebugLog.h">
+      <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\imguiext\imgui_toggle.h">
+      <Filter>Source Files\src\Engine\Libs\imguiext</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewSearch.h">
+      <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
