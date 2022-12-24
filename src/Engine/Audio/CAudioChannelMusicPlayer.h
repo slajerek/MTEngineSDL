@@ -29,7 +29,7 @@ public:
 class CAudioChannelMusicPlayer : public CAudioChannel
 {
 public:
-	CAudioChannelMusicPlayer();
+	CAudioChannelMusicPlayer(const char *name);
 	virtual ~CAudioChannelMusicPlayer();
 	
 	// overwrites buffer

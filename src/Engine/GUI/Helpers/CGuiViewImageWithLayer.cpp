@@ -1,9 +1,12 @@
 #include "GUI_Main.h"
 #include "CGuiViewImageWithLayer.h"
 
-CGuiViewImageWithLayer::CGuiViewImageWithLayer(float posX, float posY, float sizeX, float sizeY)
-: CGuiViewMovingPane(posX, posY, -1, sizeX, sizeY)
+CGuiViewImageWithLayer::CGuiViewImageWithLayer(const char *name, float posX, float posY, float sizeX, float sizeY)
+: CGuiViewMovingPaneImage(name, posX, posY, -1, sizeX, sizeY)
 {
+	imGuiNoWindowPadding = true;
+	imGuiNoScrollbar = true;
+
 	InitImage();
 
 	editLayerImageData = NULL;
@@ -34,7 +37,7 @@ void CGuiViewImageWithLayer::SetImage(CSlrImage *setImage)
 {
 	guiMain->LockMutex();
 
-	CGuiViewMovingPane::SetImage(setImage);
+	CGuiViewMovingPaneImage::SetImage(setImage);
 	
 	if (setImage != NULL)
 	{
@@ -77,7 +80,7 @@ void CGuiViewImageWithLayer::UpdateLayer(CImageData *imageDataLayer)
 }
 
 // render the editing layer
-void CGuiViewImageWithLayer::PostRenderMovingPaneCustom()
+void CGuiViewImageWithLayer::RenderCustomMovingPane()
 {
 	if (editLayerImageData == NULL)
 		return;

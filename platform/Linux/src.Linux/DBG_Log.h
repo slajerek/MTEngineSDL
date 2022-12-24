@@ -28,7 +28,7 @@
 #define DBGLVL_HTTP			(DBGLVL_CONNECTION)
 #define DBGLVL_DEBUG		(1 << 7)
 #define DBGLVL_DATABASE		(1 << 8)
-#define DBGLVL_SQL			(1 << 9)
+#define DBGLVL_PLUGIN		(1 << 9)
 #define DBGLVL_XML			(1 << 10)
 #define DBGLVL_RES			(1 << 11)
 #define DBGLVL_XMPLAYER		(1 << 12)
@@ -54,9 +54,14 @@
 //DBGLVL_CONNECTION
 
 void LOG_Init(void);
+bool LOG_IsSetLevel(unsigned int level);
+void LOG_SetLevel(unsigned int level, bool isOn);
 void LOG_BackupCurrentLogLevel();
 void LOG_RestoreBackupLogLevel();
 void LOG_SetCurrentLogLevel(int level);
+int  LOG_GetCurrentLogLevel();
+void LOG_LockMutex();
+void LOG_UnlockMutex();
 void LOG_Shutdown(void);
 
 #if !defined(GLOBAL_DEBUG_OFF)

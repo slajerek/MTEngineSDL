@@ -4,9 +4,6 @@
 CGuiViewMessages::CGuiViewMessages(const char *name, float posX, float posY, float posZ, float sizeX, float sizeY)
 : CGuiView(name, posX, posY, posZ, sizeX, sizeY)
 {
-	imGuiNoWindowPadding = false;
-	imGuiNoScrollbar = false;
-	
 	AutoScroll = true;
 	Clear();
 }

@@ -5,25 +5,16 @@
 #include "SYS_CommandLine.h"
 #include "SYS_Platform.h"
 #include "MT_VERSION.h"
-
-/*
-To add files to project:
-
-Open cmd prompt as administrator
-mklink /d [current project directory name] [directory in other project it should point to]
-This has it's drawbacks and pitfalls, but I use it on occasion for duplicate libraries that need different names.
-
-Steps to add to Visual Studio:
-
-Create link in the project folder using the steps above.
-In Visual Studio... select project in Solution Explorer.
-At the top of Solution Explorer... click the Show All Files button (may need to click it twice if already active).
-The link will now show in your project... right-click and choose Include In Project.
-*/
+#if !defined(GLOBAL_DEBUG_OFF)
+#include "CGuiViewDebugLog.h"
+#endif
 
 int main(int argc, char* argv[])
 {
 	LOG_Init();
+#if !defined(GLOBAL_DEBUG_OFF)
+	guiViewDebugLog = new CGuiViewDebugLog("Debug Log", 50, 50, -1, 200, 200);
+#endif
 	LOGM("MTEngineSDL v" MT_VERSION_STRING " compiled on " __DATE__ " " __TIME__);
 
 	SYS_SetCommandLineArguments(argc, (const char**) argv);

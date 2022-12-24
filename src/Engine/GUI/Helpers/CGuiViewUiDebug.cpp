@@ -11,6 +11,10 @@ CGuiViewUiDebug::CGuiViewUiDebug(float posX, float posY, float posZ, float sizeX
 : CGuiView(posX, posY, posZ, sizeX, sizeY)
 {
 	this->name = "MTEngineSDL UI debug test";
+	
+	imGuiNoWindowPadding = true;
+	imGuiNoScrollbar = true;
+
 	tapPosX = -1000;	// outside screen
 	tapPosY = -1000;
 	upPosX = -1000;		// outside screen
@@ -153,9 +157,9 @@ void CGuiViewUiDebug::RenderImGui()
 		SDL_GetDisplayDPI(n, &ddpi, &hdpi, &vdpi);
 		
 		float dpiScale = 0.0f;
-#if __APPLE__
+#if defined(__APPLE__)
 		dpiScale = MACOS_GetBackingScaleFactor(n);
-#else if SDL_HAS_PER_MONITOR_DPI
+#elif defined(SDL_HAS_PER_MONITOR_DPI)
 		float dpi = 0.0f;
 		if (!SDL_GetDisplayDPI(n, &dpi, NULL, NULL))
 			dpiScale = dpi / 96.0f;
@@ -292,6 +296,21 @@ bool CGuiViewUiDebug::KeyUp(u32 keyCode, bool isShift, bool isAlt, bool isContro
 bool CGuiViewUiDebug::KeyPressed(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper)
 {
 	return CGuiView::KeyPressed(keyCode, isShift, isAlt, isControl, isSuper);
+}
+
+bool CGuiViewUiDebug::DoGamePadButtonDown(CGamePad *gamePad, u8 button)
+{
+	return true;
+}
+
+bool CGuiViewUiDebug::DoGamePadButtonUp(CGamePad *gamePad, u8 button)
+{
+	return true;
+}
+
+bool CGuiViewUiDebug::DoGamePadAxisMotion(CGamePad *gamePad, u8 axis, int value)
+{
+	return true;
 }
 
 void CGuiViewUiDebug::ActivateView()

@@ -3,11 +3,10 @@
 
 #include "CGuiView.h"
 
-// TODO: CGuiViewMovingPane  change to CGuiViewMovingPaneImage, make generic/abstract
 class CGuiViewMovingPane : public CGuiView
 {
 public:
-	CGuiViewMovingPane(float posX, float posY, float posZ, float sizeX, float sizeY);
+	CGuiViewMovingPane(const char *name, float posX, float posY, float posZ, float sizeX, float sizeY, float paneWidth, float paneHeight);
 	virtual ~CGuiViewMovingPane();
 	
 	virtual void SetPosition(float posX, float posY, float posZ, float sizeX, float sizeY);
@@ -16,56 +15,32 @@ public:
 	virtual bool KeyDownOnMouseHover(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper);
 	virtual bool KeyUp(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper);
 	virtual bool KeyUpGlobal(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper);
-	virtual void DoLogic();
 	virtual void RenderImGui();
-	virtual void PostRenderMovingPaneCustom();
+	virtual void RenderCustomMovingPane();
 	
-	virtual bool DoTap(float x, float y);
-
 	virtual bool DoScrollWheel(float deltaX, float deltaY);
 	virtual bool InitZoom();
 	virtual bool DoZoomBy(float x, float y, float zoomValue, float difference);
-	virtual bool DoMove(float x, float y, float distX, float distY, float diffX, float diffY);
-	virtual bool FinishMove(float x, float y, float distX, float distY, float accelerationX, float accelerationY);
 
 	virtual bool DoRightClick(float x, float y);
 	virtual bool DoRightClickMove(float x, float y, float distX, float distY, float diffX, float diffY);
 	virtual bool FinishRightClickMove(float x, float y, float distX, float distY, float accelerationX, float accelerationY);
 
 	virtual bool DoNotTouchedMove(float x, float y);
-	
-	virtual void InitImage();
-	virtual void CreateImageData();
-	virtual void CreateEmptyImageData(int imageWidth, int imageHeight);
-	virtual bool UpdateImageData();
-	
-	CImageData *imageData;
-	CSlrImage *image;
-	bool shouldDeallocImage;
-	
-	bool imageChanged;
-	
-	virtual void SetImageData(CImageData *imageData);
-	virtual void SetImage(CSlrImage *setImage);
-	
-	CSlrFont *font;
-	float fontScale;
 
 	float currentZoom;
+	
+	float minZoom, maxZoom;
 
 	volatile bool cursorInside;
-	float cursorX, cursorY;
+	float zoomCursorX, zoomCursorY;
 
 	void ClearZoom();
 	void ZoomMap(float zoom);
 	void MoveMap(float diffX, float diffY);
 
-	int imageWidth;
-	int imageHeight;
-	int rasterWidth;
-	int rasterHeight;
-	float renderTextureStartX, renderTextureStartY;
-	float renderTextureEndX, renderTextureEndY;
+	int paneWidth;
+	int paneHeight;
 
 	float mapPosX, mapPosY, mapSizeX, mapSizeY;
 	float renderMapPosX, renderMapPosY, renderMapSizeX, renderMapSizeY;
@@ -81,12 +56,10 @@ public:
 	int numCellsInWidth;
 	int numCellsInHeight;
 
-	void ScreenPosToImagePos(float screenX, float screenY, int *imageX, int *imageY);
+	void ScreenPosToPanePos(float screenX, float screenY, int *imageX, int *imageY);
 	
-	float currentFontDataScale;
-
 	bool isBeingMoved;
-	void UpdateMapPosition();
+	void UpdatePositionAndZoom();
 
 	// for double click
 	long previousClickTime;

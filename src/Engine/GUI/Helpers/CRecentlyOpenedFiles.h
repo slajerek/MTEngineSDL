@@ -51,7 +51,7 @@ public:
 	CSlrString *GetMostRecentFilePath();
 	CSlrString *GetCurrentOpenedFolder();
 	
-	void RenderImGuiMenu(char *menuItemText);
+	void RenderImGuiMenu(const char *menuItemText);
 	
 	void Serialize(CByteBuffer *byteBuffer);
 	bool Deserialize(CByteBuffer *byteBuffer);

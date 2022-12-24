@@ -39,18 +39,22 @@ void CGuiView::Init(const char *name, float posX, float posY, float posZ, float 
 	this->name = name;
 	this->previousZ = posZ;
 	this->previousFrontZ = posZ;
-	
+		
 	focusElement = NULL;
 	
 	consumeTapBackground = true;
 	positionElementsOnFrameMove = true;
 	
+	imGuiWindow = NULL;
 	imGuiWindowSkipFocusCheck = false;
-	imGuiNoWindowPadding = true;
-	imGuiNoScrollbar = true;
+	imGuiNoWindowPadding = false;
+	imGuiNoScrollbar = false;
+	imGuiSkipKeyPressWhenIoWantsTextInput = true;
 	imGuiWindowKeepAspectRatio = false;
 	imGuiWindowAspectRatio = 1.0f;
 
+	isShowingContextMenu = false;
+	
 	imGuiForceThisFrameNewPosition = false;
 	imGuiForceThisFrameNewSize = false;
 	thisFrameNewPosX = -1; thisFrameNewPosY = -1;
@@ -58,14 +62,37 @@ void CGuiView::Init(const char *name, float posX, float posY, float posZ, float 
 
 	previousPosX = -1;
 	previousPosY = -1;
+	previousViewPosX = -1;
+	previousViewPosY = -1;
+	previousViewSizeX = -1;
+	previousViewSizeY = -1;
+	previousViewKeepAspectRatio = false;
+	previousViewAspectRatio = 0.0f;
+	previousViewIsDocked = false;
 	
 	SetWindowPositionAndSize(posX, posY, sizeX, sizeY);
 	//mousePosX = mousePosY = -1;
 	
 	fullScreenSizeX = -1;
 	fullScreenSizeY = -1;
+	
+	// this is to determine if layout parameters were rendered this frame, if yes then we'll skip render
+	previousRenderedFrameWithLayoutParameters = 0;
 }
 
+bool CGuiView::IsInsideWindow(float x, float y)
+{
+	if (!this->visible)
+		return false;
+	
+	if (x >= this->windowPosX && x <= this->windowPosEndX
+		&& y >= this->windowPosY && y <= this->windowPosEndY)
+	{
+		return true;
+	}
+	
+	return false;
+}
 
 bool CGuiView::IsInside(float x, float y)
 {
@@ -86,13 +113,39 @@ bool CGuiView::IsInsideView(float x, float y)
 	if (!this->visible)
 		return false;
 	
+	if (imGuiWindow)
+	{
+//		// resize from l/r/t/b borders, there's no corner
+//		if (imGuiWindow->ResizeBorderHeld != -1)
+//		{
+//			LOGD("skip IsInside held %d", imGuiWindow->ResizeBorderHeld);
+//			return false;
+//		}
+		// skip when resize l/r/t/b and from corners is active. TODO: this is a hacky way, can we do better?
+		ImGuiContext *context = ImGui::GetCurrentContext();
+		if (context->MouseCursor == ImGuiMouseCursor_ResizeNESW
+			|| context->MouseCursor == ImGuiMouseCursor_ResizeNWSE
+			|| context->MouseCursor == ImGuiMouseCursor_ResizeNS
+			|| context->MouseCursor == ImGuiMouseCursor_ResizeEW
+			|| context->MouseCursor == ImGuiMouseCursor_NotAllowed)
+		{
+//			LOGD("skip IsInside corner");
+			return false;
+		}
+		
+		if (guiMain->FindTopWindow(x, y) != this)
+			return false;
+	}
+	
 	return this->IsInsideViewNonVisible(x, y);
 }
 
 bool CGuiView::IsInsideViewNonVisible(float x, float y)
 {
-	if (x >= this->posX && x <= this->posEndX
-		&& y >= this->posY && y <= this->posEndY)
+	float o = 2.0f;
+	
+	if (x >= this->posX+o && x <= this->posEndX-o
+		&& y >= this->posY+o && y <= this->posEndY-o)
 	{
 		return true;
 	}
@@ -191,6 +244,33 @@ void CGuiView::SetNewImGuiWindowSize(float newSizeX, float newSizeY)
 	this->thisFrameNewSizeX = newSizeX;
 	this->thisFrameNewSizeY = newSizeY;
 	this->imGuiForceThisFrameNewSize = true;
+}
+
+void CGuiView::CenterImGuiWindowPosition()
+{
+	CenterImGuiWindowPosition(0.5f, 0.5f);
+}
+
+void CGuiView::CenterImGuiWindowPosition(float offsetFactorX, float offsetFactorY)
+{
+	ImVec2 vc;
+	if (VID_IsViewportsEnable())
+	{
+		ImGuiPlatformIO platformIO = ImGui::GetPlatformIO();
+		vc = platformIO.Monitors[0].MainSize;
+		vc.x = vc.x * offsetFactorX;
+		vc.y = vc.y * offsetFactorY;
+	}
+	else
+	{
+		vc = ImGui::GetMainViewport()->Pos;
+		vc.x += ImGui::GetMainViewport()->Size.x * offsetFactorX;
+		vc.y += ImGui::GetMainViewport()->Size.y * offsetFactorY;
+	}
+	
+	vc.x -= this->sizeX*0.5f;
+	vc.y -= this->sizeY*0.5f;
+	SetNewImGuiWindowPosition(vc.x, vc.y);
 }
 
 void CGuiView::RemoveGuiElements()
@@ -338,16 +418,16 @@ bool CGuiView::DoTapNoBackground(float x, float y)
 		if (!guiElement->visible)
 			continue;
 
-		if (guiElement->IsFocusable() && guiElement->IsInside(x, y))
+		if (guiElement->IsFocusableElement() && guiElement->IsInside(x, y))
 		{
-			SetFocus(guiElement);
+			SetFocusElement(guiElement);
 		}
 		
 		if (guiElement->DoTap(x, y))
 		{
 			if (focusElement != guiElement)
 			{
-				ClearFocus();
+				ClearFocusElement();
 			}
 			
 			if (guiElement->bringToFrontOnTap)
@@ -362,7 +442,7 @@ bool CGuiView::DoTapNoBackground(float x, float y)
 
 	if (focusElement && !focusElement->IsInside(x, y))
 	{
-		ClearFocus();
+		ClearFocusElement();
 	}
 	
 	return false;
@@ -386,7 +466,7 @@ bool CGuiView::DoFinishTap(float x, float y)
 
 	if (consumeTapBackground)
 	{
-		if (IsInside(x, y))
+		if (IsInsideView(x, y))
 			return true;
 	}
 
@@ -558,7 +638,6 @@ bool CGuiView::DoFinishRightClick(float x, float y)
 
 	return false;
 }
-
 
 bool CGuiView::DoRightClickMove(float x, float y, float distX, float distY, float diffX, float diffY)
 {
@@ -867,6 +946,11 @@ bool CGuiView::KeyDown(u32 keyCode, bool isShift, bool isAlt, bool isControl, bo
 		}
 	}
 	
+	if (this->KeyPressed(keyCode, isShift, isAlt, isControl, isSuper))
+	{
+		return true;
+	}
+	
 	return false;
 }
 
@@ -926,6 +1010,11 @@ bool CGuiView::KeyDownRepeat(u32 keyCode, bool isShift, bool isAlt, bool isContr
 		{
 			return true;
 		}
+	}
+	
+	if (this->KeyPressed(keyCode, isShift, isAlt, isControl, isSuper))
+	{
+		return true;
 	}
 	
 	return false;
@@ -1006,6 +1095,54 @@ bool CGuiView::KeyPressed(u32 keyCode, bool isShift, bool isAlt, bool isControl,
 		if (guiElement->KeyPressed(keyCode, isShift, isAlt, isControl, isSuper))
 		{
 			return true;
+		}
+	}
+	
+	return false;
+}
+
+// utf text input entered
+bool CGuiView::KeyTextInput(const char *text)
+{
+	if (focusElement && focusElement->visible)
+	{
+		if (focusElement->KeyTextInput(text))
+			return true;
+	}
+	
+	for (std::map<float, CGuiElement *, compareZdownwards>::iterator enumGuiElems = guiElementsDownwards.begin();
+		 enumGuiElems != guiElementsDownwards.end(); enumGuiElems++)
+	{
+		CGuiElement *guiElement = (*enumGuiElems).second;
+		if (!guiElement->visible)
+			continue;
+		
+		if (guiElement->KeyTextInput(text))
+		{
+			return true;
+		}
+	}
+	
+	return false;
+}
+
+// utf text input entered
+bool CGuiView::KeyTextInputOnMouseHover(const char *text)
+{
+	LOGI("CGuiView::KeyTextInputOnMouseHover: %s '%s'", name ? name : "CGuiView", text);
+	for (std::map<float, CGuiElement *, compareZdownwards>::iterator enumGuiElems = guiElementsDownwards.begin();
+		 enumGuiElems != guiElementsDownwards.end(); enumGuiElems++)
+	{
+		CGuiElement *guiElement = (*enumGuiElems).second;
+		if (!guiElement->visible)
+			continue;
+	
+		if (guiElement->IsInside(guiMain->mousePosX, guiMain->mousePosY))
+		{
+			if (guiElement->KeyTextInputOnMouseHover(text))
+			{
+				return true;
+			}
 		}
 	}
 	
@@ -1154,57 +1291,83 @@ void CGuiView::SetFullScreenViewSize(float sx, float sy)
 	this->fullScreenSizeY = sy;
 }
 
+void CGuiView::CalcAspectRatio(float aspectRatio, ImVec2 viewportSize, ImVec2 *adjustedPos, ImVec2 *adjustedSize)
+{
+	float vW = (float) viewportSize.x;
+	float vH = (float) viewportSize.y;
+	float A = (float) aspectRatio;
+	float vA = (vW / vH);
+
+	if (A > vA)
+	{
+		adjustedPos->x = 0;
+		adjustedPos->y = (vH * 0.5) - ((vW / A) * 0.5);
+		adjustedSize->x = vW;
+		adjustedSize->y = (vW / A);
+	}
+	else
+	{
+		if (A < vA)
+		{
+			adjustedPos->x = (vW * 0.5) - ((vH * A) * 0.5);
+			adjustedPos->y = 0;
+			adjustedSize->x = (vH * A);
+			adjustedSize->y = vH;
+		}
+		else
+		{
+			adjustedPos->x = 0;
+			adjustedPos->y = 0;
+			adjustedSize->x = vW;
+			adjustedSize->y = vH;
+		}
+	}
+}
+
+bool CGuiView::IsDocked()
+{
+	if (!imGuiWindow)
+		return false;
+	
+	return imGuiWindow->DockNode && imGuiWindow->DockNode->HostWindow;
+}
+
+// is view hidden by OS, i.e. minimized?
+bool CGuiView::IsHidden()
+{
+	return guiMain->IsViewHidden(this);
+}
+
+bool CGuiView::IsVisible()
+{
+	if (!IsHidden())
+	{
+		return this->visible;
+	}
+	return false;
+}
+
 void CGuiView::PreRenderImGui()
 {
 	ImGuiContext& g = *GImGui;
-	
+		
 	bool isFullScreen = (guiMain->viewFullScreen == this);
 	
 	if (isFullScreen)
 	{
 		// fullscreen
 		ImGuiViewport* viewport = ImGui::GetMainViewport();
+		ImVec2 realFullScreenPos;
+		ImVec2 realFullScreenSize;
+		float aspectRatio = (float) imGuiWindowKeepAspectRatio ? imGuiWindowAspectRatio : this->fullScreenSizeX / (float) this->fullScreenSizeY;
+		CalcAspectRatio(aspectRatio, viewport->WorkSize, &realFullScreenPos, &realFullScreenSize);
 		
-		ImVec2 realFullScreenPos;	// = viewport->WorkPos;
-		ImVec2 realFullScreenSize;	// = viewport->WorkSize;
-		
-		float vW = (float) viewport->WorkSize.x;
-		float vH = (float) viewport->WorkSize.y;
-		float A = (float) imGuiWindowKeepAspectRatio ? imGuiWindowAspectRatio : this->fullScreenSizeX / (float) this->fullScreenSizeY;
-		float vA = (vW / vH);
-
-		if (A > vA)
-		{
-			realFullScreenPos.x = 0;
-			realFullScreenPos.y = (vH * 0.5) - ((vW / A) * 0.5);
-			realFullScreenSize.x = vW;
-			realFullScreenSize.y = (vW / A);
-		}
-		else
-		{
-			if (A < vA)
-			{
-				realFullScreenPos.x = (vW * 0.5) - ((vH * A) * 0.5);
-				realFullScreenPos.y = 0;
-				realFullScreenSize.x = (vH * A);
-				realFullScreenSize.y = vH;
-			}
-			else
-			{
-				realFullScreenPos.x = 0;
-				realFullScreenPos.y = 0;
-				realFullScreenSize.x = vW;
-				realFullScreenSize.y = vH;
-			}
-		}
-
 		ImGui::SetNextWindowPos(realFullScreenPos);
 		ImGui::SetNextWindowSize(realFullScreenSize);
 		ImGui::SetNextWindowViewport(viewport->ID);
 		
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-		
 	}
 	else
 	{
@@ -1249,6 +1412,7 @@ void CGuiView::PreRenderImGui()
 			}
 			else
 			{
+				// Note, when window is docked the constraint does not work
 				ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(FLT_MAX, FLT_MAX),
 													ImGuiWindowSizeConstraints::KeepContentAspect, (void*)&imGuiWindowAspectRatio);
 			}
@@ -1279,18 +1443,55 @@ void CGuiView::PreRenderImGui()
 	// InnerRect is window size without decorations and scrollbars
 	float sx = window->InnerRect.GetSize().x-1;
 	float sy = window->InnerRect.GetSize().y-1;
+	const float offsetY = 0.0f;	// TODO: take from theme
 	
-	this->SetPosition(window->InnerRect.Min.x, window->InnerRect.Min.y, -1, sx, sy);
-	this->SetWindowPositionAndSize(window->Pos.x, window->Pos.y, window->Size.x, window->Size.y);
+	bool isDocked = IsDocked();
+	if (previousViewIsDocked != isDocked
+		|| fabs(sx - previousViewSizeX) > 0.0f
+		|| fabs(sy - previousViewSizeY) > 0.0f
+		|| fabs(window->InnerRect.Min.x - previousViewPosX) > 0.0f
+		|| fabs(window->InnerRect.Min.y - previousViewPosY) > 0.0f
+		|| previousViewKeepAspectRatio != imGuiWindowKeepAspectRatio
+		|| previousViewAspectRatio != imGuiWindowAspectRatio)
+	{
+		if (imGuiWindowKeepAspectRatio && isDocked)
+		{
+			// view should keep aspect and is docked, add black bars around
+			ImVec2 viewportSize(sx, sy);
+			ImVec2 viewScreenPos;
+			ImVec2 viewScreenSize;
+			CalcAspectRatio(imGuiWindowAspectRatio, viewportSize, &viewScreenPos, &viewScreenSize);
+
+//			LOGD("view %s is docked and should keep aspect", this->name);
+			viewScreenPos.x += window->InnerRect.Min.x;
+			viewScreenPos.y += window->InnerRect.Min.y+offsetY;
+			this->SetPosition(viewScreenPos.x, viewScreenPos.y, -1, viewScreenSize.x, viewScreenSize.y);
+		}
+		else
+		{
+			this->SetPosition(window->InnerRect.Min.x, window->InnerRect.Min.y+offsetY, -1, sx, sy);
+		}
+		this->SetWindowPositionAndSize(window->Pos.x, window->Pos.y, window->Size.x, window->Size.y);
+		
+		previousViewSizeX = sx;
+		previousViewSizeY = sy;
+		previousViewPosX = window->InnerRect.Min.x;
+		previousViewPosY = window->InnerRect.Min.y;
+		previousViewKeepAspectRatio = imGuiWindowKeepAspectRatio;
+		previousViewAspectRatio = imGuiWindowAspectRatio;
+		previousViewIsDocked = isDocked;
+	}
 
 //	LOGD("%s window->Pos.x=%5.2f window->Pos.y=%5.2f size=%5.2f %5.2f", this->name, window->Pos.x, window->Pos.y, window->Size.x, window->Size.y);
 //	LOGD("%s window->InnerRect.x=%5.2f window->InnerRect.y=%5.2f size=%5.2f %5.2f", this->name, window->InnerRect.Min.x, window->InnerRect.Min.y, sx, sy);
 
 	if (imGuiWindowSkipFocusCheck == false)
 	{
+//		LOGD("check focus %s", this->name);
 		if (ImGui::IsWindowFocused())
 		{
-			guiMain->SetViewFocus(this);
+//			LOGD("..ImGui::IsWindowFocused %s", this->name);
+			guiMain->SetInternalViewFocus(this);
 		}
 	}
 }
@@ -1302,13 +1503,17 @@ void CGuiView::PostRenderImGui()
 		ImGui::PopStyleVar();
 	}
 
-	if (HasContextMenuItems() || layoutParameters.size() > 0)
+	if (isShowingContextMenu || HasContextMenuItems() || layoutParameters.size() > 0)
 	{
 		if (ImGui::BeginPopupContextWindow())
 		{
 			RenderContextMenuItems();
-			RenderContextMenuLayoutParameters();
+			RenderContextMenuLayoutParameters(false);
 			ImGui::EndPopup();
+		}
+		else
+		{
+			isShowingContextMenu = false;
 		}
 	}
 		
@@ -1331,8 +1536,15 @@ void CGuiView::RenderContextMenuItems()
 {
 }
 
-void CGuiView::RenderContextMenuLayoutParameters()
+// forced will always render, not forced will skip render if parameters were already rendered this frame
+void CGuiView::RenderContextMenuLayoutParameters(bool forced)
 {
+	u64 currentFrame = VID_GetCurrentFrameNumber();
+	if (!forced && (previousRenderedFrameWithLayoutParameters == currentFrame))
+	{
+		// skip rendering if
+		return;
+	}
 	for (std::list<CLayoutParameter *>::iterator it = layoutParameters.begin(); it != layoutParameters.end(); it++)
 	{
 		CLayoutParameter *param = *it;
@@ -1341,6 +1553,7 @@ void CGuiView::RenderContextMenuLayoutParameters()
 			this->LayoutParameterChanged(param);
 		}
 	}
+	previousRenderedFrameWithLayoutParameters = currentFrame;
 }
 
 void CGuiView::Render()
@@ -1451,40 +1664,76 @@ void CGuiView::UpdateTheme()
 
 
 // focus
-void CGuiView::ClearFocus()
+bool CGuiView::WillClearFocus()
 {
-	LOGG("CGuiView::ClearFocus");
-	if (focusElement != NULL)
+	LOGG("CGuiView::WillClearFocus: name='%s'", (name ? name : "NULL"));
+	if (CGuiElement::WillClearFocus())
 	{
-		focusElement->FocusLost();
+		return ClearFocusElement();
 	}
-
-	for (std::map<float, CGuiElement *, compareZupwards>::iterator enumGuiElems = guiElementsUpwards.begin();
-		 enumGuiElems != guiElementsUpwards.end(); enumGuiElems++)
-	{
-		CGuiElement *guiElement = (*enumGuiElems).second;
-		
-		guiElement->hasFocus = false;
-	}
-	
-	focusElement = NULL;
+	return false;
 }
 
-bool CGuiView::SetFocus(CGuiElement *element)
+bool CGuiView::WillReceiveFocus()
 {
-	//LOGD("CGuiMain::SetFocus: %s", (element ? element->name : "NULL"));
-	this->repeatTime = 0;
-	ClearFocus();
+	return CGuiElement::WillReceiveFocus();
+}
 
-	if (element != NULL && element->SetFocus())
+bool CGuiView::FocusReceived()
+{
+	return CGuiElement::FocusReceived();
+}
+
+bool CGuiView::FocusLost()
+{
+	return CGuiElement::FocusLost();
+}
+
+bool CGuiView::ClearFocusElement()
+{
+	if (focusElement != NULL)
 	{
-		this->focusElement = element;
-		element->hasFocus = true;
-		
-		LOGG("CGuiView::SetFocus: %s is set focus", element->name);
+		if (focusElement->WillClearFocus())
+		{
+			focusElement = NULL;
+			
+			// this is a sanity check, should not be required
+			for (std::map<float, CGuiElement *, compareZupwards>::iterator enumGuiElems = guiElementsUpwards.begin();
+				 enumGuiElems != guiElementsUpwards.end(); enumGuiElems++)
+			{
+				CGuiElement *guiElement = (*enumGuiElems).second;
+				guiElement->hasFocus = false;
+			}
+			return true;
+		}
+		return false;
 	}
-	
 	return true;
+}
+
+bool CGuiView::SetFocusElement(CGuiElement *element)
+{
+	LOGD("CGuiView::SetFocusElement: view=%s, element=%s", (name ? name : "NULL"), (element ? element->name : "NULL"));
+	if (CGuiElement::WillClearFocus())
+	{
+		if (element != NULL && element->WillReceiveFocus())
+		{
+			if (this->focusElement != NULL)
+			{
+				this->focusElement->WillClearFocus();
+			}
+			this->focusElement = element;
+			LOGG("CGuiView::SetFocusElement: %s is set focus", element->name);
+			return true;
+		}
+	}
+	return false;
+}
+
+void CGuiView::SetFocus()
+{
+	SetVisible(true);
+	guiMain->SetFocus(this);
 }
 
 void CGuiView::SetKeepAspectRatio(bool shouldKeepAspectRatio, float aspectRatio)

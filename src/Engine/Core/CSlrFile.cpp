@@ -199,7 +199,7 @@ void CSlrFile::WriteUnsignedLong(u64 val)
 u64 CSlrFile::ReadUnsignedLong()
 {
 	u32 i = ReadUnsignedInt();
-	u64 ret = ((i << 32) & 0xFFFFFFFF00000000) | (ReadUnsignedInt() & 0x00000000FFFFFFFF);
+	u64 ret = (( ((u64)i) << 32) & 0xFFFFFFFF00000000) | (ReadUnsignedInt() & 0x00000000FFFFFFFF);
 	return ret;
 }
 

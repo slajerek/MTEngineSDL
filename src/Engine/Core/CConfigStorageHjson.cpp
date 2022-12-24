@@ -72,10 +72,21 @@ void CConfigStorageHjson::SetBool(const char *name, bool *value)
 	SaveConfig();
 }
 
+void CConfigStorageHjson::SetBoolSkipConfigSave(const char *name, bool *value)
+{
+	hjsonRoot[name] = *value;
+}
+
 void CConfigStorageHjson::GetBool(const char *name, bool *value, bool defaultValue)
 {
 	Hjson::Value hValue;
 	hValue = hjsonRoot[name];
+	
+	if (hValue == Hjson::Type::Undefined)
+	{
+		*value = defaultValue;
+		return;
+	}
 	
 	try
 	{
@@ -88,6 +99,14 @@ void CConfigStorageHjson::GetBool(const char *name, bool *value, bool defaultVal
 	}
 }
 
+bool CConfigStorageHjson::GetBool(const char *name, bool defaultValue)
+{
+	bool value = defaultValue;
+	GetBool(name, &value, defaultValue);
+	return value;
+}
+
+
 void CConfigStorageHjson::SetInt(const char *name, int *value)
 {
 	hjsonRoot[name] = *value;
@@ -98,6 +117,12 @@ void CConfigStorageHjson::GetInt(const char *name, int *value, int defaultValue)
 {
 	Hjson::Value hValue;
 	hValue = hjsonRoot[name];
+	
+	if (hValue == Hjson::Type::Undefined)
+	{
+		*value = defaultValue;
+		return;
+	}
 	
 	try
 	{
@@ -121,6 +146,12 @@ void CConfigStorageHjson::GetFloat(const char *name, float *value, float default
 	Hjson::Value hValue;
 	hValue = hjsonRoot[name];
 	
+	if (hValue == Hjson::Type::Undefined)
+	{
+		*value = defaultValue;
+		return;
+	}
+	
 	try
 	{
 		*value = static_cast<const float>(hValue);
@@ -142,6 +173,12 @@ void CConfigStorageHjson::GetDouble(const char *name, double *value, double defa
 {
 	Hjson::Value hValue;
 	hValue = hjsonRoot[name];
+	
+	if (hValue == Hjson::Type::Undefined)
+	{
+		*value = defaultValue;
+		return;
+	}
 	
 	try
 	{
@@ -171,6 +208,12 @@ void CConfigStorageHjson::GetString(const char *name, const char **value, const 
 	Hjson::Value hValue;
 	hValue = hjsonRoot[name];
 	
+	if (hValue == Hjson::Type::Undefined)
+	{
+		*value = defaultValue;
+		return;
+	}
+
 	try
 	{
 		*value = static_cast<const char *>(hValue);
@@ -187,6 +230,13 @@ void CConfigStorageHjson::GetString(const char *name, char *value, int stringMax
 	Hjson::Value hValue;
 	hValue = hjsonRoot[name];
 	
+	if (hValue == Hjson::Type::Undefined)
+	{
+		memset((u8*)value, 0, stringMaxLength);
+		strncpy(value, defaultValue, stringMaxLength);
+		return;
+	}
+
 	const char *strValue;
 	
 	try
@@ -220,6 +270,12 @@ void CConfigStorageHjson::GetSlrString(const char *name, CSlrString **value, CSl
 	Hjson::Value hValue;
 	hValue = hjsonRoot[name];
 	
+	if (hValue == Hjson::Type::Undefined)
+	{
+		*value = defaultValue;
+		return;
+	}
+
 	try
 	{
 		const char *buf = static_cast<const char *>(hValue);
@@ -231,4 +287,16 @@ void CConfigStorageHjson::GetSlrString(const char *name, CSlrString **value, CSl
 //		LOGError("CConfigStorageHjson::GetString error: %s", e.what());
 		*value = defaultValue;
 	}
+}
+
+bool CConfigStorageHjson::E_x_i_s_t_s(const char *name)
+{
+	Hjson::Value hValue;
+	hValue = hjsonRoot[name];
+	
+	if (hValue == Hjson::Type::Undefined)
+	{
+		return false;
+	}
+	return true;
 }

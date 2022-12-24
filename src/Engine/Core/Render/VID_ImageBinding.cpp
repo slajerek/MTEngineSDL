@@ -245,14 +245,18 @@ bool VID_BindImages()
 		{
 			CBindingImageData *bindingData = imageBindings.front();
 
+			const char *path = bindingData->image->ResourceGetPath();
 			LOGR("VID_BindImages: image->loadImage=%8.8x path=%s",
 				 bindingData->image->loadImageData,
-				 bindingData->image->ResourceGetPath());
+				 path ? path : "NULL");
 			
 			u8 mode = bindingData->mode;
 			
+			const char *bindModeDebugText = "unknown bind mode";
 			if (mode == BINDING_MODE_BIND)
 			{
+				bindModeDebugText = "bound";
+				
 				bindingData->image->BindImage();
 				if (bindingData->imageData)
 				{
@@ -263,6 +267,7 @@ bool VID_BindImages()
 					else
 					{
 						delete bindingData->imageData;
+						bindingData->image = NULL;
 					}
 				}
 				if (bindingData->destination != NULL)
@@ -272,10 +277,12 @@ bool VID_BindImages()
 			}
 			else if (mode == BINDING_MODE_DEALLOC)
 			{
+				bindModeDebugText = "delloced";
 				bindingData->image->Deallocate();
 			}
 			else if (mode == BINDING_MODE_DESTROY)
 			{
+				bindModeDebugText = "destroyed";
 				bindingData->image->Deallocate();
 				delete bindingData->image;
 				bindingData->image = NULL;
@@ -286,6 +293,7 @@ bool VID_BindImages()
 			}
 			else if (mode == BINDING_MODE_DONT_FREE_IMAGEDATA)
 			{
+				bindModeDebugText = "bound (image data kept)";
 				bindingData->image->BindImage();
 				if (bindingData->destination != NULL)
 				{
@@ -298,7 +306,7 @@ bool VID_BindImages()
 			imageBindings.pop_front();
 			delete bindingData;
 			
-			LOGR("VID_BindImages: image %s", (mode == BINDING_MODE_BIND ? "bound" : "deleted"));
+			LOGR("VID_BindImages: image %s", bindModeDebugText);
 		}
 	}
 

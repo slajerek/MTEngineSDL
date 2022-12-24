@@ -12,7 +12,7 @@ class CSlrMusicFile : public CAudioChannel, public CSlrResourceBase
 {
 public:
 	u8 type;
-	CSlrMusicFile();
+	CSlrMusicFile(const char *channelName);
 	virtual ~CSlrMusicFile();
 
 	virtual void Play();
@@ -38,8 +38,6 @@ public:
 	// adds to buffer
 	virtual void MixIn(int *mixBuffer, u32 numSamples);
 	virtual void MixInFloat(float *mixBufferL, float *mixBufferR, u32 numSamples);
-
-	float volume;
 	
 	volatile bool repeat;
 

@@ -24,6 +24,8 @@ public:
 	CGuiView(const char *name, float posX, float posY, float posZ, float sizeX, float sizeY);
 	CGuiView(float posX, float posY, float posZ, float sizeX, float sizeY);
 	
+	void CalcAspectRatio(float aspectRatio, ImVec2 viewportSize, ImVec2 *adjustedPos, ImVec2 *adjustedSize);
+	
 	void Init(const char *name, float posX, float posY, float posZ, float sizeX, float sizeY);
 
 	virtual void SetPosition(float posX, float posY);
@@ -33,10 +35,13 @@ public:
 	virtual void SetPositionElements(float posX, float posY);
 	virtual void SetSize(float sizeX, float sizeY);
 
-	// is inside including frame (with title bar, etc)?
+	// is inside window (with title bar, etc)
+	virtual bool IsInsideWindow(float x, float y);
+
+	// is inside view
 	virtual bool IsInside(float x, float y);
 	
-	// is inside view interior area (without title bar, etc)?
+	// is inside view interior area (without title bar, skips when window is being resized, etc)
 	virtual bool IsInsideView(float x, float y);
 	virtual bool IsInsideViewNonVisible(float x, float y);
 
@@ -73,6 +78,8 @@ public:
 	virtual bool KeyUpOnMouseHover(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper);
 	virtual bool KeyUpGlobal(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper);
 	virtual bool KeyPressed(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper);	// repeats
+	virtual bool KeyTextInput(const char *text); // utf text input entered
+	virtual bool KeyTextInputOnMouseHover(const char *text); // utf text input entered
 
 	virtual bool InitZoom();
 	virtual bool DoZoomBy(float x, float y, float zoomValue, float difference);
@@ -100,6 +107,9 @@ public:
 	
 	void PositionCenterOnParentView();
 	
+	virtual bool IsVisible();
+	virtual bool IsHidden();
+
 	virtual void ActivateView();
 	virtual void DeactivateView();
 
@@ -143,9 +153,14 @@ public:
 	
 	// focus
 	virtual void RenderFocusBorder();
-	virtual void ClearFocus();
-	virtual bool SetFocus(CGuiElement *view);
+	virtual bool WillReceiveFocus();
+	virtual bool WillClearFocus();
+	virtual bool FocusReceived();
+	virtual bool FocusLost();
+	virtual bool ClearFocusElement();
+	virtual bool SetFocusElement(CGuiElement *view);
 	CGuiElement *focusElement;
+	virtual void SetFocus();
 		
 	virtual void InitImGuiView(const char *name);
 	
@@ -162,10 +177,15 @@ public:
 	bool imGuiWindowSkipFocusCheck;
 	bool imGuiNoWindowPadding;
 	bool imGuiNoScrollbar;
+	bool imGuiSkipKeyPressWhenIoWantsTextInput;
 	bool imGuiWindowKeepAspectRatio;
 	float imGuiWindowAspectRatio;
-	void SetKeepAspectRatio(bool shouldKeepAspectRatio, float aspectRatio);
+	virtual void SetKeepAspectRatio(bool shouldKeepAspectRatio, float aspectRatio);
+	virtual bool IsDocked();
 	
+	virtual void CenterImGuiWindowPosition();
+	virtual void CenterImGuiWindowPosition(float offsetFactorX, float offsetFactorY);
+
 	// Resource Manager
 	// this method should prepare all resources, refresh resources
 	virtual void ResourcesPrepare();
@@ -187,7 +207,12 @@ public:
 	// Layout, hash of name
 	std::map<u64, CLayoutParameter *> layoutParametersByHash;
 	virtual void AddLayoutParameter(CLayoutParameter *layoutParameter);
-	virtual void RenderContextMenuLayoutParameters();
+	
+	// forced will always render, not forced will skip render if parameters were already rendered this frame
+	virtual void RenderContextMenuLayoutParameters(bool forced);
+
+	// this is to determine if layout parameters were rendered this frame, if yes then we'll skip render
+	u64 previousRenderedFrameWithLayoutParameters;
 
 	// called when layout parameter is changed by UI
 	virtual void LayoutParameterChanged(CLayoutParameter *layoutParameter);
@@ -208,11 +233,17 @@ public:
 	float fullScreenSizeX, fullScreenSizeY;
 	void SetFullScreenViewSize(float sx, float sy);
 	
+	bool isShowingContextMenu;
+	
 private:
 	float previousZ;
 	float previousFrontZ;
 	
 	float previousPosX, previousPosY;
+	float previousViewPosX, previousViewPosY, previousViewSizeX, previousViewSizeY;
+	bool previousViewKeepAspectRatio;
+	float previousViewAspectRatio;
+	bool previousViewIsDocked;
 };
 
 #endif

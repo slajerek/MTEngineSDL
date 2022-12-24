@@ -3,24 +3,28 @@
 
 #include "SYS_Defs.h"
 
+class CWaveformData;
+
 class CAudioChannel
 {
 public:
-	CAudioChannel();
+	CAudioChannel(const char *name);
 	virtual ~CAudioChannel();
 
-	char name[32];
-
+	char *name;
 
 	bool isActive;
 	bool removeMe;	// audio channel should be removed by engine immediately
 	bool destroyMe;	// audio channel should be destroyed by engine immediately
 	bool bypass;
+	bool isMuted;
+	float volume;
 	
 	virtual void Start();
 	virtual void Stop();
 	
 	int *channelBuffer;
+	int channelBufferNumSamples;
 
 	virtual void CreateChannelBuffer(u32 numSamples);
 	
@@ -34,6 +38,12 @@ public:
 	// adds to buffer
 	virtual void MixIn(int *mixBuffer, u32 numSamples, int numAudioChannels);
 	virtual void MixInFloat(float *mixBufferL, float *mixBufferR, u32 numSamples);
+	
+	virtual void StoreValuesToAppConfig();
+	virtual void GetDefaultValuesFromAppConfig();
+	
+	virtual void SetWaveformData(CWaveformData *waveformData);
+	CWaveformData *waveformData;
 };
 
 #endif

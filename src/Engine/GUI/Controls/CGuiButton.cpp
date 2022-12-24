@@ -83,7 +83,7 @@ CGuiButton::CGuiButton(CSlrImage *image, float posX, float posY, float posZ, flo
 	InitBackgroundColors();
 }
 
-CGuiButton::CGuiButton(char *text, float posX, float posY, float posZ, float sizeX, float sizeY, u8 alignment, CGuiButtonCallback *callback)
+CGuiButton::CGuiButton(const char *text, float posX, float posY, float posZ, float sizeX, float sizeY, u8 alignment, CGuiButtonCallback *callback)
 : CGuiElement(posX, posY, posZ, sizeX, sizeY)
 {
 	//LOGD("CGuiButton::CGuiButton text=%s", text);

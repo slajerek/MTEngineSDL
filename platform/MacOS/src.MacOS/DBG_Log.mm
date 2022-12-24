@@ -23,6 +23,7 @@
 
 // TODO: add colors http://deepitpro.com/en/articles/XcodeColors/info/
 
+#include "SYS_Defs.h"
 #include "DBG_Log.h"
 
 #import <Foundation/Foundation.h>
@@ -55,30 +56,18 @@ FILE *fpLog = NULL;
 #define BUFSIZE 1024*1024*2
 #endif
 
+#if defined(USE_DEBUG_LOG_TO_VIEW)
+#include "CGuiViewDebugLog.h"
+#endif
+
 bool logThisLevel(unsigned int level);
 const char *getLevelStr(unsigned int level);
-void LockLoggerMutex(void);
-void UnlockLoggerMutex(void);
+void LOG_LockMutex(void);
+void LOG_UnlockMutex(void);
 
 pthread_mutex_t loggerMutex;
 
 static unsigned int logger_currentLogLevel = -1;
-/*
- DBGLVL_DEBUG        | \
- DBGLVL_MAIN         | \
- DBGLVL_RES          | \
- DBGLVL_GUI          | \
- DBGLVL_PAINT        | \
- DBGLVL_FLURRY       | \
- DBGLVL_WEBSERVICE   | \
- DBGLVL_XML          | \
- DBGLVL_HTTP         | \
- DBGLVL_XMPLAYER     | \
- DBGLVL_AUDIO        | \
- DBGLVL_TODO         | \
- DBGLVL_ERROR;
- */
-
 
 static bool logger_showTimestamp = true;
 static bool logger_showFileName = false;
@@ -104,22 +93,13 @@ void LOG_Init(void)
 	fpLog = fopen([path fileSystemRepresentation], "wb");
 #endif
 	
-//	LOG_SetLevel(DBGLVL_MAIN, false);
-//	LOG_SetLevel(DBGLVL_DEBUG, false);
-//	LOG_SetLevel(DBGLVL_DEBUG2, false);
-//	LOG_SetLevel(DBGLVL_RES, false);
-//	LOG_SetLevel(DBGLVL_INPUT, false);
-//	LOG_SetLevel(DBGLVL_GUI, false);
-//	LOG_SetLevel(DBGLVL_MEMORY, false);
-//	LOG_SetLevel(DBGLVL_ANIMATION, false);
-//	LOG_SetLevel(DBGLVL_LEVEL, false);
-//	LOG_SetLevel(DBGLVL_XMPLAYER, false);
-//	LOG_SetLevel(DBGLVL_AUDIO, false);
-//	LOG_SetLevel(DBGLVL_TODO, false);
-
 	LOG_SetLevel(DBGLVL_MAIN, true);
 	LOG_SetLevel(DBGLVL_DEBUG, true);
 	LOG_SetLevel(DBGLVL_DEBUG2, true);
+	LOG_SetLevel(DBGLVL_TODO, true);
+	LOG_SetLevel(DBGLVL_ERROR, true);
+	LOG_SetLevel(DBGLVL_WARN, true);
+
 	LOG_SetLevel(DBGLVL_RES, false);
 	LOG_SetLevel(DBGLVL_INPUT, false);
 	LOG_SetLevel(DBGLVL_GUI, false);
@@ -128,7 +108,6 @@ void LOG_Init(void)
 	LOG_SetLevel(DBGLVL_LEVEL, true);
 	LOG_SetLevel(DBGLVL_XMPLAYER, false);
 	LOG_SetLevel(DBGLVL_AUDIO, false);
-	LOG_SetLevel(DBGLVL_TODO, true);
 
 	LOG_SetLevel(DBGLVL_PAINT, false);
 	
@@ -138,21 +117,6 @@ void LOG_Init(void)
 
 	LOG_SetLevel(DBGLVL_ATARI_MAIN, true);
 	LOG_SetLevel(DBGLVL_ATARI_DEBUG, true);
-
-	
-	/// leave only debug2:
-//	LOG_SetLevel(DBGLVL_MAIN, false);
-//	LOG_SetLevel(DBGLVL_DEBUG, false);
-//	LOG_SetLevel(DBGLVL_RES, false);
-//	LOG_SetLevel(DBGLVL_GUI, false);
-//	LOG_SetLevel(DBGLVL_ANIMATION, false);
-//	LOG_SetLevel(DBGLVL_LEVEL, false);
-//	LOG_SetLevel(DBGLVL_XMPLAYER, false);
-//	LOG_SetLevel(DBGLVL_AUDIO, false);
-//	LOG_SetLevel(DBGLVL_MEMORY, false);
-//	LOG_SetLevel(DBGLVL_TODO, false);
-//	LOG_SetLevel(DBGLVL_DEBUG2, true);
-
 }
 
 void LOG_SetLevel(unsigned int level, bool isOn)
@@ -165,6 +129,11 @@ void LOG_SetLevel(unsigned int level, bool isOn)
 	{
 		REMOVE_BIT(logger_currentLogLevel, level);
 	}
+}
+
+bool LOG_IsSetLevel(unsigned int level)
+{
+	return IS_SET(logger_currentLogLevel, level);
 }
 
 static int backupLogLevel = 0;
@@ -183,6 +152,11 @@ void LOG_SetCurrentLogLevel(int level)
 	logger_currentLogLevel = level;
 }
 
+int  LOG_GetCurrentLogLevel()
+{
+	return logger_currentLogLevel;
+}
+
 void LOG_Shutdown(void)
 {
 	fprintf(stderr, "LOG_Shutdown: bye\n");
@@ -197,12 +171,12 @@ void LOG_Shutdown(void)
 #endif
 }
 
-void LockLoggerMutex(void)
+void LOG_LockMutex(void)
 {
 	pthread_mutex_lock(&loggerMutex);
 }
 
-void UnlockLoggerMutex(void)
+void LOG_UnlockMutex(void)
 {
 	pthread_mutex_unlock(&loggerMutex);
 }
@@ -212,7 +186,9 @@ int _LOGGER(unsigned int level, const char *fileName, unsigned int lineNum, cons
 	if (logThisLevel(level) == false)
 		return 0;
 
-	LockLoggerMutex();
+	static char buffer[BUFSIZE];
+
+	LOG_LockMutex();
 
     if (logger_showTimestamp)
     {
@@ -225,26 +201,35 @@ int _LOGGER(unsigned int level, const char *fileName, unsigned int lineNum, cons
 
         unsigned int ms = (unsigned int)tv.tv_usec/(unsigned int)10000;
 
-        fprintf(stderr, "%02d:%02d:%02d,%03d ",
-                tm->tm_hour, tm->tm_min, tm->tm_sec, ms);
+		sprintf(buffer, "%02d:%02d:%02d,%03d ",
+				tm->tm_hour, tm->tm_min, tm->tm_sec, ms);
+		
+        fprintf(stderr, buffer);
+		
 #ifdef LOG_FILE
         if (fpLog)
-        {
-            fprintf(fpLog, "%02d:%02d:%02d,%03d ",
-                    tm->tm_hour, tm->tm_min, tm->tm_sec, ms);
-        }
+            fprintf(fpLog, buffer);
 #endif
 
-    }
+#if defined(USE_DEBUG_LOG_TO_VIEW)
+		if (guiViewDebugLog)
+			guiViewDebugLog->AddLog(buffer);
+#endif
+	}
 
 	if (logger_showFileName)
 	{
-		fprintf(stderr, "%s:%d ", fileName, lineNum);
+		sprintf(buffer, "%s:%d ", fileName, lineNum);
+		
+		fprintf(stderr, buffer);
 #ifdef LOG_FILE
         if (fpLog)
-        {
-            fprintf(fpLog, "%s:%d ", fileName, lineNum);
-        }
+            fprintf(fpLog, buffer);
+#endif
+		
+#if defined(USE_DEBUG_LOG_TO_VIEW)
+		if (guiViewDebugLog)
+			guiViewDebugLog->AddLog(buffer);
 #endif
 	}
 
@@ -253,33 +238,51 @@ int _LOGGER(unsigned int level, const char *fileName, unsigned int lineNum, cons
         NSString *threadName = [NSThread currentThread].name;
         if (threadName == nil || [threadName length] == 0)
         {
-            fprintf(stderr, "%8ld ", (unsigned long)pthread_self());
+			sprintf(buffer, "%8ld ", (unsigned long)pthread_self());
+			
+			fprintf(stderr, buffer);
 #ifdef LOG_FILE
             if (fpLog)
-                fprintf(fpLog, "%8ld ", (unsigned long)pthread_self());
+                fprintf(fpLog, buffer);
 #endif
-        }
+
+#if defined(USE_DEBUG_LOG_TO_VIEW)
+			if (guiViewDebugLog)
+				guiViewDebugLog->AddLog(buffer);
+#endif
+		}
         else
         {
-            fprintf(stderr, "%-8s ", [threadName UTF8String]);
+			sprintf(buffer, "%s ", [threadName UTF8String]);
+
+			fprintf(stderr, buffer);
 #ifdef LOG_FILE
             if (fpLog)
-                fprintf(fpLog, "%-8s ", [threadName UTF8String]);
+                fprintf(fpLog, buffer);
 #endif
-        }
+
+#if defined(USE_DEBUG_LOG_TO_VIEW)
+			if (guiViewDebugLog)
+				guiViewDebugLog->AddLog(buffer);
+#endif
+		}
     }
 
     if (logger_showCurrentLevel)
     {
-        fprintf(stderr, "%s ", getLevelStr(level));
+		sprintf(buffer, "%s ", getLevelStr(level));
+
+		fprintf(stderr, buffer);
 #ifdef LOG_FILE
         if (fpLog)
-			fprintf(fpLog, "%s ", getLevelStr(level));
+			fprintf(fpLog, buffer);
 #endif
-    }
 
-	static char buffer[BUFSIZE];
-	//memset(buffer, 0x00, BUFSIZE);
+#if defined(USE_DEBUG_LOG_TO_VIEW)
+			if (guiViewDebugLog)
+				guiViewDebugLog->AddLog(buffer);
+#endif
+	}
 
     va_list args;
 
@@ -298,23 +301,27 @@ int _LOGGER(unsigned int level, const char *fileName, unsigned int lineNum, cons
 	buffer[BUFSIZE-1] = 0x00;
 
 	fprintf(stderr, "%s", buffer);
+	fprintf(stderr, "\n");
+	fflush(stderr);
 
 #ifdef LOG_FILE
 	if (fpLog)
-		fprintf(fpLog, "%s", buffer);
-#endif
-
-    fprintf(stderr, "\n");
-    fflush(stderr);
-#ifdef LOG_FILE
-    if (fpLog)
 	{
+		fprintf(fpLog, "%s", buffer);
 		fprintf(fpLog, "\n");
 		fflush(fpLog);
 	}
 #endif
 
-	UnlockLoggerMutex();
+#if defined(USE_DEBUG_LOG_TO_VIEW)
+	if (guiViewDebugLog)
+	{
+		guiViewDebugLog->AddLog(buffer);
+		guiViewDebugLog->AddLog("\n");
+	}
+#endif
+	
+	LOG_UnlockMutex();
 	
 	return 0;
 }
@@ -324,7 +331,7 @@ int _LOGGER(unsigned int level, const char *fileName, unsigned int lineNum, cons
 	if (logThisLevel(level) == false)
 		return 0;
 
-	LockLoggerMutex();
+	LOG_LockMutex();
 
     if (logger_showTimestamp)
     {
@@ -431,7 +438,7 @@ int _LOGGER(unsigned int level, const char *fileName, unsigned int lineNum, cons
 	}
 #endif
 
-	UnlockLoggerMutex();
+	LOG_UnlockMutex();
 	
 	return 0;
 }
@@ -444,10 +451,7 @@ bool logThisLevel(unsigned int level)
 #elif defined(LOCAL_DEBUG_OFF)
     return false;
 #else
-    if (IS_SET(logger_currentLogLevel, level))
-        return true;
-
-    return false;
+	return LOG_IsSetLevel(level);
 #endif
 
 }
@@ -470,8 +474,10 @@ const char *getLevelStr(unsigned int level)
 		return "[MEM  ]";
 	if (level == DBGLVL_PAINT)
 		return "[PAINT]";
-	if (level == DBGLVL_FLURRY)
-		return "[LEVEL]";	//FLURRY
+	if (level == DBGLVL_LEVEL)
+		return "[LEVEL]";
+	if (level == DBGLVL_PLUGIN)
+		return "[PLUG ]";
 	if (level == DBGLVL_WEBSERVICE)
 		return "[WEBS ]";
 	if (level == DBGLVL_XML)

@@ -45,7 +45,7 @@ class CGuiButton : public CGuiElement
 			   float textColorDisabledR, float textColorDisabledG, float textColorDisabledB, float textColorDisabledA,
 			   CGuiButtonCallback *callback);
 
-	CGuiButton(char *text, float posX, float posY, float posZ, float sizeX, float sizeY, u8 alignment, CGuiButtonCallback *callback);
+	CGuiButton(const char *text, float posX, float posY, float posZ, float sizeX, float sizeY, u8 alignment, CGuiButtonCallback *callback);
 	virtual void Render();
 	virtual void Render(float posX, float posY);
 	virtual void RenderText(float posX, float posY);

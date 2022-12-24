@@ -152,6 +152,7 @@ public:
 	void Save(const char *fileName);
 	void SaveScaled(const char *fileName, short int min, short int max);
 	bool Load(const char *fileName, bool dealloc);
+	const char *GetLoadError();
 	void RawSave(const char *fileName);
 	void RawLoad(const char *fileName);
 

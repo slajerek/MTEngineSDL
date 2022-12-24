@@ -8,7 +8,7 @@ class CRenderBackendOpenGL3 : public CRenderBackend
 public:
 	CRenderBackendOpenGL3();
 
-	virtual SDL_Window *CreateSDLWindow(const char *title, int x, int y, int w, int h);
+	virtual SDL_Window *CreateSDLWindow(const char *title, int x, int y, int w, int h, bool maximized);
 
 	SDL_GLContext glContext;
 	virtual void CreateRenderContext();

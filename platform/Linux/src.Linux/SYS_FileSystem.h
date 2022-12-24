@@ -60,21 +60,12 @@ public:
         bool isDir;
 };
 
-std::vector<CFileItem *> *SYS_GetFilesInFolder(char *directoryPath, std::list<char *> *extensions);
-std::vector<CFileItem *> *SYS_GetFilesInFolder(char *directoryPath, std::list<char *> *extensions, bool withFolders);
+std::vector<CFileItem *> *SYS_GetFilesInFolder(const char *directoryPath, std::list<char *> *extensions);
+std::vector<CFileItem *> *SYS_GetFilesInFolder(const char *directoryPath, std::list<char *> *extensions, bool withFolders);
 
 void SYS_RefreshFiles();
 
-class CSystemFileDialogCallback
-{
-public:
-        virtual void SystemDialogFileOpenSelected(CSlrString *path);
-        virtual void SystemDialogFileOpenCancelled();
-        virtual void SystemDialogFileSaveSelected(CSlrString *path);
-        virtual void SystemDialogFileSaveCancelled();
-	virtual void SystemDialogPickFolderSelected(CSlrString *path);
-	virtual void SystemDialogPickFolderCancelled();
-};
+#include "CSystemFileDialogCallback.h"
 
 void SYS_DialogOpenFile(CSystemFileDialogCallback *callback, std::list<CSlrString *> *extensions, CSlrString *defaultFolder, CSlrString *windowTitle);
 void SYS_DialogSaveFile(CSystemFileDialogCallback *callback, std::list<CSlrString *> *extensions, CSlrString *defaultFileName, CSlrString *defaultFolder, CSlrString *windowTitle);
@@ -88,12 +79,12 @@ bool SYS_FileExists(CSlrString *path);
 bool SYS_FileDirExists(const char *path);
 bool SYS_FileDirExists(CSlrString *path);
 
-uint8 *SYS_MapMemoryToFile(int memorySize, char *filePath, void **fileDescriptor);
+uint8 *SYS_MapMemoryToFile(int memorySize, const char *filePath, void **fileDescriptor);
 void SYS_UnMapMemoryFromFile(uint8 *memoryMap, int memorySize, void **fileDescriptor);
 
 void SYS_SetCurrentFolder(CSlrString *path);
-char* SYS_GetFileExtension(char* fileName);
-char* SYS_GetFileName(char* filePath);
+char* SYS_GetFileExtension(const char* fileName);
+char* SYS_GetFileName(const char* filePath);
 
 const char *SYS_ExecSystemCommand(const char *cmd, int *terminationCode);
 long SYS_GetFileModifiedTime(const char *filePath);

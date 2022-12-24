@@ -8,6 +8,7 @@
 #include <SDL.h>
 
 extern CRenderBackend *gRenderBackend;
+class CGuiView;
 
 extern int SCREEN_WIDTH;
 extern int SCREEN_HEIGHT;
@@ -27,11 +28,13 @@ extern int SCREEN_HEIGHT;
 
 void VID_Init();
 SDL_Window *VID_GetMainSDLWindow();
+void VID_PostInit();
 void VID_RenderLoop();
 void VID_StopEventsLoop();
 void VID_Shutdown();
 
 void VID_ResetLogicClock();
+u64  VID_GetCurrentFrameNumber();
 
 unsigned long VID_GetTickCount();
 extern u64 gCurrentFrameTime;
@@ -56,7 +59,9 @@ ImGuiStyleType VID_GetDefaultImGuiStyle();
 void VID_ResetImGuiStyle();
 
 void VID_SetViewportsEnable(bool viewportsEnable);
-bool VID_GetViewportsEnable();
+bool VID_IsViewportsEnable();
+
+SDL_Window *VID_GetSDLWindowFromCGuiView(CGuiView *view);
 
 bool VID_IsWindowAlwaysOnTop();
 void VID_SetWindowAlwaysOnTop(bool isOnTop);
@@ -88,7 +93,9 @@ void SYS_SetQuitKey(int keyCode, bool isShift, bool isAlt, bool isControl);
 
 void VID_SetVSyncScreenRefresh(bool isVSyncRefresh);
 
-void VID_GetStartupMainWindowPosition(int *x, int *y, int *width, int *height);
+void VID_RaiseMainWindow();
+
+void VID_GetStartupMainWindowPosition(int *x, int *y, int *width, int *height, bool *maximized);
 void VID_StoreMainWindowPosition();
 void VID_RestoreMainWindowPosition();
 

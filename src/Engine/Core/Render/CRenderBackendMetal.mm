@@ -15,12 +15,16 @@ CRenderBackendMetal::CRenderBackendMetal()
 	textures = [[NSMutableArray alloc] init];
 }
 
-SDL_Window *CRenderBackendMetal::CreateSDLWindow(const char *title, int x, int y, int w, int h)
+SDL_Window *CRenderBackendMetal::CreateSDLWindow(const char *title, int x, int y, int w, int h, bool maximized)
 {
 	// Inform SDL that we will be using metal for rendering. Without this hint initialization of metal renderer may fail.
 	SDL_SetHint(SDL_HINT_RENDER_DRIVER, "metal");
 
-	mainWindow = SDL_CreateWindow(title, x, y, w, h, SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
+	int windowFlags = (SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_HIDDEN);
+//	if (maximized)
+//		windowFlags |= SDL_WINDOW_MAXIMIZED;
+	mainWindow = SDL_CreateWindow(title, x, y, w, h, (SDL_WindowFlags)windowFlags);
+
 	if (mainWindow == NULL)
 	{
 		SYS_FatalExit("Error creating window: %s\n", SDL_GetError());

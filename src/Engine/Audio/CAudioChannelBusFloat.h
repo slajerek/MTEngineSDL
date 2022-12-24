@@ -11,7 +11,7 @@
 class CAudioChannelBusFloat : public CAudioChannel
 {
 public:
-	CAudioChannelBusFloat(u16 numChannels);
+	CAudioChannelBusFloat(const char *name, u16 numChannels);
 	virtual ~CAudioChannelBusFloat();
 
 	virtual void Mix(int *mixBuffer, u32 numSamples);

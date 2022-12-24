@@ -10,7 +10,8 @@ CAudioChannelMusicPlayerPlaylistItem::CAudioChannelMusicPlayerPlaylistItem(CSlrM
 	this->originalVolume = music->volume;
 };
 
-CAudioChannelMusicPlayer::CAudioChannelMusicPlayer()
+CAudioChannelMusicPlayer::CAudioChannelMusicPlayer(const char *name)
+: CAudioChannel(name)
 {
 	currentPlaylistItem = NULL;
 	fadeOutMusic = NULL;

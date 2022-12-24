@@ -662,40 +662,41 @@ void SYS_DialogSaveFile(CSystemFileDialogCallback *callback, std::list<CSlrStrin
 
 void SYS_DialogPickFolder(CSystemFileDialogCallback *callback, CSlrString *defaultFolder)
 {
-	char *defaultPath = NULL;
-	if (defaultFolder)
-	{
-		defaultPath = defaultFolder->GetStdASCII();
-	}
-	else
-	{
-		defaultPath = STRALLOC(gPathToDocuments);
-	}
-	char *outPath = NULL;
-	
-	VID_SetVSyncScreenRefresh(false);
-	nfdresult_t result = NFD_PickFolder(defaultPath, &outPath);
-	VID_SetVSyncScreenRefresh(true);
-	
-	STRFREE(defaultPath);
-	
-	if (result == NFD_OKAY)
-	{
-		CSlrString *path = new CSlrString(outPath);
-		callback->SystemDialogPickFolderSelected(path);
-		free(outPath);
-		delete path;
-	}
-	else if (result == NFD_CANCEL)
-	{
-		callback->SystemDialogPickFolderCancelled();
-	}
-	else
-	{
-		LOGError("SYS_DialogPickFolder: %s", NFD_GetError());
-	}
+	dispatch_async(dispatch_get_main_queue(), ^{
+		char *defaultPath = NULL;
+		if (defaultFolder)
+		{
+			defaultPath = defaultFolder->GetStdASCII();
+		}
+		else
+		{
+			defaultPath = STRALLOC(gPathToDocuments);
+		}
+		char *outPath = NULL;
+		
+		VID_SetVSyncScreenRefresh(false);
+		nfdresult_t result = NFD_PickFolder(defaultPath, &outPath);
+		VID_SetVSyncScreenRefresh(true);
+		
+		STRFREE(defaultPath);
+		
+		if (result == NFD_OKAY)
+		{
+			CSlrString *path = new CSlrString(outPath);
+			callback->SystemDialogPickFolderSelected(path);
+			free(outPath);
+			delete path;
+		}
+		else if (result == NFD_CANCEL)
+		{
+			callback->SystemDialogPickFolderCancelled();
+		}
+		else
+		{
+			LOGError("SYS_DialogPickFolder: %s", NFD_GetError());
+		}
+	});
 }
-
 
 bool SYS_FileExists(const char *path)
 {
@@ -943,29 +944,6 @@ char *SYS_GetPathToDocuments()
 	return gCPathToDocuments;
 }
 
-void CSystemFileDialogCallback::SystemDialogFileOpenSelected(CSlrString *path)
-{
-}
-
-void CSystemFileDialogCallback::SystemDialogFileOpenCancelled()
-{
-}
-
-void CSystemFileDialogCallback::SystemDialogFileSaveSelected(CSlrString *path)
-{
-}
-
-void CSystemFileDialogCallback::SystemDialogFileSaveCancelled()
-{
-}
-
-void CSystemFileDialogCallback::SystemDialogPickFolderSelected(CSlrString *path)
-{
-}
-
-void CSystemFileDialogCallback::SystemDialogPickFolderCancelled()
-{
-}
 
 // NOTE, THE CODE BELOW TAKES 13-20 SECONDS TO EXECUTE COMMAND ON MACOS 10.15.7 in XCode, but in production is OK
 // https://stackoverflow.com/questions/67558091/nstask-launch-or-popen-takes-15-20-seconds-to-start-simple-bash-scripts-in-macos

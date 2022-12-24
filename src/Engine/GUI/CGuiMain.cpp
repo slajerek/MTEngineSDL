@@ -11,6 +11,7 @@
 #include "CLayoutManager.h"
 #include "GAM_GamePads.h"
 #include "CSlrKeyboardShortcuts.h"
+#include "imgui_notify.h"
 
 #define CONSOLE_FONT_SIZE_X		0.03125
 #define CONSOLE_FONT_SIZE_Y		0.03125
@@ -23,6 +24,7 @@ CGuiMain::CGuiMain()
 	
 	renderMutex = new CSlrMutex("CGuiMain::renderMutex");
 	uiThreadTasksMutex = new CSlrMutex("CGuiMain::uiThreadTasksMutex");
+	notificationMutex = new CSlrMutex("CGuiMain::notificationMutex");
 	
 	layoutManager = new CLayoutManager(this);
 
@@ -56,7 +58,7 @@ CGuiMain::CGuiMain()
 	//	this->imgBlack = NULL;
 #endif
 	
-	this->focusElement = NULL;
+	this->focusedView = NULL;
 	this->currentView = NULL;
 	
 #ifdef LOAD_DEFAULT_FONT
@@ -95,11 +97,14 @@ CGuiMain::CGuiMain()
 	isRightSuperPressed = false;
 	isRightAltPressed = false;
 
+	isLeftMouseButtonPressed = false;
+	isRightMouseButtonPressed = false;
+	
 	isMouseCursorVisible = true;
 
 	viewResourceManager = NULL;
 	layoutForThisFrame = NULL;
-	layoutStoreOrRestore = true;
+	layoutStoreOrRestore = LayoutStorageTask::StoreLayout;
 	layoutJustRestored = false;
 	layoutStoreCurrentInSettings = false;
 
@@ -116,6 +121,9 @@ CGuiMain::CGuiMain()
 	
 	keyboardShortcuts = new CSlrKeyboardShortcuts();
 
+	mousePosX = 0;
+	mousePosY = 0;
+	
 	mouseScrollWheelScaleX = 1.0f;
 
 #if defined(WIN32)
@@ -127,31 +135,83 @@ CGuiMain::CGuiMain()
 	layoutManager->LoadLayouts();
 }
 
+void CGuiMain::AddViewSkippingLayout(CGuiView *view)
+{
+//	LOGG("CGuiMain::AddViewNoLayout view=%x '%s'", view, view->name?view->name:"<NULL>");
+	LockMutex();
+	for (std::list<CGuiView *>::iterator it = views.begin(); it != views.end(); it++)
+	{
+		if (*it == view)
+		{
+			// view already added
+			UnlockMutex();
+			return;
+		}
+	}
+	this->views.push_back(view);
+	
+	this->DebugPrintViews();
+	UnlockMutex();
+}
+
+void CGuiMain::RemoveViewSkippingLayout(CGuiView *view)
+{
+//	LOGG("CGuiMain::RemoveViewNoLayout view=%x '%s'", view, view->name?view->name:"<NULL>");
+	LockMutex();
+	this->views.remove(view);
+	this->DebugPrintViews();
+	UnlockMutex();
+}
+
+void CGuiMain::AddViewToLayout(CGuiView *view)
+{
+//	LOGG("CGuiMain::AddViewToLayout view=%x '%s'", view, view->name?view->name:"<NULL>");
+	u64 hash = GetHashCode64(view->name);
+
+	LockMutex();
+	layoutViews[hash] = view;
+	UnlockMutex();
+}
+
+void CGuiMain::RemoveViewFromLayout(CGuiView *view)
+{
+//	LOGG("CGuiMain::RemoveViewFromLayout view=%x '%s'", view, view->name?view->name:"<NULL>");
+	u64 hash = GetHashCode64(view->name);
+
+	LockMutex();
+	layoutViews.erase(hash);
+	UnlockMutex();
+}
+
 void CGuiMain::AddView(CGuiView *view)
 {
-	this->views.push_back(view);
+	AddViewToLayout(view);
+	AddViewSkippingLayout(view);
 }
 
 void CGuiMain::RemoveView(CGuiView *view)
 {
-	this->views.remove(view);
-}
-
-void CGuiMain::AddLayoutView(CGuiView *view)
-{
-	u64 hash = GetHashCode64(view->name);
-	layoutViews[hash] = view;
-}
-
-void CGuiMain::RemoveLayoutView(CGuiView *view)
-{
-	u64 hash = GetHashCode64(view->name);
-	layoutViews.erase(hash);
+	RemoveViewFromLayout(view);
+	RemoveViewSkippingLayout(view);
 }
 
 //
-void CGuiMain::SerializeLayout(CByteBuffer *byteBuffer)
+void CGuiMain::DebugPrintViews()
 {
+//	LOGD("CGuiMain::DebugPrintViews");
+//	for (std::list<CGuiView *>::iterator it = views.begin(); it != views.end(); it++)
+//	{
+//		CGuiView *view = *it;
+//		LOGD("         : %x '%s'", view, view->name ? view->name : "<NULL>");
+//	}
+//	LOGD("--------------------------------------------");
+}
+
+//
+void CGuiMain::SerializeLayout(CLayoutData *layoutData)
+{
+	CByteBuffer *byteBuffer = layoutData->serializedLayoutBuffer;
+	
 	byteBuffer->Clear();
 	
 	// put imgui ini
@@ -164,15 +224,17 @@ void CGuiMain::SerializeLayout(CByteBuffer *byteBuffer)
 	for (std::map<u64, CGuiView *>::iterator it = layoutViews.begin(); it != layoutViews.end(); it++)
 	{
 		CGuiView *view = it->second;
-		LOGG("serialize %s", view->name);
+//		LOGG("serialize %s", view->name);
 		byteBuffer->PutString(view->name);
 		view->SerializeLayout(byteBuffer);
 	}
 }
 
 // returns if failed
-bool CGuiMain::DeserializeLayout(CByteBuffer *byteBuffer)
+bool CGuiMain::DeserializeLayout(CLayoutData *layout)
 {
+	CByteBuffer *byteBuffer = layout->serializedLayoutBuffer;
+	
 	if (!byteBuffer ||byteBuffer->length < 1)
 		return false;
 	
@@ -228,38 +290,55 @@ void CGuiMain::SetView(CGuiView *view)
 	this->currentView->ActivateView();
 }
 
-void CGuiMain::SetViewFocus(CGuiElement *viewToFocus)
+void CGuiMain::SetFocus(CGuiView *view)
 {
-	if (this->focusElement != viewToFocus)
+	view->SetVisible(true);
+
+	if (!view->imGuiWindow)
 	{
-		this->ClearViewFocus();
-		
-		if (viewToFocus->SetFocus())
+		LOGError("CGuiMain::SetFocus: %s has no imGuiWindow", view->name ? view->name : "NULL");
+		return;
+	}
+
+	guiMain->LockMutex();
+	ImGui::FocusWindow(view->imGuiWindow);
+	SetInternalViewFocus(view);
+	guiMain->UnlockMutex();
+}
+
+void CGuiMain::SetInternalViewFocus(CGuiView *viewToFocus)
+{
+//	LOGG("CGuiMain::SetViewFocus: %s", viewToFocus->name);
+	if (this->focusedView != viewToFocus)
+	{
+//		skip check, ImGui controls is view is focusable. if (viewToFocus->IsFocusableElement())
 		{
-			this->focusElement = viewToFocus;
-			viewToFocus->hasFocus = true;
+//			LOGG("... ClearViewFocus: %s", viewToFocus->name);
+			if (this->ClearInternalViewFocus())
+			{
+//				LOGG("... SetFocus: %s", viewToFocus->name);
+				if (viewToFocus->WillReceiveFocus())
+				{
+//					LOGG("... focusElement: %s", viewToFocus->name);
+					this->focusedView = viewToFocus;
+				}
+			}
 		}
 	}
 }
 
-void CGuiMain::ClearViewFocus()
+bool CGuiMain::ClearInternalViewFocus()
 {
-	if (focusElement != NULL)
+	if (focusedView != NULL)
 	{
-		focusElement->FocusLost();
-		focusElement->hasFocus = false;
+		if (focusedView->WillClearFocus())
+		{
+			focusedView = NULL;
+			return true;
+		}
+		return false;
 	}
-	else
-	{
-		focusElement = NULL;
-	}
-//	LOGTODO("change viewC64 subviews to CGuiMain subviews so we can clear focus properly");
-//	for (std::list<CGuiView *>::iterator itView = views.begin(); itView != views.end(); itView++)
-//	{
-//		CGuiElement *guiElement = (*itView);
-//		guiElement->hasFocus = false;
-//	}
-	
+	return true;
 }
 
 void CGuiMain::AddKeyboardShortcut(CSlrKeyboardShortcut *keyboardShortcut)
@@ -274,6 +353,28 @@ void CGuiMain::RemoveKeyboardShortcut(CSlrKeyboardShortcut *keyboardShortcut)
 	this->keyboardShortcuts->RemoveShortcut(keyboardShortcut);
 }
 
+bool CGuiMain::CheckKeyboardShortcut(u32 keyCode)
+{
+	u32 keyCodeBare = SYS_GetBareKey(keyCode, isShiftPressed, isAltPressed, isControlPressed, isSuperPressed);
+	
+	std::list<u32> zones;
+	zones.push_back(MT_KEYBOARD_SHORTCUT_GLOBAL);
+	CSlrKeyboardShortcut *shortcut = this->keyboardShortcuts->FindShortcut(zones, keyCodeBare,
+																		   isShiftPressed, isAltPressed, isControlPressed, isSuperPressed);
+	
+	if (shortcut != NULL)
+	{
+		shortcut->DebugPrint();
+	
+		if (shortcut->callback)
+		{
+			if (shortcut->callback->ProcessKeyboardShortcut(MT_KEYBOARD_SHORTCUT_GLOBAL, MT_ACTION_TYPE_KEYBOARD_SHORTCUT, shortcut))
+				return true;
+		}
+	}
+	return false;
+}
+
 bool CGuiMain::KeyDown(u32 keyCode)
 {
 	ImGuiIO& io = ImGui::GetIO();
@@ -281,9 +382,6 @@ bool CGuiMain::KeyDown(u32 keyCode)
 	LOGI("CGuiMain::KeyDown: keyCode=%d (0x%2.2x = %c) isShift=%s isAlt=%s isControl=%s isSuper=%s | io.WantTextInput=%s", keyCode, keyCode, keyCode,
 		 STRBOOL(isShiftPressed), STRBOOL(isAltPressed), STRBOOL(isControlPressed), STRBOOL(isSuperPressed), STRBOOL(io.WantTextInput));
 
-	if (io.WantTextInput)
-		return false;
-	
 	// check not active views first. we iterate top-down and if mouse is on a window we pass the key in a special event
 	// this is to allow key presses even if window is not focused, for example space-bar moving content like in image viewer
 	
@@ -301,6 +399,9 @@ bool CGuiMain::KeyDown(u32 keyCode)
 		if (view != NULL)
 		{
 			if (!view->visible)
+				continue;
+			
+			if (io.WantTextInput && view->imGuiSkipKeyPressWhenIoWantsTextInput == true)
 				continue;
 			
 			if (view->IsInside(mousePosX, mousePosY))
@@ -326,24 +427,31 @@ bool CGuiMain::KeyDown(u32 keyCode)
 		}
 	}
 	
-	
 	// then change current view
 	if (this->currentView != NULL)
 	{
-		LOGI("                > currentView=%s", currentView->name);
-		if (this->currentView->KeyDown(keyCode, isShiftPressed, isAltPressed, isControlPressed, isSuperPressed))
+		if ((io.WantTextInput && currentView->imGuiSkipKeyPressWhenIoWantsTextInput == false)
+			|| io.WantTextInput == false)
 		{
-			return true;
+			LOGI("                > currentView=%s", currentView->name);
+			if (currentView->KeyDown(keyCode, isShiftPressed, isAltPressed, isControlPressed, isSuperPressed))
+			{
+				return true;
+			}
 		}
 	}
 	
-	if (this->focusElement)
+	if (this->focusedView)
 	{
-		// consumed?
-		LOGI("CGuiMain::KeyDown: keyDown focusElement=%s", this->focusElement->name);
-		if (this->focusElement->KeyDown(keyCode, isShiftPressed, isAltPressed, isControlPressed, isSuperPressed))
+		if ((io.WantTextInput && focusedView->imGuiSkipKeyPressWhenIoWantsTextInput == false)
+			|| io.WantTextInput == false)
 		{
-			return true;
+			// consumed?
+			LOGI("CGuiMain::KeyDown: keyDown focusElement=%s", this->focusedView->name);
+			if (this->focusedView->KeyDown(keyCode, isShiftPressed, isAltPressed, isControlPressed, isSuperPressed))
+			{
+				return true;
+			}
 		}
 	}
 	
@@ -363,6 +471,13 @@ bool CGuiMain::KeyDown(u32 keyCode)
 	}
 	
 	// keyboard shortcuts
+	if (CheckKeyboardShortcut(keyCode))
+	{
+		return true;
+	}
+	
+	/*
+	 // keyboard shortcuts
 	u32 keyCodeBare = SYS_GetBareKey(keyCode, isShiftPressed, isAltPressed, isControlPressed, isSuperPressed);
 	
 	std::list<u32> zones;
@@ -380,7 +495,7 @@ bool CGuiMain::KeyDown(u32 keyCode)
 				return true;
 		}
 	}
-	
+	 */
 	
 	return false;
 }
@@ -392,25 +507,30 @@ bool CGuiMain::KeyDownRepeat(u32 keyCode)
 	LOGI("CGuiMain::KeyDownRepeat: keyCode=%d (0x%2.2x = %c) isShift=%s isAlt=%s isControl=%s isSuper=%s | io.WantTextInput=%s", keyCode, keyCode, keyCode,
 		 STRBOOL(isShiftPressed), STRBOOL(isAltPressed), STRBOOL(isControlPressed), STRBOOL(isSuperPressed), STRBOOL(io.WantTextInput));
 
-	if (io.WantTextInput)
-		return false;
-	
 	if (this->currentView != NULL)
 	{
-		LOGI("                > currentView=%s", currentView->name);
-		if (this->currentView->KeyDownRepeat(keyCode, isShiftPressed, isAltPressed, isControlPressed, isSuperPressed))
+		if ((io.WantTextInput && currentView->imGuiSkipKeyPressWhenIoWantsTextInput == false)
+			|| io.WantTextInput == false)
 		{
-			return true;
+			LOGI("                > currentView=%s", currentView->name);
+			if (currentView->KeyDownRepeat(keyCode, isShiftPressed, isAltPressed, isControlPressed, isSuperPressed))
+			{
+				return true;
+			}
 		}
 	}
 	
-	if (this->focusElement)
+	if (this->focusedView)
 	{
-		// consumed?
-		LOGI("KeyDownRepeat focusElement=%s", this->focusElement->name);
-		if (this->focusElement->KeyDownRepeat(keyCode, isShiftPressed, isAltPressed, isControlPressed, isSuperPressed))
+		if ((io.WantTextInput && focusedView->imGuiSkipKeyPressWhenIoWantsTextInput == false)
+			|| io.WantTextInput == false)
 		{
-			return true;
+			// consumed?
+			LOGI("KeyDownRepeat focusElement=%s", this->focusedView->name);
+			if (focusedView->KeyDownRepeat(keyCode, isShiftPressed, isAltPressed, isControlPressed, isSuperPressed))
+			{
+				return true;
+			}
 		}
 	}
 	
@@ -427,25 +547,15 @@ bool CGuiMain::KeyDownRepeat(u32 keyCode)
 //		}
 //	}
 	
+	if (io.WantTextInput)
+		return false;
+	
 	// keyboard shortcuts
-	u32 keyCodeBare = SYS_GetBareKey(keyCode, isShiftPressed, isAltPressed, isControlPressed, isSuperPressed);
-	
-	std::list<u32> zones;
-	zones.push_back(MT_KEYBOARD_SHORTCUT_GLOBAL);
-	CSlrKeyboardShortcut *shortcut = this->keyboardShortcuts->FindShortcut(zones, keyCodeBare,
-																		   isShiftPressed, isAltPressed, isControlPressed, isSuperPressed);
-	
-	if (shortcut != NULL)
+	if (CheckKeyboardShortcut(keyCode))
 	{
-		shortcut->DebugPrint();
-	
-		if (shortcut->callback)
-		{
-			if (shortcut->callback->ProcessKeyboardShortcut(MT_KEYBOARD_SHORTCUT_GLOBAL, MT_ACTION_TYPE_KEYBOARD_SHORTCUT, shortcut))
-				return true;
-		}
+		return true;
 	}
-	
+
 	return false;
 }
 
@@ -478,6 +588,9 @@ bool CGuiMain::KeyUp(u32 keyCode)
 			if (!view->visible)
 				continue;
 			
+			if (io.WantTextInput && view->imGuiSkipKeyPressWhenIoWantsTextInput == true)
+				continue;
+			
 			if (view->IsInside(mousePosX, mousePosY))
 			{
 				if (view->KeyUpOnMouseHover(keyCode, isShiftPressed, isAltPressed, isControlPressed, isSuperPressed))
@@ -497,6 +610,9 @@ bool CGuiMain::KeyUp(u32 keyCode)
 
 		if (view != NULL)
 		{
+			if (io.WantTextInput && view->imGuiSkipKeyPressWhenIoWantsTextInput == true)
+				continue;
+			
 			view->KeyUpGlobal(keyCode, isShiftPressed, isAltPressed, isControlPressed, isSuperPressed);
 		}
 	}
@@ -504,21 +620,32 @@ bool CGuiMain::KeyUp(u32 keyCode)
 	//
 	if (this->currentView != NULL)
 	{
-		if (this->currentView->KeyUp(keyCode, isShiftPressed, isAltPressed, isControlPressed, isSuperPressed))
+		if ((io.WantTextInput && currentView->imGuiSkipKeyPressWhenIoWantsTextInput == false)
+			|| io.WantTextInput == false)
 		{
-			return true;
+			if (currentView->KeyUp(keyCode, isShiftPressed, isAltPressed, isControlPressed, isSuperPressed))
+			{
+				return true;
+			}
 		}
 	}
 		
-	if (this->focusElement)
+	if (this->focusedView)
 	{
-		// consumed?
-//		LOGI("keyUp focusElement=%s", this->focusElement->name);
-		if (this->focusElement->KeyUp(keyCode, isShiftPressed, isAltPressed, isControlPressed, isSuperPressed))
+		if ((io.WantTextInput && focusedView->imGuiSkipKeyPressWhenIoWantsTextInput == false)
+			|| io.WantTextInput == false)
 		{
-			return true;
+			// consumed?
+	//		LOGI("keyUp focusElement=%s", this->focusElement->name);
+			if (focusedView->KeyUp(keyCode, isShiftPressed, isAltPressed, isControlPressed, isSuperPressed))
+			{
+				return true;
+			}
 		}
 	}
+	
+	if (io.WantTextInput)
+		return false;
 	
 	for (std::list<CGlobalKeyboardCallback *>::const_iterator itKeybardCallbacks =
 			this->globalKeyboardCallbacks.begin();
@@ -532,6 +659,127 @@ bool CGuiMain::KeyUp(u32 keyCode)
 	}
 
 	return false;
+}
+
+bool CGuiMain::KeyTextInput(const char *text)
+{
+	ImGuiIO& io = ImGui::GetIO();
+	
+	LOGI("CGuiMain::KeyTextInput: text=%s", text);
+
+	// check not active views first. we iterate top-down and if mouse is on a window we pass the key in a special event
+	// this is to allow key presses even if window is not focused, for example space-bar moving content like in image viewer
+	
+	// iterate top-down by ImGui windows
+	ImGuiContext *context = ImGui::GetCurrentContext();
+	
+	for (int i = context->Windows.Size - 1; i >= 0; i--) // Iterate front to back
+	{
+		ImGuiWindow *window = context->Windows[i];
+		if (window->Hidden)
+			continue;
+
+		CGuiView *view = (CGuiView*)window->userData;
+
+		if (view != NULL)
+		{
+			if (!view->visible)
+				continue;
+			
+			if (io.WantTextInput && view->imGuiSkipKeyPressWhenIoWantsTextInput == true)
+				continue;
+
+			if (view->IsInside(mousePosX, mousePosY))
+			{
+				if (view->KeyTextInputOnMouseHover(text))
+				{
+					return true;
+				}
+				
+				break;
+			}
+		}
+	}
+	
+//	for (int i = context->Windows.Size - 1; i >= 0; i--) // Iterate front to back
+//	{
+//		ImGuiWindow *window = context->Windows[i];
+//		CGuiView *view = (CGuiView*)window->userData;
+//
+//		if (view != NULL)
+//		{
+//			view->KeyTextInputGlobal(text);
+//		}
+//	}
+	
+	
+	// then change current view
+	if (this->currentView != NULL)
+	{
+		if ((io.WantTextInput && currentView->imGuiSkipKeyPressWhenIoWantsTextInput == false)
+			|| io.WantTextInput == false)
+		{
+			LOGI("                > currentView=%s", currentView->name);
+			if (currentView->KeyTextInput(text))
+			{
+				return true;
+			}
+		}
+	}
+	
+	if (this->focusedView)
+	{
+		if ((io.WantTextInput && focusedView->imGuiSkipKeyPressWhenIoWantsTextInput == false)
+			|| io.WantTextInput == false)
+		{
+			// consumed?
+			LOGI("CGuiMain::KeyTextInput: focusElement=%s", this->focusedView->name);
+			if (focusedView->KeyTextInput(text))
+			{
+				return true;
+			}
+		}
+	}
+	
+	LOGI("CGuiMain::KeyTextInput: not consumed by focusElement, io.WantTextInput=%s", STRBOOL(io.WantTextInput));
+	
+	if (io.WantTextInput)
+		return false;
+	
+	for (std::list<CGlobalKeyboardCallback *>::const_iterator itKeybardCallbacks =
+			this->globalKeyboardCallbacks.begin();
+			itKeybardCallbacks != this->globalKeyboardCallbacks.end();
+			itKeybardCallbacks++)
+	{
+		CGlobalKeyboardCallback *callback =
+		(CGlobalKeyboardCallback *) *itKeybardCallbacks;
+		if (callback->GlobalKeyTextInputCallback(text) == true)
+		{
+			return true;
+		}
+	}
+	
+//	// keyboard shortcuts
+//	u32 keyCodeBare = SYS_GetBareKey(keyCode, isShiftPressed, isAltPressed, isControlPressed, isSuperPressed);
+//
+//	std::list<u32> zones;
+//	zones.push_back(MT_KEYBOARD_SHORTCUT_GLOBAL);
+//	CSlrKeyboardShortcut *shortcut = this->keyboardShortcuts->FindShortcut(zones, keyCodeBare,
+//																		   isShiftPressed, isAltPressed, isControlPressed, isSuperPressed);
+//
+//	if (shortcut != NULL)
+//	{
+//		shortcut->DebugPrint();
+//
+//		if (shortcut->callback)
+//		{
+//			if (shortcut->callback->ProcessKeyboardShortcut(MT_KEYBOARD_SHORTCUT_GLOBAL, MT_ACTION_TYPE_KEYBOARD_SHORTCUT, shortcut))
+//				return true;
+//		}
+//	}
+//
+	return false;
+
 }
 
 bool CGuiMain::IsOnAnyOpenedPopup(float px, float py)
@@ -600,6 +848,8 @@ bool CGuiMain::DoTap(float x, float y)
 {
 	LOGI("CGuiMain: DoTap: px=%3.2f; py=%3.2f;", x, y);
 	
+	isLeftMouseButtonPressed = true;
+	
 	if (IsOnAnyOpenedPopup(x, y))
 	{
 //		LOGI("...is on popup, skipping tap");
@@ -629,7 +879,7 @@ bool CGuiMain::DoTap(float x, float y)
 		if (view != NULL && view->IsVisible())
 		{
 //			LOGI("....view=%s", view->name);
-			if (view->IsInside(x, y))
+			if (view->IsInsideView(x, y))
 			{
 //				LOGI("....... IsInside, DoTap()");
 				if (view->DoTap(x, y))
@@ -665,9 +915,11 @@ bool CGuiMain::DoFinishTap(float x, float y)
 {
 	LOGI("CGuiMain: DoFinishTap: px=%3.2f; py=%3.2f;", x, y);
 
+	isLeftMouseButtonPressed = false;
+	
 	if (IsOnAnyOpenedPopup(x, y))
 	{
-		LOGI("...is on popup, skipping tap");
+//		LOGI("...is on popup, skipping tap");
 		return false;
 	}
 	
@@ -680,20 +932,27 @@ bool CGuiMain::DoFinishTap(float x, float y)
 			continue;
 
 		CGuiView *view = (CGuiView*)window->userData;
-
+//		LOGI("...view=%s visible=%s", view ? view->name : "NULL", view ? STRBOOL(view->IsVisible()) : "");
+		
 		if (view != NULL && view->IsVisible())
 		{
+//			LOGI("...DoFinishTap");
 			if (view->DoFinishTap(x, y))
 			{
+//				LOGI("...iterate view DoFinishTap consumed");
 				return true;
 			}
 		}
 	}
 	
-	if (focusElement)
+//	LOGI("...check focusElement=%s", focusElement ? focusElement->name : "NULL");
+	if (focusedView)
 	{
-		if (focusElement->DoFinishTap(x, y))
+		if (focusedView->DoFinishTap(x, y))
+		{
+//			LOGI("...focusElement DoFinishTap consumed");
 			return true;
+		}
 	}
 	
 //	for (std::list<CGuiView *>::iterator itView = this->views.begin(); itView != this->views.end(); itView++)
@@ -706,12 +965,15 @@ bool CGuiMain::DoFinishTap(float x, float y)
 //			return true;
 //	}
 
+//	LOGI("...DoFinishTap not consumed");
 	return false;
 }
 
 bool CGuiMain::DoRightClick(float x, float y)
 {
 	LOGI("CGuiMain: DoRightClick: px=%3.2f; py=%3.2f;", x, y);
+	
+	isRightMouseButtonPressed = true;
 	
 	if (IsOnAnyOpenedPopup(x, y))
 	{
@@ -742,7 +1004,7 @@ bool CGuiMain::DoRightClick(float x, float y)
 		if (view != NULL && view->IsVisible())
 		{
 //			LOGD("....view=%s", view->name);
-			if (view->IsInside(x, y))
+			if (view->IsInsideView(x, y))
 			{
 //				LOGD("....... IsInside, DoTap()");
 				if (view->DoRightClick(x, y))
@@ -778,6 +1040,8 @@ bool CGuiMain::DoFinishRightClick(float x, float y)
 {
 	LOGI("CGuiMain: DoFinishRightClick: px=%3.2f; py=%3.2f;", x, y);
 
+	isRightMouseButtonPressed = false;
+	
 	if (IsOnAnyOpenedPopup(x, y))
 	{
 		LOGI("...is on popup, skipping tap");
@@ -803,9 +1067,9 @@ bool CGuiMain::DoFinishRightClick(float x, float y)
 		}
 	}
 	
-	if (focusElement)
+	if (focusedView)
 	{
-		if (focusElement->DoFinishRightClick(x, y))
+		if (focusedView->DoFinishRightClick(x, y))
 			return true;
 	}
 	
@@ -824,6 +1088,8 @@ bool CGuiMain::DoFinishRightClick(float x, float y)
 
 bool CGuiMain::DoMove(float x, float y)
 {
+	isLeftMouseButtonPressed = true;
+	
 	if (IsOnAnyOpenedPopup(x, y))
 	{
 		LOGI("...is on popup, skipping move");
@@ -849,10 +1115,10 @@ bool CGuiMain::DoMove(float x, float y)
 		}
 	}
 		
-	if (this->focusElement)
+	if (this->focusedView)
 	{
 		// consumed?
-		if (this->focusElement->DoMove(x, y, 0, 0, 0, 0))
+		if (this->focusedView->DoMove(x, y, 0, 0, 0, 0))
 		{
 			return true;
 		}
@@ -886,12 +1152,79 @@ bool CGuiMain::DoMove(float x, float y)
 	return false;
 }
 
+bool CGuiMain::DoRightClickMove(float x, float y)
+{
+	isRightMouseButtonPressed = true;
+	
+	if (IsOnAnyOpenedPopup(x, y))
+	{
+		LOGI("...is on popup, skipping move");
+		return false;
+	}
+	
+#if !defined(FINAL_RELEASE)
+	if (x > SCREEN_WIDTH - 20 && y < 20)
+		//if (x > SCREEN_WIDTH - 20 && y > SCREEN_HEIGHT - 20)
+		//if (x < 20 && y > SCREEN_HEIGHT - 20)
+	{
+		StartResourceManager();
+		return true;
+	}
+#endif
+	
+	if (this->currentView != NULL)
+	{
+		// TODO: FIXME, DoRightClickMove temporarily does not forward these values
+		if (this->currentView->DoRightClickMove(x, y, 0, 0, 0, 0))
+		{
+			return true;
+		}
+	}
+		
+	if (this->focusedView)
+	{
+		// consumed?
+		if (this->focusedView->DoRightClickMove(x, y, 0, 0, 0, 0))
+		{
+			return true;
+		}
+	}
+	return false;
+	
+	/*
+	
+	
+	
+	// iterate top-down by ImGui windows
+	ImGuiContext *context = ImGui::GetCurrentContext();
+	for (int i = context->Windows.Size - 1; i >= 0; i--) // Iterate front to back
+	{
+		ImGuiWindow *window = context->Windows[i];
+		if (window->Hidden)
+			continue;
+	 
+		CGuiView *view = (CGuiView*)window->userData;
+
+		if (view != NULL && view->IsVisible())
+		{
+			// TODO: FIXME, DoMove temporarily does not forward these values
+			if (view->DoMove(x, y, 0, 0, 0, 0))
+			{
+				return true;
+			}
+		}
+	}
+	*/
+	return false;
+}
+
+
 void CGuiMain::DoNotTouchedMove(float x, float y)
 {
 	mousePosX = x;
 	mousePosY = y;
 	
-	if (currentView)
+	if (currentView && currentView->IsVisible())
 	{
 		currentView->DoNotTouchedMove(x, y);
 //		return;
@@ -901,7 +1234,7 @@ void CGuiMain::DoNotTouchedMove(float x, float y)
 	for (std::list<CGuiView *>::iterator itView = this->views.begin(); itView != this->views.end(); itView++)
 	{
 		CGuiView *view = *itView;
-		if (!view->visible)
+		if (!view->IsVisible())
 			continue;
 		
 		view->DoNotTouchedMove(x, y);
@@ -943,8 +1276,8 @@ void CGuiMain::DoScrollWheel(float deltaX, float deltaY)
 			if (!view->visible)
 				continue;
 			
-//			LOGG("  view->IsInside(%f %f)  window: posX=%5.2f posEndX=%5.2f posY=%5.2f posEndY=%5.2f", mousePosX, mousePosY, view->windowPosX, view->windowPosEndX, view->windowPosY, view->windowPosEndY);
-			if (view->IsInside(mousePosX, mousePosY))
+			LOGG("  view->IsInside(%f %f)  window: posX=%5.2f posEndX=%5.2f posY=%5.2f posEndY=%5.2f", mousePosX, mousePosY, view->windowPosX, view->windowPosEndX, view->windowPosY, view->windowPosEndY);
+			if (view->IsInsideView(mousePosX, mousePosY))
 			{
 				LOGG("  view %s ->DoScrollWheel(%f %f)", view->name, deltaX, deltaY);
 				if (view->DoScrollWheel(deltaX, deltaY))
@@ -974,8 +1307,8 @@ void CGuiMain::DoScrollWheel(float deltaX, float deltaY)
 		if (!view->visible)
 			continue;
 		
-		LOGG("  view->IsInside(%f %f)", mousePosX, mousePosY);
-		if (view->IsInside(mousePosX, mousePosY))
+		LOGG("  view->IsInsideView(%f %f)", mousePosX, mousePosY);
+		if (view->IsInsideView(mousePosX, mousePosY))
 		{
 			LOGG("  view %s ->DoScrollWheel(%f %f)", view->name, deltaX, deltaY);
 			if (view->DoScrollWheel(deltaX, deltaY))
@@ -987,9 +1320,9 @@ void CGuiMain::DoScrollWheel(float deltaX, float deltaY)
 	*/
 	
 	// if not then by focus
-	if (focusElement != NULL)
+	if (focusedView != NULL)
 	{
-		focusElement->DoScrollWheel(deltaX, deltaY);
+		focusedView->DoScrollWheel(deltaX, deltaY);
 	}
 }
 
@@ -1068,7 +1401,7 @@ bool CGuiMain::DoGamePadAxisMotionButtonUp(CGamePad *gamePad, u8 button)
 }
 
 
-void CGuiMain::SetWindowOnTop(CGuiElement *view)
+void CGuiMain::SetWindowOnTop(CGuiView *view)
 {
 	// deprecated
 	LOGTODO("CGuiMain::SetWindowOnTop");
@@ -1081,7 +1414,7 @@ void CGuiMain::ShowMessageBox(const char *title, const char *message)
 
 void CGuiMain::ShowMessageBox(const char *title, const char *message, CUiMessageBoxCallback *messageBoxCallback)
 {
-	guiMain->LockMutex();
+	LockMutex();
 	if (messageBoxTitle != NULL)
 		STRFREE(messageBoxTitle);
 	if (messageBoxText != NULL)
@@ -1090,7 +1423,22 @@ void CGuiMain::ShowMessageBox(const char *title, const char *message, CUiMessage
 	messageBoxText = STRALLOC(message);
 	beginMessageBoxPopup = true;
 	this->messageBoxCallback = messageBoxCallback;
-	guiMain->UnlockMutex();
+	UnlockMutex();
+}
+
+void CGuiMain::ShowNotification(const char *title, const char *message)
+{
+	notificationMutex->Lock();
+//	ImGui::InsertNotification({ ImGuiToastType_Success, title, 3000, message });
+	ImGui::InsertNotification({ ImGuiToastType_Info, title, 3000, message });
+	notificationMutex->Unlock();
+}
+
+void CGuiMain::ShowNotification(ImGuiToastType_ toastType, int dismissTime, const char *title, const char *message)
+{
+	notificationMutex->Lock();
+	ImGui::InsertNotification({ toastType, title, dismissTime, message });
+	notificationMutex->Unlock();
 }
 
 void CGuiMain::RenderImGui()
@@ -1113,7 +1461,7 @@ void CGuiMain::RenderImGui()
 //	if (ImGui::IsAnyWindowFocused() == false)
 	if (io.WantCaptureMouse == false)
 	{
-		ClearViewFocus();
+		ClearInternalViewFocus();
 	}
 	
 	//
@@ -1140,7 +1488,7 @@ void CGuiMain::RenderImGui()
 			&& layoutManager->currentLayout->doNotUpdateViewsPositions == false)
 		{
 			layoutManager->currentLayout->serializedLayoutBuffer->Clear();
-			SerializeLayout(layoutManager->currentLayout->serializedLayoutBuffer);
+			SerializeLayout(layoutManager->currentLayout);
 			layoutManager->StoreLayouts();
 		}
 		
@@ -1149,35 +1497,37 @@ void CGuiMain::RenderImGui()
 	
 	if (layoutForThisFrame != NULL)
 	{
-		// TODO: add enum for this
-		if (layoutStoreOrRestore)
+		if (layoutStoreOrRestore == LayoutStorageTask::StoreLayout)
 		{
-			// true means store
-			this->SerializeLayout(layoutForThisFrame->serializedLayoutBuffer);
+			this->SerializeLayout(layoutForThisFrame);
 			layoutForThisFrame = NULL;
 		}
-		else
+		else if (layoutStoreOrRestore == LayoutStorageTask::RestoreLayout)
 		{
-			// false means restore
-			
 			// store previous layout
 			if (layoutManager->currentLayout != NULL
 				&& layoutManager->currentLayout->doNotUpdateViewsPositions == false)
 			{
 				layoutManager->currentLayout->serializedLayoutBuffer->Clear();
-				SerializeLayout(layoutManager->currentLayout->serializedLayoutBuffer);
+				SerializeLayout(layoutManager->currentLayout);
 				layoutManager->StoreLayouts();
 			}
 
-			this->DeserializeLayout(layoutForThisFrame->serializedLayoutBuffer);
+			this->DeserializeLayout(layoutForThisFrame);
 			
 			layoutManager->currentLayout = layoutForThisFrame;
 			layoutForThisFrame = NULL;
 			layoutJustRestored = true;
 		}
+		else LOGError("CGuiMain::RenderImGui: unknown LayoutStorageTask=%d", layoutStoreOrRestore);
 	}
-	
-	//
+
+	// notifications
+	notificationMutex->Lock();
+	ImGui::RenderNotifications();
+	notificationMutex->Unlock();
+
+	// message boxes
 	if (beginMessageBoxPopup)
 	{
 		ImGui::OpenPopup(messageBoxTitle);
@@ -1196,7 +1546,7 @@ void CGuiMain::RenderImGui()
 		bool popen = true;
 		if (ImGui::BeginPopupModal(messageBoxTitle, &popen, ImGuiWindowFlags_AlwaysAutoResize))
 		{
-			ImGui::Text(messageBoxText);
+			ImGui::Text("%s", messageBoxText);
 			if (ImGui::Button("  OK  "))
 			{
 				STRFREE(messageBoxTitle);
@@ -1214,7 +1564,6 @@ void CGuiMain::RenderImGui()
 		ImGui::PopStyleVar();
 	}
 	
-	//
 }
 
 void CGuiMain::PostRenderEndFrame()
@@ -1238,6 +1587,66 @@ void CGuiMain::PostRenderEndFrame()
 void CGuiMain::StoreLayoutInSettingsAtEndOfThisFrame()
 {
 	layoutStoreCurrentInSettings = true;
+}
+
+// iterate top-down by ImGui windows and find most top in x,y
+CGuiView* CGuiMain::FindTopWindow(float x, float y)
+{
+	LockMutex();
+	
+	ImGuiContext *context = ImGui::GetCurrentContext();
+	for (int i = context->Windows.Size - 1; i >= 0; i--) // Iterate front to back
+	{
+		ImGuiWindow *window = context->Windows[i];
+		if (window->Hidden)
+			continue;
+
+		CGuiView *view = (CGuiView*)window->userData;
+
+		if (view != NULL && view->IsVisible() && !view->IsHidden())
+		{
+//			LOGD("....view=%s", view->name);
+			if (view->IsInsideWindow(x, y))
+			{
+				UnlockMutex();
+				return view;
+			}
+		}
+	}
+	
+	UnlockMutex();
+	return NULL;
+}
+
+// returns if view is hidden (i.e. hidden or minimized)
+bool CGuiMain::IsViewHidden(CGuiView *view)
+{
+	SDL_Window *window = NULL;
+	if (VID_IsViewportsEnable())
+	{
+		window = VID_GetSDLWindowFromCGuiView(view);
+		if (!window)
+			window = VID_GetMainSDLWindow();
+
+	}
+	else
+	{
+		window = VID_GetMainSDLWindow();
+	}
+
+	if (!window)
+		return true;
+
+	// check main window
+	Uint32 flags = SDL_GetWindowFlags(window);
+	
+	if (flags & SDL_WINDOW_HIDDEN
+		|| flags & SDL_WINDOW_MINIMIZED)
+	{
+		return true;
+	}
+	
+	return false;
 }
 
 void CGuiMain::AddUiThreadTask(CUiThreadTaskCallback *taskCallback)
@@ -1349,8 +1758,14 @@ void CGuiMain::NotifyGlobalDropFileCallbacks(char *filePath, bool consumedByView
 	}
 }
 
-void CGuiMain::CreateUiFontsTexture()
+void CGuiMain::MergeIconsWithLatestFont(float fontSize)
 {
+	ImGui::MergeIconsWithLatestFont(fontSize);
+}
+
+void CGuiMain::CreateUiFontsTexture(float fontSize)
+{
+//	MergeIconsWithLatestFont(fontSize);
 	gRenderBackend->CreateFontsTexture();
 }
 
@@ -1367,6 +1782,11 @@ bool CGlobalKeyboardCallback::GlobalKeyUpCallback(u32 keyCode, bool isShift, boo
 }
 
 bool CGlobalKeyboardCallback::GlobalKeyPressCallback(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper)
+{
+	return false;
+}
+
+bool CGlobalKeyboardCallback::GlobalKeyTextInputCallback(const char *text)
 {
 	return false;
 }
@@ -1450,6 +1870,32 @@ void CUiThreadTaskSetView::RunUIThreadTask()
 	// TODO: FIX ME  guiMain->SetViewAsync(this->view);
 }
 
+void CGuiMain::RaiseMainWindow()
+{
+	CUiThreadTaskRaiseMainWindow *task = new CUiThreadTaskRaiseMainWindow();
+	guiMain->AddUiThreadTask(task);
+}
+
+void CGuiMain::CloseCurrentImGuiWindow()
+{
+	LockMutex();
+	for (std::list<CGuiView *>::iterator it = views.begin(); it != views.end(); it++)
+	{
+		CGuiView *view = *it;
+		if (view->HasFocus())
+		{
+			view->SetVisible(false);
+			break;
+		}
+	}
+	UnlockMutex();
+}
+
+void CUiThreadTaskRaiseMainWindow::RunUIThreadTask()
+{
+	VID_RaiseMainWindow();
+}
+
 CUiThreadTaskSetMouseCursorVisible::CUiThreadTaskSetMouseCursorVisible(bool mouseCursorVisible)
 {
 	this->mouseCursorVisible = mouseCursorVisible;
@@ -1483,11 +1929,6 @@ CUiThreadTaskSetAlwaysOnTop::CUiThreadTaskSetAlwaysOnTop(bool isAlwaysOnTop)
 void CUiThreadTaskSetAlwaysOnTop::RunUIThreadTask()
 {
 	VID_SetWindowAlwaysOnTop(isAlwaysOnTop);
-}
-
-void CGuiMain::SetFocus(CGuiElement *element)
-{
-	LOGTODO("CGuiMain::SetFocus NOT IMPLEMENTED");
 }
 
 void CGuiMain::SetMouseCursorVisible(bool isVisible)
@@ -1541,17 +1982,24 @@ void CGuiMain::RemoveAllViews()
 // TODO: fullscreen: there may be a situation that layout was not stored and async task loop was started between render unlock and renderPostEndFrame. check on other platforms. remove debug logs when it is confirmed working
 
 // go fullscreen with one view (for example emulator screen), or get back to windowed mode when view is NULL
-void CGuiMain::SetViewFullScreen(CGuiView *view)
+void CGuiMain::SetViewFullScreen(SetFullScreenMode setFullScreenMode, CGuiView *view)
 {
-	SetViewFullScreen(view, view ? view->sizeX : 0, view ? view->sizeY : 0);
+	SetViewFullScreen(setFullScreenMode, view, view ? view->sizeX : 0, view ? view->sizeY : 0);
 }
 
-void CGuiMain::SetViewFullScreen(CGuiView *view, float fullScreenSizeX, float fullScreenSizeY)
+void CGuiMain::SetViewFullScreen(SetFullScreenMode setFullScreenMode, CGuiView *view, float fullScreenSizeX, float fullScreenSizeY)
 {
 	LOGD("CGuiMain::SetViewFullScreen: view=%s", view ? view->name : "NULL");
 
-	if (view != NULL)
+	if (setFullScreenMode == SetFullScreenMode::ViewEnterFullScreen
+		|| setFullScreenMode == SetFullScreenMode::MainWindowEnterFullScreen)
 	{
+		if (setFullScreenMode == SetFullScreenMode::ViewEnterFullScreen && view == NULL)
+		{
+			LOGError("CGuiMain::SetViewFullScreen: ViewEnterFullScreen view==NULL");
+			return;
+		}
+		
 		if (IsViewFullScreen())
 		{
 			LOGError("CGuiMain::SetViewFullScreen: %s is already fullscreen", view->name);
@@ -1564,7 +2012,7 @@ void CGuiMain::SetViewFullScreen(CGuiView *view, float fullScreenSizeX, float fu
 			return;
 		}
 		
-		guiMain->LockMutex();
+		LockMutex();
 		
 		isChangingFullScreenState = true;
 		
@@ -1576,15 +2024,16 @@ void CGuiMain::SetViewFullScreen(CGuiView *view, float fullScreenSizeX, float fu
 		
 		// create a temporary layout to hold views to go back to windowed mode
 		layoutForThisFrame = temporaryLayoutToGoBackFromFullScreen;
-		layoutStoreOrRestore = true;	// store
+		layoutStoreOrRestore = LayoutStorageTask::StoreLayout;
 		
 		// the fullscreen mode will be started after layout is stored in an async task
-		CUiThreadTaskSetViewFullScreen *task = new CUiThreadTaskSetViewFullScreen(view, fullScreenSizeX, fullScreenSizeY);
+		CUiThreadTaskSetViewFullScreen *task = new CUiThreadTaskSetViewFullScreen(setFullScreenMode, view, fullScreenSizeX, fullScreenSizeY);
 		AddUiThreadTask(task);
 				
-		guiMain->UnlockMutex();
+		UnlockMutex();
 	}
-	else
+	else if (setFullScreenMode == SetFullScreenMode::ViewLeaveFullScreen
+			 || setFullScreenMode == SetFullScreenMode::MainWindowLeaveFullScreen)
 	{
 		// go back to windowed mode
 		if (temporaryLayoutToGoBackFromFullScreen == NULL)
@@ -1593,16 +2042,16 @@ void CGuiMain::SetViewFullScreen(CGuiView *view, float fullScreenSizeX, float fu
 			return;
 		}
 		
-		guiMain->LockMutex();
+		LockMutex();
 
 		layoutForThisFrame = temporaryLayoutToGoBackFromFullScreen;
-		layoutStoreOrRestore = false;	// restore
+		layoutStoreOrRestore = LayoutStorageTask::RestoreLayout;
 		
 		// the window mode will be restored after layout is restored in async task
-		CUiThreadTaskSetViewFullScreen *task = new CUiThreadTaskSetViewFullScreen(NULL, 0, 0);
+		CUiThreadTaskSetViewFullScreen *task = new CUiThreadTaskSetViewFullScreen(setFullScreenMode, NULL, 0, 0);
 		AddUiThreadTask(task);
 		
-		guiMain->UnlockMutex();
+		UnlockMutex();
 	}
 }
 
@@ -1611,8 +2060,9 @@ bool CGuiMain::IsViewFullScreen()
 	return (viewFullScreen != NULL) || isChangingFullScreenState;
 }
 
-CUiThreadTaskSetViewFullScreen::CUiThreadTaskSetViewFullScreen(CGuiView *view, float fullScreenSizeX, float fullScreenSizeY)
+CUiThreadTaskSetViewFullScreen::CUiThreadTaskSetViewFullScreen(SetFullScreenMode setFullScreenMode, CGuiView *view, float fullScreenSizeX, float fullScreenSizeY)
 {
+	this->setFullScreenMode = setFullScreenMode;
 	this->view = view;
 	this->fullScreenSizeX = fullScreenSizeX;
 	this->fullScreenSizeY = fullScreenSizeY;
@@ -1623,10 +2073,15 @@ void CUiThreadTaskSetViewFullScreen::RunUIThreadTask()
 	LOGD("CUiThreadTaskSetViewFullScreen::RunUIThreadTask");
 	
 	//
-	if (view != NULL)
+	if (setFullScreenMode == SetFullScreenMode::ViewEnterFullScreen)
 	{
-		// go fullscreen
+		if (view == NULL)
+		{
+			LOGError("CUiThreadTaskSetViewFullScreen: view==NULL");
+			return;
+		}
 		
+		// view goes fullscreen
 		LOGD("CUiThreadTaskSetViewFullScreen: fullscreen, view=%s", view->name);
 
 		guiMain->viewFullScreen = view;
@@ -1662,9 +2117,14 @@ void CUiThreadTaskSetViewFullScreen::RunUIThreadTask()
 			VID_SetMainApplicationWindowFullScreen(true);
 		}
 	}
-	else
+	else if (setFullScreenMode == SetFullScreenMode::MainWindowEnterFullScreen)
 	{
-		LOGD("CUiThreadTaskSetViewFullScreen: go back to windowed");
+		VID_SetMainApplicationWindowFullScreen(true);
+	}
+	
+	else if (setFullScreenMode == SetFullScreenMode::ViewLeaveFullScreen)
+	{
+		LOGD("CUiThreadTaskSetViewFullScreen: view goes back to windowed");
 		
 		// reset background to previous/backup from black background
 		guiMain->SetImGuiStyleWindowBackupBackground();
@@ -1676,6 +2136,26 @@ void CUiThreadTaskSetViewFullScreen::RunUIThreadTask()
 			// the fullscreen mode is stopped before layout is restored
 			VID_SetMainApplicationWindowFullScreen(false);
 		}
+		
+		LOGD(".......... in PostRenderEndFrame set BACK currentLayout to currentLayoutBeforeFullScreen");
+
+		guiMain->layoutManager->currentLayout = guiMain->currentLayoutBeforeFullScreen;
+		guiMain->currentLayoutBeforeFullScreen = NULL;
+				
+		guiMain->viewFullScreen = NULL;
+		guiMain->isChangingFullScreenState = false;
+	}
+	else if (setFullScreenMode == SetFullScreenMode::MainWindowLeaveFullScreen)
+	{
+		LOGD("CUiThreadTaskSetViewFullScreen: mainwindow goes back to windowed");
+		
+		// reset background to previous/backup from black background
+		guiMain->SetImGuiStyleWindowBackupBackground();
+		
+		// the fullscreen mode is stopped before layout is restored
+		VID_SetMainApplicationWindowFullScreen(false);
+
+		// TODO: store full screen layout
 		
 		LOGD(".......... in PostRenderEndFrame set BACK currentLayout to currentLayoutBeforeFullScreen");
 

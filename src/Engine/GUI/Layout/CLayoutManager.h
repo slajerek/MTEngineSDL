@@ -22,6 +22,9 @@ public:
 	bool doNotUpdateViewsPositions;	// shall we always save views position on layout change, or not (i.e. always restore original positions)
 	CByteBuffer *serializedLayoutBuffer;
 	CSlrKeyboardShortcut *keyShortcut;
+	
+	bool isFullScreenLayout;
+	CLayoutData *parentLayout;
 };
 
 class CLayoutManager : public CSlrKeyboardShortcutCallback
@@ -36,13 +39,18 @@ public:
 	virtual void AddLayout(CLayoutData *layoutData);
 	virtual void RemoveAndDeleteLayout(CLayoutData *layoutData);
 	
+	virtual void SerializeLayout(CLayoutData *layoutData, CByteBuffer *byteBuffer);
 	virtual void SerializeLayouts(CByteBuffer *byteBuffer);
+	CLayoutData *DeserializeLayout(CByteBuffer *byteBuffer, u16 version);
 	virtual void DeserializeLayouts(CByteBuffer *byteBuffer, u16 version);
 
 	virtual void DeleteAllLayouts();
 	
 	virtual void LoadLayouts();
 	virtual void StoreLayouts();
+	virtual void StoreLayout(CLayoutData *layoutData, CSlrString *filePath);
+	virtual CLayoutData *LoadLayout(CSlrString *filePath);
+	
 	
 	CLayoutData *GetLayoutByName(const char *name);
 	

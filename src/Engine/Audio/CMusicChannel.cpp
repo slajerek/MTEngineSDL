@@ -2,6 +2,7 @@
 #include "SYS_Main.h"
 
 CMusicChannel::CMusicChannel(CSlrMusicFile *musicFile)
+: CAudioChannel(musicFile->name)
 {
 	LOGA("CMusicChannel::CMusicChannel");
 	this->musicFile = musicFile;

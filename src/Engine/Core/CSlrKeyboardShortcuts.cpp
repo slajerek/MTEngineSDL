@@ -46,6 +46,10 @@ void CSlrKeyboardShortcutsZone::AddShortcut(CSlrKeyboardShortcut *shortcutToAdd)
 				LOGError("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
 				LOGError("!!");
 				LOGError("!!  CSlrKeyboardShortcuts::AddShortcut: shortcut %4.4x already exists in list", shortcutToAdd->keyCode);
+				LOGError("Existing shortcut:");
+				shortcut->DebugPrint();
+				LOGError("NOT added shortcut:");
+				shortcutToAdd->DebugPrint();
 				LOGError("!!");
 				LOGError("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
 				return;

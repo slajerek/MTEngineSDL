@@ -20,7 +20,9 @@ public:
 	Hjson::Value hjsonRoot;
 
 	void SetBool(const char *name, bool *value);
+	void SetBoolSkipConfigSave(const char *name, bool *value);
 	void GetBool(const char *name, bool *value, bool defaultValue);
+	bool GetBool(const char *name, bool defaultValue);
 
 	void SetInt(const char *name, int *value);
 	void GetInt(const char *name, int *value, int defaultValue);
@@ -38,6 +40,9 @@ public:
 
 	void SetSlrString(const char *name, CSlrString **value);
 	void GetSlrString(const char *name, CSlrString **value, CSlrString *defaultValue);
+	
+	// damn fucking ms windows !!!! when below member name is called Exists then vc compiler is stupid as int sts exists
+	bool E_x_i_s_t_s(const char *name);
 };
 
 #endif

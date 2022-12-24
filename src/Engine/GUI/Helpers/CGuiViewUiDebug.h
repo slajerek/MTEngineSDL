@@ -40,6 +40,10 @@ public:
 	virtual bool KeyUp(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper);
 	virtual bool KeyPressed(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper);	// repeats
 	
+	virtual bool DoGamePadButtonDown(CGamePad *gamePad, u8 button);
+	virtual bool DoGamePadButtonUp(CGamePad *gamePad, u8 button);
+	virtual bool DoGamePadAxisMotion(CGamePad *gamePad, u8 axis, int value);
+
 	virtual void ActivateView();
 	virtual void DeactivateView();
 

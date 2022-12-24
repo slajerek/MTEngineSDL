@@ -15,6 +15,9 @@
 // do not show any UI
 //#define MODE_HEADLESS
 
+// shall we log debug messages to be displayed in the log view?
+//#define USE_DEBUG_LOG_TO_VIEW
+
 #define FINAL_RELEASE
 #define INIT_DEFAULT_UI_THEME
 #define LOAD_CONSOLE_FONT
@@ -36,6 +39,10 @@ extern "C"
 
 #ifndef WIN32
 #include <math.h>
+#endif
+
+#ifdef WIN32
+#define strcasecmp(s1, s2)      _stricmp(s1, s2)
 #endif
 
 #if defined(MACOS) || defined(LINUX)

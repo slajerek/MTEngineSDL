@@ -5,6 +5,9 @@ void SYS_PlatformInit();
 void SYS_PlatformShutdown();
 void SYS_AttachConsole();
 
+void PLATFORM_SetThreadName(const char *name);
+void PLATFORM_UpdateMenus();
+
 #define PLATFORM_SCANCODE_LCTRL	SDL_SCANCODE_LCTRL
 #define PLATFORM_SCANCODE_RCTRL	SDL_SCANCODE_RCTRL
 #define PLATFORM_SCANCODE_LGUI	SDL_SCANCODE_LGUI

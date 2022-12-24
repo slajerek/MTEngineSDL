@@ -645,6 +645,56 @@ void sprintfUnsignedNum(char *pszBuffer, int size, char base, char numDigits, ch
     return;
 }
 
+// fuzzy search
+int FUN_FuzzyScore( const char *str1, const char *str2 )
+{
+	int score = 0, consecutive = 0, maxerrors = 0;
+	int charNum = 0;
+	while( *str1 && *str2 )
+	{
+		int is_leading = (*str1 & 64) && !(str1[1] & 64);
+		if( (*str1 & ~32) == (*str2 & ~32) )
+		{
+			int had_separator = 0;
+			if (charNum != 0)
+			{
+				had_separator = (str1[-1] <= 32);
+			}
+			
+			int x = had_separator || is_leading ? 10 : consecutive * 5;
+			consecutive = 1;
+			score += x;
+			++str2;
+		}
+		else
+		{
+			int x = -1, y = is_leading * -3;
+			consecutive = 0;
+			score += x;
+			maxerrors += y;
+		}
+		++str1;
+		++charNum;
+	}
+	return score + (maxerrors < -9 ? -9 : maxerrors);
+}
+
+int FUN_FuzzySearch( const char *str, int num, const char *words[] )
+{
+	int scoremax = 0;
+	int best = -1;
+	for( int i = 0; i < num; ++i ) {
+		int score = FUN_FuzzyScore( words[i], str );
+		int record = ( score >= scoremax );
+		int draw = ( score == scoremax );
+		if( record ) {
+			scoremax = score;
+			if( !draw ) best = i;
+			else best = best >= 0 && strlen(words[best]) < strlen(words[i]) ? best : i;
+		}
+	}
+	return best;
+}
 
 
 /*

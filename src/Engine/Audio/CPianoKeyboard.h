@@ -14,13 +14,16 @@
 #include "CGuiView.h"
 #include "CMidiInKeyboard.h"
 
+// TODO: CPianoKeyboard multitouch, multiple notes. SDL2 does not support multitouch, but MTEngine does, we need to port that old code
 class CPianoKeyboard;
+class CPianoKey;
 
+// TODO: refactor to CPianoKey, remove u8 note 		this->callback->PianoKeyboardNotePressed(this, key); // + currentOctave*12);
 class CPianoKeyboardCallback
 {
 public:
-	virtual void PianoKeyboardNotePressed(CPianoKeyboard *pianoKeyboard, u8 note);
-	virtual void PianoKeyboardNoteReleased(CPianoKeyboard *pianoKeyboard, u8 note);
+	virtual void PianoKeyboardNotePressed(CPianoKeyboard *pianoKeyboard, CPianoKey *pianoKey);
+	virtual void PianoKeyboardNoteReleased(CPianoKeyboard *pianoKeyboard, CPianoKey *pianoKey);
 };
 
 class CPianoKey
@@ -56,6 +59,8 @@ public:
 	bool isAlt;
 	bool isControl;
 	bool isSuper;
+	
+	CPianoKey *pianoKey;
 };
 
 class CPianoKeyboard : public CGuiView, public CMidiInKeyboardCallback
@@ -92,15 +97,22 @@ public:
 	double keyBlackWidth;
 	double keyBlackHeight;
 
-	u8 GetPressedNote(float x, float y);
-	volatile bool tapped;
+	bool IsInsideKey(float x, float y, CPianoKey *key);
+	CPianoKey *GetPianoKey(float x, float y);
+	std::list<CPianoKey *> pressedKeys;
+
+	// TODO: make multitouch based on fingerID (note: SDL2 does not support multitouch)
+	CPianoKey *tappedKey;
 	
+	virtual bool AddKeyToPressed(CPianoKey *key);
+	virtual bool RemoveKeyFromPressed(CPianoKey *key);
+
 	const char **octaveNames;
 	
 	std::vector<CPianoKey *> pianoKeys;
 	std::vector<CPianoKey *> pianoWhiteKeys;
 	std::vector<CPianoKey *> pianoBlackKeys;
-
+	
 	void SetKeysFadeOut(bool doKeysFadeOut);
 	void SetKeysFadeOutSpeed(float speed);
 	bool doKeysFadeOut;
@@ -118,7 +130,15 @@ public:
 	// MIDI
 	virtual void MidiInKeyboardCallbackNoteOn(int channel, int key, int pressure);
 	virtual void MidiInKeyboardCallbackNoteOff(int channel, int key, int pressure);
+	
+	// Context menu
+	virtual bool HasContextMenuItems();
+	virtual void RenderContextMenuItems();
+	
+	int midiPortNum;
+	int midiChannel;
 
+	CSlrMutex *mutex;
 };
 
 #endif //_SLRPIANOKEYBOARD_

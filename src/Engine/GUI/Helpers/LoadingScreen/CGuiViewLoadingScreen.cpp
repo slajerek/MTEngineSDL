@@ -11,6 +11,9 @@ CGuiViewLoadingScreen::CGuiViewLoadingScreen(float posX, float posY, float posZ,
 {
 	this->name = "CGuiViewLoadingScreen";
 	
+	imGuiNoWindowPadding = true;
+	imGuiNoScrollbar = true;
+
 	memset(this->loadingText, 0x00, GUIVIEWLOADINGSCREEN_TEXT_LEN);
 	this->SetLoadingText("idle");
 }
@@ -19,7 +22,7 @@ CGuiViewLoadingScreen::~CGuiViewLoadingScreen()
 {
 }
 
-void CGuiViewLoadingScreen::SetLoadingText(char *text)
+void CGuiViewLoadingScreen::SetLoadingText(const char *text)
 {
 	guiMain->LockMutex();
 	strncpy(this->loadingText, text, GUIVIEWLOADINGSCREEN_TEXT_LEN-2);
@@ -41,7 +44,7 @@ void CGuiViewLoadingScreen::Render()
 	
 	u64 loadTime = SYS_GetCurrentTimeInMillis() - loadStartTime;
 	TimeToStr(loadTime);
-	guiMain->fntConsole->BlitText(this->strTime, SCREEN_WIDTH-(8*11), 0, 0, 11, 1.0);
+	guiMain->fntConsole->BlitText(this->strTime, sizeX-(8*11), 0, 0, 11, 1.0);
 	
 	guiMain->viewResourceManager->Render(0.0f, 0.0f);
 

@@ -107,7 +107,6 @@ void RES_Init(u16 destScreenWidth)
 	resourcesSortedByActivation.clear();
 
 	_resourceLoaderThread = new CResourceLoaderThread();
-	_resourceLoaderThread->ThreadSetName("CResourceLoaderThread");
 	
 	RES_InitDeployFile(destScreenWidth);
 	RES_InitEmbeddedData();
@@ -731,7 +730,7 @@ CSlrMusicFile *RES_GetMusic(const char *fileName, bool seekable, int resourceLev
 	}
 
 	// load music
-	music = new CSlrMusicFileOgg(fileName, seekable, fromResources);
+	music = new CSlrMusicFileOgg(fileName, fileName, seekable, fromResources);
 
 	LOGR("RES_GetMusic: music loaded: '%s'", fileName);
 
@@ -1211,7 +1210,7 @@ void RES_LoadResourcesAsync()
 
 void CResourceLoaderThread::ThreadRun(void *data)
 {
-	this->ThreadSetName("ResourceLoader");
+	ThreadSetName("ResourceLoader");
 
 	LOGR("============================================= CResourceLoaderThread::ThreadRun");
 

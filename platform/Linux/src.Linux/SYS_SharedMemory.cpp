@@ -395,6 +395,7 @@ bool SYS_SetClipboardAsSlrString(CSlrString *str)
 	
 	return ret;
 	*/
+	return false;
 }
 
 

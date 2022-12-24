@@ -711,6 +711,13 @@ struct ImGui_ImplSDL2_ViewportData
     ~ImGui_ImplSDL2_ViewportData() { IM_ASSERT(Window == NULL && GLContext == NULL); }
 };
 
+SDL_Window *ImGui_ImplSDL2_ImGuiViewportToSDLWindow(ImGuiViewport *imGuiViewport)
+{
+	ImGui_ImplSDL2_ViewportData *viewportData = (ImGui_ImplSDL2_ViewportData *)imGuiViewport->PlatformUserData;
+	SDL_Window *sdlWindow = viewportData ? viewportData->Window : NULL;
+	return sdlWindow;
+}
+
 static void ImGui_ImplSDL2_CreateWindow(ImGuiViewport* viewport)
 {
     ImGui_ImplSDL2_Data* bd = ImGui_ImplSDL2_GetBackendData();

@@ -47,6 +47,44 @@ std::list<CSlrString *> *CMidiInKeyboard::EnumerateAvailablePorts(CSlrString **e
 	return availablePorts;
 }
 
+std::list<char *> *CMidiInKeyboard::EnumerateAvailablePorts()
+{
+	LOGD("CMidiInKeyboard::EnumerateAvailablePorts");
+	
+	std::list<char *> *availablePorts = new std::list<char *>();
+
+	RtMidiIn *midiIn;
+	
+	try
+	{
+		midiIn = new RtMidiIn();
+		
+		unsigned int nPorts = midiIn->getPortCount();
+		LOGD("There are %d MIDI input sources available.", nPorts);
+		
+		std::string portName;
+		for (u32 i=0; i < nPorts; i++)
+		{
+			portName = midiIn->getPortName(i);
+			LOGD("%d = '%s'", i+1, portName.c_str());
+			char *strPortName = STRALLOC(portName.c_str());
+			availablePorts->push_back(strPortName);
+		}
+	}
+	catch (RtMidiError &error)
+	{
+		LOGError("CMidiInKeyboard::CMidiInKeyboard: error %s", error.getMessage().c_str());
+//		*errorString = new CSlrString(error.getMessage().c_str());
+		
+		return availablePorts;
+	}
+	delete midiIn;
+
+	LOGD("CMidiInKeyboard::EnumerateAvailablePorts done");
+
+	return availablePorts;
+}
+
 void CMidiInKeyboard::Init(int portNum, CMidiInKeyboardCallback *callback)
 {
 	this->callback = callback;
@@ -67,9 +105,10 @@ void CMidiInKeyboard::Init(int portNum)
 #elif defined(LINUX)
 		midiIn = new RtMidiIn(RtMidi::LINUX_ALSA);
 #endif
+		midiIn->setCallback( &slrMidiCallback, (void*)this );
+
 		midiIn->openPort(portNum);
 		//midiIn->ignoreTypes( false, false, false )
-		midiIn->setCallback( &slrMidiCallback, (void*)this );
 		
 		std::string portNameStr = midiIn->getPortName(portNum);
 		strncpy(deviceName, portNameStr.c_str(), 512);
@@ -80,8 +119,8 @@ void CMidiInKeyboard::Init(int portNum)
 		LOGError("CMidiInKeyboard::CMidiInKeyboard: error %s", error.getMessage().c_str());
 		LOGTODO("convert errorMessage: std::string to CSlrString");
 		errorString = new CSlrString(error.getMessage().c_str());
-		delete midiIn;
-		midiIn = NULL;
+//		delete midiIn;
+//		midiIn = NULL;
 		
 		deviceName[0] = 0x00;
 	}

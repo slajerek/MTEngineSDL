@@ -24,7 +24,7 @@ void CGuiEditBoxTextCallback::EditBoxTextFinished(CGuiEditBoxText *editBox, char
 
 CGuiEditBoxText::CGuiEditBoxText(float posX, float posY, float posZ,
 								 float fontWidth, float fontHeight,
-								 char *defaultText, u16 maxNumChars, bool readOnly,
+								 const char *defaultText, u16 maxNumChars, bool readOnly,
 								 CGuiEditBoxTextCallback *callback)
 :CGuiView(posX, posY, posZ, 50, 50)
 {
@@ -41,7 +41,7 @@ CGuiEditBoxText::CGuiEditBoxText(float posX, float posY, float posZ,
 
 CGuiEditBoxText::CGuiEditBoxText(float posX, float posY, float posZ,
 								 float sizeX, float sizeY,
-								 char *defaultText, u16 maxNumChars,
+								 const char *defaultText, u16 maxNumChars,
 								 CSlrFont *textFont, float fontScale, bool readOnly, CGuiEditBoxTextCallback *callback)
 :CGuiView(posX, posY, posZ, sizeX, sizeY)
 {
@@ -62,7 +62,7 @@ CGuiEditBoxText::CGuiEditBoxText(float posX, float posY, float posZ,
 
 CGuiEditBoxText::CGuiEditBoxText(float posX, float posY, float posZ,
 								 float sizeX,
-								 char *defaultText, u16 maxNumChars,
+								 const char *defaultText, u16 maxNumChars,
 								 CSlrFont *textFont, float fontScale, bool readOnly, CGuiEditBoxTextCallback *callback)
 :CGuiView(posX, posY, posZ, sizeX, 0.0f)
 {
@@ -90,7 +90,7 @@ CGuiEditBoxText::CGuiEditBoxText(float posX, float posY, float posZ,
 	this->SetText(defaultText);
 }
 
-void CGuiEditBoxText::Initialize(char *defaultText, u16 maxNumChars, bool readOnly,
+void CGuiEditBoxText::Initialize(const char *defaultText, u16 maxNumChars, bool readOnly,
 								 CGuiEditBoxTextCallback *callback)
 {
 	this->name = "CGuiEditBoxText";
@@ -168,8 +168,7 @@ bool CGuiEditBoxText::DoTap(float x, float y)
 		if (this->enabled == false)
 			return true;
 		
-		LOGTODO(" CGuiEditBoxText::DoTap: fix me guiMain->SetFocus(this);");
-//		guiMain->SetFocus(this);
+//		this->parent->SetFocusElement(this);
 		return true;
 	}
 	return false;
@@ -297,7 +296,7 @@ void CGuiEditBoxText::Render(float posX, float posY, float sizeX, float sizeY)
 	this->Render(posX, posY);
 }
 
-void CGuiEditBoxText::SetText(char *setText)
+void CGuiEditBoxText::SetText(const char *setText)
 {
 	//guiMain->LockRenderMutex();
 	if (setText == NULL)
@@ -318,21 +317,23 @@ void CGuiEditBoxText::SetText(char *setText)
 	this->SetSize((fontWidth*(float)maxNumChars*gapX), (fontHeight*gapY));
 }
 
-char *CGuiEditBoxText::GetText()
+const char *CGuiEditBoxText::GetText()
 {
 	return textBuffer;
 }
 
-void CGuiEditBoxText::FocusReceived()
+bool CGuiEditBoxText::FocusReceived()
 {
 	LOGM("CGuiEditBoxText::FocusReceived");
 	GUI_ShowVirtualKeyboard();
 
 	this->editing = true;
 	LOGD("this->editing=%d", this->editing);
+	
+	return true;
 }
 
-void CGuiEditBoxText::FocusLost()
+bool CGuiEditBoxText::FocusLost()
 {
 	LOGM("CGuiEditBoxText::FocusLost");
 	CGuiElement::FocusLost();
@@ -340,6 +341,8 @@ void CGuiEditBoxText::FocusLost()
 	GUI_HideVirtualKeyboard();
 	this->editing = false;
 	LOGD("this->editing=%d", this->editing);
+	
+	return true;
 }
 
 bool CGuiEditBoxText::KeyDown(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper)

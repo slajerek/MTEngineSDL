@@ -230,10 +230,10 @@ private:
 	std::list<CSlrString *> tags;
 	std::list<CSlrString *> vals;
 
-	bool TagExists(char *tagName);
-	CSlrString *GetValueForTag(char *tagName);
-	float GetFloatValueForTag(char *tagName, float defaultValue);
-	int GetIntValueForTag(char *tagName, int defaultValue);
+	bool TagExists(const char *tagName);
+	CSlrString *GetValueForTag(const char *tagName);
+	float GetFloatValueForTag(const char *tagName, float defaultValue);
+	int GetIntValueForTag(const char *tagName, int defaultValue);
 
 	void AddElement(CGuiRichTextLabelElement *el);
 	

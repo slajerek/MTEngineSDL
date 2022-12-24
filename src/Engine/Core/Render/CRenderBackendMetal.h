@@ -8,7 +8,7 @@ class CRenderBackendMetal : public CRenderBackend
 public:
 	CRenderBackendMetal();
 
-	virtual SDL_Window *CreateSDLWindow(const char *title, int x, int y, int w, int h);
+	virtual SDL_Window *CreateSDLWindow(const char *title, int x, int y, int w, int h, bool maximized);
 
 	SDL_Renderer* renderer;
 	

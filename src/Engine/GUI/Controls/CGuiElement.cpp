@@ -31,7 +31,6 @@ CGuiElement::CGuiElement(float posX, float posY, float posZ, float sizeX, float 
 	this->manualRender = false;
 	this->bringToFrontOnTap = false;
 	
-	this->repeatTime = 0;
 	this->isKeyDown = false;
 	
 	this->drawFocusBorder = true;
@@ -174,7 +173,7 @@ void CGuiElement::RenderFocusBorder()
 	}
 }
 
-bool CGuiElement::IsFocusable()
+bool CGuiElement::IsFocusableElement()
 {
 	return allowFocus;
 }
@@ -323,24 +322,6 @@ float CGuiElement::GetHeight()
 	return this->posEndY - this->posY;
 }
 
-void CGuiElement::FocusReceived()
-{
-//	LOGG("CGuiElement::FocusReceived: name=%s", name);
-	this->hasFocus = true;
-}
-
-void CGuiElement::FocusLost()
-{
-//	LOGG("CGuiElement::FocusLost: name=%s", name);
-	this->hasFocus = false;
-}
-
-bool CGuiElement::HasFocus()
-{
-//	LOGD("CGuiElement::HasFocus: element=%s hasFocus=%s", this->name, STRBOOL(this->hasFocus));
-	return this->hasFocus;
-}
-
 bool CGuiElement::KeyDown(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper)
 {
 	LOGI("CGuiElement::KeyDown: %d %s %s %s", keyCode, STRBOOL(isShift), STRBOOL(isAlt), STRBOOL(isControl));
@@ -386,6 +367,17 @@ bool CGuiElement::KeyPressed(u32 keyCode, bool isShift, bool isAlt, bool isContr
 	return false;
 }
 
+// utf text input entered
+bool CGuiElement::KeyTextInput(const char *text)
+{
+	return false;
+}
+
+bool CGuiElement::KeyTextInputOnMouseHover(const char *text)
+{
+	return false;
+}
+
 void CGuiElement::ResourcesPrepare()
 {	
 }
@@ -407,8 +399,44 @@ void CGuiElement::Deserialize(CByteBuffer *byteBuffer)
 {
 }
 
-bool CGuiElement::SetFocus()
+bool CGuiElement::WillReceiveFocus()
 {
-	this->FocusReceived();
+//	LOGG("CGuiElement::WillReceiveFocus: name='%s'", (name ? name : "NULL"));
+	if (this->FocusReceived())
+	{
+		this->hasFocus = true;
+		return true;
+	}
+	return false;
+}
+
+bool CGuiElement::WillClearFocus()
+{
+//	LOGG("CGuiElement::WillClearFocus: name='%s'", (name ? name : "NULL"));
+	if (this->FocusLost())
+	{
+//		LOGG("CGuiElement::WillClearFocus: name='%s set hasFocus=false", (name ? name : "NULL"));
+		this->hasFocus = false;
+		return true;
+	}
+	return false;
+}
+
+bool CGuiElement::FocusReceived()
+{
+//	LOGG("CGuiElement::FocusReceived: name=%s", (name ? name : "NULL"));
 	return true;
 }
+
+bool CGuiElement::FocusLost()
+{
+//	LOGG("CGuiElement::FocusLost: name=%s", (name ? name : "NULL"));
+	return true;
+}
+
+bool CGuiElement::HasFocus()
+{
+//	LOGD("CGuiElement::HasFocus: element=%s hasFocus=%s", (name ? name : "NULL"), STRBOOL(this->hasFocus));
+	return this->hasFocus;
+}
+

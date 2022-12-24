@@ -72,6 +72,7 @@ public:
 	void PrintString(char *text);
 	
 	virtual bool KeyDown(u32 keyCode);
+	virtual bool KeyTextInput(const char *text);
 	virtual bool DoScrollWheel(float deltaX, float deltaY);
 
 	void Render();

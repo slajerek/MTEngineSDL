@@ -180,7 +180,7 @@ void CGuiViewSaveFile::ActivateView()
 	GUI_SetSysTextFieldEditFinishedCallback(this);
 #else
 	this->editBoxFileName->SetText(this->defaultFileName);
-	guiMain->SetFocus(this->editBoxFileName);
+	parent->SetFocusElement(this->editBoxFileName);
 #endif
 	 */
 }
@@ -192,7 +192,7 @@ void CGuiViewSaveFile::DeactivateView()
 #if defined(IOS)
 	GUI_HideSysTextField();
 #else
-//	guiMain->SetFocus(NULL);
+//	parent->SetFocusElement(NULL);
 #endif
 }
 
@@ -324,7 +324,7 @@ void CGuiViewSaveFile::FolderSelected(CSlrString *fullFolderPath, CSlrString *fo
 	guiMain->SetWindowOnTop(NULL);
 	this->viewSelectFolder->DeactivateView();
 	GUI_SetPressConsumed(true);
-//	guiMain->SetFocus(this->editBoxFileName);
+//	parent->SetFocusElement(this->editBoxFileName);
 }
 
 void CGuiViewSaveFile::FolderSelectionCancelled()
@@ -332,7 +332,7 @@ void CGuiViewSaveFile::FolderSelectionCancelled()
 	guiMain->SetWindowOnTop(NULL);
 	this->viewSelectFolder->DeactivateView();
 	GUI_SetPressConsumed(true);
-//	guiMain->SetFocus(this->editBoxFileName);
+//	parent->SetFocusElement(this->editBoxFileName);
 }
 
 void CGuiViewSaveFileCallback::SaveFileSelected(CSlrString *fullFilePath, CSlrString *fileName)

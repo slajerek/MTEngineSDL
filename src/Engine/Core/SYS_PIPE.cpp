@@ -158,7 +158,6 @@ void PIPE_Init(const char *pipeName)
 	SYS_ReleaseCharBuf(buf);
 	
 	threadPipeReadPackets = new CPipeReadPacketsThread();
-	threadPipeReadPackets->ThreadSetName("PIPEread");
 	SYS_StartThread(threadPipeReadPackets);
 }
 
@@ -303,6 +302,8 @@ bool PIPE_SendByteBuffer(CByteBuffer *byteBuffer)
 
 void CPipeReadPacketsThread::ThreadRun(void *data)
 {
+	ThreadSetName("PIPEread");
+
 	LOGM("PIPE Read Packets Thread started");
 	
 #if defined(MACOS) || defined(LINUX)

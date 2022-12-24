@@ -100,24 +100,26 @@ public:
 	virtual void DoLogic();
 
 	virtual bool HasFocus();
-	virtual bool IsFocusable();
-	virtual void FocusReceived();
-	virtual void FocusLost();
-	virtual bool SetFocus();
-	
+	virtual bool IsFocusableElement();
+	virtual bool WillReceiveFocus();	// return true: ok, returned false: something went wrong, can't receive focus
+	virtual bool WillClearFocus();
+	virtual bool FocusReceived();
+	virtual bool FocusLost();
+
 	bool drawFocusBorder;
 	virtual void RenderFocusBorder();
 	volatile bool hasFocus;
 
 	virtual bool KeyDown(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper);
-	virtual bool KeyDownOnMouseHover(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper);
-	virtual bool KeyDownGlobal(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper);		// fired always, even on not focused and not visible
-	virtual bool KeyDownRepeat(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper);
 	virtual bool KeyUp(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper);
+	virtual bool KeyDownOnMouseHover(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper);
 	virtual bool KeyUpOnMouseHover(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper);
+	virtual bool KeyDownGlobal(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper);		// fired always, even on not focused and not visible
 	virtual bool KeyUpGlobal(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper);
+	virtual bool KeyDownRepeat(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper);
 	virtual bool KeyPressed(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper);	// repeats
-	u32 repeatTime;
+	virtual bool KeyTextInput(const char *text); // utf text input entered
+	virtual bool KeyTextInputOnMouseHover(const char *text); // utf text input entered
 	bool isKeyDown;
 
 	virtual float GetHeight();
@@ -129,7 +131,7 @@ public:
 	virtual void ResourcesPrepare();
 	virtual void ResourcesPostLoad();
 
-	bool IsVisible();
+	virtual bool IsVisible();
 	bool visible;
 
 	// does not render in view->Render method

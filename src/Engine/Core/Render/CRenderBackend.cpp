@@ -6,7 +6,7 @@ CRenderBackend::CRenderBackend(const char *name)
 	this->mainWindow = NULL;
 }
 
-SDL_Window *CRenderBackend::CreateSDLWindow(const char *title, int x, int y, int w, int h)
+SDL_Window *CRenderBackend::CreateSDLWindow(const char *title, int x, int y, int w, int h, bool maximized)
 {
 	return NULL;
 }
