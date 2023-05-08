@@ -128,6 +128,7 @@
     <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiViewMenu.cpp" />
     <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiViewMessageBox.cpp" />
     <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiViewMovingPane.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiViewMovingPaneImage.cpp" />
     <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiViewNumKeys.cpp" />
     <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiViewSaveFile.cpp" />
     <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiViewSelectFile.cpp" />
@@ -177,6 +178,7 @@
     <ClCompile Include="..\..\..\src\Engine\Libs\imgui\imgui_widgets.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Libs\implot\implot.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Libs\implot\implot_demo.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\implot\implot_items.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\cdjpeg.c" />
     <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jaricom.c" />
     <ClCompile Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jcapimin.c" />
@@ -459,6 +461,7 @@
     <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiViewMenu.h" />
     <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiViewMessageBox.h" />
     <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiViewMovingPane.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiViewMovingPaneImage.h" />
     <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiViewNumKeys.h" />
     <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiViewSaveFile.h" />
     <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiViewSelectFile.h" />
@@ -515,6 +518,7 @@
     <ClInclude Include="..\..\..\src\Engine\Libs\imgui\imstb_textedit.h" />
     <ClInclude Include="..\..\..\src\Engine\Libs\imgui\imstb_truetype.h" />
     <ClInclude Include="..\..\..\src\Engine\Libs\implot\implot.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\implot\implot_internal.h" />
     <ClInclude Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\cderror.h" />
     <ClInclude Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\cdjpeg.h" />
     <ClInclude Include="..\..\..\src\Engine\Libs\jpeg\jpeg-9a\jconfig.h" />
@@ -647,26 +651,26 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
@@ -717,7 +721,7 @@
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>false</ConformanceMode>
       <PreprocessorDefinitions>_MBCS;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;WIN32</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>C:\develop\MTEngineSDL\src\Engine\Libs\hjson;C:\develop\MTEngineSDL\src\Engine\Libs\stb;C:\develop\MTEngineSDL\src\Engine\Libs\ENet;C:\develop\MTEngineSDL\src\Engine\Libs\utf8;C:\develop\MTEngineSDL\src\Engine\Libs\zlib;C:\develop\MTEngineSDL\src\Engine\Libs\tremor\Ogg;C:\develop\MTEngineSDL\src\Engine\Libs\tremor;C:\develop\MTEngineSDL\src\Engine\Libs\rtmidi;C:\develop\MTEngineSDL\src\Engine\Libs\pugixml;C:\develop\MTEngineSDL\src\Engine\Libs\minizip;C:\develop\MTEngineSDL\src\Engine\Libs\md5;C:\develop\MTEngineSDL\src\Engine\Libs\mtrand;C:\develop\MTEngineSDL\src\Engine\Libs\lodepng;C:\develop\MTEngineSDL\src\Engine\Libs\libjson;C:\develop\MTEngineSDL\src\Engine\Libs\libpng;C:\develop\MTEngineSDL\src\Engine\Libs\jpeg\jpeg-9a;C:\develop\MTEngineSDL\src\Engine\Libs\jpeg;C:\develop\MTEngineSDL\src\Engine\Libs\imguiext;C:\develop\MTEngineSDL\src\Engine\Libs\implot;C:\develop\MTEngineSDL\src\Engine\Libs\imgui;C:\develop\MTEngineSDL\src\Engine\Libs\imgui-notify;C:\develop\MTEngineSDL\src\Engine\Libs\nfd;C:\develop\MTEngineSDL\src\Engine\Libs;C:\develop\MTEngineSDL\src\Engine\GUI\AudioMixer;C:\develop\MTEngineSDL\src\Engine\GUI\Helpers\ResourceManager;C:\develop\MTEngineSDL\src\Engine\GUI\Helpers\LoadingScreen;C:\develop\MTEngineSDL\src\Engine\GUI\Helpers;C:\develop\MTEngineSDL\src\Engine\GUI\Layout;C:\develop\MTEngineSDL\src\Engine\GUI\Controls;C:\develop\MTEngineSDL\src\Engine\GUI;C:\develop\MTEngineSDL\src\Engine\Funct\ImageProcessing\stb_image;C:\develop\MTEngineSDL\src\Engine\Funct\ImageProcessing\resampler;C:\develop\MTEngineSDL\src\Engine\Funct\ImageProcessing;C:\develop\MTEngineSDL\src\Engine\Funct\DataTable;C:\develop\MTEngineSDL\src\Engine\Funct;C:\develop\MTEngineSDL\src\Engine\Core\Render;C:\develop\MTEngineSDL\src\Engine\Core\Net;C:\develop\MTEngineSDL\src\Engine\Core\Pool;C:\develop\MTEngineSDL\src\Engine\Core;C:\develop\MTEngineSDL\src\Engine\Audio\MIDI;C:\develop\MTEngineSDL\src\Engine\Audio\WAV;C:\develop\MTEngineSDL\src\Engine\Audio;C:\develop\MTEngineSDL\src\Engine;C:\develop\MTEngineSDL\src\Embedded;C:\develop\MTEngineSDL\src;C:\develop\MTEngineSDL\platform\Windows\src.Windows;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\develop\MTEngineSDL\src\Engine\Libs\hjson;C:\develop\MTEngineSDL\src\Engine\Libs\stb;C:\develop\MTEngineSDL\src\Engine\Libs\ENet;C:\develop\MTEngineSDL\src\Engine\Libs\utf8;C:\develop\MTEngineSDL\src\Engine\Libs\zlib;C:\develop\MTEngineSDL\src\Engine\Libs\tremor\Ogg;C:\develop\MTEngineSDL\src\Engine\Libs\tremor;C:\develop\MTEngineSDL\src\Engine\Libs\rtmidi;C:\develop\MTEngineSDL\src\Engine\Libs\pugixml;C:\develop\MTEngineSDL\src\Engine\Libs\minizip;C:\develop\MTEngineSDL\src\Engine\Libs\md5;C:\develop\MTEngineSDL\src\Engine\Libs\mtrand;C:\develop\MTEngineSDL\src\Engine\Libs\lodepng;C:\develop\MTEngineSDL\src\Engine\Libs\libjson;C:\develop\MTEngineSDL\src\Engine\Libs\libpng;C:\develop\MTEngineSDL\src\Engine\Libs\jpeg\jpeg-9a;C:\develop\MTEngineSDL\src\Engine\Libs\jpeg;C:\develop\MTEngineSDL\src\Engine\Libs\imguiext;C:\develop\MTEngineSDL\src\Engine\Libs\implot;C:\develop\MTEngineSDL\src\Engine\Libs\imgui;C:\develop\MTEngineSDL\src\Engine\Libs\imgui-notify;C:\develop\MTEngineSDL\src\Engine\Libs\nfd;C:\develop\MTEngineSDL\src\Engine\Libs;C:\develop\MTEngineSDL\src\Engine\GUI\AudioMixer;C:\develop\MTEngineSDL\src\Engine\GUI\Helpers\ResourceManager;C:\develop\MTEngineSDL\src\Engine\GUI\Helpers\LoadingScreen;C:\develop\MTEngineSDL\src\Engine\GUI\Helpers;C:\develop\MTEngineSDL\src\Engine\GUI\Layout;C:\develop\MTEngineSDL\src\Engine\GUI\Controls;C:\develop\MTEngineSDL\src\Engine\GUI\Waveform;C:\develop\MTEngineSDL\src\Engine\GUI;C:\develop\MTEngineSDL\src\Engine\Funct\ImageProcessing\stb_image;C:\develop\MTEngineSDL\src\Engine\Funct\ImageProcessing\resampler;C:\develop\MTEngineSDL\src\Engine\Funct\ImageProcessing;C:\develop\MTEngineSDL\src\Engine\Funct\DataTable;C:\develop\MTEngineSDL\src\Engine\Funct;C:\develop\MTEngineSDL\src\Engine\Core\Render;C:\develop\MTEngineSDL\src\Engine\Core\Net;C:\develop\MTEngineSDL\src\Engine\Core\Pool;C:\develop\MTEngineSDL\src\Engine\Core;C:\develop\MTEngineSDL\src\Engine\Audio\MIDI;C:\develop\MTEngineSDL\src\Engine\Audio\WAV;C:\develop\MTEngineSDL\src\Engine\Audio;C:\develop\MTEngineSDL\src\Engine;C:\develop\MTEngineSDL\src\Embedded;C:\develop\MTEngineSDL\src;C:\develop\MTEngineSDL\platform\Windows\src.Windows;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <Link>
@@ -731,7 +735,7 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>false</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\develop\MTEngineSDL\src\Engine\Libs\hjson;C:\develop\MTEngineSDL\src\Engine\Libs\stb;C:\develop\MTEngineSDL\src\Engine\Libs\ENet;C:\develop\MTEngineSDL\src\Engine\Libs\utf8;C:\develop\MTEngineSDL\src\Engine\Libs\zlib;C:\develop\MTEngineSDL\src\Engine\Libs\tremor\Ogg;C:\develop\MTEngineSDL\src\Engine\Libs\tremor;C:\develop\MTEngineSDL\src\Engine\Libs\rtmidi;C:\develop\MTEngineSDL\src\Engine\Libs\pugixml;C:\develop\MTEngineSDL\src\Engine\Libs\minizip;C:\develop\MTEngineSDL\src\Engine\Libs\md5;C:\develop\MTEngineSDL\src\Engine\Libs\mtrand;C:\develop\MTEngineSDL\src\Engine\Libs\lodepng;C:\develop\MTEngineSDL\src\Engine\Libs\libjson;C:\develop\MTEngineSDL\src\Engine\Libs\libpng;C:\develop\MTEngineSDL\src\Engine\Libs\jpeg\jpeg-9a;C:\develop\MTEngineSDL\src\Engine\Libs\jpeg;C:\develop\MTEngineSDL\src\Engine\Libs\imguiext;C:\develop\MTEngineSDL\src\Engine\Libs\implot;C:\develop\MTEngineSDL\src\Engine\Libs\imgui;C:\develop\MTEngineSDL\src\Engine\Libs\imgui-notify;C:\develop\MTEngineSDL\src\Engine\Libs\nfd;C:\develop\MTEngineSDL\src\Engine\Libs;C:\develop\MTEngineSDL\src\Engine\GUI\AudioMixer;C:\develop\MTEngineSDL\src\Engine\GUI\Helpers\ResourceManager;C:\develop\MTEngineSDL\src\Engine\GUI\Helpers\LoadingScreen;C:\develop\MTEngineSDL\src\Engine\GUI\Helpers;C:\develop\MTEngineSDL\src\Engine\GUI\Layout;C:\develop\MTEngineSDL\src\Engine\GUI\Controls;C:\develop\MTEngineSDL\src\Engine\GUI;C:\develop\MTEngineSDL\src\Engine\Funct\ImageProcessing\stb_image;C:\develop\MTEngineSDL\src\Engine\Funct\ImageProcessing\resampler;C:\develop\MTEngineSDL\src\Engine\Funct\ImageProcessing;C:\develop\MTEngineSDL\src\Engine\Funct\DataTable;C:\develop\MTEngineSDL\src\Engine\Funct;C:\develop\MTEngineSDL\src\Engine\Core\Render;C:\develop\MTEngineSDL\src\Engine\Core\Net;C:\develop\MTEngineSDL\src\Engine\Core\Pool;C:\develop\MTEngineSDL\src\Engine\Core;C:\develop\MTEngineSDL\src\Engine\Audio\MIDI;C:\develop\MTEngineSDL\src\Engine\Audio\WAV;C:\develop\MTEngineSDL\src\Engine\Audio;C:\develop\MTEngineSDL\src\Engine;C:\develop\MTEngineSDL\src\Embedded;C:\develop\MTEngineSDL\src;C:\develop\MTEngineSDL\platform\Windows\src.Windows;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\develop\MTEngineSDL\src\Engine\Libs\hjson;C:\develop\MTEngineSDL\src\Engine\Libs\stb;C:\develop\MTEngineSDL\src\Engine\Libs\ENet;C:\develop\MTEngineSDL\src\Engine\Libs\utf8;C:\develop\MTEngineSDL\src\Engine\Libs\zlib;C:\develop\MTEngineSDL\src\Engine\Libs\tremor\Ogg;C:\develop\MTEngineSDL\src\Engine\Libs\tremor;C:\develop\MTEngineSDL\src\Engine\Libs\rtmidi;C:\develop\MTEngineSDL\src\Engine\Libs\pugixml;C:\develop\MTEngineSDL\src\Engine\Libs\minizip;C:\develop\MTEngineSDL\src\Engine\Libs\md5;C:\develop\MTEngineSDL\src\Engine\Libs\mtrand;C:\develop\MTEngineSDL\src\Engine\Libs\lodepng;C:\develop\MTEngineSDL\src\Engine\Libs\libjson;C:\develop\MTEngineSDL\src\Engine\Libs\libpng;C:\develop\MTEngineSDL\src\Engine\Libs\jpeg\jpeg-9a;C:\develop\MTEngineSDL\src\Engine\Libs\jpeg;C:\develop\MTEngineSDL\src\Engine\Libs\imguiext;C:\develop\MTEngineSDL\src\Engine\Libs\implot;C:\develop\MTEngineSDL\src\Engine\Libs\imgui;C:\develop\MTEngineSDL\src\Engine\Libs\imgui-notify;C:\develop\MTEngineSDL\src\Engine\Libs\nfd;C:\develop\MTEngineSDL\src\Engine\Libs;C:\develop\MTEngineSDL\src\Engine\GUI\AudioMixer;C:\develop\MTEngineSDL\src\Engine\GUI\Helpers\ResourceManager;C:\develop\MTEngineSDL\src\Engine\GUI\Helpers\LoadingScreen;C:\develop\MTEngineSDL\src\Engine\GUI\Helpers;C:\develop\MTEngineSDL\src\Engine\GUI\Layout;C:\develop\MTEngineSDL\src\Engine\GUI\Controls;C:\develop\MTEngineSDL\src\Engine\GUI\Waveform;C:\develop\MTEngineSDL\src\Engine\GUI;C:\develop\MTEngineSDL\src\Engine\Funct\ImageProcessing\stb_image;C:\develop\MTEngineSDL\src\Engine\Funct\ImageProcessing\resampler;C:\develop\MTEngineSDL\src\Engine\Funct\ImageProcessing;C:\develop\MTEngineSDL\src\Engine\Funct\DataTable;C:\develop\MTEngineSDL\src\Engine\Funct;C:\develop\MTEngineSDL\src\Engine\Core\Render;C:\develop\MTEngineSDL\src\Engine\Core\Net;C:\develop\MTEngineSDL\src\Engine\Core\Pool;C:\develop\MTEngineSDL\src\Engine\Core;C:\develop\MTEngineSDL\src\Engine\Audio\MIDI;C:\develop\MTEngineSDL\src\Engine\Audio\WAV;C:\develop\MTEngineSDL\src\Engine\Audio;C:\develop\MTEngineSDL\src\Engine;C:\develop\MTEngineSDL\src\Embedded;C:\develop\MTEngineSDL\src;C:\develop\MTEngineSDL\platform\Windows\src.Windows;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;WIN32;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>

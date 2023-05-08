@@ -10,6 +10,8 @@
 #ifndef __VID_CSLRIMAGE_H__
 #define __VID_CSLRIMAGE_H__
 
+// TODO: rename engine callbacks to not confuse with data load (i.e. ReBind image vs ReBind data image)
+
 #include "SYS_Defs.h"
 #include "CImageData.h"
 //#include "OpenGLCommon.h"
@@ -55,6 +57,9 @@ public:
 	void SetLoadImageData(CImageData *imageData);
     void ReBindImageData(CImageData *imageData);
 	void SetLinearScaling(bool isLinearScaling);
+	
+	void SetImageData(CImageData *imageData);
+	void PostReBind();
 	
 	u8 fileLoadError;
 

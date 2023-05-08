@@ -176,6 +176,11 @@ public:
 	bool KeyUp(u32 keyCode);
 	bool KeyTextInput(const char *text);
 	
+	float moveStartTapPosX, moveStartTapPosY;
+	float movePrevTapPosX, movePrevTapPosY;
+	float moveStartRightClickPosX, moveStartRightClickPosY;
+	float movePrevRightClickPosX, movePrevRightClickPosY;
+
 	bool DoTap(float x, float y);
 	bool DoFinishTap(float x, float y);
 	bool DoRightClick(float x, float y);

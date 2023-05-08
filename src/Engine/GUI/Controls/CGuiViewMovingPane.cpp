@@ -5,16 +5,23 @@
 #include "SYS_KeyCodes.h"
 #include "VID_ImageBinding.h"
 
+// TODO: add post-render to support mouse cursor change, we need to change cursor every frame when being moved from click-down to click-up
+//if (changeCursorOnMove)
+//{
+//	ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeAll);
+//}
+
+
 CGuiViewMovingPane::CGuiViewMovingPane(const char *name, float posX, float posY, float posZ, float sizeX, float sizeY, float paneWidth, float paneHeight)
 : CGuiView(name, posX, posY, posZ, sizeX, sizeY)
 {
 	this->paneWidth = paneWidth;
 	this->paneHeight = paneHeight;
 
-	isBeingMoved = false;
 	isForcedMovingMap = false;
 
-	useMultiTouch = false;
+	SetMovingPaneStyle(MovingPaneStyle_RightClick);
+//	changeCursorOnMove = true;
 	mouseInvert = false;
 
 	cursorInside = false;
@@ -23,6 +30,11 @@ CGuiViewMovingPane::CGuiViewMovingPane(const char *name, float posX, float posY,
 	minZoom = 1.0f;
 	maxZoom = 60.0f;
 	ClearZoom();
+}
+
+void CGuiViewMovingPane::SetMovingPaneStyle(MovingPaneStyle movingPaneStyle)
+{
+	this->movingPaneStyle = movingPaneStyle;
 }
 
 CGuiViewMovingPane::~CGuiViewMovingPane()
@@ -42,7 +54,7 @@ bool CGuiViewMovingPane::DoScrollWheel(float deltaX, float deltaY)
 {
 	LOGG("CGuiViewMovingPane::DoScrollWheel: %5.2f %5.2f", deltaX, deltaY);
 
-	if (useMultiTouch)
+	if (movingPaneStyle == MovingPaneStyle_MultiTouch)
 	{
 		MoveMap(deltaX, deltaY);
 	}
@@ -84,7 +96,7 @@ bool CGuiViewMovingPane::DoZoomBy(float x, float y, float zoomValue, float diffe
 {
 	LOGD("CGuiViewMovingPane::DoZoomBy: x=%5.2f y=%5.2f zoomValue=%5.2f diff=%5.2f", x, y, zoomValue, difference);
 
-	if (useMultiTouch)
+	if (movingPaneStyle == MovingPaneStyle_MultiTouch)
 	{
 		if (cursorInside == false)
 			return false;
@@ -110,15 +122,19 @@ bool CGuiViewMovingPane::DoZoomBy(float x, float y, float zoomValue, float diffe
 	return false;
 }
 
-bool CGuiViewMovingPane::DoRightClick(float x, float y)
+bool CGuiViewMovingPane::DoTap(float x, float y)
 {
-	if (useMultiTouch == false)
+	if (movingPaneStyle == MovingPaneStyle_LeftClick)
 	{
 		if (IsInside(x, y))
 		{
-			this->accelerateX = 0.0f;
-			this->accelerateY = 0.0f;
-			isBeingMoved = true;
+			isForcedMovingMap = true;
+			prevMousePosX = guiMain->mousePosX;
+			prevMousePosY = guiMain->mousePosY;
+//			if (changeCursorOnMove)
+//			{
+//				ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeAll);
+//			}
 			return true;
 		}
 	}
@@ -126,34 +142,64 @@ bool CGuiViewMovingPane::DoRightClick(float x, float y)
 	return false;
 }
 
-bool CGuiViewMovingPane::DoRightClickMove(float x, float y, float distX, float distY, float diffX, float diffY)
+bool CGuiViewMovingPane::DoFinishTap(float x, float y)
 {
-//	LOGD("CGuiViewMovingPane::DoRightClickMove");
-	
-	if (useMultiTouch == false)
+	if (movingPaneStyle == MovingPaneStyle_LeftClick)
 	{
-		this->accelerateX = 0.0f;
-		this->accelerateY = 0.0f;
-		MoveMap(diffX / sizeX * mapSizeX * 5.0f, diffY / sizeY * mapSizeY * 5.0f);
-		return true;
+		isForcedMovingMap = false;
+//		if (changeCursorOnMove)
+//		{
+//			ImGui::SetMouseCursor(ImGuiMouseCursor_Arrow);
+//		}
+		
+		if (IsInside(x, y))
+		{
+			return true;
+		}
 	}
 	
 	return false;
 }
 
-bool CGuiViewMovingPane::FinishRightClickMove(float x, float y, float distX, float distY, float accelerationX, float accelerationY)
+bool CGuiViewMovingPane::DoRightClick(float x, float y)
 {
-	if (useMultiTouch == false && isBeingMoved)
+//	LOGG("CGuiViewMovingPane::DoRightClick");
+
+	if (movingPaneStyle == MovingPaneStyle_RightClick)
 	{
-//		this->accelerateX = accelerationX / 10.0f;
-//		this->accelerateY = accelerationY / 10.0f;
-		isBeingMoved = false;
-		return true;
+		if (IsInside(x, y))
+		{
+			isForcedMovingMap = true;
+			prevMousePosX = guiMain->mousePosX;
+			prevMousePosY = guiMain->mousePosY;
+//			if (changeCursorOnMove)
+//			{
+//				ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeAll);
+//			}
+			return true;
+		}
 	}
 	
 	return false;
 }
 
+bool CGuiViewMovingPane::DoFinishRightClick(float x, float y)
+{
+	if (movingPaneStyle == MovingPaneStyle_RightClick)
+	{
+		if (IsInside(x, y))
+		{
+			isForcedMovingMap = false;
+//			if (changeCursorOnMove)
+//			{
+//				ImGui::SetMouseCursor(ImGuiMouseCursor_Arrow);
+//			}
+			return true;
+		}
+	}
+	
+	return false;
+}
 
 bool CGuiViewMovingPane::DoNotTouchedMove(float x, float y)
 {
@@ -168,25 +214,22 @@ bool CGuiViewMovingPane::DoNotTouchedMove(float x, float y)
 		
 		prevMousePosX = x;
 		prevMousePosY = y;
-
-		this->accelerateX = 0.0f;
-		this->accelerateY = 0.0f;
+		
 		return true;
+	}
+	
+	if (IsInside(x, y) == false)
+	{
+		cursorInside = false;
 	}
 	
 	// change x, y into position within memory map area (cursorX, cursorY)
 	
 	float px = (x - posX) / sizeX;
 	float py = (y - posY) / sizeY;
-	
-	if (px < 0.0f
-		|| px > 1.0f
-		|| py < 0.0f
-		|| py > 1.0f)
-	{
-		cursorInside = false;
-		return false;
-	}
+
+	px = ImClamp(px, 0.0f, 1.0f);
+	py = ImClamp(py, 0.0f, 1.0f);
 	
 	zoomCursorX = px;
 	zoomCursorY = py;
@@ -312,7 +355,7 @@ void CGuiViewMovingPane::UpdatePositionAndZoom()
 //	LOGD("UpdateMapPosition: mapSize=%5.2f %5.2f", mapSizeX, mapSizeY);
 }
 
-void CGuiViewMovingPane::RenderCustomMovingPane()
+void CGuiViewMovingPane::RenderMovingPane()
 {
 }
 
@@ -342,7 +385,7 @@ void CGuiViewMovingPane::RenderImGui()
 //			 renderTextureEndY);
 //	}
 	
-	RenderCustomMovingPane();
+	RenderMovingPane();
 
 	VID_ResetClipping();
 	

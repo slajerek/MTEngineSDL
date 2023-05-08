@@ -51,6 +51,8 @@
 		413E03AB26791B900032D02B /* imguiComboFilter.h in Headers */ = {isa = PBXBuildFile; fileRef = 413E03A926791B900032D02B /* imguiComboFilter.h */; };
 		41425B69270CA62300785D85 /* CGuiViewImageWithLayer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 41425B67270CA62300785D85 /* CGuiViewImageWithLayer.cpp */; };
 		41425B6A270CA62300785D85 /* CGuiViewImageWithLayer.h in Headers */ = {isa = PBXBuildFile; fileRef = 41425B68270CA62300785D85 /* CGuiViewImageWithLayer.h */; };
+		4143A3D629DE4549006F2318 /* implot_internal.h in Headers */ = {isa = PBXBuildFile; fileRef = 4143A3D529DE4549006F2318 /* implot_internal.h */; };
+		4143A3D829DE45F9006F2318 /* implot_items.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4143A3D729DE45F9006F2318 /* implot_items.cpp */; };
 		4146A6632903ACD2007A060D /* CViewWaveform.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4146A65F2903ACD2007A060D /* CViewWaveform.cpp */; };
 		4146A6642903ACD2007A060D /* CWaveformData.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4146A6602903ACD2007A060D /* CWaveformData.cpp */; };
 		4146A6652903ACD2007A060D /* CWaveformData.h in Headers */ = {isa = PBXBuildFile; fileRef = 4146A6612903ACD2007A060D /* CWaveformData.h */; };
@@ -611,6 +613,8 @@
 		413E03A926791B900032D02B /* imguiComboFilter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = imguiComboFilter.h; path = imguiext/imguiComboFilter.h; sourceTree = "<group>"; };
 		41425B67270CA62300785D85 /* CGuiViewImageWithLayer.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CGuiViewImageWithLayer.cpp; sourceTree = "<group>"; };
 		41425B68270CA62300785D85 /* CGuiViewImageWithLayer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CGuiViewImageWithLayer.h; sourceTree = "<group>"; };
+		4143A3D529DE4549006F2318 /* implot_internal.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = implot_internal.h; path = implot/implot_internal.h; sourceTree = "<group>"; };
+		4143A3D729DE45F9006F2318 /* implot_items.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = implot_items.cpp; path = implot/implot_items.cpp; sourceTree = "<group>"; };
 		4146A65F2903ACD2007A060D /* CViewWaveform.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CViewWaveform.cpp; sourceTree = "<group>"; };
 		4146A6602903ACD2007A060D /* CWaveformData.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CWaveformData.cpp; sourceTree = "<group>"; };
 		4146A6612903ACD2007A060D /* CWaveformData.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CWaveformData.h; sourceTree = "<group>"; };
@@ -1274,9 +1278,11 @@
 		4122B8E824BF3767001CFD64 /* implot */ = {
 			isa = PBXGroup;
 			children = (
+				4143A3D729DE45F9006F2318 /* implot_items.cpp */,
+				4143A3D529DE4549006F2318 /* implot_internal.h */,
 				4122B8E924BF3775001CFD64 /* implot_demo.cpp */,
-				4122B8EA24BF3775001CFD64 /* implot.h */,
 				4122B8EB24BF3775001CFD64 /* implot.cpp */,
+				4122B8EA24BF3775001CFD64 /* implot.h */,
 			);
 			name = implot;
 			sourceTree = "<group>";
@@ -2516,6 +2522,7 @@
 				41D5E2FC239D891200143F1C /* RES_ResourceManager.h in Headers */,
 				41D5E2B6239D891200143F1C /* CSlrAnimationState.h in Headers */,
 				4173996423A4E67B008764F9 /* JSONNode.h in Headers */,
+				4143A3D629DE4549006F2318 /* implot_internal.h in Headers */,
 				41D5E241239D890700143F1C /* CGuiViewSelectFile.h in Headers */,
 				41D5E2CF239D891200143F1C /* CGlobalKeyboardCallback.h in Headers */,
 				41D5E231239D890700143F1C /* CGuiViewFade.h in Headers */,
@@ -2934,6 +2941,7 @@
 				41F26A05264C0FBC0069862A /* hjson_value.cpp in Sources */,
 				4146A6632903ACD2007A060D /* CViewWaveform.cpp in Sources */,
 				41DAE4C723BA18C90011FEA9 /* gl3w.c in Sources */,
+				4143A3D829DE45F9006F2318 /* implot_items.cpp in Sources */,
 				41DAE4BB23BA18C90011FEA9 /* nfd_cocoa.m in Sources */,
 				41E4CA97285343B6007509C3 /* CRenderBackend.cpp in Sources */,
 				41D5E309239D895F00143F1C /* CDataTable.cpp in Sources */,
@@ -2999,7 +3007,7 @@
 				ARCHS = "$(ARCHS_STANDARD)";
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++17";
 				DEVELOPMENT_TEAM = APV7Y7Q9JY;
-				ENABLE_HARDENED_RUNTIME = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
 				EXECUTABLE_PREFIX = lib;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"$(inherited)",
@@ -3013,7 +3021,7 @@
 					"$(PROJECT_DIR)/libs",
 					/usr/local/lib,
 				);
-				ONLY_ACTIVE_ARCH = NO;
+				ONLY_ACTIVE_ARCH = YES;
 				OTHER_LDFLAGS = "-lfreetype";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -3026,7 +3034,7 @@
 				ARCHS = "$(ARCHS_STANDARD)";
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++17";
 				DEVELOPMENT_TEAM = APV7Y7Q9JY;
-				ENABLE_HARDENED_RUNTIME = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
 				EXECUTABLE_PREFIX = lib;
 				GCC_PREPROCESSOR_DEFINITIONS = MACOS;
 				HEADER_SEARCH_PATHS = (
@@ -3037,7 +3045,7 @@
 					"$(PROJECT_DIR)/libs",
 					/usr/local/lib,
 				);
-				ONLY_ACTIVE_ARCH = NO;
+				ONLY_ACTIVE_ARCH = YES;
 				OTHER_LDFLAGS = "-lfreetype";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -3086,7 +3094,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 10.12;
+				MACOSX_DEPLOYMENT_TARGET = 10.13;
 				MTL_ENABLE_DEBUG_INFO = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = macosx;
@@ -3129,7 +3137,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 10.12;
+				MACOSX_DEPLOYMENT_TARGET = 10.13;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				SDKROOT = macosx;
 			};

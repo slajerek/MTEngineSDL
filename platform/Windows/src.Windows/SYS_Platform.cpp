@@ -312,6 +312,9 @@ std::wstring ConvertUtf8ToWide(const std::string& str)
 
 void PLATFORM_SetThreadName(const char *name)
 {
+/*
+	// this is not supported on windows below windows 10, removed for now
+	
 	WCHAR threadName[256];
 	MultiByteToWideChar(0, 0, name, strlen(name), threadName, 256);
 	HRESULT hr = SetThreadDescription(GetCurrentThread(), threadName);
@@ -319,6 +322,7 @@ void PLATFORM_SetThreadName(const char *name)
 	{
 		LOGError("PLATFORM_SetThreadName: failed to set name '%s'", name);
 	}
+*/
 }
 
 void PLATFORM_UpdateMenus()

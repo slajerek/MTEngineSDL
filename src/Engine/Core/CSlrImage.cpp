@@ -820,6 +820,16 @@ CSlrImage::~CSlrImage()
 		gRenderBackend->DeleteTexture(this);
 	}
 }
+void CSlrImage::SetImageData(CImageData *imageData)
+{
+	this->SetLoadImageData(imageData);
+	this->PostReBind();
+}
+
+void CSlrImage::PostReBind()
+{
+	VID_PostImageBinding(this, NULL, BINDING_MODE_DONT_FREE_IMAGEDATA);
+}
 
 void CSlrImage::InitImageLoad(bool linearScaling)
 {

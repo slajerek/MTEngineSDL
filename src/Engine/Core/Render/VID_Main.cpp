@@ -10,6 +10,8 @@
 #include "SYS_SharedMemory.h"
 #include "CRenderBackendOpenGL3.h"
 #include "CGuiView.h"
+#include "CLayoutManager.h"
+#include "implot.h"
 
 #if defined(MACOS)
 #include "SYS_MacOSWrapper.h"
@@ -99,6 +101,8 @@ void VID_Init()
 		return;
 	}
 	
+	ImPlot::CreateContext();
+	
 	ImGuiIO& io = ImGui::GetIO();
 	
 	char *iniFileName = new char[PATH_MAX];
@@ -165,6 +169,10 @@ void VID_Init()
 void VID_PostInit()
 {
 	LOGM("VID_PostInit: show window, restore position");
+	
+	// restore selected layout
+	CLayoutData *layoutData = guiMain->layoutManager->currentLayout;
+	guiMain->layoutManager->SetLayoutAsync(layoutData, false);
 	
 	if (initWindowMaxmized)
 	{

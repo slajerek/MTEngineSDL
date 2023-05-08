@@ -94,7 +94,7 @@ CGuiLabel::CGuiLabel(char *text, bool stretched, float  posX, float  posY, float
 }
 
 CGuiLabel::CGuiLabel(char *text, float  posX, float  posY, float  posZ, CSlrFont *font, float fontSize, CGuiLabelCallback *callback)
-: CGuiElement(posX, posY, posZ, sizeX, sizeY)
+: CGuiElement(posX, posY, posZ, 100, 50)
 {
 	this->name = "CGuiLabel:Text";
 	this->beingClicked = false;

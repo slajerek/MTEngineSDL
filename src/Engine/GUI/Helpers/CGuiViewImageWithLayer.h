@@ -17,8 +17,12 @@ public:
 		
 	//
 	virtual void SetImage(CSlrImage *setImage);
-	virtual void RenderCustomMovingPane();
+	virtual void SetImageKeepAspect(CSlrImage *setImage);
+	virtual void SetImage(CSlrImage *setImage, bool clearZoom);
+	virtual void SetImageKeepAspect(CSlrImage *setImage, bool clearZoom);
+	virtual void RenderMovingPane();
 
+	bool resetLayerImageOnSetImage;
 	CImageData *editLayerImageData;
 	CSlrImage *editLayerImage;
 };
