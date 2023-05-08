@@ -16,7 +16,7 @@
 #include "CByteBuffer.h"
 
 CGuiView::CGuiView(const char *name, float posX, float posY, float sizeX, float sizeY)
-	: CGuiElement(posX, posY, posZ, sizeX, sizeY)
+	: CGuiElement(posX, posY, -1, sizeX, sizeY)
 {
 	this->Init(name, posX, posY, 0, sizeX, sizeY);
 }
@@ -71,8 +71,14 @@ void CGuiView::Init(const char *name, float posX, float posY, float posZ, float 
 	previousViewIsDocked = false;
 	
 	SetWindowPositionAndSize(posX, posY, sizeX, sizeY);
-	//mousePosX = mousePosY = -1;
-	
+	windowInnerRectPosX = posX;
+	windowInnerRectPosY = posY;
+	windowInnerRectSizeX = sizeX;
+	windowInnterRectSizeY = sizeY;
+	windowInnerRectPosEndX = posX + sizeX;
+	windowInnterRectPosEndY = posY + sizeY;
+
+
 	fullScreenSizeX = -1;
 	fullScreenSizeY = -1;
 	
@@ -87,6 +93,52 @@ bool CGuiView::IsInsideWindow(float x, float y)
 	
 	if (x >= this->windowPosX && x <= this->windowPosEndX
 		&& y >= this->windowPosY && y <= this->windowPosEndY)
+	{
+		return true;
+	}
+	
+	return false;
+}
+
+bool CGuiView::IsResizingOrOutsideWindow(float x, float y)
+{
+	if (imGuiWindow)
+	{
+//		// resize from l/r/t/b borders, there's no corner
+//		if (imGuiWindow->ResizeBorderHeld != -1)
+//		{
+//			LOGD("skip IsInside held %d", imGuiWindow->ResizeBorderHeld);
+//			return false;
+//		}
+		// skip when resize l/r/t/b and from corners is active. TODO: this is a hacky way, can we do better?
+		ImGuiContext *context = ImGui::GetCurrentContext();
+		if (context->MouseCursor == ImGuiMouseCursor_ResizeNESW
+			|| context->MouseCursor == ImGuiMouseCursor_ResizeNWSE
+			|| context->MouseCursor == ImGuiMouseCursor_ResizeNS
+			|| context->MouseCursor == ImGuiMouseCursor_ResizeEW
+			|| context->MouseCursor == ImGuiMouseCursor_NotAllowed)
+		{
+//			LOGD("skip IsInside corner");
+			return true;
+		}
+		
+		if (guiMain->FindTopWindow(x, y) != this)
+			return true;
+	}
+
+	return false;
+}
+
+bool CGuiView::IsInsideWindowInnerRect(float x, float y)
+{
+	if (!this->visible)
+		return false;
+
+	if (IsResizingOrOutsideWindow(x, y))
+		return false;
+
+	if (x >= this->windowInnerRectPosX && x <= this->windowInnerRectPosEndX
+		&& y >= this->windowInnerRectPosY && y <= this->windowInnterRectPosEndY)
 	{
 		return true;
 	}
@@ -113,30 +165,9 @@ bool CGuiView::IsInsideView(float x, float y)
 	if (!this->visible)
 		return false;
 	
-	if (imGuiWindow)
-	{
-//		// resize from l/r/t/b borders, there's no corner
-//		if (imGuiWindow->ResizeBorderHeld != -1)
-//		{
-//			LOGD("skip IsInside held %d", imGuiWindow->ResizeBorderHeld);
-//			return false;
-//		}
-		// skip when resize l/r/t/b and from corners is active. TODO: this is a hacky way, can we do better?
-		ImGuiContext *context = ImGui::GetCurrentContext();
-		if (context->MouseCursor == ImGuiMouseCursor_ResizeNESW
-			|| context->MouseCursor == ImGuiMouseCursor_ResizeNWSE
-			|| context->MouseCursor == ImGuiMouseCursor_ResizeNS
-			|| context->MouseCursor == ImGuiMouseCursor_ResizeEW
-			|| context->MouseCursor == ImGuiMouseCursor_NotAllowed)
-		{
-//			LOGD("skip IsInside corner");
-			return false;
-		}
-		
-		if (guiMain->FindTopWindow(x, y) != this)
-			return false;
-	}
-	
+	if (IsResizingOrOutsideWindow(x, y))
+		return false;
+
 	return this->IsInsideViewNonVisible(x, y);
 }
 
@@ -641,7 +672,8 @@ bool CGuiView::DoFinishRightClick(float x, float y)
 
 bool CGuiView::DoRightClickMove(float x, float y, float distX, float distY, float diffX, float diffY)
 {
-	//	LOGG("--- DoRightClickMove ---");
+//	LOGD("--- DoRightClickMove ---: %s", this->name);
+
 	/*
 	if (this->IsInside(x, y))
 	{
@@ -1473,6 +1505,13 @@ void CGuiView::PreRenderImGui()
 		}
 		this->SetWindowPositionAndSize(window->Pos.x, window->Pos.y, window->Size.x, window->Size.y);
 		
+		windowInnerRectPosX = window->InnerRect.Min.x;
+		windowInnerRectPosY = window->InnerRect.Min.y;
+		windowInnerRectSizeX = window->InnerRect.Max.x - window->InnerRect.Min.x;
+		windowInnterRectSizeY = window->InnerRect.Max.y - window->InnerRect.Min.y;
+		windowInnerRectPosEndX = window->InnerRect.Max.x;
+		windowInnterRectPosEndY = window->InnerRect.Max.y;
+
 		previousViewSizeX = sx;
 		previousViewSizeY = sy;
 		previousViewPosX = window->InnerRect.Min.x;

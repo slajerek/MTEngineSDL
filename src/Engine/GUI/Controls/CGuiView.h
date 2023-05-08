@@ -45,6 +45,11 @@ public:
 	virtual bool IsInsideView(float x, float y);
 	virtual bool IsInsideViewNonVisible(float x, float y);
 
+	// is inside window's inner rect (note, for keep-aspect and docked windows this may be different than view's)
+	virtual bool IsInsideWindowInnerRect(float x, float y);
+	
+	virtual bool IsResizingOrOutsideWindow(float x, float y);
+	
 	virtual void RenderImGui();
 	virtual void PreRenderImGui();
 	virtual void PostRenderImGui();
@@ -230,6 +235,10 @@ public:
 	float windowSizeX, windowSizeY;
 	float windowPosEndX, windowPosEndY;
 	
+	float windowInnerRectPosX, windowInnerRectPosY;
+	float windowInnerRectSizeX, windowInnterRectSizeY;
+	float windowInnerRectPosEndX, windowInnterRectPosEndY;
+
 	float fullScreenSizeX, fullScreenSizeY;
 	void SetFullScreenViewSize(float sx, float sy);
 	

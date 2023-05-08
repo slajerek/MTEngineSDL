@@ -59,7 +59,7 @@ int ThreadStarterFuncRun(void *dataToPassWithArg)
 void SYS_StartThread(CSlrThread *run, void *passData, float priority)
 {
 	// crashes on windows??
-	LOGD("SYS_StartThread: %x isRunning=%s", run, STRBOOL(run->isRunning));
+	LOGD("SYS_StartThread: %s %x isRunning=%s", run->threadName, run, STRBOOL(run->isRunning));
 
 	if (run->isRunning)
 	{

@@ -3,6 +3,13 @@
 
 #include "CGuiView.h"
 
+enum MovingPaneStyle
+{
+	MovingPaneStyle_MultiTouch,
+	MovingPaneStyle_LeftClick,
+	MovingPaneStyle_RightClick
+};
+
 class CGuiViewMovingPane : public CGuiView
 {
 public:
@@ -16,15 +23,17 @@ public:
 	virtual bool KeyUp(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper);
 	virtual bool KeyUpGlobal(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper);
 	virtual void RenderImGui();
-	virtual void RenderCustomMovingPane();
+	virtual void RenderMovingPane();
 	
 	virtual bool DoScrollWheel(float deltaX, float deltaY);
 	virtual bool InitZoom();
 	virtual bool DoZoomBy(float x, float y, float zoomValue, float difference);
 
+	virtual bool DoTap(float x, float y);
+	virtual bool DoFinishTap(float x, float y);
+
 	virtual bool DoRightClick(float x, float y);
-	virtual bool DoRightClickMove(float x, float y, float distX, float distY, float diffX, float diffY);
-	virtual bool FinishRightClickMove(float x, float y, float distX, float distY, float accelerationX, float accelerationY);
+	virtual bool DoFinishRightClick(float x, float y);
 
 	virtual bool DoNotTouchedMove(float x, float y);
 
@@ -58,23 +67,22 @@ public:
 
 	void ScreenPosToPanePos(float screenX, float screenY, int *imageX, int *imageY);
 	
-	bool isBeingMoved;
 	void UpdatePositionAndZoom();
 
 	// for double click
 	long previousClickTime;
 	int previousClickAddr;
 	
-	// move acceleration
-	float accelerateX, accelerateY;
-	
 	bool isForcedMovingMap;
 	float prevMousePosX;
 	float prevMousePosY;
 
 	// config
-	bool useMultiTouch;
+	void SetMovingPaneStyle(MovingPaneStyle movingPaneStyle);
+	MovingPaneStyle movingPaneStyle;
 	bool mouseInvert;
+//	bool changeCursorOnMove;
+	
 };
 
 #endif

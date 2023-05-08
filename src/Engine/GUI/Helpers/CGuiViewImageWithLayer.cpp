@@ -9,6 +9,8 @@ CGuiViewImageWithLayer::CGuiViewImageWithLayer(const char *name, float posX, flo
 
 	InitImage();
 
+	resetLayerImageOnSetImage = true;
+
 	editLayerImageData = NULL;
 	editLayerImage = NULL;
 }
@@ -32,14 +34,33 @@ bool CGuiViewImageWithLayer::UpdateImageData()
 	return false;
 }
 
+void CGuiViewImageWithLayer::SetImageKeepAspect(CSlrImage *setImage)
+{
+	SetImageKeepAspect(setImage, true);
+}
+
+void CGuiViewImageWithLayer::SetImageKeepAspect(CSlrImage *setImage, bool clearZoom)
+{
+	if (setImage != NULL)
+	{
+		SetKeepAspectRatio(true, setImage->width / setImage->height);
+	}
+	SetImage(setImage, clearZoom);
+}
+
 //
 void CGuiViewImageWithLayer::SetImage(CSlrImage *setImage)
 {
+	SetImage(setImage, true);
+}
+
+void CGuiViewImageWithLayer::SetImage(CSlrImage *setImage, bool clearZoom)
+{
 	guiMain->LockMutex();
 
-	CGuiViewMovingPaneImage::SetImage(setImage);
+	CGuiViewMovingPaneImage::SetImage(setImage, clearZoom);
 	
-	if (setImage != NULL)
+	if (resetLayerImageOnSetImage && setImage != NULL)
 	{
 		if (editLayerImage)
 		{
@@ -67,6 +88,8 @@ void CGuiViewImageWithLayer::SetImage(CSlrImage *setImage)
 
 void CGuiViewImageWithLayer::UpdateLayer(CImageData *imageDataLayer)
 {
+	/* Example
+	 
 	// render any "stuff"
 	static int z = 0;
 	for (int x = 0; x < 100; x++)
@@ -77,10 +100,11 @@ void CGuiViewImageWithLayer::UpdateLayer(CImageData *imageDataLayer)
 		}
 	}
 	z++;
+	 */
 }
 
 // render the editing layer
-void CGuiViewImageWithLayer::RenderCustomMovingPane()
+void CGuiViewImageWithLayer::RenderMovingPane()
 {
 	if (editLayerImageData == NULL)
 		return;

@@ -25,6 +25,16 @@ CGuiViewMovingPaneImage::CGuiViewMovingPaneImage(const char *name, float posX, f
 	// derived constructor should load image and call InitImage()
 }
 
+bool CGuiViewMovingPaneImage::IsInside(float x, float y)
+{
+	return IsInsideWindowInnerRect(x, y);
+}
+
+bool CGuiViewMovingPaneImage::IsInsideView(float x, float y)
+{
+	return IsInsideWindowInnerRect(x, y);
+}
+
 void CGuiViewMovingPaneImage::InitPane()
 {
 	InitImage();
@@ -81,6 +91,11 @@ CGuiViewMovingPaneImage::~CGuiViewMovingPaneImage()
 
 void CGuiViewMovingPaneImage::SetImageData(CImageData *imageIn)
 {
+	SetImageData(imageData, true);
+}
+
+void CGuiViewMovingPaneImage::SetImageData(CImageData *imageIn, bool clearZoom)
+{
 	guiMain->LockMutex();
 	
 	if (this->image && shouldDeallocImage)
@@ -128,12 +143,20 @@ void CGuiViewMovingPaneImage::SetImageData(CImageData *imageIn)
 	renderTextureStartY = 0.0f;
 	renderTextureEndY = ((float)paneHeight / (float)rasterHeight);
 
-	ClearZoom();
+	if (clearZoom)
+	{
+		ClearZoom();
+	}
 	
 	guiMain->UnlockMutex();
 }
 
 void CGuiViewMovingPaneImage::SetImage(CSlrImage *setImage)
+{
+	SetImage(setImage, true);
+}
+
+void CGuiViewMovingPaneImage::SetImage(CSlrImage *setImage, bool clearZoom)
 {
 	guiMain->LockMutex();
 	if (shouldDeallocImage && this->image)
@@ -145,27 +168,35 @@ void CGuiViewMovingPaneImage::SetImage(CSlrImage *setImage)
 	shouldDeallocImage = false;
 	this->image = setImage;
 	
-	paneWidth = image->width;
-	paneHeight = image->height;
-	rasterWidth = image->rasterWidth;
-	rasterHeight = image->rasterHeight;
+	if (image)
+	{
+		paneWidth = image->width;
+		paneHeight = image->height;
+		rasterWidth = image->rasterWidth;
+		rasterHeight = image->rasterHeight;
+	}
 
 	renderTextureStartX = 0.0f;
 	renderTextureEndX = ((float)paneWidth / (float)rasterWidth);
 	renderTextureStartY = 0.0f;
 	renderTextureEndY = ((float)paneHeight / (float)rasterHeight);
 
+	if (clearZoom)
+	{
+		ClearZoom();
+	}
+
 	guiMain->UnlockMutex();
 }
 
-void CGuiViewMovingPaneImage::PostRenderMovingPaneCustom()
+void CGuiViewMovingPaneImage::RenderMovingPane()
 {
 }
 
 void CGuiViewMovingPaneImage::RenderImGui()
 {
-	if (image == NULL)
-		return;
+//	if (image == NULL)
+//		return;
 	
 	PreRenderImGui();
 	
@@ -173,33 +204,36 @@ void CGuiViewMovingPaneImage::RenderImGui()
 		
 	float gap = 1.0f;
 	
-	BlitRectangle(posX-gap, posY-gap, -1, sizeX+gap*2, sizeY+gap*2, 0.3, 0.3, 0.3, 0.7f);
+//	BlitRectangle(posX-gap, posY-gap, -1, sizeX+gap*2, sizeY+gap*2, 0.3, 0.3, 0.3, 0.7f);
 	
 	// blit
 	
-	VID_SetClipping(posX, posY, sizeX, sizeY);
+//	VID_SetClipping(posX, posY, sizeX, sizeY);
 	
 	
 	//	LOGD("renderTextureStartX=%f renderTextureEndX=%f renderTextureStartY=%f renderTextureEndY=%f",
 	//		 renderTextureStartX, renderTextureEndX, renderTextureStartY, renderTextureEndY);
 
-	if (UpdateImageData())
+	if (image)
 	{
-		image->ReBindImage();
-	}
+		if (UpdateImageData())
+		{
+			image->ReBindImage();
+		}
 
-	if (image->isBound)
-	{
-		Blit(image, renderMapPosX, renderMapPosY, -1, renderMapSizeX, renderMapSizeY,
-			 renderTextureStartX,
-			 renderTextureStartY,
-			 renderTextureEndX,
-			 renderTextureEndY);
+		if (image->isBound)
+		{
+			Blit(image, renderMapPosX, renderMapPosY, -1, renderMapSizeX, renderMapSizeY,
+				 renderTextureStartX,
+				 renderTextureStartY,
+				 renderTextureEndX,
+				 renderTextureEndY);
+		}
 	}
 	
-	PostRenderMovingPaneCustom();
+	RenderMovingPane();
 
-	VID_ResetClipping();
+//	VID_ResetClipping();
 	
 	//	// debug cursor
 	//	float px = cursorX * sizeX + posX;

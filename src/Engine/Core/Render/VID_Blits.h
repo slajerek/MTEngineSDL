@@ -87,6 +87,7 @@ void BlitInImGuiWindow(CSlrImage *image, float destX, float destY, float z, floa
 					   float texStartX, float texStartY,
 					   float texEndX, float texEndY);
 void BlitInImGuiWindow(CSlrImage *image, float posX, float posY);
+void BlitInImGuiWindow(CSlrImage *image, float posX, float posY, float alpha);
 void BlitInImGuiWindow(CSlrImage *image);
 
 

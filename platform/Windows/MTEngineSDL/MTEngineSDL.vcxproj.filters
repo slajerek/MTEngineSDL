@@ -1098,6 +1098,12 @@
     <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewSearch.cpp">
       <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiViewMovingPaneImage.cpp">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\implot\implot_items.cpp">
+      <Filter>Source Files\src\Engine\Libs\imgui</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src.Windows\CLogByteBuffer.h">
@@ -2011,6 +2017,12 @@
     </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewSearch.h">
       <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiViewMovingPaneImage.h">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\implot\implot_internal.h">
+      <Filter>Source Files\src\Engine\Libs\imgui</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

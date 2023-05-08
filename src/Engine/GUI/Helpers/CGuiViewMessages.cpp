@@ -26,13 +26,17 @@ void CGuiViewMessages::Render()
 
 void CGuiViewMessages::Clear()
 {
+	guiMain->LockMutex();
 	Buf.clear();
 	LineOffsets.clear();
 	LineOffsets.push_back(0);
+	guiMain->UnlockMutex();
 }
 
 void CGuiViewMessages::AddLog(const char* fmt, ...) IM_FMTARGS(2)
 {
+	guiMain->LockMutex();
+
 	int old_size = Buf.size();
 	va_list args;
 	va_start(args, fmt);
@@ -41,6 +45,8 @@ void CGuiViewMessages::AddLog(const char* fmt, ...) IM_FMTARGS(2)
 	for (int new_size = Buf.size(); old_size < new_size; old_size++)
 		if (Buf[old_size] == '\n')
 			LineOffsets.push_back(old_size + 1);
+
+	guiMain->UnlockMutex();
 }
 
 void CGuiViewMessages::RenderImGui()

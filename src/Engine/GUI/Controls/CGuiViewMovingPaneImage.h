@@ -10,7 +10,10 @@ public:
 	virtual ~CGuiViewMovingPaneImage();
 	
 	virtual void RenderImGui();
-	virtual void PostRenderMovingPaneCustom();
+	virtual void RenderMovingPane();
+	
+	virtual bool IsInside(float x, float y);
+	virtual bool IsInsideView(float x, float y);
 	
 	virtual void InitPane();
 	virtual void InitImage();
@@ -23,9 +26,12 @@ public:
 	bool shouldDeallocImage;
 	
 	bool imageChanged;
-	
+
 	virtual void SetImageData(CImageData *imageData);
 	virtual void SetImage(CSlrImage *setImage);
+
+	virtual void SetImageData(CImageData *imageData, bool clearZoom);
+	virtual void SetImage(CSlrImage *setImage, bool clearZoom);
 	
 	CSlrFont *font;
 	float fontScale;

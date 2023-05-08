@@ -101,6 +101,8 @@ CGuiMain::CGuiMain()
 	isRightMouseButtonPressed = false;
 	
 	isMouseCursorVisible = true;
+	
+	moveStartTapPosX = moveStartTapPosY = movePrevTapPosX = movePrevTapPosY = moveStartRightClickPosX = moveStartRightClickPosY = movePrevRightClickPosX = movePrevRightClickPosY = -1;;
 
 	viewResourceManager = NULL;
 	layoutForThisFrame = NULL;
@@ -850,6 +852,9 @@ bool CGuiMain::DoTap(float x, float y)
 	
 	isLeftMouseButtonPressed = true;
 	
+	moveStartTapPosX = movePrevTapPosX = x;
+	moveStartTapPosY = movePrevTapPosY = y;
+	
 	if (IsOnAnyOpenedPopup(x, y))
 	{
 //		LOGI("...is on popup, skipping tap");
@@ -917,6 +922,8 @@ bool CGuiMain::DoFinishTap(float x, float y)
 
 	isLeftMouseButtonPressed = false;
 	
+	moveStartTapPosX = moveStartTapPosY = movePrevTapPosX = movePrevTapPosY = -1;
+	
 	if (IsOnAnyOpenedPopup(x, y))
 	{
 //		LOGI("...is on popup, skipping tap");
@@ -974,6 +981,9 @@ bool CGuiMain::DoRightClick(float x, float y)
 	LOGI("CGuiMain: DoRightClick: px=%3.2f; py=%3.2f;", x, y);
 	
 	isRightMouseButtonPressed = true;
+	
+	moveStartRightClickPosX = movePrevRightClickPosX = x;
+	moveStartRightClickPosY = movePrevRightClickPosY = y;
 	
 	if (IsOnAnyOpenedPopup(x, y))
 	{
@@ -1042,6 +1052,8 @@ bool CGuiMain::DoFinishRightClick(float x, float y)
 
 	isRightMouseButtonPressed = false;
 	
+	moveStartRightClickPosX = moveStartRightClickPosY = movePrevRightClickPosX = movePrevRightClickPosY = -1;
+	
 	if (IsOnAnyOpenedPopup(x, y))
 	{
 		LOGI("...is on popup, skipping tap");
@@ -1106,10 +1118,17 @@ bool CGuiMain::DoMove(float x, float y)
 	}
 #endif
 	
+	float distX = x - moveStartTapPosX;
+	float distY = y - moveStartTapPosY;
+	float diffX = x - movePrevTapPosX;
+	float diffY = y - movePrevTapPosY;
+	movePrevTapPosX = x;
+	movePrevTapPosY = y;
+	
 	if (this->currentView != NULL)
 	{
 		// TODO: FIXME, DoMove temporarily does not forward these values
-		if (this->currentView->DoMove(x, y, 0, 0, 0, 0))
+		if (this->currentView->DoMove(x, y, distX, distY, diffX, diffY))
 		{
 			return true;
 		}
@@ -1118,7 +1137,7 @@ bool CGuiMain::DoMove(float x, float y)
 	if (this->focusedView)
 	{
 		// consumed?
-		if (this->focusedView->DoMove(x, y, 0, 0, 0, 0))
+		if (this->focusedView->DoMove(x, y, distX, distY, diffX, diffY))
 		{
 			return true;
 		}
@@ -1154,6 +1173,8 @@ bool CGuiMain::DoMove(float x, float y)
 
 bool CGuiMain::DoRightClickMove(float x, float y)
 {
+//	LOGD("CGuiMain::DoRightClickMove");
+	
 	isRightMouseButtonPressed = true;
 	
 	if (IsOnAnyOpenedPopup(x, y))
@@ -1172,10 +1193,17 @@ bool CGuiMain::DoRightClickMove(float x, float y)
 	}
 #endif
 	
+	float distX = x - moveStartRightClickPosX;
+	float distY = y - moveStartRightClickPosY;
+	float diffX = x - movePrevRightClickPosX;
+	float diffY = y - movePrevRightClickPosY;
+	movePrevRightClickPosX = x;
+	movePrevRightClickPosY = y;
+
 	if (this->currentView != NULL)
 	{
 		// TODO: FIXME, DoRightClickMove temporarily does not forward these values
-		if (this->currentView->DoRightClickMove(x, y, 0, 0, 0, 0))
+		if (this->currentView->DoRightClickMove(x, y, distX, distY, diffX, diffY))
 		{
 			return true;
 		}
@@ -1184,7 +1212,7 @@ bool CGuiMain::DoRightClickMove(float x, float y)
 	if (this->focusedView)
 	{
 		// consumed?
-		if (this->focusedView->DoRightClickMove(x, y, 0, 0, 0, 0))
+		if (this->focusedView->DoRightClickMove(x, y, distX, distY, diffX, diffY))
 		{
 			return true;
 		}
@@ -1483,6 +1511,7 @@ void CGuiMain::RenderImGui()
 	
 	if (layoutStoreCurrentInSettings)
 	{
+		LOGD("layoutStoreCurrentInSettings: store layout now");
 		// store previous layout
 		if (layoutManager->currentLayout != NULL
 			&& layoutManager->currentLayout->doNotUpdateViewsPositions == false)
@@ -1499,11 +1528,13 @@ void CGuiMain::RenderImGui()
 	{
 		if (layoutStoreOrRestore == LayoutStorageTask::StoreLayout)
 		{
+			LOGD("CGuiMain::RenderImGui: LayoutStorageTask::StoreLayout");
 			this->SerializeLayout(layoutForThisFrame);
 			layoutForThisFrame = NULL;
 		}
 		else if (layoutStoreOrRestore == LayoutStorageTask::RestoreLayout)
 		{
+			LOGD("CGuiMain::RenderImGui: LayoutStorageTask::RestoreLayout");
 			// store previous layout
 			if (layoutManager->currentLayout != NULL
 				&& layoutManager->currentLayout->doNotUpdateViewsPositions == false)
@@ -1586,6 +1617,7 @@ void CGuiMain::PostRenderEndFrame()
 
 void CGuiMain::StoreLayoutInSettingsAtEndOfThisFrame()
 {
+	LOGD("StoreLayoutInSettingsAtEndOfThisFrame");
 	layoutStoreCurrentInSettings = true;
 }
 
@@ -2141,7 +2173,7 @@ void CUiThreadTaskSetViewFullScreen::RunUIThreadTask()
 
 		guiMain->layoutManager->currentLayout = guiMain->currentLayoutBeforeFullScreen;
 		guiMain->currentLayoutBeforeFullScreen = NULL;
-				
+		
 		guiMain->viewFullScreen = NULL;
 		guiMain->isChangingFullScreenState = false;
 	}

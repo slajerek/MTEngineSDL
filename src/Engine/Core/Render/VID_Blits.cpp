@@ -756,6 +756,23 @@ void BlitInImGuiWindow(CSlrImage *image, float posX, float posY)
 	
 }
 
+void BlitInImGuiWindow(CSlrImage *image, float posX, float posY, float alpha)
+{
+	ImGuiWindow* window = ImGui::GetCurrentWindow();
+	float w = window->ContentRegionRect.GetWidth();
+	float scale = (w / (float)image->width);
+	float h = image->height * scale;
+	
+	BlitInImGuiWindow(image,
+					  posX, posY, -1, w, h,
+					  image->defaultTexStartX,
+					  image->defaultTexStartY,
+					  image->defaultTexEndX,
+					  image->defaultTexEndY,
+					  1.0f, 1.0f, 1.0f, alpha);
+	
+}
+
 
 void BlitAlpha(CSlrImage *image, float destX, float destY, float z, float sizeX, float sizeY,
 			   float texStartX, float texStartY,

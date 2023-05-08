@@ -15,6 +15,8 @@ CRecentlyOpenedFiles::CRecentlyOpenedFiles(CSlrString *settingsFileName, CRecent
 	maxNumberOfFiles = 40;
 	countFilesAvailableRefresh = FILES_REFRESH_NUM_FRAMES-1;
 	RestoreFromSettings();
+
+	sprintf(threadName, "CRecentlyOpenedFiles");
 }
 
 void CRecentlyOpenedFiles::Clear()
