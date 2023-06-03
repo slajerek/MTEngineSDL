@@ -614,6 +614,9 @@ bool CGuiButton::DoTap(float posX, float posY)
 
 	this->wasExpanded = this->isExpanded;
 	
+	textUTF->DebugPrint("CGuiButton::DoTap: text=");
+	LOGD("... posx=%f posy=%f x=%f y=%f", this->posX, this->posY, posX, posY);
+	
 	beingClicked = false;
 	if (IsInside(posX, posY))
 	{

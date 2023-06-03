@@ -379,8 +379,8 @@ bool SYS_windowAlwaysOnTopBeforeFileDialog = false;
 void SYS_DialogOpenFile(CSystemFileDialogCallback *callback, std::list<CSlrString *> *extensions, CSlrString *defaultFolder, CSlrString *windowTitle)
 {
 	// temporary remove always on top window flag
-	SYS_windowAlwaysOnTopBeforeFileDialog = VID_IsWindowAlwaysOnTop();
-	VID_SetWindowAlwaysOnTopTemporary(false);
+	SYS_windowAlwaysOnTopBeforeFileDialog = VID_IsMainWindowAlwaysOnTop();
+	VID_SetMainWindowAlwaysOnTopTemporary(false);
 
 	char *defaultFolderStr = NULL;
 
@@ -414,14 +414,14 @@ void SYS_DialogOpenFile(CSystemFileDialogCallback *callback, std::list<CSlrStrin
 
 	if (result == NFD_OKAY)
 	{
-		VID_SetWindowAlwaysOnTopTemporary(SYS_windowAlwaysOnTopBeforeFileDialog);
+		VID_SetMainWindowAlwaysOnTopTemporary(SYS_windowAlwaysOnTopBeforeFileDialog);
 
 		CSlrString *outPath = new CSlrString(outPathStr);
 		callback->SystemDialogFileOpenSelected(outPath);
 	}
 	else if (result == NFD_CANCEL)
 	{
-		VID_SetWindowAlwaysOnTopTemporary(SYS_windowAlwaysOnTopBeforeFileDialog);
+		VID_SetMainWindowAlwaysOnTopTemporary(SYS_windowAlwaysOnTopBeforeFileDialog);
 
 		callback->SystemDialogFileOpenCancelled();
 	}
@@ -437,8 +437,8 @@ void SYS_DialogOpenFile(CSystemFileDialogCallback *callback, std::list<CSlrStrin
 void SYS_DialogSaveFile(CSystemFileDialogCallback *callback, std::list<CSlrString *> *extensions, CSlrString *defaultFileName, CSlrString *defaultFolder, CSlrString *windowTitle)
 {
  	// temporary remove always on top window flag
-	SYS_windowAlwaysOnTopBeforeFileDialog = VID_IsWindowAlwaysOnTop();
-	VID_SetWindowAlwaysOnTopTemporary(false);
+	SYS_windowAlwaysOnTopBeforeFileDialog = VID_IsMainWindowAlwaysOnTop();
+	VID_SetMainWindowAlwaysOnTopTemporary(false);
 
 	char *defaultFolderStr = NULL;
 
@@ -471,7 +471,7 @@ void SYS_DialogSaveFile(CSystemFileDialogCallback *callback, std::list<CSlrStrin
 
 	if (result == NFD_OKAY)
         {
-                VID_SetWindowAlwaysOnTopTemporary(SYS_windowAlwaysOnTopBeforeFileDialog);
+                VID_SetMainWindowAlwaysOnTopTemporary(SYS_windowAlwaysOnTopBeforeFileDialog);
 		
 		LOGD("outPathStr=%s", outPathStr);
                 CSlrString *outPath = new CSlrString(outPathStr);
@@ -487,7 +487,7 @@ void SYS_DialogSaveFile(CSystemFileDialogCallback *callback, std::list<CSlrStrin
         }   
         else if (result == NFD_CANCEL)
         {
-                VID_SetWindowAlwaysOnTopTemporary(SYS_windowAlwaysOnTopBeforeFileDialog);
+                VID_SetMainWindowAlwaysOnTopTemporary(SYS_windowAlwaysOnTopBeforeFileDialog);
 
                 callback->SystemDialogFileSaveCancelled();
         }

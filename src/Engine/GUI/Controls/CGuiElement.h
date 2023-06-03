@@ -111,6 +111,7 @@ public:
 	volatile bool hasFocus;
 
 	virtual bool KeyDown(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper);
+	virtual bool PostKeyDown(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper);	// fired when KeyDown was not consumed by any view or key shortcut
 	virtual bool KeyUp(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper);
 	virtual bool KeyDownOnMouseHover(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper);
 	virtual bool KeyUpOnMouseHover(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper);

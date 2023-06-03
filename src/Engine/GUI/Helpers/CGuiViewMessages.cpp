@@ -1,9 +1,11 @@
 #include "CGuiViewMessages.h"
 #include "CGuiMain.h"
+#include "SYS_Threading.h"
 
 CGuiViewMessages::CGuiViewMessages(const char *name, float posX, float posY, float posZ, float sizeX, float sizeY)
 : CGuiView(name, posX, posY, posZ, sizeX, sizeY)
 {
+	mutex = new CSlrMutex("CGuiViewMessages");
 	AutoScroll = true;
 	Clear();
 }
@@ -26,16 +28,16 @@ void CGuiViewMessages::Render()
 
 void CGuiViewMessages::Clear()
 {
-	guiMain->LockMutex();
+	mutex->Lock();
 	Buf.clear();
 	LineOffsets.clear();
 	LineOffsets.push_back(0);
-	guiMain->UnlockMutex();
+	mutex->Unlock();
 }
 
 void CGuiViewMessages::AddLog(const char* fmt, ...) IM_FMTARGS(2)
 {
-	guiMain->LockMutex();
+	mutex->Lock();
 
 	int old_size = Buf.size();
 	va_list args;
@@ -46,7 +48,7 @@ void CGuiViewMessages::AddLog(const char* fmt, ...) IM_FMTARGS(2)
 		if (Buf[old_size] == '\n')
 			LineOffsets.push_back(old_size + 1);
 
-	guiMain->UnlockMutex();
+	mutex->Unlock();
 }
 
 void CGuiViewMessages::RenderImGui()
@@ -78,9 +80,15 @@ void CGuiViewMessages::RenderImGui()
 	if (copy)
 		ImGui::LogToClipboard();
 
+
+	// render lines
+	
 	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
 	const char* buf = Buf.begin();
 	const char* buf_end = Buf.end();
+	
+	mutex->Lock();
+	
 	if (Filter.IsActive())
 	{
 		// In this example we don't use the clipper when Filter is enabled.
@@ -123,6 +131,9 @@ void CGuiViewMessages::RenderImGui()
 		}
 		clipper.End();
 	}
+	
+	mutex->Unlock();
+	
 	ImGui::PopStyleVar();
 
 	if (AutoScroll && ImGui::GetScrollY() >= ImGui::GetScrollMaxY())

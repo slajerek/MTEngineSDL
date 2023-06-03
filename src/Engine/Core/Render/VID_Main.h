@@ -61,11 +61,15 @@ void VID_ResetImGuiStyle();
 void VID_SetViewportsEnable(bool viewportsEnable);
 bool VID_IsViewportsEnable();
 
+SDL_Window *VID_GetSDLViewportWindowFromCGuiView(CGuiView *view);
 SDL_Window *VID_GetSDLWindowFromCGuiView(CGuiView *view);
 
-bool VID_IsWindowAlwaysOnTop();
-void VID_SetWindowAlwaysOnTop(bool isOnTop);
-void VID_SetWindowAlwaysOnTopTemporary(bool isOnTop);
+bool VID_IsMainWindowAlwaysOnTop();
+void VID_SetMainWindowAlwaysOnTop(bool isOnTop);
+void VID_SetMainWindowAlwaysOnTopTemporary(bool isOnTop);
+
+bool VID_IsWindowAlwaysOnTop(CGuiView *view);
+void VID_SetWindowAlwaysOnTop(CGuiView *view, bool isOnTop);
 
 bool VID_IsMainApplicationWindowFullScreen();
 void VID_SetMainApplicationWindowFullScreen(bool isFullScreen);

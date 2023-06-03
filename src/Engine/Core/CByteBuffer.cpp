@@ -1601,6 +1601,17 @@ float CByteBuffer::GetFloat()
 	return this->getFloat();
 }
 
+void CByteBuffer::PutDouble(double b)
+{
+	this->putDouble(b);
+}
+
+double CByteBuffer::GetDouble()
+{
+	return this->getDouble();
+}
+
+
 void CByteBuffer::PutSlrString(CSlrString *str)
 {
 	if (str == NULL)
@@ -1708,7 +1719,7 @@ bool CByteBuffer::DecompressWholeBuffer()
 	u32 decompressedSize = this->GetU32();
 	u8 *decompressedDataBuffer = (u8*)malloc( decompressedSize );
 
-	u32 compressedSize = this->length;
+	u32 compressedSize = this->length - 4;
 	u8 *compressedData = this->data + 4;	// u32
 	
 	CSlrFileMemory *memFile = new CSlrFileMemory(compressedData, compressedSize);

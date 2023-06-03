@@ -1,7 +1,7 @@
 #include "CRenderBackendMetal.h"
 #include "SYS_Main.h"
 #include "CSlrImage.h"
-#include "imgui_impl_sdl.h"
+#include "imgui_impl_sdl2.h"
 #include "imgui_impl_metal.h"
 #import <Metal/Metal.h>
 #import <QuartzCore/QuartzCore.h>

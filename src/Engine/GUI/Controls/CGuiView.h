@@ -76,6 +76,7 @@ public:
 	virtual bool FinishRightClickMove(float x, float y, float distX, float distY, float accelerationX, float accelerationY);
 	
 	virtual bool KeyDown(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper);
+	virtual bool PostKeyDown(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper);	// fired when KeyDown was not consumed by any view or key shortcut
 	virtual bool KeyDownOnMouseHover(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper);
 	virtual bool KeyDownGlobal(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper);		// fired always even on not focused, not visible
 	virtual bool KeyDownRepeat(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper);

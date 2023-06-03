@@ -133,6 +133,8 @@ public:
 	float getFloat();
 	void PutFloat(float val);
 	float GetFloat();
+	void PutDouble(double b);
+	double GetDouble();
 	void putDouble(double val);
 	double getDouble();
 	void PutDate(CSlrDate *date);

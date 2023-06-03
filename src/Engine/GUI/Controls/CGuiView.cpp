@@ -986,6 +986,32 @@ bool CGuiView::KeyDown(u32 keyCode, bool isShift, bool isAlt, bool isControl, bo
 	return false;
 }
 
+bool CGuiView::PostKeyDown(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper)
+{
+	LOGI("CGuiView::PostKeyDown: %s %d %s %s %s", name ? name : "CGuiView", keyCode, STRBOOL(isShift), STRBOOL(isAlt), STRBOOL(isControl));
+	if (focusElement && focusElement->visible)
+	{
+		LOGI("...%s PostKeyDown focusElement=%s", name ? name : "CGuiView", focusElement->name);
+		if (focusElement->KeyDown(keyCode, isShift, isAlt, isControl, isSuper))
+			return true;
+	}
+	
+	for (std::map<float, CGuiElement *, compareZdownwards>::iterator enumGuiElems = guiElementsDownwards.begin();
+		 enumGuiElems != guiElementsDownwards.end(); enumGuiElems++)
+	{
+		CGuiElement *guiElement = (*enumGuiElems).second;
+		if (!guiElement->visible)
+			continue;
+		
+		if (guiElement->PostKeyDown(keyCode, isShift, isAlt, isControl, isSuper))
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
 bool CGuiView::KeyDownOnMouseHover(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper)
 {
 	LOGI("CGuiView::KeyDownOnMouseHover: %s %d %s %s %s", name ? name : "CGuiView", keyCode, STRBOOL(isShift), STRBOOL(isAlt), STRBOOL(isControl));

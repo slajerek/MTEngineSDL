@@ -420,7 +420,7 @@ void SYS_DialogOpenFile(CSystemFileDialogCallback *callback, std::list<CSlrStrin
     char szFileName[MAX_PATH] = "";
 
 	// temporary remove always on top window flag
-	SYS_windowAlwaysOnTopBeforeFileDialog = VID_IsWindowAlwaysOnTop();
+	SYS_windowAlwaysOnTopBeforeFileDialog = VID_IsMainWindowAlwaysOnTop();
 	//VID_SetWindowAlwaysOnTopTemporary(false);
 
     ZeroMemory(&ofn, sizeof(ofn));
@@ -519,7 +519,7 @@ void SYS_DialogOpenFile(CSystemFileDialogCallback *callback, std::list<CSlrStrin
     if(GetOpenFileName(&ofn))
     {
     	LOGD("..... callback: file open selected");
-		VID_SetWindowAlwaysOnTopTemporary(SYS_windowAlwaysOnTopBeforeFileDialog);
+		VID_SetMainWindowAlwaysOnTopTemporary(SYS_windowAlwaysOnTopBeforeFileDialog);
 
 		if (title != NULL)
 			free(title);
@@ -534,7 +534,7 @@ void SYS_DialogOpenFile(CSystemFileDialogCallback *callback, std::list<CSlrStrin
 	else
 	{
 		LOGD("..... callback: file open cancelled");
-		VID_SetWindowAlwaysOnTopTemporary(SYS_windowAlwaysOnTopBeforeFileDialog);
+		VID_SetMainWindowAlwaysOnTopTemporary(SYS_windowAlwaysOnTopBeforeFileDialog);
 
 		if (title != NULL)
 			free(title);
@@ -549,7 +549,7 @@ void SYS_DialogSaveFile(CSystemFileDialogCallback *callback, std::list<CSlrStrin
     char szFileName[MAX_PATH] = "";
 
 	// temporary remove always on top window flag
-	SYS_windowAlwaysOnTopBeforeFileDialog = VID_IsWindowAlwaysOnTop();
+	SYS_windowAlwaysOnTopBeforeFileDialog = VID_IsMainWindowAlwaysOnTop();
 	//VID_SetWindowAlwaysOnTopTemporary(false);
 
     ZeroMemory(&ofn, sizeof(ofn));
@@ -642,7 +642,7 @@ void SYS_DialogSaveFile(CSystemFileDialogCallback *callback, std::list<CSlrStrin
     if(GetSaveFileName(&ofn))
     {
     	LOGD("     ...callback OK");
-		VID_SetWindowAlwaysOnTopTemporary(SYS_windowAlwaysOnTopBeforeFileDialog);
+		VID_SetMainWindowAlwaysOnTopTemporary(SYS_windowAlwaysOnTopBeforeFileDialog);
 
 		if (title != NULL)
 			free(title);
@@ -658,7 +658,7 @@ void SYS_DialogSaveFile(CSystemFileDialogCallback *callback, std::list<CSlrStrin
 	else
 	{
 		LOGD("    ...callback cancelled");
-		VID_SetWindowAlwaysOnTopTemporary(SYS_windowAlwaysOnTopBeforeFileDialog);
+		VID_SetMainWindowAlwaysOnTopTemporary(SYS_windowAlwaysOnTopBeforeFileDialog);
 
 		if (title != NULL)
 			free(title);
