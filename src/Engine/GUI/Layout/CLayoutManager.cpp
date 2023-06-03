@@ -204,6 +204,7 @@ void CLayoutManager::StoreLayouts()
 
 void CLayoutManager::LoadLayouts()
 {
+	LOGD("CLayoutManager::LoadLayouts");
 	CByteBuffer *byteBuffer = new CByteBuffer();
 
 	CSlrString *fileName = new CSlrString(C64D_LAYOUTS_FILE_NAME);

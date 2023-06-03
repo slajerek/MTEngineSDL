@@ -3,7 +3,7 @@
 
 #include <SDL.h>
 #include "imgui.h"
-#include "imgui_impl_sdl.h"
+#include "imgui_impl_sdl2.h"
 
 #include "VID_Main.h"
 #include "NET_Main.h"

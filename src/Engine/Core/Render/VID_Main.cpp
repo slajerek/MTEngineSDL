@@ -170,9 +170,9 @@ void VID_PostInit()
 {
 	LOGM("VID_PostInit: show window, restore position");
 	
-	// restore selected layout
-	CLayoutData *layoutData = guiMain->layoutManager->currentLayout;
-	guiMain->layoutManager->SetLayoutAsync(layoutData, false);
+	// restore selected layout, note we need to do this after next frame
+	CUiThreadTaskRefreshLayout *task = new CUiThreadTaskRefreshLayout();
+	guiMain->AddUiThreadTask(task);
 	
 	if (initWindowMaxmized)
 	{
@@ -690,6 +690,25 @@ void VID_ProcessEvents()
 				 || event.type == SDL_CONTROLLERAXISMOTION
 				 || event.type == SDL_CONTROLLERBUTTONDOWN || event.type == SDL_CONTROLLERBUTTONUP)
 		{
+//			switch(event.type)
+//			{
+//				case SDL_CONTROLLERDEVICEADDED:
+//					LOGI("SDL_CONTROLLERDEVICEADDED");
+//					break;
+//				case SDL_CONTROLLERDEVICEREMOVED:
+//					LOGI("SDL_CONTROLLERDEVICEREMOVED");
+//					break;
+//				case SDL_CONTROLLERAXISMOTION:
+//					LOGI("SDL_CONTROLLERAXISMOTION");
+//					break;
+//				case SDL_CONTROLLERBUTTONDOWN:
+//					LOGI("SDL_CONTROLLERBUTTONDOWN");
+//					break;
+//				case SDL_CONTROLLERBUTTONUP:
+//					LOGI("SDL_CONTROLLERBUTTONUP");
+//					break;
+//			}
+
 			GAM_GamePadsEvent(event);
 		}
 		else if (event.type == SDL_DROPFILE)
@@ -867,7 +886,7 @@ SDL_Window *ImGui_ImplSDL2_ImGuiViewportToSDLWindow(ImGuiViewport *imGuiViewport
 //	return sdlWindow;
 //}
 
-SDL_Window *VID_GetSDLWindowFromCGuiView(CGuiView *view)
+SDL_Window *VID_GetSDLViewportWindowFromCGuiView(CGuiView *view)
 {
 	if (!view->imGuiWindow)
 		return NULL;
@@ -880,62 +899,82 @@ SDL_Window *VID_GetSDLWindowFromCGuiView(CGuiView *view)
 	return ImGui_ImplSDL2_ImGuiViewportToSDLWindow(imGuiViewport);
 }
 
-bool VID_IsWindowAlwaysOnTop()
+SDL_Window *VID_GetSDLWindowFromCGuiView(CGuiView *view)
 {
-	LOGTODO("VID_IsWindowAlwaysOnTop TODO");
-	
-	/*
-	 -// Helper structure we store in the void* PlatformUserData field of each ImGuiViewport to easily retrieve our backend data.
-	 -struct ImGui_ImplSDL2_ViewportData
-	 -{
-	 -       SDL_Window*     Window;
-	 -       Uint32          WindowID;
-	 -       bool            WindowOwned;
-	 -       SDL_GLContext   GLContext;
-	 -
-	 -       ImGui_ImplSDL2_ViewportData() { Window = NULL; WindowID = 0; WindowOwned = false; GLContext = NULL; }
-	 -       ~ImGui_ImplSDL2_ViewportData() { IM_ASSERT(Window == NULL && GLContext == NULL); }
-	 -};
-	 -
-	  //@returns is consumed
-	  bool CViewAtariScreen::DoTap(float x, float y)
-	  {
-			 LOGG("CViewAtariScreen::DoTap:  x=%f y=%f", x, y);
-	 -
-	 -//     static bool isFullscreen = false;
-	 -
-	 -       isFullscreen = !isFullscreen;
-	 -
-	 -//     ImGuiWindow *window = this->imGuiWindow;
-	 -//
-	 -//     ImGui_ImplSDL2_ViewportData *viewportData = (ImGui_ImplSDL2_ViewportData *)window->Viewport->PlatformUserData;
-	 -//
-	 -//     SDL_Window *sdlWindow = viewportData->Window;
-	 -//
-	 -//     if (isFullscreen == false)
-	 -//     {
-	 -//             SDL_SetWindowFullscreen(sdlWindow, SDL_WINDOW_FULLSCREEN);
-	 -//             isFullscreen = true;
-	 -//     }
-	 -//     else
-	 -//     {
-	 -//             SDL_SetWindowFullscreen(sdlWindow, 0);
-	 -//             isFullscreen = false;
-	 -//     }
-	 -
+	SDL_Window *window = NULL;
+	if (VID_IsViewportsEnable())
+	{
+		window = VID_GetSDLViewportWindowFromCGuiView(view);
+		if (!window)
+			window = VID_GetMainSDLWindow();
 
-	 */
+	}
+	else
+	{
+		window = VID_GetMainSDLWindow();
+	}
+	return window;
+}
+
+bool VID_IsWindowAlwaysOnTop(CGuiView *view)
+{
+	SDL_Window *window = VID_GetSDLWindowFromCGuiView(view);
+	
+	if (!window)
+	{
+		LOGError("VID_IsWindowAlwaysOnTop: SDL_Window for view=%s is NULL", view->name);
+		return false;
+	}
+
+	// check main window
+	Uint32 flags = SDL_GetWindowFlags(window);
+	
+	if (flags & SDL_WINDOW_ALWAYS_ON_TOP)
+	{
+		return true;
+	}
+	
 	return false;
 }
 
-void VID_SetWindowAlwaysOnTop(bool isOnTop)
+void VID_SetWindowAlwaysOnTop(CGuiView *view, bool isOnTop)
 {
-	LOGTODO("VID_SetWindowAlwaysOnTop TODO");
+	SDL_Window *window = VID_GetSDLWindowFromCGuiView(view);
+	
+	if (!window)
+	{
+		LOGError("VID_SetWindowAlwaysOnTop: SDL_Window for view=%s is NULL", view->name);
+		return;
+	}
+	
+	SDL_SetWindowAlwaysOnTop(window, isOnTop ? SDL_TRUE:SDL_FALSE);
 }
 
-void VID_SetWindowAlwaysOnTopTemporary(bool isOnTop)
+bool VID_IsMainWindowAlwaysOnTop()
 {
-	LOGTODO("VID_SetWindowAlwaysOnTopTemporary TODO");
+	SDL_Window *window = VID_GetMainSDLWindow();
+	
+	// check main window
+	Uint32 flags = SDL_GetWindowFlags(window);
+	
+	if (flags & SDL_WINDOW_ALWAYS_ON_TOP)
+	{
+		return true;
+	}
+	
+	return false;
+}
+
+void VID_SetMainWindowAlwaysOnTop(bool isOnTop)
+{
+	SDL_Window *window = VID_GetMainSDLWindow();
+	SDL_SetWindowAlwaysOnTop(window, isOnTop ? SDL_TRUE:SDL_FALSE);
+}
+
+void VID_SetMainWindowAlwaysOnTopTemporary(bool isOnTop)
+{
+	SDL_Window *window = VID_GetMainSDLWindow();
+	SDL_SetWindowAlwaysOnTop(window, isOnTop ? SDL_TRUE:SDL_FALSE);
 }
 
 void VID_SetClipping(int x, int y, int sizeX, int sizeY)

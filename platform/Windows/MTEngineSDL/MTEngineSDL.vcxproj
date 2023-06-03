@@ -173,7 +173,7 @@
     <ClCompile Include="..\..\..\src\Engine\Libs\imgui\imgui_draw.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Libs\imgui\imgui_freetype.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Libs\imgui\imgui_impl_opengl3.cpp" />
-    <ClCompile Include="..\..\..\src\Engine\Libs\imgui\imgui_impl_sdl.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\imgui\imgui_impl_sdl2.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Libs\imgui\imgui_tables.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Libs\imgui\imgui_widgets.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Libs\implot\implot.cpp" />
@@ -512,7 +512,7 @@
     <ClInclude Include="..\..\..\src\Engine\Libs\imgui\imgui.h" />
     <ClInclude Include="..\..\..\src\Engine\Libs\imgui\imgui_freetype.h" />
     <ClInclude Include="..\..\..\src\Engine\Libs\imgui\imgui_impl_opengl3.h" />
-    <ClInclude Include="..\..\..\src\Engine\Libs\imgui\imgui_impl_sdl.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\imgui\imgui_impl_sdl2.h" />
     <ClInclude Include="..\..\..\src\Engine\Libs\imgui\imgui_internal.h" />
     <ClInclude Include="..\..\..\src\Engine\Libs\imgui\imstb_rectpack.h" />
     <ClInclude Include="..\..\..\src\Engine\Libs\imgui\imstb_textedit.h" />

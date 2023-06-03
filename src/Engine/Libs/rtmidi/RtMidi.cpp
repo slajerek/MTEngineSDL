@@ -635,6 +635,7 @@ void MidiApi :: error( RtMidiError::Type type, std::string errorString )
     return;
   }
 
+	/* NOTE, MIDI ERROR LOG IS COMMENTED OUT FOR RELEASE VERSION
   if ( type == RtMidiError::WARNING ) {
     std::cerr << '\n' << errorString << "\n\n";
   }
@@ -647,6 +648,7 @@ void MidiApi :: error( RtMidiError::Type type, std::string errorString )
     std::cerr << '\n' << errorString << "\n\n";
     throw RtMidiError( errorString, type );
   }
+	 */
 }
 
 //*********************************************************************//

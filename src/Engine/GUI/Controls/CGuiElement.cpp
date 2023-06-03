@@ -328,6 +328,12 @@ bool CGuiElement::KeyDown(u32 keyCode, bool isShift, bool isAlt, bool isControl,
 	return false;
 }
 
+bool CGuiElement::PostKeyDown(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper)
+{
+	LOGI("CGuiElement::PostKeyDown: %d %s %s %s", keyCode, STRBOOL(isShift), STRBOOL(isAlt), STRBOOL(isControl));
+	return false;
+}
+
 bool CGuiElement::KeyDownOnMouseHover(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper)
 {
 //	LOGI("CGuiElement::KeyDownOnMouseHover: %d %s %s %s", keyCode, STRBOOL(isShift), STRBOOL(isAlt), STRBOOL(isControl));

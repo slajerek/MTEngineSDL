@@ -435,9 +435,9 @@ void SYS_DialogOpenFile(CSystemFileDialogCallback *callback, std::list<CSlrStrin
 {
 	LOGD("SYS_DialogOpenFile");
 	
-	// temporary remove always on top window flag
-	SYS_windowAlwaysOnTopBeforeFileDialog = VID_IsWindowAlwaysOnTop();
-	VID_SetWindowAlwaysOnTopTemporary(false);
+//	// temporary remove always on top window flag
+	SYS_windowAlwaysOnTopBeforeFileDialog = VID_IsMainWindowAlwaysOnTop();
+	VID_SetMainWindowAlwaysOnTopTemporary(false);
 	
 	if (defaultFolder != NULL)
 	{
@@ -517,7 +517,7 @@ void SYS_DialogOpenFile(CSystemFileDialogCallback *callback, std::list<CSlrStrin
 		{
 			LOGD("SYS_DialogOpenFile: dialog result=%d", result);
 			
-			VID_SetWindowAlwaysOnTopTemporary(SYS_windowAlwaysOnTopBeforeFileDialog);
+			VID_SetMainWindowAlwaysOnTopTemporary(SYS_windowAlwaysOnTopBeforeFileDialog);
 			VID_SetVSyncScreenRefresh(true);
 
 			if (result == NSFileHandlingPanelOKButton)
@@ -559,9 +559,9 @@ void SYS_DialogSaveFile(CSystemFileDialogCallback *callback, std::list<CSlrStrin
 {
 //	SYS_FatalExit("TODO");
 	
-	// temporary remove always on top window flag
-	SYS_windowAlwaysOnTopBeforeFileDialog = VID_IsWindowAlwaysOnTop();
-	VID_SetWindowAlwaysOnTopTemporary(false);
+//	// temporary remove always on top window flag
+	SYS_windowAlwaysOnTopBeforeFileDialog = VID_IsMainWindowAlwaysOnTop();
+	VID_SetMainWindowAlwaysOnTopTemporary(false);
 
 	NSMutableArray *extensionsArray = [[NSMutableArray alloc] init];
 	
@@ -627,7 +627,7 @@ void SYS_DialogSaveFile(CSystemFileDialogCallback *callback, std::list<CSlrStrin
 		 {
 			 LOGD("SYS_DialogSaveFile: dialog result=%d", result);
 			 
-			 VID_SetWindowAlwaysOnTopTemporary(SYS_windowAlwaysOnTopBeforeFileDialog);
+			 VID_SetMainWindowAlwaysOnTopTemporary(SYS_windowAlwaysOnTopBeforeFileDialog);
 			 VID_SetVSyncScreenRefresh(true);
 
 			 if (result == NSFileHandlingPanelOKButton)

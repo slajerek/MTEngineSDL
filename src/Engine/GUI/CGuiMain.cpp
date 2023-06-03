@@ -499,6 +499,20 @@ bool CGuiMain::KeyDown(u32 keyCode)
 	}
 	 */
 	
+	// then change current view
+	if (this->currentView != NULL)
+	{
+		if ((io.WantTextInput && currentView->imGuiSkipKeyPressWhenIoWantsTextInput == false)
+			|| io.WantTextInput == false)
+		{
+			LOGI("                > PostKeyDown currentView=%s", currentView->name);
+			if (currentView->PostKeyDown(keyCode, isShiftPressed, isAltPressed, isControlPressed, isSuperPressed))
+			{
+				return true;
+			}
+		}
+	}
+
 	return false;
 }
 
@@ -1650,21 +1664,11 @@ CGuiView* CGuiMain::FindTopWindow(float x, float y)
 	return NULL;
 }
 
+// TODO: move to VID_* or move VID_AlwaysOnTop here
 // returns if view is hidden (i.e. hidden or minimized)
 bool CGuiMain::IsViewHidden(CGuiView *view)
 {
-	SDL_Window *window = NULL;
-	if (VID_IsViewportsEnable())
-	{
-		window = VID_GetSDLWindowFromCGuiView(view);
-		if (!window)
-			window = VID_GetMainSDLWindow();
-
-	}
-	else
-	{
-		window = VID_GetMainSDLWindow();
-	}
+	SDL_Window *window = VID_GetSDLWindowFromCGuiView(view);
 
 	if (!window)
 		return true;
@@ -1953,14 +1957,22 @@ void CUiThreadTaskSetMouseCursorVisible::RunUIThreadTask()
 	guiMain->isMouseCursorVisible = mouseCursorVisible;
 }
 
-CUiThreadTaskSetAlwaysOnTop::CUiThreadTaskSetAlwaysOnTop(bool isAlwaysOnTop)
+CUiThreadTaskSetAlwaysOnTop::CUiThreadTaskSetAlwaysOnTop(CGuiView *view, bool isAlwaysOnTop)
 {
+	this->view = view;
 	this->isAlwaysOnTop = isAlwaysOnTop;
 }
 	
 void CUiThreadTaskSetAlwaysOnTop::RunUIThreadTask()
 {
-	VID_SetWindowAlwaysOnTop(isAlwaysOnTop);
+	if (view == NULL)
+	{
+		VID_SetMainWindowAlwaysOnTop(isAlwaysOnTop);
+	}
+	else
+	{
+		VID_SetWindowAlwaysOnTop(view, isAlwaysOnTop);
+	}
 }
 
 void CGuiMain::SetMouseCursorVisible(bool isVisible)
@@ -2003,7 +2015,8 @@ void CGuiMain::SetImGuiStyleWindowBackupBackground()
 
 void CGuiMain::SetApplicationWindowAlwaysOnTop(bool alwaysOnTop)
 {
-	LOGTODO("CGuiMain::SetApplicationWindowAlwaysOnTop NOT IMPLEMENTED");
+	CUiThreadTaskSetAlwaysOnTop *task = new CUiThreadTaskSetAlwaysOnTop(NULL, alwaysOnTop);
+	AddUiThreadTask(task);
 }
 
 void CGuiMain::RemoveAllViews()
@@ -2197,5 +2210,23 @@ void CUiThreadTaskSetViewFullScreen::RunUIThreadTask()
 		guiMain->viewFullScreen = NULL;
 		guiMain->isChangingFullScreenState = false;
 	}
+}
+
+// this is for async intermittent bug, workaround
+void CUiThreadTaskRefreshLayout::RunUIThreadTask()
+{
+	// refresh (restore) current layout
+	CLayoutData *layoutData = guiMain->layoutManager->currentLayout;
+	guiMain->layoutManager->SetLayoutAsync(layoutData, false);
+}
+
+CUiThreadTaskSetViewFocus::CUiThreadTaskSetViewFocus(CGuiView *view)
+{
+	this->view = view;
+}
+
+void CUiThreadTaskSetViewFocus::RunUIThreadTask()
+{
+	guiMain->SetFocus(view);
 }
 

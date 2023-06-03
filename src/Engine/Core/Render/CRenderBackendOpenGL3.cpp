@@ -1,7 +1,7 @@
 #include "CRenderBackendOpenGL3.h"
 #include "SYS_Main.h"
 #include "CSlrImage.h"
-#include "imgui_impl_sdl.h"
+#include "imgui_impl_sdl2.h"
 #include "imgui_impl_opengl3.h"
 #include <GL/gl3w.h>
 #include <vector>

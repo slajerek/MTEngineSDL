@@ -346,9 +346,19 @@ public:
 class CUiThreadTaskSetAlwaysOnTop : public CUiThreadTaskCallback
 {
 public:
-	CUiThreadTaskSetAlwaysOnTop(bool isAlwaysOnTop);
+	CUiThreadTaskSetAlwaysOnTop(CGuiView *view, bool isAlwaysOnTop);
 	
+	CGuiView *view;
 	bool isAlwaysOnTop;
+	virtual void RunUIThreadTask();
+};
+
+class CUiThreadTaskSetViewFocus : public CUiThreadTaskCallback
+{
+public:
+	CUiThreadTaskSetViewFocus(CGuiView *view);
+	
+	CGuiView *view;
 	virtual void RunUIThreadTask();
 };
 
@@ -365,6 +375,11 @@ public:
 	virtual void RunUIThreadTask();
 };
 
+class CUiThreadTaskRefreshLayout : public CUiThreadTaskCallback
+{
+public:
+	virtual void RunUIThreadTask();
+};
 
 extern CGuiMain *guiMain;
 

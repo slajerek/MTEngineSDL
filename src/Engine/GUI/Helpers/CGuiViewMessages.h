@@ -3,6 +3,8 @@
 
 #include "CGuiView.h"
 
+class CSlrMutex;
+
 class CGuiViewMessages : public CGuiView
 {
 public:
@@ -51,6 +53,7 @@ public:
 	void Clear();
 	void AddLog(const char* fmt, ...) IM_FMTARGS(2);
 
+	CSlrMutex *mutex;
 };
 
 #endif //_VIEW_C64GOATTRACKER_
