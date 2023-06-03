@@ -263,6 +263,7 @@ add_library(MTEngineSDL STATIC
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/imgui-notify/fa_solid_900.cpp"
 
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/implot/implot_demo.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/implot/implot_items.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/implot/implot.cpp"
 
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jcapimin.c"
