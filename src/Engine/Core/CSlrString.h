@@ -94,6 +94,7 @@ public:
 	u16 PopCharFront();
 
 	char *GetStdASCII();
+	char *GetUTF8();
 	char16_t *GetChar16Str();
 
 	int ToInt();
@@ -174,6 +175,13 @@ char *cppstrdup(const char *str);
 void cppstrfree(const char *str);
 
 u64 strlen(char16_t *str);
+
+unsigned char* NOT_TESTED_Utf8StringToLower(unsigned char* pString);
+int NOT_TESTED_Utf8StrnCiCmp(const char* s1, const char* s2, size_t ztCount);
+int NOT_TESTED_Utf8StrCiCmp(const char* s1, const char* s2);
+char* NOT_TESTED_Utf8StrCiStr(const char* s1, const char* s2);
+
+std::string Utf8StringToLowercase(const std::string& utf8_str);
 
 #endif
 //_CSLRSTRING_H_

@@ -53,6 +53,7 @@ void sprintfHexCode64(char *pszBuffer, u64 n);
 
 void sprintfHexCode4WithoutZeroEnding(char *pszBuffer, uint8 value);
 void sprintfHexCode8WithoutZeroEnding(char *pszBuffer, uint8 value);
+void sprintfHexCode12WithoutZeroEnding(char *pszBuffer, uint16 value);
 void sprintfHexCode16WithoutZeroEnding(char *pszBuffer, uint16 value);
 void sprintfHexCode16WithoutZeroEndingAndNoLeadingZeros(char *pszBuffer, uint16 value);
 

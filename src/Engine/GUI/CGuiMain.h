@@ -139,7 +139,7 @@ public:
 	// modal dialog
 	void ShowMessageBox(const char *title, const char *message);
 	void ShowMessageBox(const char *title, const char *message, CUiMessageBoxCallback *messageBoxCallback);
-	bool beginMessageBoxPopup;
+	volatile bool beginMessageBoxPopup;
 	char *messageBoxTitle;
 	char *messageBoxText;
 	CUiMessageBoxCallback *messageBoxCallback;
@@ -362,6 +362,16 @@ public:
 	virtual void RunUIThreadTask();
 };
 
+class CUiThreadTaskSetViewVisible : public CUiThreadTaskCallback
+{
+public:
+	CUiThreadTaskSetViewVisible(CGuiView *view, bool isVisible);
+	
+	CGuiView *view;
+	volatile bool isVisible;
+	virtual void RunUIThreadTask();
+};
+
 class CUiThreadTaskRecreateUiFonts : public CUiThreadTaskCallback
 {
 public:
@@ -375,9 +385,13 @@ public:
 	virtual void RunUIThreadTask();
 };
 
-class CUiThreadTaskRefreshLayout : public CUiThreadTaskCallback
+class CUiThreadTaskSetLayout : public CUiThreadTaskCallback
 {
 public:
+	CUiThreadTaskSetLayout(CLayoutData *layoutData, bool saveCurrentLayout);
+	
+	CLayoutData *layoutData;
+	bool saveCurrentLayout;
 	virtual void RunUIThreadTask();
 };
 

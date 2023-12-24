@@ -8,7 +8,6 @@
 #include "CSlrString.h"
 #include "SYS_KeyCodes.h"
 
-#define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui.h"
 #include "imgui_internal.h"
 #include "imguihelper.h"

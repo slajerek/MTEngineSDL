@@ -67,6 +67,47 @@ void CRecentlyOpenedFiles::Add(CSlrString *filePath)
 	filesListMutex->Unlock();
 }
 
+void CRecentlyOpenedFiles::Remove(CSlrString *filePath)
+{
+	LOGD("CRecentlyOpenedFiles::Remove:");
+	filePath->DebugPrint("filePath=");
+	
+	filesListMutex->Lock();
+
+	for (std::list<CRecentFile *>::iterator it = listOfFiles.begin(); it != listOfFiles.end(); it++)
+	{
+		CRecentFile *file = *it;
+		if (file->filePath->CompareWith(filePath))
+		{
+			listOfFiles.remove(file);
+
+			StoreToSettings();
+			filesListMutex->Unlock();
+			return;
+		}
+	}
+
+	filesListMutex->Unlock();
+}
+
+bool CRecentlyOpenedFiles::Exists(CSlrString *filePath)
+{
+	filesListMutex->Lock();
+
+	for (std::list<CRecentFile *>::iterator it = listOfFiles.begin(); it != listOfFiles.end(); it++)
+	{
+		CRecentFile *file = *it;
+		if (file->filePath->CompareWith(filePath))
+		{
+			filesListMutex->Unlock();
+			return true;
+		}
+	}
+
+	filesListMutex->Unlock();
+	return false;
+}
+
 bool CRecentlyOpenedFiles::IsMostRecentFilePathAvailable()
 {
 	filesListMutex->Lock();
@@ -136,7 +177,14 @@ void CRecentlyOpenedFiles::RenderImGuiMenu(const char *menuItemLabel)
 	bool enabled = listOfFiles.size() > 0 ? true : false;
 	
 	CRecentFile *fileSelected = NULL;
-	if (ImGui::BeginMenu(menuItemLabel, enabled))
+
+	bool menuStarted = true;
+	if (menuItemLabel != NULL)
+	{
+		menuStarted = ImGui::BeginMenu(menuItemLabel, enabled);
+	}
+	
+	if (menuStarted)
 	{
 		for (std::list<CRecentFile *>::iterator it = listOfFiles.begin(); it != listOfFiles.end(); it++)
 		{
@@ -159,7 +207,9 @@ void CRecentlyOpenedFiles::RenderImGuiMenu(const char *menuItemLabel)
 				}
 			}
 		}
-		ImGui::EndMenu();
+		
+		if (menuItemLabel != NULL)
+			ImGui::EndMenu();
 	}
 	
 	if (fileSelected)
@@ -219,6 +269,7 @@ void CRecentlyOpenedFiles::StoreToSettings()
 
 	CByteBuffer *b = new CByteBuffer();
 	Serialize(b);
+	settingsFileName->DebugPrint("settingsFileName=");
 	b->storeToSettings(settingsFileName);
 	delete b;
 
@@ -231,6 +282,7 @@ void CRecentlyOpenedFiles::RestoreFromSettings()
 
 	Clear();
 	CByteBuffer *b = new CByteBuffer();
+	settingsFileName->DebugPrint("settingsFileName=");
 	b->loadFromSettings(settingsFileName);
 	if (b->length > 0)
 	{

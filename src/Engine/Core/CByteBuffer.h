@@ -84,6 +84,8 @@ public:
 	char *GetString();
 	void putString(const char *str, int begin, int len);
 	char *getString();
+	void putStringZeroEnded(const char *str);
+	void PutStringZeroEnded(const char *str);
 	void PutStdString(std::string str);
 	std::string GetStdString();
 	
@@ -96,6 +98,7 @@ public:
 	void PutByteBuffer(CByteBuffer *byteBuffer);
 	CByteBuffer *GetByteBuffer();
 
+	void printf(const char *format, ...);
 
 	void putShort(short int val);
 	short int getShort();

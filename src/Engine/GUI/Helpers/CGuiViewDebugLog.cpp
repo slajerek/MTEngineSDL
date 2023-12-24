@@ -52,6 +52,9 @@ void CGuiViewDebugLog::RenderLevelSwitch(u32 level, const char *name)
 void CGuiViewDebugLog::RenderImGui()
 {
 	PreRenderImGui();
+
+#if defined(FULL_LOG)
+#else
 	
 	RenderLevelSwitch(DBGLVL_MAIN, "MAIN");
 	ImGui::SameLine();
@@ -84,6 +87,8 @@ void CGuiViewDebugLog::RenderImGui()
 	RenderLevelSwitch(DBGLVL_ATARI_DEBUG, "ATARI-D");
 	ImGui::SameLine();
 	RenderLevelSwitch(DBGLVL_ATARI_MAIN, "ATARI");
+	
+#endif
 
 #if defined(USE_DEBUG_LOG_TO_VIEW)
 	// Options menu

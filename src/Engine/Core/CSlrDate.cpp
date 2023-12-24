@@ -2,6 +2,11 @@
 
 CSlrDate::CSlrDate()
 {
+	RefreshFromCurrentSystemTime();
+}
+
+void CSlrDate::RefreshFromCurrentSystemTime()
+{
 #if !defined(WIN32)
 	time_t rawtime;
 	time ( &rawtime ); struct tm *timeinfo = localtime ( &rawtime );
@@ -22,7 +27,6 @@ CSlrDate::CSlrDate()
 	this->month = tmeCurrent.wMonth;
 	this->year = tmeCurrent.wYear;
 #endif
-
 }
 
 u8 CSlrDate::NumDaysInMonth(u8 m)
@@ -155,7 +159,11 @@ void CSlrDate::TimeToString(char *buf)
 
 void CSlrDate::DateTimeToString(char *buf)
 {
-	// it's 00.00.0000
 	sprintf(buf, "%2d/%2d/%4d %02d:%02d:%02d", day, month, year, hour, minute, second);
+}
+
+void CSlrDate::DateTimeToFileNameString(char *buf)
+{
+	sprintf(buf, "%04d%02d%02d-%02d%02d%02d", year, month, day, hour, minute, second);
 }
 

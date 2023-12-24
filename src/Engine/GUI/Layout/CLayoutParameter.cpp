@@ -300,6 +300,6 @@ void CLayoutParameterPath::Serialize(CByteBuffer *byteBuffer)
 
 bool CLayoutParameterPath::Deserialize(CByteBuffer *byteBuffer)
 {
-	return false;
+	return true;
 }
 

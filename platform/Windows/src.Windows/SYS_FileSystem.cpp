@@ -9,6 +9,7 @@
 
 #ifdef WIN32
 #include <windows.h>
+#include <commdlg.h>
 #endif
 
 #include "SYS_FileSystem.h"
@@ -33,6 +34,7 @@
 #include <cstdint>
 #include <deque>
 #include <thread>
+#include <filesystem>
 
 #include "SYS_Startup.h"
 #include "SYS_DocsVsRes.h"
@@ -47,7 +49,6 @@
 #include "mman.h"
 #include "nfd.h"
 
-// TODO!!!!!!!!!!!!
 HWND hWnd = NULL;
 
 std::list<CHttpFileUploadedCallback *> httpFileUploadedCallbacks;
@@ -71,6 +72,15 @@ char *gCPathToCurrentDirectory;
 CSlrString *gUTFPathToCurrentDirectory;
 
 bool sysInitFileSystemDone = false;
+
+void SYS_MoveFilesFromFolderAtoFolderB(const std::string& folderA, const std::string& folderB);
+
+namespace fs = std::filesystem;
+
+bool SYS_MoveFilesAndDeleteSource(const std::string& source, const std::string& destination);
+
+// shall we use new folder for settings (CSIDL_LOCAL_APPDATA instead of CSIDL_COMMON_APPDATA)
+//#define SKIP_SETTINGS_MIGRATION
 
 void SYS_InitFileSystem()
 {
@@ -110,6 +120,10 @@ void SYS_InitFileSystem()
 	gUTFPathToTemp = new CSlrString(gCPathToTemp);
 
 	gPathToSettings = new char[MAX_PATH];
+	
+#if defined(SKIP_SETTINGS_MIGRATION)
+	// use old code for settings location
+
 	char* buf = SYS_GetCharBuf();
 	if (!SUCCEEDED(SHGetFolderPath(NULL, CSIDL_COMMON_APPDATA, NULL, 0, buf)))
 	{
@@ -135,10 +149,152 @@ void SYS_InitFileSystem()
 	}
 	SYS_ReleaseCharBuf(buf);
 
+#else
+	// upgrade and move settings from old location to a new location
+	// we need to move from CSIDL_COMMON_APPDATA to CSIDL_LOCAL_APPDATA as the CSIDL_COMMON_APPDATA is not writable anymore in new Windows (we all love Windows don't we)
+
+	char* buf = SYS_GetCharBuf();
+
+	if (!SUCCEEDED(SHGetFolderPath(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, buf)))
+	{
+		LOGError("failed to get app setings folder: CSIDL_LOCAL_APPDATA");
+		sprintf(gPathToSettings, "%s\\", curDir);
+	}
+	else
+	{
+		const char *settingsFolderName = MT_GetSettingsFolderName();
+		sprintf(gPathToSettings, "%s\\%s\\", buf, settingsFolderName);
+		
+		// check if folder exists & create new if needed
+		DWORD dwAttrib = GetFileAttributes(gPathToSettings);
+		if (dwAttrib == INVALID_FILE_ATTRIBUTES)
+		{
+			// settings folder does not exist
+			if (!CreateDirectory(gPathToSettings, NULL))
+			{
+				LOGError("failed to create app setings folder");
+				sprintf(gPathToSettings, "%s\\", curDir);
+			}
+			else
+			{
+				// created new settings folder, check if we need to move from old location
+				char *oldSettingsFolder = NULL;
+				bool oldFolderExists = false;
+				if (!SUCCEEDED(SHGetFolderPath(NULL, CSIDL_COMMON_APPDATA, NULL, 0, buf)))
+				{
+					LOGError("failed to get app setings folder: CSIDL_COMMON_APPDATA");
+				}
+				else
+				{
+					const char *settingsFolderName = MT_GetSettingsFolderName();
+					oldSettingsFolder = new char[MAX_STRING_LENGTH];
+					sprintf(oldSettingsFolder, "%s\\%s\\", buf, settingsFolderName);
+
+					if (SYS_FileExists(oldSettingsFolder))
+					{
+						LOGM("Upgrading settings path, moving settings from %s to %s", oldSettingsFolder, gPathToSettings);
+						
+						// we need to move all settings files from old folder
+						std::string folderFrom = std::string(oldSettingsFolder);
+						std::string folderTo = std::string(gPathToSettings);
+						SYS_MoveFilesAndDeleteSource(folderFrom, folderTo);
+	//					SYS_MoveFilesFromFolderAtoFolderB(folderFrom, folderTo);
+						
+						// remove old settings folder
+//						RemoveDirectory(oldSettingsFolder);
+					}
+
+					if (oldSettingsFolder != NULL)
+						delete[] oldSettingsFolder;
+				}
+			}
+		}
+		
+		// do we need this?? --- no!
+		//strcat(gPathToSettings, "\\");
+		//LOGTODO(" is settings folder correct: %s", gPathToSettings);
+	}
+	
+	SYS_ReleaseCharBuf(buf);
+
+#endif
+	
 	LOGM("pathToSettings=%s", gPathToSettings);
 
 	gCPathToSettings = gPathToSettings;
 	gUTFPathToSettings = new CSlrString(gCPathToSettings);
+}
+
+bool SYS_MoveFilesAndDeleteSource(const std::string& source, const std::string& destination)
+{
+	try
+	{
+		fs::create_directory(destination);
+
+		for (const auto& entry : fs::directory_iterator(source))
+		{
+			const auto& path = entry.path();
+			auto dest = fs::path(destination) / path.filename();
+
+			if (fs::is_directory(path))
+			{
+				if (!SYS_MoveFilesAndDeleteSource(path.string(), dest.string()))
+				{
+					return false;
+				}
+			}
+			else
+			{
+				fs::copy_file(path, dest, fs::copy_options::overwrite_existing);
+			}
+		}
+
+		// note, do not delete for now to let old apps still have settings
+//		fs::remove_all(source);
+	}
+	catch (const fs::filesystem_error& e)
+	{
+//		LOGError("SYS_MoveFilesAndDeleteSource: exception %s", e.what().c_str());
+		return false;
+	}
+
+	return true;
+}
+
+void SYS_MoveFilesFromFolderAtoFolderB(const std::string& folderA, const std::string& folderB)
+{
+	LOGD("SYS_MoveFilesFromFolderAtoFolderB");
+	
+	WIN32_FIND_DATA findFileData;
+	HANDLE hFind = FindFirstFile((folderA + "\\*").c_str(), &findFileData);
+
+	if (hFind == INVALID_HANDLE_VALUE)
+	{
+		LOGError("FindFirstFile failed with error %s", GetLastError());
+		return;
+	}
+
+	do
+	{
+		// Skip directories
+		if (findFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+		{
+			continue;
+		}
+
+		std::string sourceFile = folderA + "\\" + findFileData.cFileName;
+		std::string destFile = folderB + "\\" + findFileData.cFileName;
+
+		// Move the file
+		if (!MoveFile(sourceFile.c_str(), destFile.c_str()))
+		{
+			LOGError("Failed to move file: %s with error %s", sourceFile.c_str(), GetLastError());
+		}
+
+	}
+	while (FindNextFile(hFind, &findFileData) != 0);
+
+	FindClose(hFind);
 }
 
 CFileItem::CFileItem(char *name, char *fullPath, char *modDate, bool isDir)
@@ -395,6 +551,14 @@ void SYS_RefreshFiles()
 	}
 }
 
+FILE *SYS_OpenFile(const char *path, const char *mode)
+{
+	return fopen(path, mode);
+//	std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
+//	std::wstring wpath = converter.from_bytes(path);
+//	return _wfopen(wpath.c_str(), converter.from_bytes(mode).c_str());
+}
+
 void GUI_KeyUpAllModifiers()
 {
 	guiMain->isShiftPressed = false;
@@ -546,7 +710,8 @@ void SYS_DialogOpenFile(CSystemFileDialogCallback *callback, std::list<CSlrStrin
 void SYS_DialogSaveFile(CSystemFileDialogCallback *callback, std::list<CSlrString *> *extensions, CSlrString *defaultFileName, CSlrString *defaultFolder, CSlrString *windowTitle)
 {
 	OPENFILENAME ofn;
-    char szFileName[MAX_PATH] = "";
+	char szFileName[MAX_PATH];
+	memset(szFileName, 0, MAX_PATH - 1);
 
 	// temporary remove always on top window flag
 	SYS_windowAlwaysOnTopBeforeFileDialog = VID_IsMainWindowAlwaysOnTop();
@@ -625,7 +790,17 @@ void SYS_DialogSaveFile(CSystemFileDialogCallback *callback, std::list<CSlrStrin
 		ofn.lpstrTitle = title;
 	}
 
+	if (defaultFileName != NULL)
+	{
+		LOGD("defaultFileName != NULL");
+		defaultFileName->DebugPrint("defaultFileName=");
+		char *fileName = defaultFileName->GetStdASCII();
+		strncpy(szFileName, fileName, MAX_PATH-1);
+		LOGD("szFileName=%s", szFileName);
+		STRFREE(fileName);
+	}
     ofn.lpstrFile = szFileName;
+
 	if (defaultFolder != NULL)
 	{
 		initialFolder = defaultFolder->GetStdASCII();
@@ -1145,3 +1320,24 @@ const char* SYS_ExecSystemCommand(const char* cmd, int* terminationCode)
 	return STRALLOC(ListStdOut.c_str());
 }
 
+std::vector<std::string> SYS_Win32GetAvailableDrivesPaths()
+{
+	std::vector<std::string> drives;
+	DWORD driveMask = GetLogicalDrives();
+	if (driveMask == 0)
+	{
+		std::cerr << "Failed to get drives." << std::endl;
+		return drives; // Return empty vector if there's an error
+	}
+
+	for (char drive = 'A'; drive <= 'Z'; drive++) {
+		// Check if the corresponding bit is set in the mask
+		if (driveMask & (1 << (drive - 'A')))
+		{
+			std::string drivePath = std::string(1, drive) + ":\\";
+			drives.push_back(drivePath);
+		}
+	}
+
+	return drives;
+}

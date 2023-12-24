@@ -24,6 +24,8 @@ public:
 	CSlrDate(u8 day, u8 month, i16 year) { this->day = day; this->month = month; this->year = year; };
 	CSlrDate(u8 day, u8 month, i16 year, u8 second, u8 minute, u8 hour) { this->day = day; this->month = month; this->year = year; this->second = second; this->minute = minute; this->hour = hour; };
 
+	void RefreshFromCurrentSystemTime();
+	
 	void IncreaseSecond();
 	void DecreaseSecond();
 	void IncreaseMinute();
@@ -41,6 +43,7 @@ public:
 	void DateToString(char *buf);
 	void TimeToString(char *buf);
 	void DateTimeToString(char *buf);
+	void DateTimeToFileNameString(char *buf);
 };
 
 #endif

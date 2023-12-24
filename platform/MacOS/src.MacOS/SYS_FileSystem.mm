@@ -35,26 +35,30 @@ NSString *gOSPathToDocuments;
 char *gPathToDocuments;
 char *gCPathToDocuments;
 CSlrString *gUTFPathToDocuments;
+std::string gStdPathToDocuments;
 
 NSString *gOSPathToTemp;
 char *gPathToTemp;
 char *gCPathToTemp;
 CSlrString *gUTFPathToTemp;
+std::string gStdPathToTemp;
 
 NSString *gOSPathToResources;
 char *gPathToResources;
 char *gCPathToResources;
 CSlrString *gUTFPathToResources;
+std::string gStdPathToResources;
 
 NSString *gOSPathToSettings;
 char *gPathToSettings;
 char *gCPathToSettings;
 CSlrString *gUTFPathToSettings;
+std::string gStdPathToSettings;
 
 char *gPathToCurrentDirectory;
 char *gCPathToCurrentDirectory;
 CSlrString *gUTFPathToCurrentDirectory;
-
+std::string gStdPathToCurrentDirectory;
 
 std::list<CHttpFileUploadedCallback *> httpFileUploadedCallbacks;
 
@@ -77,6 +81,7 @@ void SYS_InitFileSystem()
 	
 	gCPathToCurrentDirectory = gPathToCurrentDirectory;
 	gUTFPathToCurrentDirectory = new CSlrString(gCPathToCurrentDirectory);
+	gStdPathToCurrentDirectory = std::string(gPathToCurrentDirectory);
 	
 	NSError *error;
 	
@@ -122,22 +127,25 @@ void SYS_InitFileSystem()
 	gCPathToDocuments = strdup(path);
 	gPathToDocuments = gCPathToDocuments;
 	gUTFPathToDocuments = FUN_ConvertNSStringToCSlrString(gOSPathToDocuments);
-
+	gStdPathToDocuments = std::string([gOSPathToDocuments UTF8String]);
 	
 	const char *pathResources = (const char *)[gOSPathToDocuments UTF8String];
 	gCPathToResources = strdup(path);
 	gPathToResources = gCPathToDocuments;
-	gUTFPathToDocuments = FUN_ConvertNSStringToCSlrString(gOSPathToDocuments);
+	gUTFPathToResources = FUN_ConvertNSStringToCSlrString(gOSPathToDocuments);
+	gStdPathToResources = std::string([gOSPathToDocuments UTF8String]);
 
 	const char *pathTemp = (const char *)[gOSPathToTemp UTF8String];
 	gCPathToTemp = strdup(pathTemp);
 	gPathToTemp = gCPathToTemp;
 	gUTFPathToTemp = FUN_ConvertNSStringToCSlrString(gOSPathToTemp);
-	
+	gStdPathToTemp = std::string([gOSPathToTemp UTF8String]);
+
 	const char *pathSettings = (const char *)[gOSPathToSettings UTF8String];
 	gCPathToSettings = strdup(pathSettings);
 	gPathToSettings = gCPathToSettings;
 	gUTFPathToSettings = FUN_ConvertNSStringToCSlrString(gOSPathToSettings);
+	gStdPathToSettings = std::string([gOSPathToSettings UTF8String]);
 	
 	LOGD("gCPathToDocuments=%s", gCPathToDocuments);
 	LOGD("gCPathToResources=%s", gCPathToResources);
@@ -425,6 +433,11 @@ void SYS_RefreshFiles()
 		CHttpFileUploadedCallback *callback = *itCallback;
 		callback->HttpFileUploadedCallback();
 	}
+}
+
+FILE *SYS_OpenFile(const char *path, const char *mode)
+{
+	return fopen(path, mode);
 }
 
 bool SYS_windowAlwaysOnTopBeforeFileDialog = false;
@@ -765,17 +778,14 @@ bool SYS_FileDirExists(const char *cPath)
 	
 	if(stat( cPath, &info ) != 0)
 	{
-		delete [] cPath;
 		return false;
 	}
 	else if(info.st_mode & S_IFDIR)
 	{
-		delete [] cPath;
 		return true;
 	}
 	else
 	{
-		delete [] cPath;
 		return false;
 	}
 }

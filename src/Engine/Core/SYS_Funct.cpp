@@ -458,6 +458,13 @@ void sprintfHexCode8WithoutZeroEnding(char *pszBuffer, uint8 value)
 	pszBuffer[1] = hexTableSmall[(value) & 0x0F];
 }
 
+void sprintfHexCode12WithoutZeroEnding(char *pszBuffer, uint16 value)
+{
+	pszBuffer[0] = hexTableSmall[(value >> 8) & 0x0F];
+	pszBuffer[1] = hexTableSmall[(value >> 4) & 0x0F];
+	pszBuffer[2] = hexTableSmall[(value) & 0x0F];
+}
+
 void sprintfHexCode16WithoutZeroEnding(char *pszBuffer, uint16 value)
 {
 	pszBuffer[0] = hexTableSmall[(value >> 12) & 0x0F];

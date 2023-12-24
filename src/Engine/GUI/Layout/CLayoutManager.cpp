@@ -168,7 +168,13 @@ void CLayoutManager::DeserializeLayouts(CByteBuffer *byteBuffer, u16 version)
 	
 	char *currentLayoutName = byteBuffer->GetString();
 	LOGD("currentLayoutName=%s", currentLayoutName);
-	currentLayout = GetLayoutByName(currentLayoutName);
+
+	CLayoutData *layoutData = GetLayoutByName(currentLayoutName);
+	if (layoutData != NULL)
+	{
+		CUiThreadTaskSetLayout *task = new CUiThreadTaskSetLayout(layoutData, false);
+		guiMain->AddUiThreadTask(task);
+	}
 }
 
 CLayoutData *CLayoutManager::GetLayoutByName(const char *name)
@@ -256,7 +262,9 @@ void CLayoutManager::LoadLayouts()
 		layoutData->doNotUpdateViewsPositions = false;
 		guiMain->layoutManager->AddLayout(layoutData);
 		guiMain->layoutManager->currentLayout = layoutData;
-		guiMain->layoutManager->StoreLayouts();
+		
+		// note, we do not need to overwrite layouts.dat file now, it will be anyway restored to default
+//		guiMain->layoutManager->StoreLayouts();
 	}
 	
 	delete byteBuffer;

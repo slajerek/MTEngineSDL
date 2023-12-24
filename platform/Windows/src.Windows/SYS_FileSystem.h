@@ -87,6 +87,9 @@ public:
 
 void SYS_RefreshFiles();
 
+// utf8-compatible equivalent
+FILE *SYS_OpenFile(const char *path, const char *mode);
+
 #include "CSystemFileDialogCallback.h"
 
 void SYS_DialogOpenFile(CSystemFileDialogCallback *callback, std::list<CSlrString *> *extensions, CSlrString *defaultFolder, CSlrString *windowTitle);
@@ -109,6 +112,7 @@ char* SYS_GetFileExtension(const char* fileName);
 char* SYS_GetFileName(const char* filePath);
 long SYS_GetFileModifiedTime(const char* filePath);
 const char* SYS_ExecSystemCommand(const char* cmd, int* terminationCode);
+std::vector<std::string> SYS_Win32GetAvailableDrivesPaths();
 
 char* SYS_GetPathToDocuments();
 

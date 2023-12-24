@@ -41,6 +41,7 @@ void CGuiViewImageWithLayer::SetImageKeepAspect(CSlrImage *setImage)
 
 void CGuiViewImageWithLayer::SetImageKeepAspect(CSlrImage *setImage, bool clearZoom)
 {
+//	LOGD("CGuiViewImageWithLayer::SetImageKeepAspect: setImage=%x width=%f height=%f aspect=%f", setImage, setImage->width, setImage->height, (setImage->width / setImage->height));
 	if (setImage != NULL)
 	{
 		SetKeepAspectRatio(true, setImage->width / setImage->height);
@@ -80,7 +81,6 @@ void CGuiViewImageWithLayer::SetImage(CSlrImage *setImage, bool clearZoom)
 		editLayerImage->LoadImageForRebinding(editLayerImageData, RESOURCE_PRIORITY_STATIC);
 		
 		VID_PostImageBinding(editLayerImage, NULL, BINDING_MODE_DONT_FREE_IMAGEDATA);
-
 	}
 
 	guiMain->UnlockMutex();

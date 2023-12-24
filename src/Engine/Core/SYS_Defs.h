@@ -24,6 +24,9 @@
 #define LOAD_CONSOLE_INVERTED_FONT
 #define LOAD_DEFAULT_FONT
 //#define LOAD_AND_BLIT_ZOOM_SIGN
+#define USE_IMPLOT_COLORS_EXTENSION
+
+#include <iostream>
 
 // common library headers
 extern "C"	
@@ -33,6 +36,7 @@ extern "C"
 #include <stdarg.h>
 #ifndef WIN32
 #include <stddef.h>
+#else
 #endif
 #include <string.h>
 }
@@ -48,8 +52,6 @@ extern "C"
 #if defined(MACOS) || defined(LINUX)
 #include <unistd.h>
 #endif
-
-#include <iostream>
 
 #if defined(WIN32)
 #pragma warning( disable : 4100) //unreferenced parameters
@@ -159,6 +161,7 @@ typedef long long                   int64;
 #define MT_PRIORITY_ABOVE_NORMAL	3
 #define MT_PRIORITY_HIGH_PRIORITY	4
 
+// 
 #include "stb_sprintf.h"
 
 #endif

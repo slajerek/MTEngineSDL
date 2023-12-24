@@ -65,6 +65,9 @@ std::vector<CFileItem *> *SYS_GetFilesInFolder(const char *directoryPath, std::l
 
 void SYS_RefreshFiles();
 
+// utf8-compatible equivalent
+FILE *SYS_OpenFile(const char *path, const char *mode);
+
 #include "CSystemFileDialogCallback.h"
 
 void SYS_DialogOpenFile(CSystemFileDialogCallback *callback, std::list<CSlrString *> *extensions, CSlrString *defaultFolder, CSlrString *windowTitle);

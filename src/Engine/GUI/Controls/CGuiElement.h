@@ -133,6 +133,7 @@ public:
 	virtual void ResourcesPostLoad();
 
 	virtual bool IsVisible();
+
 	bool visible;
 
 	// does not render in view->Render method

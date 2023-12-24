@@ -68,7 +68,7 @@ void SYS_InitFileSystem()
 //#if !defined(USE_DOCS_INSTEAD_OF_RESOURCES)
 //	sprintf(gPathToResources, "./Resources/");
 //#else
-	sprintf(gPathToResources, "./Documents/");
+	sprintf(gPathToResources, ".");
 //#endif
 
 	LOGD("pathToResources=%s", gPathToResources);
@@ -76,7 +76,7 @@ void SYS_InitFileSystem()
 
 
 	gPathToDocuments = new char[PATH_MAX];
-	sprintf(gPathToDocuments, "./Documents/");
+	sprintf(gPathToDocuments, ".");
 	gCPathToDocuments = gPathToDocuments;
 	gUTFPathToDocuments = new CSlrString(gCPathToDocuments);
 
@@ -365,6 +365,12 @@ void SYS_RefreshFiles()
 		callback->HttpFileUploadedCallback();
 	}
 }
+
+FILE *SYS_OpenFile(const char *path, const char *mode)
+{
+	return fopen(path, mode);
+}
+
 
 bool SYS_windowAlwaysOnTopBeforeFileDialog = false;
 

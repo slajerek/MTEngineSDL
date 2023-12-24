@@ -118,7 +118,7 @@ bool CGuiView::IsResizingOrOutsideWindow(float x, float y)
 			|| context->MouseCursor == ImGuiMouseCursor_ResizeEW
 			|| context->MouseCursor == ImGuiMouseCursor_NotAllowed)
 		{
-//			LOGD("skip IsInside corner");
+//			LOGI("IsResizingOrOutsideWindow: skip, IsInside corner");
 			return true;
 		}
 		
@@ -131,12 +131,15 @@ bool CGuiView::IsResizingOrOutsideWindow(float x, float y)
 
 bool CGuiView::IsInsideWindowInnerRect(float x, float y)
 {
+//	LOGD("IsInsideWindowInnerRect: visible");
 	if (!this->visible)
 		return false;
 
+//	LOGD("IsInsideWindowInnerRect: IsResizingOrOutsideWindow");
 	if (IsResizingOrOutsideWindow(x, y))
 		return false;
 
+//	LOGD("IsInsideWindowInnerRect: check position");
 	if (x >= this->windowInnerRectPosX && x <= this->windowInnerRectPosEndX
 		&& y >= this->windowInnerRectPosY && y <= this->windowInnterRectPosEndY)
 	{
@@ -162,19 +165,23 @@ bool CGuiView::IsInside(float x, float y)
 
 bool CGuiView::IsInsideView(float x, float y)
 {
+//	LOGI("IsInsideView: visible");
 	if (!this->visible)
 		return false;
 	
+//	LOGI("IsInsideView: resizing");
 	if (IsResizingOrOutsideWindow(x, y))
 		return false;
 
+//	LOGI("IsInsideView: IsInsideViewNonVisible");
 	return this->IsInsideViewNonVisible(x, y);
 }
+
 
 bool CGuiView::IsInsideViewNonVisible(float x, float y)
 {
 	float o = 2.0f;
-	
+		
 	if (x >= this->posX+o && x <= this->posEndX-o
 		&& y >= this->posY+o && y <= this->posEndY-o)
 	{
@@ -1865,11 +1872,12 @@ void CGuiView::LayoutParameterChanged(CLayoutParameter *layoutParameter)
 void CGuiView::SerializeLayout(CByteBuffer *byteBuffer)
 {
 	LOGG("CGuiView::SerializeLayout: %s", name);
+	
 	byteBuffer->PutBool(IsVisible());
-//	byteBuffer->PutI32(posX);
-//	byteBuffer->PutI32(posY);
-//	byteBuffer->PutI32(sizeX);
-//	byteBuffer->PutI32(sizeY);
+//	viewByteBuffer->PutI32(posX);
+//	viewByteBuffer->PutI32(posY);
+//	viewByteBuffer->PutI32(sizeX);
+//	viewByteBuffer->PutI32(sizeY);
 	
 	byteBuffer->PutU32(layoutParameters.size());
 	
@@ -1879,13 +1887,15 @@ void CGuiView::SerializeLayout(CByteBuffer *byteBuffer)
 
 		byteBuffer->putString(parameter->name);
 		parameter->Serialize(byteBuffer);
-	}
+	}	
 }
 
-bool CGuiView::DeserializeLayout(CByteBuffer *byteBuffer)
+bool CGuiView::DeserializeLayout(CByteBuffer *byteBuffer, int version)
 {
-	LOGG("CGuiView::DeserializeLayout: %s", name);
-	this->visible = byteBuffer->GetBool();
+	LOGG("CGuiView::DeserializeLayout: %s version=%d", name, version);
+	
+	bool isRestoreCorrect = true;
+	bool setVisible = byteBuffer->GetBool();
 //	int px = byteBuffer->GetI32();
 //	int py = byteBuffer->GetI32();
 //	int sx = byteBuffer->GetI32();
@@ -1905,7 +1915,8 @@ bool CGuiView::DeserializeLayout(CByteBuffer *byteBuffer)
 		{
 			LOGError("CGuiView::DeserializeLayout: %s layout parameter not found '%s'", this->name, paramName);
 			STRFREE(paramName);
-			return false;
+			isRestoreCorrect = false;
+			break;
 		}
 
 		STRFREE(paramName);
@@ -1913,13 +1924,15 @@ bool CGuiView::DeserializeLayout(CByteBuffer *byteBuffer)
 		CLayoutParameter *parameter = it->second;
 		if (parameter->Deserialize(byteBuffer) == false)
 		{
-			return false;
+			isRestoreCorrect = false;
+			break;
 		}
 	}
 	
 	this->LayoutParameterChanged(NULL);
+	this->SetVisible(setVisible);
 	
-	return true;
+	return isRestoreCorrect;
 }
 
 bool CGuiView::DoDropFile(char *filePath)

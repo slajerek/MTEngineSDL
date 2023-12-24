@@ -139,8 +139,10 @@ CSlrMutex::CSlrMutex(const char *name)
 {
 	strcpy(this->name, name);
 
+#if defined(USE_SDL_MUTEX)
 	// SDL mutexes are recursive
 	mutex = SDL_CreateMutex();
+#endif
 	
 #if defined(MT_DEBUG_MUTEX)
 	lockedLevel = 0;
@@ -149,7 +151,9 @@ CSlrMutex::CSlrMutex(const char *name)
 
 CSlrMutex::~CSlrMutex()
 {
+#if defined(USE_SDL_MUTEX)
 	SDL_DestroyMutex(mutex);
+#endif
 }
 	
 void CSlrMutex::Lock()
@@ -171,13 +175,23 @@ void CSlrMutex::Lock()
 	lockedLevel++;
 
 #else
+	
+#if defined(USE_SDL_MUTEX)
 	SDL_LockMutex(mutex);
-#endif	
+#else
+	mutex.lock();
+#endif
+	
+#endif
 }
 
 bool CSlrMutex::TryLock()
 {
+#if defined(USE_SDL_MUTEX)
 	return ( SDL_TryLockMutex(mutex) != SDL_MUTEX_TIMEDOUT );
+#else
+	return mutex.try_lock();
+#endif
 }
 
 void CSlrMutex::Unlock()
@@ -186,7 +200,11 @@ void CSlrMutex::Unlock()
 	lockedLevel--;
 #endif
 	
+#if defined(USE_SDL_MUTEX)
 	SDL_UnlockMutex(mutex);
+#else
+	mutex.unlock();
+#endif
 }
 
 unsigned long SYS_GetProcessId()
