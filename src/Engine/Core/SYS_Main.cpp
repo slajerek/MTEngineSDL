@@ -12,10 +12,24 @@
 #include "CGlobalLogicCallback.h"
 #include "SYS_Threading.h"
 #include <list>
+#include <filesystem>
 
 #if !defined(WIN32)
 #include <sys/time.h>
 #endif
+
+//#define ASSERT_CHECK_ReleaseCharBuf
+//#define SAFEMALLOC_USEMARKER
+//#define SAFEMALLOC_MARKER ((unsigned int) 0x4400DEAD)
+
+// remove me:
+namespace fs = std::filesystem;
+
+void testFilesystem()
+{
+	const std::string path_as_string = "\xe4\xb8\xad";
+	const std::filesystem::path correct_path = std::filesystem::u8path(path_as_string);
+}
 
 unsigned long SYS_GetCurrentTimeInMillis()
 {
@@ -235,9 +249,9 @@ void SYS_Free(void **ptr)
 	if (*p != SAFEMALLOC_MARKER)
 	{
 		if (*p == (SAFEMALLOC_MARKER ^ 0xFFFFFFFF))
-			SYS_Errorf("SYS_FREE: freeing pointer twice");
+			LOGError("SYS_FREE: freeing pointer twice");
 		else
-			SYS_Errorf("SYS_FREE: freeing not alloced pointer");
+			LOGError("SYS_FREE: freeing not alloced pointer");
 	}
 	*p = SAFEMALLOC_MARKER ^ 0xFFFFFFFF;
 
@@ -299,6 +313,21 @@ char *SYS_GetCharBuf()
 void SYS_ReleaseCharBuf(char *buf)
 {
 	charBufsMutex->Lock();
+	
+#if defined(ASSERT_CHECK_ReleaseCharBuf)
+	for (std::list<char *>::iterator it = charBufsPool.begin(); it != charBufsPool.end(); it++)
+	{
+		char *b = *it;
+		if (b == buf)
+		{
+			LOGError("SYS_ReleaseCharBuf: freeing twice %x", buf);
+			LOGError("SYS_ReleaseCharBuf: %x = '%s'", buf, buf);
+//			SYS_FatalExit("SYS_ReleaseCharBuf failed");
+			charBufsMutex->Unlock();
+			return;
+		}
+	}
+#endif
 	charBufsPool.push_back(buf);
 	charBufsMutex->Unlock();
 }

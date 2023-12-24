@@ -41,6 +41,8 @@ public:
 	
 	void Clear();
 	void Add(CSlrString *filePath);
+	void Remove(CSlrString *filePath);
+	bool Exists(CSlrString *filePath);
 
 	virtual void ThreadRun(void *passData);
 	void RefreshAreFilesAvailable();

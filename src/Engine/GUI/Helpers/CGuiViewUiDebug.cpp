@@ -58,6 +58,10 @@ void CGuiViewUiDebug::RenderImGui()
 	guiMain->fntConsole->BlitText(buf, px, py, 0, fontSize, 1.0);
 	py += fontSize;
 	
+	sprintf(buf, "compiled on " __DATE__ " " __TIME__);
+	guiMain->fntConsole->BlitText(buf, px, py, 0, fontSize, 1.0);
+	py += fontSize;
+
 	SDL_version compiled;
 	SDL_version linked;
 	SDL_VERSION(&compiled);

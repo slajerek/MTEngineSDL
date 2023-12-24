@@ -254,15 +254,15 @@ void CSlrKeyboardShortcuts::AddShortcut(CSlrKeyboardShortcut *shortcutToAdd)
 	{
 		shortcutsZone = itShortcuts->second;
 		
-//		// check if hashcode exists
-//		std::map<u64, CSlrKeyboardShortcut *>::iterator itHashcode = shortcutsZone->shortcutByHashcode->find(shortcutToAdd->hashCode);
-//		if (itHashcode != shortcutsZone->shortcutByHashcode->end())
-//		{
-//			CSlrKeyboardShortcut *shortcut = itHashcode->second;
-//			
-//			SYS_FatalExit("CSlrKeyboardShortcuts::AddShortcut: duplicated shortcut hashcode %x ('%s' == '%s')", shortcutToAdd->hashCode,
-//						  shortcut->name, shortcutToAdd->name);
-//		}
+		// check if hashcode exists
+		std::map<u64, CSlrKeyboardShortcut *>::iterator itHashcode = shortcutsZone->shortcutByHashcode->find(shortcutToAdd->hashCode);
+		if (itHashcode != shortcutsZone->shortcutByHashcode->end())
+		{
+			CSlrKeyboardShortcut *shortcut = itHashcode->second;
+
+			LOGError("CSlrKeyboardShortcuts::AddShortcut: duplicated shortcut hashcode %x ('%s' == '%s')", shortcutToAdd->hashCode,
+						  shortcut->name, shortcutToAdd->name);
+		}
 	}
 	else
 	{

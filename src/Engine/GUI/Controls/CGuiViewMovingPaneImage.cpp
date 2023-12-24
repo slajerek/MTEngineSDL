@@ -214,6 +214,8 @@ void CGuiViewMovingPaneImage::RenderImGui()
 	//	LOGD("renderTextureStartX=%f renderTextureEndX=%f renderTextureStartY=%f renderTextureEndY=%f",
 	//		 renderTextureStartX, renderTextureEndX, renderTextureStartY, renderTextureEndY);
 
+//	LOGD("CGuiViewMovingPaneImage::RenderImGui: image=%x", image);
+	
 	if (image)
 	{
 		if (UpdateImageData())

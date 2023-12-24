@@ -410,6 +410,7 @@ void CSlrImage::LoadImage(CImageData *origImageData, u8 resourcePriority, bool f
 	this->rasterHeight = NextPow2(loadImgHeight);
 	this->origRasterWidth = rasterWidth;
 	this->origRasterHeight = rasterHeight;
+	
 	this->width = loadImgWidth;
 	this->height = loadImgHeight;
 
@@ -423,7 +424,7 @@ void CSlrImage::LoadImage(CImageData *origImageData, u8 resourcePriority, bool f
 	this->loadImageData->AllocImage(false, true);
 
 	u8 *imageData = (u8*)this->loadImageData->resultData;
-	
+
 	if (rasterWidth == loadImgWidth && rasterHeight == loadImgHeight)
 	{
 		memcpy(this->loadImageData->resultData, origImageData->resultData, origImageData->width*origImageData->height*4);
@@ -448,7 +449,7 @@ void CSlrImage::LoadImage(CImageData *origImageData, u8 resourcePriority, bool f
 			}
 		}
 	}
-	
+
 	unsigned int w = (unsigned int)(rasterWidth*4);
 
 	if (flipImageVertically)
@@ -475,7 +476,7 @@ void CSlrImage::LoadImage(CImageData *origImageData, u8 resourcePriority, bool f
 					}
 			}
 	}
-	
+
 	this->widthD2 = this->width/2.0;
 	this->heightD2 = this->height/2.0;
 	this->widthM2 = this->width*2.0;

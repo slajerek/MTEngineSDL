@@ -209,12 +209,17 @@ void CGuiMain::DebugPrintViews()
 //	LOGD("--------------------------------------------");
 }
 
+#define LAYOUT_VERSION 1
+
 //
 void CGuiMain::SerializeLayout(CLayoutData *layoutData)
 {
 	CByteBuffer *byteBuffer = layoutData->serializedLayoutBuffer;
 	
 	byteBuffer->Clear();
+	
+	// put version
+	byteBuffer->PutU32(LAYOUT_VERSION);
 	
 	// put imgui ini
 	size_t len = 0;
@@ -223,13 +228,19 @@ void CGuiMain::SerializeLayout(CLayoutData *layoutData)
 	byteBuffer->PutBytes((u8*)data, len+1);
 	
 	byteBuffer->PutU32(layoutViews.size());
+	
+	CByteBuffer *viewByteBuffer = new CByteBuffer();
 	for (std::map<u64, CGuiView *>::iterator it = layoutViews.begin(); it != layoutViews.end(); it++)
 	{
 		CGuiView *view = it->second;
 //		LOGG("serialize %s", view->name);
 		byteBuffer->PutString(view->name);
-		view->SerializeLayout(byteBuffer);
+		
+		viewByteBuffer->Clear();
+		view->SerializeLayout(viewByteBuffer);
+		byteBuffer->PutByteBuffer(viewByteBuffer);
 	}
+	delete viewByteBuffer;
 }
 
 // returns if failed
@@ -242,14 +253,28 @@ bool CGuiMain::DeserializeLayout(CLayoutData *layout)
 	
 	byteBuffer->Rewind();
 	
-	u32 len = byteBuffer->GetU32();
+	u32 version;
+	u32 len;
+	
+	version = byteBuffer->GetU32();
+//	LOGD("read %d", version);
+	if (version != LAYOUT_VERSION)
+	{
+		// we have old version, so this u32 means length
+		len = version;
+//		LOGD("len=%d", len);
+		version = 0;
+	}
+	else
+	{
+		len = byteBuffer->GetU32();
+	}
+	
+	LOGD("CGuiMain::DeserializeLayout: version=%d", version);
+	
 	u8 *data = byteBuffer->GetBytes(len);
 	
 	ImGui::LoadIniSettingsFromMemory((const char*)data);
-	
-//	FILE *fp = fopen("/Users/mars/imgui-ini.txt", "wb");
-//	fwrite(data, len, 1, fp);
-//	fclose(fp);
 	
 	delete [] data;
 	
@@ -257,21 +282,41 @@ bool CGuiMain::DeserializeLayout(CLayoutData *layout)
 	for (u32 i = 0; i < numViews; i++)
 	{
 		char *str = byteBuffer->GetString();
+		CByteBuffer *viewByteBuffer;
+		
+		if (version > 0)
+		{
+			viewByteBuffer = byteBuffer->GetByteBuffer();;
+		}
+		else
+		{
+			// old version
+			viewByteBuffer = byteBuffer;
+		}
+		
 		u64 hash = GetHashCode64(str);
-		LOGG("  view %s hash %x", str, hash);
+		LOGD("  view %s hash %x", str, hash);
 		std::map<u64, CGuiView *>::iterator it = layoutViews.find(hash);
 		if (it == layoutViews.end())
 		{
 			// view not found? error, break restore
-			LOGD("   view not found %s hash %08x", str, hash);
+			LOGError("   view not found %s hash %08x, skipping", str, hash);
 			STRFREE(str);
-			return false;
+			
+			if (version > 0)
+				delete viewByteBuffer;
+			continue;
 		}
 		
 		STRFREE(str);
 
 		CGuiView *view = it->second;
-		if (view->DeserializeLayout(byteBuffer) == false)
+		bool isCorrect = view->DeserializeLayout(viewByteBuffer, version);
+		
+		if (version > 0)
+			delete viewByteBuffer;
+		
+		if (isCorrect == false)
 		{
 			return false;
 		}
@@ -393,7 +438,7 @@ bool CGuiMain::KeyDown(u32 keyCode)
 	for (int i = context->Windows.Size - 1; i >= 0; i--) // Iterate front to back
 	{
 		ImGuiWindow *window = context->Windows[i];
-		if (window->Hidden)
+		if (!window->WasActive || window->Hidden)
 			continue;
 
 		CGuiView *view = (CGuiView*)window->userData;
@@ -594,7 +639,7 @@ bool CGuiMain::KeyUp(u32 keyCode)
 	for (int i = context->Windows.Size - 1; i >= 0; i--) // Iterate front to back
 	{
 		ImGuiWindow *window = context->Windows[i];
-		if (window->Hidden)
+		if (!window->WasActive || window->Hidden)
 			continue;
 
 		CGuiView *view = (CGuiView*)window->userData;
@@ -692,7 +737,7 @@ bool CGuiMain::KeyTextInput(const char *text)
 	for (int i = context->Windows.Size - 1; i >= 0; i--) // Iterate front to back
 	{
 		ImGuiWindow *window = context->Windows[i];
-		if (window->Hidden)
+		if (!window->WasActive || window->Hidden)
 			continue;
 
 		CGuiView *view = (CGuiView*)window->userData;
@@ -832,7 +877,7 @@ void CGuiMain::DoDropFile(u32 windowId, char *filePath)
 		for (int i = context->Windows.Size - 1; i >= 0; i--) // Iterate front to back
 		{
 			ImGuiWindow *window = context->Windows[i];
-			if (window->Hidden)
+			if (!window->WasActive || window->Hidden)
 				continue;
 			
 			CGuiView *view = (CGuiView*)window->userData;
@@ -871,7 +916,7 @@ bool CGuiMain::DoTap(float x, float y)
 	
 	if (IsOnAnyOpenedPopup(x, y))
 	{
-//		LOGI("...is on popup, skipping tap");
+		LOGI("...is on popup, skipping tap");
 		return false;
 	}
 	
@@ -890,22 +935,38 @@ bool CGuiMain::DoTap(float x, float y)
 	for (int i = context->Windows.Size - 1; i >= 0; i--) // Iterate front to back
 	{
 		ImGuiWindow *window = context->Windows[i];
-		if (window->Hidden)
+		CGuiView *view = (CGuiView*)window->userData;
+		
+		if (view != NULL)
+		{
+			LOGI("....view=%s", view->name);
+		}
+		else
+		{
+			LOGI("....view=NULL");
+		}
+
+		LOGD("window->Hidden=%s window->WasActive=%s", STRBOOL(window->Hidden), STRBOOL(window->WasActive));
+		
+		if (!window->WasActive || window->Hidden)
 			continue;
 
-		CGuiView *view = (CGuiView*)window->userData;
 
 		if (view != NULL && view->IsVisible())
 		{
-//			LOGI("....view=%s", view->name);
+			LOGI("....view=%s IsInside?", view->name);
 			if (view->IsInsideView(x, y))
 			{
-//				LOGI("....... IsInside, DoTap()");
+				LOGI("....... IsInsideView, DoTap(): %s", view->name);
 				if (view->DoTap(x, y))
 				{
-//					LOGI("......... view %s consumed tap", view->name);
+					LOGI("......... view %s consumed tap", view->name);
 					return true;
 				}
+			}
+			else
+			{
+				LOGI("....view=%s not IsInsideView");
 			}
 		}
 	}
@@ -949,7 +1010,7 @@ bool CGuiMain::DoFinishTap(float x, float y)
 	for (int i = context->Windows.Size - 1; i >= 0; i--) // Iterate front to back
 	{
 		ImGuiWindow *window = context->Windows[i];
-		if (window->Hidden)
+		if (!window->WasActive || window->Hidden)
 			continue;
 
 		CGuiView *view = (CGuiView*)window->userData;
@@ -1020,7 +1081,7 @@ bool CGuiMain::DoRightClick(float x, float y)
 	for (int i = context->Windows.Size - 1; i >= 0; i--) // Iterate front to back
 	{
 		ImGuiWindow *window = context->Windows[i];
-		if (window->Hidden)
+		if (!window->WasActive || window->Hidden)
 			continue;
 
 		CGuiView *view = (CGuiView*)window->userData;
@@ -1079,7 +1140,7 @@ bool CGuiMain::DoFinishRightClick(float x, float y)
 	for (int i = context->Windows.Size - 1; i >= 0; i--) // Iterate front to back
 	{
 		ImGuiWindow *window = context->Windows[i];
-		if (window->Hidden)
+		if (!window->WasActive || window->Hidden)
 			continue;
 
 		CGuiView *view = (CGuiView*)window->userData;
@@ -1167,7 +1228,7 @@ bool CGuiMain::DoMove(float x, float y)
 	for (int i = context->Windows.Size - 1; i >= 0; i--) // Iterate front to back
 	{
 		ImGuiWindow *window = context->Windows[i];
-		if (window->Hidden)
+		if (!window->WasActive || window->Hidden)
 			continue;
 	 
 		CGuiView *view = (CGuiView*)window->userData;
@@ -1242,7 +1303,7 @@ bool CGuiMain::DoRightClickMove(float x, float y)
 	for (int i = context->Windows.Size - 1; i >= 0; i--) // Iterate front to back
 	{
 		ImGuiWindow *window = context->Windows[i];
-		if (window->Hidden)
+		if (!window->WasActive || window->Hidden)
 			continue;
 	 
 		CGuiView *view = (CGuiView*)window->userData;
@@ -1306,7 +1367,7 @@ void CGuiMain::DoScrollWheel(float deltaX, float deltaY)
 	for (int i = context->Windows.Size - 1; i >= 0; i--) // Iterate front to back
 	{
 		ImGuiWindow *window = context->Windows[i];
-		if (window->Hidden)
+		if (!window->WasActive || window->Hidden)
 			continue;
 
 		CGuiView *view = (CGuiView*)window->userData;
@@ -1631,29 +1692,31 @@ void CGuiMain::PostRenderEndFrame()
 
 void CGuiMain::StoreLayoutInSettingsAtEndOfThisFrame()
 {
-	LOGD("StoreLayoutInSettingsAtEndOfThisFrame");
+	LOGI("StoreLayoutInSettingsAtEndOfThisFrame");
 	layoutStoreCurrentInSettings = true;
 }
 
 // iterate top-down by ImGui windows and find most top in x,y
 CGuiView* CGuiMain::FindTopWindow(float x, float y)
 {
+//	LOGI("....FindTopWindow %f %f", x, y);
 	LockMutex();
 	
 	ImGuiContext *context = ImGui::GetCurrentContext();
 	for (int i = context->Windows.Size - 1; i >= 0; i--) // Iterate front to back
 	{
 		ImGuiWindow *window = context->Windows[i];
-		if (window->Hidden)
+		if (!window->WasActive || window->Hidden)
 			continue;
 
 		CGuiView *view = (CGuiView*)window->userData;
 
 		if (view != NULL && view->IsVisible() && !view->IsHidden())
 		{
-//			LOGD("....view=%s", view->name);
+//			LOGI("....FindTopWindow: view=%s view->visible=%s", view->name, STRBOOL(view->visible));
 			if (view->IsInsideWindow(x, y))
 			{
+//				LOGI("....FindTopWindow: inside window");
 				UnlockMutex();
 				return view;
 			}
@@ -2212,12 +2275,15 @@ void CUiThreadTaskSetViewFullScreen::RunUIThreadTask()
 	}
 }
 
-// this is for async intermittent bug, workaround
-void CUiThreadTaskRefreshLayout::RunUIThreadTask()
+CUiThreadTaskSetLayout::CUiThreadTaskSetLayout(CLayoutData *layoutData, bool saveCurrentLayout)
 {
-	// refresh (restore) current layout
-	CLayoutData *layoutData = guiMain->layoutManager->currentLayout;
-	guiMain->layoutManager->SetLayoutAsync(layoutData, false);
+	this->layoutData = layoutData;
+	this->saveCurrentLayout = saveCurrentLayout;
+}
+
+void CUiThreadTaskSetLayout::RunUIThreadTask()
+{
+	guiMain->layoutManager->SetLayoutAsync(layoutData, saveCurrentLayout);
 }
 
 CUiThreadTaskSetViewFocus::CUiThreadTaskSetViewFocus(CGuiView *view)
@@ -2229,4 +2295,16 @@ void CUiThreadTaskSetViewFocus::RunUIThreadTask()
 {
 	guiMain->SetFocus(view);
 }
+
+CUiThreadTaskSetViewVisible::CUiThreadTaskSetViewVisible(CGuiView *view, bool isVisible)
+{
+	this->view = view;
+	this->isVisible = isVisible;
+}
+
+void CUiThreadTaskSetViewVisible::RunUIThreadTask()
+{
+	view->visible = isVisible;
+}
+
 

@@ -163,11 +163,11 @@
     <Filter Include="Source Files\src\Engine\GUI\AudioMixer">
       <UniqueIdentifier>{d4717988-4718-413d-bd7e-db53d0fd65fc}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\src\Engine\Libs\ENet">
+      <UniqueIdentifier>{f8118afd-95f8-4711-8ec7-d87b00d4ca54}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\src\Embedded\RES_Embedded.cpp">
-      <Filter>Source Files\src\Embedded</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\Audio\WAV\SND_WavReader.cpp">
       <Filter>Source Files\src\Engine\Audio\WAV</Filter>
     </ClCompile>
@@ -1104,6 +1104,33 @@
     <ClCompile Include="..\..\..\src\Engine\Libs\imgui\imgui_impl_sdl2.cpp">
       <Filter>Source Files\src\Engine\Libs</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\Embedded\RES_Embedded.cpp">
+      <Filter>Source Files\src\Embedded</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\ENet\ENET_Callbacks.cpp">
+      <Filter>Source Files\src\Engine\Libs\ENet</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\ENet\ENET_Compress.cpp">
+      <Filter>Source Files\src\Engine\Libs\ENet</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\ENet\ENET_Host.cpp">
+      <Filter>Source Files\src\Engine\Libs\ENet</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\ENet\ENET_List.cpp">
+      <Filter>Source Files\src\Engine\Libs\ENet</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\ENet\ENET_Packet.cpp">
+      <Filter>Source Files\src\Engine\Libs\ENet</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\ENet\ENET_Peer.cpp">
+      <Filter>Source Files\src\Engine\Libs\ENet</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\ENet\ENET_Protocol.cpp">
+      <Filter>Source Files\src\Engine\Libs\ENet</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\ENet\ENET_Win32.cpp">
+      <Filter>Source Files\src\Engine\Libs\ENet</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src.Windows\CLogByteBuffer.h">
@@ -1171,18 +1198,6 @@
     </ClInclude>
     <ClInclude Include="..\..\..\src\MT_VERSION.h">
       <Filter>Source Files\src</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\Embedded\console_plain_gfx.h">
-      <Filter>Source Files\src\Embedded</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\Embedded\default_font_fnt.h">
-      <Filter>Source Files\src\Embedded</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\Embedded\default_font_gfx.h">
-      <Filter>Source Files\src\Embedded</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\Embedded\RES_Embedded.h">
-      <Filter>Source Files\src\Embedded</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\Audio\WAV\SND_WavReader.h">
       <Filter>Source Files\src\Engine\Audio\WAV</Filter>
@@ -2023,6 +2038,45 @@
     </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\Libs\imgui\imgui_impl_sdl2.h">
       <Filter>Source Files\src\Engine\Libs</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Embedded\console_inverted_plain_gfx.h">
+      <Filter>Source Files\src\Embedded</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Embedded\console_plain_gfx.h">
+      <Filter>Source Files\src\Embedded</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Embedded\default_font_fnt.h">
+      <Filter>Source Files\src\Embedded</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Embedded\default_font_gfx.h">
+      <Filter>Source Files\src\Embedded</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Embedded\RES_Embedded.h">
+      <Filter>Source Files\src\Embedded</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\ENet\enet.h">
+      <Filter>Source Files\src\Engine\Libs\ENet</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\ENet\ENET_Callbacks.h">
+      <Filter>Source Files\src\Engine\Libs\ENet</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\ENet\ENET_List.h">
+      <Filter>Source Files\src\Engine\Libs\ENet</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\ENet\ENET_Protocol.h">
+      <Filter>Source Files\src\Engine\Libs\ENet</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\ENet\ENET_Time.h">
+      <Filter>Source Files\src\Engine\Libs\ENet</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\ENet\ENET_Types.h">
+      <Filter>Source Files\src\Engine\Libs\ENet</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\ENet\ENET_Utility.h">
+      <Filter>Source Files\src\Engine\Libs\ENet</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\ENet\ENET_Win32.h">
+      <Filter>Source Files\src\Engine\Libs\ENet</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

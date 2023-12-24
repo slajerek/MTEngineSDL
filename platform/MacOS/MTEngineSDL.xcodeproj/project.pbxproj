@@ -26,6 +26,8 @@
 		4116AFBE263AB895001477AD /* CLayoutManager.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4116AFBA263AB894001477AD /* CLayoutManager.cpp */; };
 		4116AFBF263AB895001477AD /* CLayoutManager.h in Headers */ = {isa = PBXBuildFile; fileRef = 4116AFBB263AB894001477AD /* CLayoutManager.h */; };
 		4116AFC0263AB895001477AD /* CLayoutParameter.h in Headers */ = {isa = PBXBuildFile; fileRef = 4116AFBC263AB894001477AD /* CLayoutParameter.h */; };
+		411F11612B29B99A00098FEE /* implot_colors_extension.h in Headers */ = {isa = PBXBuildFile; fileRef = 411F115F2B29B99A00098FEE /* implot_colors_extension.h */; };
+		411F11622B29B99A00098FEE /* implot_colors_extension.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 411F11602B29B99A00098FEE /* implot_colors_extension.cpp */; };
 		4122B8EC24BF3775001CFD64 /* implot_demo.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4122B8E924BF3775001CFD64 /* implot_demo.cpp */; };
 		4122B8ED24BF3775001CFD64 /* implot.h in Headers */ = {isa = PBXBuildFile; fileRef = 4122B8EA24BF3775001CFD64 /* implot.h */; };
 		4122B8EE24BF3775001CFD64 /* implot.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4122B8EB24BF3775001CFD64 /* implot.cpp */; };
@@ -73,8 +75,6 @@
 		4150B2F4245E2A38007DB292 /* ENET_Callbacks.h in Headers */ = {isa = PBXBuildFile; fileRef = 4150B2E2245E2A38007DB292 /* ENET_Callbacks.h */; };
 		4150B2F5245E2A38007DB292 /* ENET_Time.h in Headers */ = {isa = PBXBuildFile; fileRef = 4150B2E3245E2A38007DB292 /* ENET_Time.h */; };
 		4150B2F6245E2A38007DB292 /* ENET_Compress.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4150B2E4245E2A38007DB292 /* ENET_Compress.cpp */; };
-		4150B2F7245E2A38007DB292 /* ENET_Win32.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4150B2E5245E2A38007DB292 /* ENET_Win32.cpp */; };
-		4150B2F8245E2A38007DB292 /* ENET_Win32.h in Headers */ = {isa = PBXBuildFile; fileRef = 4150B2E6245E2A38007DB292 /* ENET_Win32.h */; };
 		4150B2F9245E2A38007DB292 /* ENET_List.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4150B2E7245E2A38007DB292 /* ENET_List.cpp */; };
 		4150B2FA245E2A38007DB292 /* ENET_Types.h in Headers */ = {isa = PBXBuildFile; fileRef = 4150B2E8245E2A38007DB292 /* ENET_Types.h */; };
 		4154FF182397A93A00EB6387 /* RES_Embedded.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 415EEAEA238ECE0900C0A32A /* RES_Embedded.cpp */; };
@@ -586,6 +586,8 @@
 		4116AFBA263AB894001477AD /* CLayoutManager.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CLayoutManager.cpp; sourceTree = "<group>"; };
 		4116AFBB263AB894001477AD /* CLayoutManager.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CLayoutManager.h; sourceTree = "<group>"; };
 		4116AFBC263AB894001477AD /* CLayoutParameter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CLayoutParameter.h; sourceTree = "<group>"; };
+		411F115F2B29B99A00098FEE /* implot_colors_extension.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = implot_colors_extension.h; path = implot/implot_colors_extension.h; sourceTree = "<group>"; };
+		411F11602B29B99A00098FEE /* implot_colors_extension.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = implot_colors_extension.cpp; path = implot/implot_colors_extension.cpp; sourceTree = "<group>"; };
 		4122B8E924BF3775001CFD64 /* implot_demo.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = implot_demo.cpp; path = implot/implot_demo.cpp; sourceTree = "<group>"; };
 		4122B8EA24BF3775001CFD64 /* implot.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = implot.h; path = implot/implot.h; sourceTree = "<group>"; };
 		4122B8EB24BF3775001CFD64 /* implot.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = implot.cpp; path = implot/implot.cpp; sourceTree = "<group>"; };
@@ -635,8 +637,6 @@
 		4150B2E2245E2A38007DB292 /* ENET_Callbacks.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ENET_Callbacks.h; sourceTree = "<group>"; };
 		4150B2E3245E2A38007DB292 /* ENET_Time.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ENET_Time.h; sourceTree = "<group>"; };
 		4150B2E4245E2A38007DB292 /* ENET_Compress.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ENET_Compress.cpp; sourceTree = "<group>"; };
-		4150B2E5245E2A38007DB292 /* ENET_Win32.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ENET_Win32.cpp; sourceTree = "<group>"; };
-		4150B2E6245E2A38007DB292 /* ENET_Win32.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ENET_Win32.h; sourceTree = "<group>"; };
 		4150B2E7245E2A38007DB292 /* ENET_List.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ENET_List.cpp; sourceTree = "<group>"; };
 		4150B2E8245E2A38007DB292 /* ENET_Types.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ENET_Types.h; sourceTree = "<group>"; };
 		415E837028588E4200800162 /* CGuiViewMessages.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CGuiViewMessages.cpp; sourceTree = "<group>"; };
@@ -1278,6 +1278,8 @@
 		4122B8E824BF3767001CFD64 /* implot */ = {
 			isa = PBXGroup;
 			children = (
+				411F11602B29B99A00098FEE /* implot_colors_extension.cpp */,
+				411F115F2B29B99A00098FEE /* implot_colors_extension.h */,
 				4143A3D729DE45F9006F2318 /* implot_items.cpp */,
 				4143A3D529DE4549006F2318 /* implot_internal.h */,
 				4122B8E924BF3775001CFD64 /* implot_demo.cpp */,
@@ -1341,8 +1343,6 @@
 				4150B2E2245E2A38007DB292 /* ENET_Callbacks.h */,
 				4150B2E3245E2A38007DB292 /* ENET_Time.h */,
 				4150B2E4245E2A38007DB292 /* ENET_Compress.cpp */,
-				4150B2E5245E2A38007DB292 /* ENET_Win32.cpp */,
-				4150B2E6245E2A38007DB292 /* ENET_Win32.h */,
 				4150B2E7245E2A38007DB292 /* ENET_List.cpp */,
 				4150B2E8245E2A38007DB292 /* ENET_Types.h */,
 			);
@@ -2439,7 +2439,6 @@
 				4173996223A4E67B008764F9 /* JSONMemoryPool.h in Headers */,
 				4183456123A00D4F00BE5475 /* nfd.h in Headers */,
 				41D5E2CA239D891200143F1C /* CContinuousParamSin.h in Headers */,
-				4150B2F8245E2A38007DB292 /* ENET_Win32.h in Headers */,
 				41D5E2B4239D891200143F1C /* CSlrKeyboardShortcuts.h in Headers */,
 				41A2CE6923A6D5A400B68A26 /* SYS_PauseResume.h in Headers */,
 				41D5E2FE239D891200143F1C /* SYS_Funct.h in Headers */,
@@ -2604,6 +2603,7 @@
 				4173995623A4E67B008764F9 /* JSONChildren.h in Headers */,
 				41D5E21C239D890700143F1C /* CGuiEditHex.h in Headers */,
 				417C8657245E2BA8001D67E9 /* CNetPacket.h in Headers */,
+				411F11612B29B99A00098FEE /* implot_colors_extension.h in Headers */,
 				4173995223A4E67B008764F9 /* JSON_Base64.h in Headers */,
 				4180D28728F45914001FE88A /* fa_solid_900.cpp in Headers */,
 				4150B2EE245E2A38007DB292 /* enet.h in Headers */,
@@ -2731,11 +2731,11 @@
 				415E837228588E4200800162 /* CGuiViewMessages.cpp in Sources */,
 				41D5E2C9239D891200143F1C /* CContinuousParamSin.cpp in Sources */,
 				4173996623A4E67B008764F9 /* JSONPreparse.cpp in Sources */,
+				411F11622B29B99A00098FEE /* implot_colors_extension.cpp in Sources */,
 				4166F18425E520060066DB71 /* CPianoKeyboard.cpp in Sources */,
 				4154FF6A2397A94700EB6387 /* jcapimin.c in Sources */,
 				41326040239E81440061FC82 /* imguial_term.cpp in Sources */,
 				4154FF6B2397A94700EB6387 /* jcapistd.c in Sources */,
-				4150B2F7245E2A38007DB292 /* ENET_Win32.cpp in Sources */,
 				4154FF6C2397A94700EB6387 /* jcarith.c in Sources */,
 				4154FF6D2397A94700EB6387 /* jccoefct.c in Sources */,
 				41D5E2D5239D891200143F1C /* CSlrFile.cpp in Sources */,
@@ -3005,10 +3005,11 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ARCHS = "$(ARCHS_STANDARD)";
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++17";
+				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
 				DEVELOPMENT_TEAM = APV7Y7Q9JY;
 				ENABLE_HARDENED_RUNTIME = YES;
 				EXECUTABLE_PREFIX = lib;
+				GCC_C_LANGUAGE_STANDARD = c17;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"$(inherited)",
 					MACOS,
@@ -3021,7 +3022,7 @@
 					"$(PROJECT_DIR)/libs",
 					/usr/local/lib,
 				);
-				ONLY_ACTIVE_ARCH = YES;
+				ONLY_ACTIVE_ARCH = NO;
 				OTHER_LDFLAGS = "-lfreetype";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -3032,10 +3033,11 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ARCHS = "$(ARCHS_STANDARD)";
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++17";
+				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
 				DEVELOPMENT_TEAM = APV7Y7Q9JY;
 				ENABLE_HARDENED_RUNTIME = YES;
 				EXECUTABLE_PREFIX = lib;
+				GCC_C_LANGUAGE_STANDARD = c17;
 				GCC_PREPROCESSOR_DEFINITIONS = MACOS;
 				HEADER_SEARCH_PATHS = (
 					"$(PROJECT_DIR)/include",
@@ -3045,7 +3047,7 @@
 					"$(PROJECT_DIR)/libs",
 					/usr/local/lib,
 				);
-				ONLY_ACTIVE_ARCH = YES;
+				ONLY_ACTIVE_ARCH = NO;
 				OTHER_LDFLAGS = "-lfreetype";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -3058,7 +3060,7 @@
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
+				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
 				CLANG_CXX_LIBRARY = "libc++";
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
@@ -3094,7 +3096,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 10.13;
+				MACOSX_DEPLOYMENT_TARGET = 10.15;
 				MTL_ENABLE_DEBUG_INFO = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = macosx;
@@ -3107,7 +3109,7 @@
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
+				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
 				CLANG_CXX_LIBRARY = "libc++";
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
@@ -3137,8 +3139,9 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 10.13;
+				MACOSX_DEPLOYMENT_TARGET = 10.15;
 				MTL_ENABLE_DEBUG_INFO = NO;
+				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = macosx;
 			};
 			name = Release;

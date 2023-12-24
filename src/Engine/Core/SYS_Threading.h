@@ -4,12 +4,22 @@
 //#include <SDL.h>
 struct SDL_Thread;
 typedef struct SDL_Thread SDL_Thread;
+
+//#define USE_SDL_MUTEX
+//#define MT_DEBUG_MUTEX
+
+#if defined(MT_DEBUG_MUTEX)
+#define USE_SDL_MUTEX
+#endif
+
+#if defined(USE_SDL_MUTEX)
 struct SDL_mutex;
 typedef struct SDL_mutex SDL_mutex;
+#else
+#include <mutex>
+#endif
 
 #include "SYS_Defs.h"
-
-//#define MT_DEBUG_MUTEX
 
 #define MT_THREAD_PRIORITY_NORMAL	0
 
@@ -21,7 +31,12 @@ public:
 	
 	char name[64];
 	
+	
+#if defined(USE_SDL_MUTEX)
 	SDL_mutex *mutex;
+#else
+	std::recursive_mutex mutex;
+#endif
 
 #if defined(MT_DEBUG_MUTEX)
 	// for debugging

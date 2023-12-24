@@ -38,14 +38,13 @@
 
 #if !defined (GLOBAL_DEBUG_OFF)
 
-//#define LOCAL_DEBUG_OFF
-//#define FULL_LOG
-
-//#define LOG_FILE
+//#define LOGGER_LOG_TO_FILE
+//#define LOGGER_FORCE_LOG_FULL
+//#define LOGGER_FORCE_LOG_OFF
 
 ///////////////////////////////////////////////////////////////
 
-#ifdef LOG_FILE
+#ifdef LOGGER_LOG_TO_FILE
 FILE *fpLog = NULL;
 #endif
 
@@ -78,7 +77,7 @@ void LOG_Init(void)
 {
 	pthread_mutex_init(&loggerMutex, NULL);
 
-#ifdef LOG_FILE
+#ifdef LOGGER_LOG_TO_FILE
 	time_t rawtime;
 	struct tm * timeinfo;
 	time ( &rawtime );
@@ -161,7 +160,7 @@ void LOG_Shutdown(void)
 {
 	fprintf(stderr, "LOG_Shutdown: bye\n");
 	fflush(stderr);
-#ifdef LOG_FILE
+#ifdef LOGGER_LOG_TO_FILE
 	if (fpLog)
 	{
 		fprintf(fpLog, "LOG_Shutdown: bye\n");
@@ -206,7 +205,7 @@ int _LOGGER(unsigned int level, const char *fileName, unsigned int lineNum, cons
 		
         fprintf(stderr, buffer);
 		
-#ifdef LOG_FILE
+#ifdef LOGGER_LOG_TO_FILE
         if (fpLog)
             fprintf(fpLog, buffer);
 #endif
@@ -222,7 +221,7 @@ int _LOGGER(unsigned int level, const char *fileName, unsigned int lineNum, cons
 		sprintf(buffer, "%s:%d ", fileName, lineNum);
 		
 		fprintf(stderr, buffer);
-#ifdef LOG_FILE
+#ifdef LOGGER_LOG_TO_FILE
         if (fpLog)
             fprintf(fpLog, buffer);
 #endif
@@ -241,7 +240,7 @@ int _LOGGER(unsigned int level, const char *fileName, unsigned int lineNum, cons
 			sprintf(buffer, "%8ld ", (unsigned long)pthread_self());
 			
 			fprintf(stderr, buffer);
-#ifdef LOG_FILE
+#ifdef LOGGER_LOG_TO_FILE
             if (fpLog)
                 fprintf(fpLog, buffer);
 #endif
@@ -256,7 +255,7 @@ int _LOGGER(unsigned int level, const char *fileName, unsigned int lineNum, cons
 			sprintf(buffer, "%s ", [threadName UTF8String]);
 
 			fprintf(stderr, buffer);
-#ifdef LOG_FILE
+#ifdef LOGGER_LOG_TO_FILE
             if (fpLog)
                 fprintf(fpLog, buffer);
 #endif
@@ -273,7 +272,7 @@ int _LOGGER(unsigned int level, const char *fileName, unsigned int lineNum, cons
 		sprintf(buffer, "%s ", getLevelStr(level));
 
 		fprintf(stderr, buffer);
-#ifdef LOG_FILE
+#ifdef LOGGER_LOG_TO_FILE
         if (fpLog)
 			fprintf(fpLog, buffer);
 #endif
@@ -304,7 +303,7 @@ int _LOGGER(unsigned int level, const char *fileName, unsigned int lineNum, cons
 	fprintf(stderr, "\n");
 	fflush(stderr);
 
-#ifdef LOG_FILE
+#ifdef LOGGER_LOG_TO_FILE
 	if (fpLog)
 	{
 		fprintf(fpLog, "%s", buffer);
@@ -346,7 +345,7 @@ int _LOGGER(unsigned int level, const char *fileName, unsigned int lineNum, cons
 
         fprintf(stderr, "%02d:%02d:%02d,%03d ",
                 tm->tm_hour, tm->tm_min, tm->tm_sec, ms);
-#ifdef LOG_FILE
+#ifdef LOGGER_LOG_TO_FILE
         if (fpLog)
         {
             fprintf(fpLog, "%02d:%02d:%02d,%03d ",
@@ -359,7 +358,7 @@ int _LOGGER(unsigned int level, const char *fileName, unsigned int lineNum, cons
 	if (logger_showFileName)
 	{
 		fprintf(stderr, "%s:%d ", fileName, lineNum);
-#ifdef LOG_FILE
+#ifdef LOGGER_LOG_TO_FILE
         if (fpLog)
         {
             fprintf(fpLog, "%s:%d ", fileName, lineNum);
@@ -373,7 +372,7 @@ int _LOGGER(unsigned int level, const char *fileName, unsigned int lineNum, cons
         if (threadName == nil || [threadName length] == 0)
         {
             fprintf(stderr, "%8ld ", (unsigned long)pthread_self());
-#ifdef LOG_FILE
+#ifdef LOGGER_LOG_TO_FILE
             if (fpLog)
                 fprintf(fpLog, "%8ld ", (unsigned long)pthread_self());
 #endif
@@ -381,7 +380,7 @@ int _LOGGER(unsigned int level, const char *fileName, unsigned int lineNum, cons
         else
         {
             fprintf(stderr, "%-8s ", [threadName UTF8String]);
-#ifdef LOG_FILE
+#ifdef LOGGER_LOG_TO_FILE
             if (fpLog)
                 fprintf(fpLog, "%-8s ", [threadName UTF8String]);
 #endif
@@ -391,7 +390,7 @@ int _LOGGER(unsigned int level, const char *fileName, unsigned int lineNum, cons
     if (logger_showCurrentLevel)
     {
         fprintf(stderr, "%s ", getLevelStr(level));
-#ifdef LOG_FILE
+#ifdef LOGGER_LOG_TO_FILE
         if (fpLog)
 			fprintf(fpLog, "%s ", getLevelStr(level));
 #endif
@@ -405,7 +404,7 @@ int _LOGGER(unsigned int level, const char *fileName, unsigned int lineNum, cons
 	if (ptr)
     {
 		fprintf(stderr, "%s", ptr);
-#ifdef LOG_FILE
+#ifdef LOGGER_LOG_TO_FILE
         if (fpLog)
 			fprintf(fpLog, "%s", ptr);
 #endif
@@ -417,7 +416,7 @@ int _LOGGER(unsigned int level, const char *fileName, unsigned int lineNum, cons
 		if (CFStringGetCString(log, ptr, buflen, kCFStringEncodingUTF8))
 		{
             fprintf(stderr, "%s", ptr);
-#ifdef LOG_FILE
+#ifdef LOGGER_LOG_TO_FILE
 			if (fpLog)
 				fprintf(fpLog, "%s", ptr);
 #endif
@@ -430,7 +429,7 @@ int _LOGGER(unsigned int level, const char *fileName, unsigned int lineNum, cons
 
     fprintf(stderr, "\n");
     fflush(stderr);
-#ifdef LOG_FILE
+#ifdef LOGGER_LOG_TO_FILE
     if (fpLog)
 	{
 		fprintf(fpLog, "\n");
@@ -446,9 +445,9 @@ int _LOGGER(unsigned int level, const char *fileName, unsigned int lineNum, cons
 
 bool logThisLevel(unsigned int level)
 {
-#if defined(FULL_LOG)
+#if defined(LOGGER_FORCE_LOG_FULL)
     return true;
-#elif defined(LOCAL_DEBUG_OFF)
+#elif defined(LOGGER_FORCE_LOG_OFF)
     return false;
 #else
 	return LOG_IsSetLevel(level);

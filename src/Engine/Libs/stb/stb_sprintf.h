@@ -25,6 +25,9 @@
 //
 //   See end of file for license information.
 
+#define USE_STB_SPRINTF
+#if defined(USE_STB_SPRINTF)
+
 #ifndef STB_SPRINTF_H_INCLUDE
 #define STB_SPRINTF_H_INCLUDE
 
@@ -1885,3 +1888,5 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //#define vsnprintf stbsp_vsnprintf
 #endif
 
+
+#endif

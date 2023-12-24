@@ -224,7 +224,7 @@ public:
 	virtual void LayoutParameterChanged(CLayoutParameter *layoutParameter);
 
 	virtual void SerializeLayout(CByteBuffer *byteBuffer);
-	virtual bool DeserializeLayout(CByteBuffer *byteBuffer);
+	virtual bool DeserializeLayout(CByteBuffer *byteBuffer, int version);
 
 	// custom
 	virtual void Serialize(CByteBuffer *byteBuffer);

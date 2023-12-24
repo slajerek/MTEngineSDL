@@ -15,7 +15,7 @@ public:
 	CSlrString *configFileName;
 	
 	void ReadConfig();
-	void SaveConfig();
+	bool SaveConfig();
 	
 	Hjson::Value hjsonRoot;
 
@@ -25,6 +25,7 @@ public:
 	bool GetBool(const char *name, bool defaultValue);
 
 	void SetInt(const char *name, int *value);
+	void SetIntSkipConfigSave(const char *name, int *value);
 	void GetInt(const char *name, int *value, int defaultValue);
 
 	void SetFloat(const char *name, float *value);
@@ -38,10 +39,14 @@ public:
 	void GetString(const char *name, const char **value, const char *defaultValue);
 	void GetString(const char *name, char *value, int stringMaxLength, const char *defaultValue);
 
+	void SetStdString(const char *name, const std::string value);
+	void SetStdString(const char *name, const std::string *value);
+	void GetStdString(const char *name, std::string *value, const std::string defaultValue);
+
 	void SetSlrString(const char *name, CSlrString **value);
 	void GetSlrString(const char *name, CSlrString **value, CSlrString *defaultValue);
 	
-	// damn fucking ms windows !!!! when below member name is called Exists then vc compiler is stupid as int sts exists
+	// damn fucking ms windows !!!! when below member name is called Exists then vc compiler is stupid and throws error as int sts exists
 	bool E_x_i_s_t_s(const char *name);
 };
 

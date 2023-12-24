@@ -50,7 +50,7 @@ void CConfigStorageHjson::ReadConfig()
 	delete byteBuffer;
 }
 
-void CConfigStorageHjson::SaveConfig()
+bool CConfigStorageHjson::SaveConfig()
 {
 	std::stringstream ss;
 	ss << Hjson::Marshal(hjsonRoot);
@@ -61,9 +61,15 @@ void CConfigStorageHjson::SaveConfig()
 	CByteBuffer *byteBuffer = new CByteBuffer();
 	byteBuffer->PutBytes((u8*)cstr, (unsigned int)strlen(cstr));
 	
-	byteBuffer->storeToSettings(configFileName);
+	bool ret = byteBuffer->storeToSettings(configFileName);
+	
+	if (ret == false)
+	{
+		LOGError("CConfigStorageHjson::SaveConfig: failed to save config");
+	}
 	
 	delete byteBuffer;
+	return ret;
 }
 
 void CConfigStorageHjson::SetBool(const char *name, bool *value)
@@ -111,6 +117,11 @@ void CConfigStorageHjson::SetInt(const char *name, int *value)
 {
 	hjsonRoot[name] = *value;
 	SaveConfig();
+}
+
+void CConfigStorageHjson::SetIntSkipConfigSave(const char *name, int *value)
+{
+	hjsonRoot[name] = *value;
 }
 
 void CConfigStorageHjson::GetInt(const char *name, int *value, int defaultValue)
@@ -199,6 +210,7 @@ void CConfigStorageHjson::SetString(const char *name, const char *value)
 
 void CConfigStorageHjson::SetString(const char *name, const char **value)
 {
+	LOGD("CConfigStorageHjson::SetString: name='%s' value='%s'", name, *value);
 	hjsonRoot[name] = *value;
 	SaveConfig();
 }
@@ -253,6 +265,40 @@ void CConfigStorageHjson::GetString(const char *name, char *value, int stringMax
 	strncpy(value, strValue, stringMaxLength);
 }
 
+void CConfigStorageHjson::SetStdString(const char *name, const std::string value)
+{
+	hjsonRoot[name] = value;
+	SaveConfig();
+}
+
+void CConfigStorageHjson::SetStdString(const char *name, const std::string *value)
+{
+	hjsonRoot[name] = *value;
+	SaveConfig();
+}
+
+void CConfigStorageHjson::GetStdString(const char *name, std::string *value, const std::string defaultValue)
+{
+	Hjson::Value hValue;
+	hValue = hjsonRoot[name];
+	
+	if (hValue == Hjson::Type::Undefined)
+	{
+		value->clear();
+		return;
+	}
+
+	try
+	{
+		*value = static_cast<const std::string&>(hValue);
+	}
+	catch(const std::exception& e)
+	{
+//		LOGError("CConfigStorageHjson::GetString error: %s", e.what());
+		*value = defaultValue;
+	}
+}
+
 void CConfigStorageHjson::SetSlrString(const char *name, CSlrString **value)
 {
 //	LOGD("CConfigStorageHjson::SetSlrString: name=%s", name);
@@ -280,7 +326,6 @@ void CConfigStorageHjson::GetSlrString(const char *name, CSlrString **value, CSl
 	{
 		const char *buf = static_cast<const char *>(hValue);
 		*value = new CSlrString(buf);
-		delete defaultValue;
 	}
 	catch(const std::exception& e)
 	{
@@ -289,6 +334,7 @@ void CConfigStorageHjson::GetSlrString(const char *name, CSlrString **value, CSl
 	}
 }
 
+// damn fucking ms windows !!!! when below member name is called Exists then vc compiler is stupid and throws error as int sts exists
 bool CConfigStorageHjson::E_x_i_s_t_s(const char *name)
 {
 	Hjson::Value hValue;

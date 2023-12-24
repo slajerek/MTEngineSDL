@@ -53,8 +53,8 @@ class CGuiEventMouse : public CGuiEvent
 {
 public:
     CGuiEventMouse(GuiEventMouseState mouseState, int x, int y);
-    int x;
-    int y;
+	int x;
+	int y;
 	
 	u8 mouseState;
 };

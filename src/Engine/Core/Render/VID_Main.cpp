@@ -170,10 +170,6 @@ void VID_PostInit()
 {
 	LOGM("VID_PostInit: show window, restore position");
 	
-	// restore selected layout, note we need to do this after next frame
-	CUiThreadTaskRefreshLayout *task = new CUiThreadTaskRefreshLayout();
-	guiMain->AddUiThreadTask(task);
-	
 	if (initWindowMaxmized)
 	{
 		SDL_MaximizeWindow(gMainWindow);
@@ -192,7 +188,7 @@ void VID_SetViewportsEnable(bool viewportsEnable)
 	{
 		// if viewports were enabled at startup then ImGuiPlatformIO is already setup, if not, we need to restart app to setup SDL's ImGuiPlatformIO
 		CUiMessageBoxCallbackRestartApplication *messageBoxCallback = new CUiMessageBoxCallbackRestartApplication();
-		guiMain->ShowMessageBox("Application", "Please restart application to apply floating windows setting.", messageBoxCallback);
+		guiMain->ShowMessageBox("Application", "Please restart the application for the floating windows setting to take effect.", messageBoxCallback);
 		return;
 	}
 	
@@ -1114,7 +1110,7 @@ float VID_GetScreenHeight()
 
 ImGuiStyleType VID_GetDefaultImGuiStyle()
 {
-	int style = ImGuiStyleType::IMGUI_STYLE_DARK_ALTERNATIVE;
+	int style = ImGuiStyleType::IMGUI_STYLE_DARK;
 	gApplicationDefaultConfig->GetInt("uiImGuiStyle", &style, style);
 	return (ImGuiStyleType)style;
 }

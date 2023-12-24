@@ -27,21 +27,26 @@ class CSlrString;
 extern char *gPathToDocuments;
 extern char *gCPathToDocuments;
 extern CSlrString *gUTFPathToDocuments;
+extern std::string gStdPathToDocuments;
 
 extern char *gPathToTemp;
 extern char *gCPathToTemp;
 extern CSlrString *gUTFPathToTemp;
+extern std::string gStdPathToTemp;
 
 extern char *gPathToResources;
 extern char *gCPathToResources;
 extern CSlrString *gUTFPathToResources;
+extern std::string gStdPathToResources;
 
 extern char *gPathToSettings;
 extern char *gCPathToSettings;
 extern CSlrString *gUTFPathToSettings;
+extern std::string gStdPathToSettings;
 
 extern char *gCPathToCurrentDirectory;
 extern CSlrString *gUTFPathToCurrentDirectory;
+extern std::string gStdPathToCurrentDirectory;
 
 void SYS_DeleteFile(CSlrString *filePath);
 
@@ -91,6 +96,9 @@ std::vector<CFileItem *> *SYS_GetFilesInFolder(char *directoryPath, std::list<ch
 void SYS_RefreshFiles();
 
 class CSlrString;
+
+// utf8-compatible equivalent
+FILE *SYS_OpenFile(const char *path, const char *mode);
 
 #include "CSystemFileDialogCallback.h"
 

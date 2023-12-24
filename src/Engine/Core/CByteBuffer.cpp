@@ -499,6 +499,17 @@ void CByteBuffer::putString(const char *str)
 	this->putString(str, 0, len);
 }
 
+void CByteBuffer::putStringZeroEnded(const char *str)
+{
+#ifdef PRINT_BUFFER_OPS
+	LOGD("putStringZeroEnded: str='%s'", str);
+#endif
+
+	int len = strlen(str);
+	putBytes((uint8 *)str, 0, len);
+	putByte(0);
+}
+
 void CByteBuffer::putString(const char *str, int begin, int len)
 {
 #ifdef PRINT_BUFFER_OPS
@@ -762,6 +773,21 @@ float CByteBuffer::getFloat()
 #endif
 
 	return valFloat;
+}
+
+void CByteBuffer::printf(const char *format, ...)
+{
+	char *buffer = SYS_GetCharBuf();
+	va_list args;
+	
+	va_start(args, format);
+	vsnprintf(buffer, MAX_STRING_LENGTH-1, format, args);
+	va_end(args);
+
+//	LOGD("CByteBuffer::printf %s", buffer);
+	putBytes((uint8 *)buffer, 0, strlen(buffer));
+
+	SYS_ReleaseCharBuf(buffer);
 }
 
 void CByteBuffer::DebugPrint()
@@ -1357,7 +1383,8 @@ bool CByteBuffer::storeToSettings(CSlrString *fileName)
 //	str->DebugPrint("str=");
 //	fileName->DebugPrint("fileName=");
 
-	str->Concatenate(fileName);	
+	str->Concatenate(fileName);
+	
 //	str->DebugPrint("storeToFile, str=");
 	
 	bool ret = storeToFile(str);
@@ -1544,6 +1571,11 @@ uint8 *CByteBuffer::GetBytes(unsigned int len)
 void CByteBuffer::PutString(const char *str)
 {
 	this->putString(str);
+}
+
+void CByteBuffer::PutStringZeroEnded(const char *str)
+{
+	this->putStringZeroEnded(str);
 }
 
 char *CByteBuffer::GetString()
