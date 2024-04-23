@@ -4,10 +4,16 @@ project(MTEngineSDL)
 #set(CMAKE_BUILD_TYPE Debug)
 set(CMAKE_BUILD_TYPE RelWithDebInfo)
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED On)
+set(CMAKE_CXX_EXTENSIONS Off)
+
 add_definitions(
     -DLINUX
     -DIMGUI_IMPL_OPENGL_LOADER_GL3W
 )
+
+set (CMAKE_CXX_FLAGS "-fpermissive")
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(GTK3 REQUIRED gtk+-3.0)
