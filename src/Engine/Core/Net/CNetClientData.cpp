@@ -5,6 +5,7 @@
  *
  */
 
+#include "enet.h"
 #include "CNetClientData.h"
 #include "CNetServer.h"
 #include "CByteBuffer.h"

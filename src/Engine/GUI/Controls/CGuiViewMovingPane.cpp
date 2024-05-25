@@ -4,6 +4,7 @@
 #include "CGuiViewMovingPane.h"
 #include "SYS_KeyCodes.h"
 #include "VID_ImageBinding.h"
+#include "CLayoutParameter.h"
 
 // TODO: add post-render to support mouse cursor change, we need to change cursor every frame when being moved from click-down to click-up
 //if (changeCursorOnMove)
@@ -11,25 +12,28 @@
 //	ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeAll);
 //}
 
-
 CGuiViewMovingPane::CGuiViewMovingPane(const char *name, float posX, float posY, float posZ, float sizeX, float sizeY, float paneWidth, float paneHeight)
 : CGuiView(name, posX, posY, posZ, sizeX, sizeY)
 {
 	this->paneWidth = paneWidth;
 	this->paneHeight = paneHeight;
-
+	
 	isForcedMovingMap = false;
-
-	SetMovingPaneStyle(MovingPaneStyle_RightClick);
-//	changeCursorOnMove = true;
+	
+	SetMovingPaneStyle(MovingPaneStyle_RightClickAndSpacebar);
+	//	changeCursorOnMove = true;
 	mouseInvert = false;
-
+	
 	cursorInside = false;
 	zoomCursorX = zoomCursorY = 0.5f;
-		
+	
 	minZoom = 1.0f;
 	maxZoom = 60.0f;
 	ClearZoom();
+	
+	AddLayoutParameter(new CLayoutParameterFloat("MovingPaneZoom", true, &currentZoom));
+	AddLayoutParameter(new CLayoutParameterFloat("MovingPanePosX", true, &mapPosX));
+	AddLayoutParameter(new CLayoutParameterFloat("MovingPanePosY", true, &mapPosY));
 }
 
 void CGuiViewMovingPane::SetMovingPaneStyle(MovingPaneStyle movingPaneStyle)
@@ -58,7 +62,7 @@ bool CGuiViewMovingPane::DoScrollWheel(float deltaX, float deltaY)
 	{
 		MoveMap(deltaX, deltaY);
 	}
-	else
+	else if (movingPaneStyle != MovingPaneStyle_None)
 	{
 		if (cursorInside == false)
 		{
@@ -83,7 +87,7 @@ bool CGuiViewMovingPane::DoScrollWheel(float deltaX, float deltaY)
 		return true;
 	}
 	
-	return true;
+	return CGuiView::DoScrollWheel(deltaX, deltaY);
 }
 
 bool CGuiViewMovingPane::InitZoom()
@@ -119,7 +123,7 @@ bool CGuiViewMovingPane::DoZoomBy(float x, float y, float zoomValue, float diffe
 		return true;
 	}
 	
-	return false;
+	return CGuiView::DoZoomBy(x, y, zoomValue, difference);
 }
 
 bool CGuiViewMovingPane::DoTap(float x, float y)
@@ -139,7 +143,7 @@ bool CGuiViewMovingPane::DoTap(float x, float y)
 		}
 	}
 	
-	return false;
+	return CGuiView::DoTap(x, y);
 }
 
 bool CGuiViewMovingPane::DoFinishTap(float x, float y)
@@ -158,14 +162,15 @@ bool CGuiViewMovingPane::DoFinishTap(float x, float y)
 		}
 	}
 	
-	return false;
+	return CGuiView::CGuiElement::DoFinishTap(x, y);
 }
 
 bool CGuiViewMovingPane::DoRightClick(float x, float y)
 {
 //	LOGG("CGuiViewMovingPane::DoRightClick");
 
-	if (movingPaneStyle == MovingPaneStyle_RightClick)
+	if (movingPaneStyle == MovingPaneStyle_RightClick
+		|| movingPaneStyle == MovingPaneStyle_RightClickAndSpacebar)
 	{
 		if (IsInside(x, y))
 		{
@@ -180,12 +185,13 @@ bool CGuiViewMovingPane::DoRightClick(float x, float y)
 		}
 	}
 	
-	return false;
+	return CGuiView::DoRightClick(x, y);
 }
 
 bool CGuiViewMovingPane::DoFinishRightClick(float x, float y)
 {
-	if (movingPaneStyle == MovingPaneStyle_RightClick)
+	if (movingPaneStyle == MovingPaneStyle_RightClick
+		|| movingPaneStyle == MovingPaneStyle_RightClickAndSpacebar)
 	{
 		if (IsInside(x, y))
 		{
@@ -198,7 +204,7 @@ bool CGuiViewMovingPane::DoFinishRightClick(float x, float y)
 		}
 	}
 	
-	return false;
+	return CGuiView::DoFinishRightClick(x, y);
 }
 
 bool CGuiViewMovingPane::DoNotTouchedMove(float x, float y)
@@ -236,7 +242,7 @@ bool CGuiViewMovingPane::DoNotTouchedMove(float x, float y)
 	
 	cursorInside = true;
 	
-	return false;
+	return CGuiView::DoNotTouchedMove(x, y);
 }
 
 void CGuiViewMovingPane::ClearZoom()
@@ -508,46 +514,67 @@ void CGuiViewMovingPane::ScreenPosToPanePos(float screenX, float screenY, int *i
 
 bool CGuiViewMovingPane::KeyDown(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper)
 {
-	if (keyCode == MTKEY_SPACEBAR)
+	if (movingPaneStyle == MovingPaneStyle_Spacebar
+		|| movingPaneStyle == MovingPaneStyle_RightClickAndSpacebar)
 	{
-		isForcedMovingMap = true;
-		prevMousePosX = guiMain->mousePosX;
-		prevMousePosY = guiMain->mousePosY;
-		return true;
+		if (keyCode == MTKEY_SPACEBAR && !isShift && !isAlt && !isControl)
+		{
+			isForcedMovingMap = true;
+			prevMousePosX = guiMain->mousePosX;
+			prevMousePosY = guiMain->mousePosY;
+			return true;
+		}
 	}
 	
-	return false;
+	return CGuiView::KeyDown(keyCode, isShift, isAlt, isControl, isSuper);
 }
 
 bool CGuiViewMovingPane::KeyUp(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper)
 {
-	if (keyCode == MTKEY_SPACEBAR && !isShift && !isAlt && !isControl)
+	if (movingPaneStyle == MovingPaneStyle_Spacebar
+		|| movingPaneStyle == MovingPaneStyle_RightClickAndSpacebar)
 	{
-		isForcedMovingMap = false;
-		return true;
+		if (keyCode == MTKEY_SPACEBAR && !isShift && !isAlt && !isControl)
+		{
+			isForcedMovingMap = false;
+			return true;
+		}
 	}
 	
-	return false;
+	return CGuiView::KeyUp(keyCode, isShift, isAlt, isControl, isSuper);
 }
 
 bool CGuiViewMovingPane::KeyDownOnMouseHover(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper)
 {
-	if (keyCode == MTKEY_SPACEBAR && !isShift && !isAlt && !isControl)
+	if (movingPaneStyle == MovingPaneStyle_Spacebar
+		|| movingPaneStyle == MovingPaneStyle_RightClickAndSpacebar)
 	{
-		if (this->KeyDown(keyCode, isShift, isAlt, isControl, isSuper))
-				return true;
+		if (keyCode == MTKEY_SPACEBAR && !isShift && !isAlt && !isControl)
+		{
+			if (this->KeyDown(keyCode, isShift, isAlt, isControl, isSuper))
+					return true;
+		}
 	}
-	
-	return false;
+	return CGuiView::KeyDownOnMouseHover(keyCode, isShift, isAlt, isControl, isSuper);
 }
 
 bool CGuiViewMovingPane::KeyUpGlobal(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper)
 {
-	if (keyCode == MTKEY_SPACEBAR && !isShift && !isAlt && !isControl)
+	if (movingPaneStyle == MovingPaneStyle_Spacebar
+		|| movingPaneStyle == MovingPaneStyle_RightClickAndSpacebar)
 	{
-		this->KeyUp(keyCode, isShift, isAlt, isControl, isSuper);
+		if (keyCode == MTKEY_SPACEBAR && !isShift && !isAlt && !isControl)
+		{
+			this->KeyUp(keyCode, isShift, isAlt, isControl, isSuper);
+		}
 	}
-	
-	return false;
+	return CGuiView::KeyUpGlobal(keyCode, isShift, isAlt, isControl, isSuper);
 }
 
+//
+void CGuiViewMovingPane::LayoutParameterChanged(CLayoutParameter *layoutParameter)
+{
+	mapSizeX = currentZoom;
+	mapSizeY = currentZoom;
+	UpdatePositionAndZoom();
+}

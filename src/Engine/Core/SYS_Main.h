@@ -121,4 +121,6 @@ else SYS_StrFree(&(point));                                             \
 } while(0)
 */
 
+void LOG_PrintHexArray(u8 *data, int size);
+
 #endif // __SYS_MAIN_H__

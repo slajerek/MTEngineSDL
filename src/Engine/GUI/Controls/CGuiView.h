@@ -210,6 +210,10 @@ public:
 
 	// Layout, order to display in popup
 	std::list<CLayoutParameter *> layoutParameters;
+	
+	// number of visible layout parameters
+	int numNotHiddenLayoutParameters;
+	
 	// Layout, hash of name
 	std::map<u64, CLayoutParameter *> layoutParametersByHash;
 	virtual void AddLayoutParameter(CLayoutParameter *layoutParameter);

@@ -148,6 +148,8 @@ void CGuiViewMovingPaneImage::SetImageData(CImageData *imageIn, bool clearZoom)
 		ClearZoom();
 	}
 	
+	SetKeepAspectRatio(true, imageIn->width / imageIn->height);
+
 	guiMain->UnlockMutex();
 }
 
@@ -186,7 +188,24 @@ void CGuiViewMovingPaneImage::SetImage(CSlrImage *setImage, bool clearZoom)
 		ClearZoom();
 	}
 
+	SetKeepAspectRatio(true, paneWidth / paneHeight);
+
 	guiMain->UnlockMutex();
+}
+
+void CGuiViewMovingPaneImage::SetImageKeepAspect(CSlrImage *setImage)
+{
+	SetImageKeepAspect(setImage, true);
+}
+
+void CGuiViewMovingPaneImage::SetImageKeepAspect(CSlrImage *setImage, bool clearZoom)
+{
+//	LOGD("CGuiViewMovingPaneImage::SetImageKeepAspect: setImage=%x width=%f height=%f aspect=%f", setImage, setImage->width, setImage->height, (setImage->width / setImage->height));
+	SetImage(setImage, clearZoom);
+	if (setImage != NULL)
+	{
+		SetKeepAspectRatio(true, paneWidth / paneHeight);
+	}
 }
 
 void CGuiViewMovingPaneImage::RenderMovingPane()
@@ -202,7 +221,7 @@ void CGuiViewMovingPaneImage::RenderImGui()
 	
 //	frameCounter++;
 		
-	float gap = 1.0f;
+//	float gap = 1.0f;
 	
 //	BlitRectangle(posX-gap, posY-gap, -1, sizeX+gap*2, sizeY+gap*2, 0.3, 0.3, 0.3, 0.7f);
 	

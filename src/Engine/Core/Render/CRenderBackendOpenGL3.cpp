@@ -115,7 +115,6 @@ void CRenderBackendOpenGL3::CreateRenderContext()
 void CRenderBackendOpenGL3::InitRenderPipeline()
 {
 	ImGui_ImplSDL2_InitForOpenGL(mainWindow, glContext);
-	
 	ImGui_ImplOpenGL3_Init(glslVersionString);
 }
 

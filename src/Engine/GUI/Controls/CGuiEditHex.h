@@ -29,6 +29,7 @@ public:
 	int cursorPos;
 	
 	unsigned int value;
+	unsigned int originalValueBeforeEsc;
 	
 	void KeyDown(u32 keyCode);
 	void FinalizeEntering(u32 keyCode, bool isCancelled);

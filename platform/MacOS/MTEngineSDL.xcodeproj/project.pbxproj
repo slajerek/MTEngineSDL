@@ -59,8 +59,6 @@
 		4146A6642903ACD2007A060D /* CWaveformData.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4146A6602903ACD2007A060D /* CWaveformData.cpp */; };
 		4146A6652903ACD2007A060D /* CWaveformData.h in Headers */ = {isa = PBXBuildFile; fileRef = 4146A6612903ACD2007A060D /* CWaveformData.h */; };
 		4146A6662903ACD2007A060D /* CViewWaveform.h in Headers */ = {isa = PBXBuildFile; fileRef = 4146A6622903ACD2007A060D /* CViewWaveform.h */; };
-		414DD3F5260202C200138569 /* GAM_GamePads.h in Headers */ = {isa = PBXBuildFile; fileRef = 414DD3F3260202C200138569 /* GAM_GamePads.h */; };
-		414DD3F6260202C200138569 /* GAM_GamePads.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 414DD3F4260202C200138569 /* GAM_GamePads.cpp */; };
 		4150B2E9245E2A38007DB292 /* ENET_Packet.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4150B2D7245E2A38007DB292 /* ENET_Packet.cpp */; };
 		4150B2EA245E2A38007DB292 /* ENET_Utility.h in Headers */ = {isa = PBXBuildFile; fileRef = 4150B2D8245E2A38007DB292 /* ENET_Utility.h */; };
 		4150B2EB245E2A38007DB292 /* ENET_Callbacks.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4150B2D9245E2A38007DB292 /* ENET_Callbacks.cpp */; };
@@ -315,6 +313,12 @@
 		418A43A12A274AF1003DD78B /* imgui_impl_sdl2.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 418A439F2A274968003DD78B /* imgui_impl_sdl2.cpp */; };
 		418D82EF2732FC7E00CFFD8E /* CContinuousParamBezier.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 418D82ED2732FC7D00CFFD8E /* CContinuousParamBezier.cpp */; };
 		418D82F02732FC7E00CFFD8E /* CContinuousParam.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 418D82EE2732FC7E00CFFD8E /* CContinuousParam.cpp */; };
+		418F2C012B52D4160013C384 /* GAM_GamePads.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 418F2BFF2B52D4160013C384 /* GAM_GamePads.cpp */; };
+		418F2C022B52D4160013C384 /* GAM_GamePads.h in Headers */ = {isa = PBXBuildFile; fileRef = 418F2C002B52D4160013C384 /* GAM_GamePads.h */; };
+		418F2C072B52D44C0013C384 /* CGamePadAxisMotionToButton.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 418F2C032B52D44C0013C384 /* CGamePadAxisMotionToButton.cpp */; };
+		418F2C082B52D44C0013C384 /* CGamePad.h in Headers */ = {isa = PBXBuildFile; fileRef = 418F2C042B52D44C0013C384 /* CGamePad.h */; };
+		418F2C092B52D44C0013C384 /* CGamePadAxisMotionToButton.h in Headers */ = {isa = PBXBuildFile; fileRef = 418F2C052B52D44C0013C384 /* CGamePadAxisMotionToButton.h */; };
+		418F2C0A2B52D44C0013C384 /* CGamePad.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 418F2C062B52D44C0013C384 /* CGamePad.cpp */; };
 		4192C36F27661F54001D2913 /* CRecentlyOpenedFiles.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4192C36D27661F54001D2913 /* CRecentlyOpenedFiles.cpp */; };
 		4192C37027661F54001D2913 /* CRecentlyOpenedFiles.h in Headers */ = {isa = PBXBuildFile; fileRef = 4192C36E27661F54001D2913 /* CRecentlyOpenedFiles.h */; };
 		41A2CE5F23A6D00800B68A26 /* SYS_Types.h in Headers */ = {isa = PBXBuildFile; fileRef = 41A2CE5E23A6D00800B68A26 /* SYS_Types.h */; };
@@ -562,6 +566,7 @@
 		41E9502926442AE7008A842C /* CColorsTheme.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 41E9502726442AE7008A842C /* CColorsTheme.cpp */; };
 		41E9502A26442AE7008A842C /* CColorsTheme.h in Headers */ = {isa = PBXBuildFile; fileRef = 41E9502826442AE7008A842C /* CColorsTheme.h */; };
 		41EE305225E92B9F0050257F /* M_Circlebuf.h in Headers */ = {isa = PBXBuildFile; fileRef = 41EE305125E92B9F0050257F /* M_Circlebuf.h */; };
+		41F19CD62B7447E7008E523B /* ImGuiUtils.h in Headers */ = {isa = PBXBuildFile; fileRef = 41F19CD52B7447E7008E523B /* ImGuiUtils.h */; };
 		41F26A01264C0FBC0069862A /* hjson_decode.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 41F269FC264C0FBC0069862A /* hjson_decode.cpp */; };
 		41F26A02264C0FBC0069862A /* hjson_parsenumber.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 41F269FD264C0FBC0069862A /* hjson_parsenumber.cpp */; };
 		41F26A03264C0FBC0069862A /* hjson_encode.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 41F269FE264C0FBC0069862A /* hjson_encode.cpp */; };
@@ -621,8 +626,7 @@
 		4146A6602903ACD2007A060D /* CWaveformData.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CWaveformData.cpp; sourceTree = "<group>"; };
 		4146A6612903ACD2007A060D /* CWaveformData.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CWaveformData.h; sourceTree = "<group>"; };
 		4146A6622903ACD2007A060D /* CViewWaveform.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CViewWaveform.h; sourceTree = "<group>"; };
-		414DD3F3260202C200138569 /* GAM_GamePads.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = GAM_GamePads.h; sourceTree = "<group>"; };
-		414DD3F4260202C200138569 /* GAM_GamePads.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = GAM_GamePads.cpp; sourceTree = "<group>"; };
+		4148EA0D2B57DC2D00E16B1E /* gamecontrollerdb_txt_zlib.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = gamecontrollerdb_txt_zlib.h; sourceTree = "<group>"; };
 		4150B2D7245E2A38007DB292 /* ENET_Packet.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ENET_Packet.cpp; sourceTree = "<group>"; };
 		4150B2D8245E2A38007DB292 /* ENET_Utility.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ENET_Utility.h; sourceTree = "<group>"; };
 		4150B2D9245E2A38007DB292 /* ENET_Callbacks.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ENET_Callbacks.cpp; sourceTree = "<group>"; };
@@ -964,6 +968,12 @@
 		418A43A02A274968003DD78B /* imgui_impl_sdl2.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = imgui_impl_sdl2.h; sourceTree = "<group>"; };
 		418D82ED2732FC7D00CFFD8E /* CContinuousParamBezier.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CContinuousParamBezier.cpp; sourceTree = "<group>"; };
 		418D82EE2732FC7E00CFFD8E /* CContinuousParam.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CContinuousParam.cpp; sourceTree = "<group>"; };
+		418F2BFF2B52D4160013C384 /* GAM_GamePads.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = GAM_GamePads.cpp; sourceTree = "<group>"; };
+		418F2C002B52D4160013C384 /* GAM_GamePads.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = GAM_GamePads.h; sourceTree = "<group>"; };
+		418F2C032B52D44C0013C384 /* CGamePadAxisMotionToButton.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CGamePadAxisMotionToButton.cpp; sourceTree = "<group>"; };
+		418F2C042B52D44C0013C384 /* CGamePad.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CGamePad.h; sourceTree = "<group>"; };
+		418F2C052B52D44C0013C384 /* CGamePadAxisMotionToButton.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CGamePadAxisMotionToButton.h; sourceTree = "<group>"; };
+		418F2C062B52D44C0013C384 /* CGamePad.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CGamePad.cpp; sourceTree = "<group>"; };
 		4192C36D27661F54001D2913 /* CRecentlyOpenedFiles.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CRecentlyOpenedFiles.cpp; sourceTree = "<group>"; };
 		4192C36E27661F54001D2913 /* CRecentlyOpenedFiles.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CRecentlyOpenedFiles.h; sourceTree = "<group>"; };
 		419890812684D22400B1AE5C /* libfreetype.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libfreetype.a; path = libs/libfreetype.a; sourceTree = "<group>"; };
@@ -1224,6 +1234,7 @@
 		41E9502726442AE7008A842C /* CColorsTheme.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CColorsTheme.cpp; sourceTree = "<group>"; };
 		41E9502826442AE7008A842C /* CColorsTheme.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CColorsTheme.h; sourceTree = "<group>"; };
 		41EE305125E92B9F0050257F /* M_Circlebuf.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = M_Circlebuf.h; sourceTree = "<group>"; };
+		41F19CD52B7447E7008E523B /* ImGuiUtils.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ImGuiUtils.h; path = imguiext/ImGuiUtils.h; sourceTree = "<group>"; };
 		41F269FC264C0FBC0069862A /* hjson_decode.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = hjson_decode.cpp; sourceTree = "<group>"; };
 		41F269FD264C0FBC0069862A /* hjson_parsenumber.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = hjson_parsenumber.cpp; sourceTree = "<group>"; };
 		41F269FE264C0FBC0069862A /* hjson_encode.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = hjson_encode.cpp; sourceTree = "<group>"; };
@@ -1292,6 +1303,7 @@
 		41326027239E81390061FC82 /* imguiext */ = {
 			isa = PBXGroup;
 			children = (
+				41F19CD52B7447E7008E523B /* ImGuiUtils.h */,
 				41CD91582923DE520061FC8E /* imgui_toggle.cpp */,
 				41CD915B2923DE590061FC8E /* imgui_toggle.h */,
 				413E03A826791B900032D02B /* imguiComboFilter.cpp */,
@@ -1407,6 +1419,7 @@
 		415EE8BC238EB93800C0A32A /* Core */ = {
 			isa = PBXGroup;
 			children = (
+				418F2BFE2B52D4160013C384 /* GamePads */,
 				41732EB82916C7A700F212AC /* VID_Fonts.cpp */,
 				41732EB72916C7A700F212AC /* VID_Fonts.h */,
 				416C256D28D6B944002BDC0D /* CSystemFileDialogCallback.cpp */,
@@ -1414,8 +1427,6 @@
 				41E4CA9C28534501007509C3 /* Render */,
 				41866F83265D1B5100E7E638 /* CConfigStorageHjson.cpp */,
 				41866F84265D1B5100E7E638 /* CConfigStorageHjson.h */,
-				414DD3F4260202C200138569 /* GAM_GamePads.cpp */,
-				414DD3F3260202C200138569 /* GAM_GamePads.h */,
 				417C8647245E2BA8001D67E9 /* Net */,
 				4165798323C5355E0051CEFE /* SYS_Threading.cpp */,
 				4165798423C5355E0051CEFE /* SYS_Threading.h */,
@@ -1899,6 +1910,7 @@
 		415EEAE6238ECE0900C0A32A /* Embedded */ = {
 			isa = PBXGroup;
 			children = (
+				4148EA0D2B57DC2D00E16B1E /* gamecontrollerdb_txt_zlib.h */,
 				4178216F25F64824006BCE2F /* console_inverted_plain_gfx.h */,
 				415EEAE7238ECE0900C0A32A /* console_plain_gfx.h */,
 				415EEAE8238ECE0900C0A32A /* default_font_fnt.h */,
@@ -2108,6 +2120,19 @@
 				4189FFAB2790AD97006432AE /* SpectrumAnalysis.h */,
 			);
 			path = FFT;
+			sourceTree = "<group>";
+		};
+		418F2BFE2B52D4160013C384 /* GamePads */ = {
+			isa = PBXGroup;
+			children = (
+				418F2BFF2B52D4160013C384 /* GAM_GamePads.cpp */,
+				418F2C002B52D4160013C384 /* GAM_GamePads.h */,
+				418F2C062B52D44C0013C384 /* CGamePad.cpp */,
+				418F2C042B52D44C0013C384 /* CGamePad.h */,
+				418F2C032B52D44C0013C384 /* CGamePadAxisMotionToButton.cpp */,
+				418F2C052B52D44C0013C384 /* CGamePadAxisMotionToButton.h */,
+			);
+			path = GamePads;
 			sourceTree = "<group>";
 		};
 		41A5739D239C7BF6004D8756 /* GUI */ = {
@@ -2420,6 +2445,7 @@
 				41D5E214239D890700143F1C /* CGuiEditBoxFloat.h in Headers */,
 				41DAE4C423BA18C90011FEA9 /* CSlrFileFromTemp.h in Headers */,
 				41D5E2D4239D891200143F1C /* CSlrDate.h in Headers */,
+				41F19CD62B7447E7008E523B /* ImGuiUtils.h in Headers */,
 				41EE305225E92B9F0050257F /* M_Circlebuf.h in Headers */,
 				4173998423A4E67B008764F9 /* pugixml.h in Headers */,
 				41D5E30A239D895F00143F1C /* CGuiViewDataTable.h in Headers */,
@@ -2464,6 +2490,7 @@
 				41E87518263F5BDC00BEDCC8 /* IMG_SimpleSegmentation.h in Headers */,
 				41D5E233239D890700143F1C /* CGuiViewFrame.h in Headers */,
 				41D5E22F239D890700143F1C /* CGuiView.h in Headers */,
+				418F2C082B52D44C0013C384 /* CGamePad.h in Headers */,
 				4173995D23A4E67B008764F9 /* JSONDefs.h in Headers */,
 				4173995823A4E67B008764F9 /* JSONDebug.h in Headers */,
 				41BB0A08239CBC800035DB9F /* utf8_unchecked.h in Headers */,
@@ -2571,7 +2598,6 @@
 				41DAE4C623BA18C90011FEA9 /* DBG_Log.h in Headers */,
 				41F706882936CA8B001A9715 /* CGuiViewSearch.h in Headers */,
 				41D5E2FB239D891200143F1C /* RES_DeployFile.h in Headers */,
-				414DD3F5260202C200138569 /* GAM_GamePads.h in Headers */,
 				41D5E249239D890700143F1C /* CGuiViewVerticalScroll.h in Headers */,
 				41D5E216239D890700143F1C /* CGuiEditBoxHex.h in Headers */,
 				41866F86265D1B5200E7E638 /* CConfigStorageHjson.h in Headers */,
@@ -2594,7 +2620,9 @@
 				41D5E247239D890700143F1C /* CGuiViewToolBox.h in Headers */,
 				4173997023A4E67B008764F9 /* JSONWorker.h in Headers */,
 				4189FFA02790AB98006432AE /* RtMidi.h in Headers */,
+				418F2C092B52D44C0013C384 /* CGamePadAxisMotionToButton.h in Headers */,
 				41D5E2D8239D891200143F1C /* CSlrFileFromMemory.h in Headers */,
+				418F2C022B52D4160013C384 /* GAM_GamePads.h in Headers */,
 				41DAE4C923BA18C90011FEA9 /* SYS_Memory.h in Headers */,
 				41B403C22600F07D00C271F3 /* stb_sprintf.h in Headers */,
 				41D5E307239D895F00143F1C /* FUN_CSVParser.h in Headers */,
@@ -2701,7 +2729,6 @@
 				41D5E22C239D890700143F1C /* CGuiTheme.cpp in Sources */,
 				4146A6642903ACD2007A060D /* CWaveformData.cpp in Sources */,
 				4110F6FB239FA2D300C478B8 /* CGuiMain.cpp in Sources */,
-				414DD3F6260202C200138569 /* GAM_GamePads.cpp in Sources */,
 				4154FF5F2397A94700EB6387 /* tremor-mdct.c in Sources */,
 				41866F85265D1B5200E7E638 /* CConfigStorageHjson.cpp in Sources */,
 				415ED33729151F3400C21738 /* CViewAudioMixer.cpp in Sources */,
@@ -2740,6 +2767,7 @@
 				4154FF6D2397A94700EB6387 /* jccoefct.c in Sources */,
 				41D5E2D5239D891200143F1C /* CSlrFile.cpp in Sources */,
 				41DAE4CA23BA18C90011FEA9 /* SYS_Memory.mm in Sources */,
+				418F2C072B52D44C0013C384 /* CGamePadAxisMotionToButton.cpp in Sources */,
 				4154FF6E2397A94700EB6387 /* jccolor.c in Sources */,
 				412698D7261DE0D700A3B0BE /* CGuiViewMovingPane.cpp in Sources */,
 				4173996523A4E67B008764F9 /* JSONNode_Mutex.cpp in Sources */,
@@ -2772,6 +2800,7 @@
 				4154FF7A2397A94700EB6387 /* jdapimin.c in Sources */,
 				41326042239E81440061FC82 /* imguifilesystem.cpp in Sources */,
 				4154FF7B2397A94700EB6387 /* jdapistd.c in Sources */,
+				418F2C012B52D4160013C384 /* GAM_GamePads.cpp in Sources */,
 				4154FF7C2397A94700EB6387 /* jdarith.c in Sources */,
 				4154FF7D2397A94700EB6387 /* jdatadst.c in Sources */,
 				41D5E2F5239D891200143F1C /* MTH_FixedPoint.cpp in Sources */,
@@ -2859,6 +2888,7 @@
 				41DA965128B52ECC009ADFB3 /* CGuiViewProgressBarWindow.cpp in Sources */,
 				4154FFAC2397A94700EB6387 /* pngrutil.c in Sources */,
 				41732EBA2916C7A700F212AC /* VID_Fonts.cpp in Sources */,
+				418F2C0A2B52D44C0013C384 /* CGamePad.cpp in Sources */,
 				418D82EF2732FC7E00CFFD8E /* CContinuousParamBezier.cpp in Sources */,
 				4154FFAD2397A94700EB6387 /* pngset.c in Sources */,
 				41D5E236239D890700143F1C /* CGuiViewList.cpp in Sources */,

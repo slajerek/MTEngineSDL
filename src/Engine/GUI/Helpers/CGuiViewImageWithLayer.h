@@ -17,9 +17,7 @@ public:
 		
 	//
 	virtual void SetImage(CSlrImage *setImage);
-	virtual void SetImageKeepAspect(CSlrImage *setImage);
 	virtual void SetImage(CSlrImage *setImage, bool clearZoom);
-	virtual void SetImageKeepAspect(CSlrImage *setImage, bool clearZoom);
 	virtual void RenderMovingPane();
 
 	bool resetLayerImageOnSetImage;

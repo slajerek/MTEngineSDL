@@ -262,6 +262,10 @@ void CSlrKeyboardShortcuts::AddShortcut(CSlrKeyboardShortcut *shortcutToAdd)
 
 			LOGError("CSlrKeyboardShortcuts::AddShortcut: duplicated shortcut hashcode %x ('%s' == '%s')", shortcutToAdd->hashCode,
 						  shortcut->name, shortcutToAdd->name);
+
+			// this is due to broken macOS Xcode debugger that does not respect properly above breakpoint.
+			static int a = 0; a++;
+			return;
 		}
 	}
 	else

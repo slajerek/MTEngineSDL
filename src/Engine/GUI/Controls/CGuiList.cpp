@@ -350,19 +350,19 @@ bool CGuiList::DoTap(float x, float y)
 
 bool CGuiList::DoFinishTap(float x, float y)
 {
-	LOGD("CGuiList::DoFinishTap: '%s'", this->name);
+	LOGG("CGuiList::DoFinishTap: '%s'", this->name);
 	if (!visible)
 		return false;
 
 	if (!IsInside(x, y))
 	{
-		LOGD("   -outside");
+//		LOGG("   -outside");
 		return false;
 	}
 
 	if (scrollModified == true)
 	{
-		LOGD("CGuiList::DoFinishTap: scrollModified");
+		LOGG("CGuiList::DoFinishTap: scrollModified");
 		return false;
 	}
 

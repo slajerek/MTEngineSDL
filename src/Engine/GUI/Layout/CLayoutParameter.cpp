@@ -9,6 +9,13 @@
 CLayoutParameter::CLayoutParameter(const char *name)
 {
 	this->name = name;
+	this->isHidden = false;
+}
+
+CLayoutParameter::CLayoutParameter(const char *name, bool isHidden)
+{
+	this->name = name;
+	this->isHidden = isHidden;
 }
 
 CLayoutParameter::~CLayoutParameter()
@@ -32,6 +39,13 @@ bool CLayoutParameter::Deserialize(CByteBuffer *byteBuffer)
 //
 CLayoutParameterBool::CLayoutParameterBool(const char *name, bool *value)
 : CLayoutParameter(name)
+{
+	this->value = value;
+	this->flags = 0;
+}
+
+CLayoutParameterBool::CLayoutParameterBool(const char *name, bool isHidden, bool *value)
+: CLayoutParameter(name, isHidden)
 {
 	this->value = value;
 	this->flags = 0;
@@ -67,11 +81,19 @@ bool CLayoutParameterBool::Deserialize(CByteBuffer *byteBuffer)
 	return true;
 }
 
-
 //
 
 CLayoutParameterInt::CLayoutParameterInt(const char *name, int *value)
 : CLayoutParameter(name)
+{
+	this->value = value;
+	this->step = 1;
+	this->step_fast = 100;
+	this->flags = 0;
+}
+
+CLayoutParameterInt::CLayoutParameterInt(const char *name, bool isHidden, int *value)
+: CLayoutParameter(name, isHidden)
 {
 	this->value = value;
 	this->step = 1;
@@ -115,6 +137,18 @@ bool CLayoutParameterInt::Deserialize(CByteBuffer *byteBuffer)
 
 CLayoutParameterFloat::CLayoutParameterFloat(const char *name, float *value)
 : CLayoutParameter(name)
+{
+	this->value = value;
+	this->minValue = 0.1f;
+	this->maxValue = 50.0f;
+	this->step = 0.0f;
+	this->step_fast = 0.0f;
+	this->format = "%.2f";
+	this->flags = 0;
+}
+
+CLayoutParameterFloat::CLayoutParameterFloat(const char *name, bool isHidden, float *value)
+: CLayoutParameter(name, isHidden)
 {
 	this->value = value;
 	this->minValue = 0.1f;

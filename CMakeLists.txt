@@ -8,12 +8,14 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED On)
 set(CMAKE_CXX_EXTENSIONS Off)
 
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fpermissive")
+set(CMAKE_C_FLAGS "$(CMAKE_C_FLAGS) -fpermissive")
+
 add_definitions(
     -DLINUX
     -DIMGUI_IMPL_OPENGL_LOADER_GL3W
+    
 )
-
-set (CMAKE_CXX_FLAGS "-fpermissive")
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(GTK3 REQUIRED gtk+-3.0)
@@ -38,6 +40,7 @@ include_directories(
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/Render"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/Net"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/GamePads"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/Pool"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Funct"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Funct/DataTable"
@@ -103,6 +106,10 @@ add_library(MTEngineSDL STATIC
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/Net/CNetServer.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/Net/NET_Main.cpp"
 
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/GamePads/GAM_GamePads.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/GamePads/CGamePad.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/GamePads/CGamePadAxisMotionToButton.cpp"
+
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/Pool/CPool.cpp"
 
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/Render/VID_Blits.cpp"
@@ -141,7 +148,6 @@ add_library(MTEngineSDL STATIC
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/CSlrDate.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/CSlrTexture.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/CSystemFileDialogCallback.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/GAM_GamePads.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/MTH_FastMath.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/MTH_FixedPoint.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/MTH_Random.cpp"
@@ -250,9 +256,9 @@ add_library(MTEngineSDL STATIC
 
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/imgui/imgui_demo.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/imgui/imgui_draw.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/imgui/imgui_freetype.cpp"
+#    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/imgui/imgui_freetype.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/imgui/imgui_impl_opengl3.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/imgui/imgui_impl_sdl.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/imgui/imgui_impl_sdl2.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/imgui/imgui_tables.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/imgui/imgui_widgets.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/imgui/imgui_demo.cpp"
@@ -264,12 +270,14 @@ add_library(MTEngineSDL STATIC
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/imguiext/imguiComboFilter.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/imguiext/imguifilesystem.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/imguiext/imgui_toggle.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/imguiext/ImGuiUtils.h"
 
 # TODO: move font awesome from here
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/imgui-notify/fa_solid_900.cpp"
 
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/implot/implot_demo.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/implot/implot_items.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/implot/implot_colors_extension.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/implot/implot.cpp"
 
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jcapimin.c"

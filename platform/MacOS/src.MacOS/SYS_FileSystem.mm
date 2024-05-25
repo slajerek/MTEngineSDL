@@ -11,6 +11,7 @@
 
 #include "SYS_MacOS.h"
 #include <AppKit/AppKit.h>
+#include <cstdlib>
 
 #include "SYS_FileSystem.h"
 #include "TargetConditionals.h"
@@ -1164,3 +1165,21 @@ std::string SYS_ExecSystemCommand(const char* cmd)
 
 
  */
+
+void SYS_OpenURLInBrowser(const char *url)
+{
+	// Prepare the command by adding the prefix needed to open a URL
+	std::string command = "open ";
+	// Append the URL passed to the function
+	command += url;
+
+	// Use the system() function to execute the command
+	// system() returns -1 on error, and the return value of the command otherwise
+	// It's generally a good idea to check the return value for error handling
+	int result = system(command.c_str());
+
+	if (result == -1)
+	{
+		LOGError("SYS_OpenURLInBrowser: failed to open url %s", url);
+	}
+}

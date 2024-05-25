@@ -83,6 +83,7 @@ void MACOS_RestoreMainWindowPosition()
 	savedRect.origin.y = (float)y;
 	savedRect.size.width = (float)width;
 	savedRect.size.height = (float)height;
+		
 
 //	NSString *winFrameString = [[NSUserDefaults standardUserDefaults] stringForKey:@"MainWindowFrameKey"];
 //
@@ -93,7 +94,11 @@ void MACOS_RestoreMainWindowPosition()
 
 		for (id screen in [NSScreen screens])
 		{
-			if (CGRectContainsRect(((NSScreen *)screen).visibleFrame, savedRect))
+			NSRect visibleFrame = ((NSScreen *)screen).visibleFrame;
+
+//			if (CGRectContainsRect(visibleFrame, savedRect))
+			if (   savedRect.origin.x >= visibleFrame.origin.x && savedRect.origin.x < visibleFrame.origin.x-10 + visibleFrame.size.width
+				&& savedRect.origin.y >= visibleFrame.origin.y && savedRect.origin.y < visibleFrame.origin.y-10 + visibleFrame.size.height)			
 			{
 				if (savedRect.size.width > 10 && savedRect.size.height > 10)
 				{

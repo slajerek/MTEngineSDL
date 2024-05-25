@@ -1341,3 +1341,15 @@ std::vector<std::string> SYS_Win32GetAvailableDrivesPaths()
 
 	return drives;
 }
+
+void SYS_OpenURLInBrowser(const char *url)
+{
+	// The function opens the document or file specified by lpFile in the application specified by lpOperation
+	HINSTANCE result = ShellExecute(NULL, "open", url, NULL, NULL, SW_SHOWNORMAL);
+
+	// ShellExecute returns a value greater than 32 if successful
+	if ((int)result <= 32) 
+	{
+		LOGError("SYS_OpenURLInBrowser: Failed to open URL: %s", url);
+	}
+}

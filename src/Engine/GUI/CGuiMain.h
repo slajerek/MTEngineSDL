@@ -289,6 +289,7 @@ public:
 	
 	//
 	void RenderImGui();
+	void UpdateLayouts();
 	void PostRenderEndFrame();
 
 	//

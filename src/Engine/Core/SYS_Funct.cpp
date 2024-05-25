@@ -703,7 +703,6 @@ int FUN_FuzzySearch( const char *str, int num, const char *words[] )
 	return best;
 }
 
-
 /*
 // return whether a number is a power of two
 inline UInt32 IsPowerOfTwo(UInt32 x)

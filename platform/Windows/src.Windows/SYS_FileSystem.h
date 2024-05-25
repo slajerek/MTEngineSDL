@@ -116,5 +116,6 @@ std::vector<std::string> SYS_Win32GetAvailableDrivesPaths();
 
 char* SYS_GetPathToDocuments();
 
+void SYS_OpenURLInBrowser(const char *url);
 
 #endif //__SYS_CFILESYSTEM_H__

@@ -94,4 +94,6 @@ long SYS_GetFileModifiedTime(const char *filePath);
 
 char* SYS_GetPathToDocuments();
 
+void SYS_OpenURLInBrowser(const char *url);
+
 #endif //__SYS_FILESYSTEM_H__

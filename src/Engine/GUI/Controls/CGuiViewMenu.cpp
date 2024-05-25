@@ -37,6 +37,8 @@ void CGuiViewMenu::ClearItems()
 
 	firstVisibleItem = menuItems.begin();
 	selectedItem = menuItems.end();
+	
+	currentSubMenu = NULL;
 
 	guiMain->UnlockMutex();
 }

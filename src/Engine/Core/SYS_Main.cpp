@@ -421,7 +421,15 @@ u32 SYS_GetShiftedKey(u32 keyCode, bool isShift, bool isAlt, bool isControl, boo
 				return '|';
 		}
 		
-		return toupper(keyCode);
+		if (keyCode < SDLK_CAPSLOCK) //1073741881)
+		{
+			return toupper(keyCode);
+		}
+		else
+		{
+			return keyCode;
+		}
+		
 	}
 	
 	return keyCode;
@@ -644,4 +652,20 @@ void SYS_PrintError(const char *format, ...)
 	SYS_ReleaseCharBuf(buffer);
 
 	fprintf(stderr, "%s\n", buffer);
+}
+
+void LOG_PrintHexArray(u8 *data, int size)
+{
+	char *buf = SYS_GetCharBuf();
+	char hex[4] = {0,0,0x20,0};
+	
+	for (int i = 0; i < size; i++)
+	{
+		sprintfHexCode8(hex, data[i]);
+		strcat(buf, hex);
+	}
+	
+	LOGD("%s", buf);
+	
+	SYS_ReleaseCharBuf(buf);
 }

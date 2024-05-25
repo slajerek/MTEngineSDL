@@ -34,6 +34,7 @@
 #include "SYS_FileSystem.h"
 #include "SYS_PauseResume.h"
 #include "CSlrString.h"
+#include "GAM_GamePads.h"
 
 void SYS_Shutdown();
 
@@ -79,19 +80,21 @@ void SYS_MTEngineStartup()
 
 	SND_Init();
 	
-	// init the application
+	// init the application gui
 	GUI_Init();
 	
-#if !defined(WIN32)
+	// init Enet
 	NET_Initialize();
-#else
-	LOGTODO("NET_Initialize(); windows");
-#endif
 	
+	// init gamepads
+	GAM_InitGamePads();
+
+	// update default OS menus (e.g. remove items in macOS)
 	PLATFORM_UpdateMenus();
 	
 	MT_PostInit();
 	
+	// start sound
 	SND_Start();
 
 	VID_PostInit();
@@ -107,11 +110,14 @@ void SYS_MTEngineStartup()
 		// store ImGui layout
 		ImGui::SaveIniSettingsToDisk(g.IO.IniFilename);
 
-		// serialize current layout to workspaces
-		guiMain->layoutManager->currentLayout->serializedLayoutBuffer->Clear();
-		
-		// note, we can just serialize layout now because the frame has been rendered, normally we would need to call async serialize
-		guiMain->SerializeLayout(guiMain->layoutManager->currentLayout);
+		if (guiMain->layoutManager->currentLayout->doNotUpdateViewsPositions == false)
+		{
+			// serialize current layout to workspaces
+			guiMain->layoutManager->currentLayout->serializedLayoutBuffer->Clear();
+			
+			// note, we can just serialize layout now because the frame has been rendered, normally we would need to call async serialize
+			guiMain->SerializeLayout(guiMain->layoutManager->currentLayout);
+		}
 		
 		// save all layouts
 		guiMain->layoutManager->StoreLayouts();
@@ -120,8 +126,10 @@ void SYS_MTEngineStartup()
 	SYS_ApplicationShutdown();
 	SYS_PlatformShutdown();
 	
+#if !defined(MTENGINE_FULL_SHUTDOWN_PROCEDURE)
 	LOG_Shutdown();
 	_exit(0);
+#else
 
 	// this below takes ages sometimes (~1-2sec) and is not needed on modern systems
 	SND_Shutdown();
@@ -130,6 +138,8 @@ void SYS_MTEngineStartup()
 	
 	LOG_Shutdown();
 	_exit(0);
+#endif
+	
 }
 
 void SYS_Shutdown()
