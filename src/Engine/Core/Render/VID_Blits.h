@@ -137,6 +137,8 @@ void BlitLine(float startX, float startY, float endX, float endY, float posZ,
 
 void BlitFilledRectangle(float destX, float destY, float z, float sizeX, float sizeY, 
 						 float colorR, float colorG, float colorB, float alpha);
+void BlitFilledRectangleOnForeground(float destX, float destY, float z, float sizeX, float sizeY,
+									 float colorR, float colorG, float colorB, float alpha);
 
 void BlitRectangle(float destX, float destY, float z, float sizeX, float sizeY, 
 				   float colorR, float colorG, float colorB, float alpha);

@@ -853,6 +853,20 @@ void BlitFilledRectangle(float destX, float destY, float z, float sizeX, float s
 
 }
 
+void BlitFilledRectangleOnForeground(float destX, float destY, float z, float sizeX, float sizeY,
+						 float colorR, float colorG, float colorB, float alpha)
+{
+	
+	ImVec2 pMin(destX,			destY);
+	ImVec2 pMax(destX + sizeX,	destY + sizeY);
+	
+	ImDrawFlags corners_none = 0;
+
+	ImDrawList *drawList = ImGui::GetForegroundDrawList();
+	drawList->AddRectFilled(pMin, pMax, ImGui::ColorConvertFloat4ToU32(ImVec4(colorR, colorG, colorB, alpha)), 0.0f, corners_none);
+
+}
+
 void BlitGradientRectangle(float destX, float destY, float z, float sizeX, float sizeY,
 						   float colorR1, float colorG1, float colorB1, float colorA1,
 						   float colorR2, float colorG2, float colorB2, float colorA2,

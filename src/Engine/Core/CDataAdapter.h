@@ -42,6 +42,8 @@ public:
 	virtual void AdapterReadByteModulus(int pointer, uint8 *value);
 	virtual void AdapterWriteByteModulus(int pointer, uint8 value);
 
+	virtual void GetAddressStringForCell(int cell, char *str, int maxLen);
+
 	//CDataAdapterCallback *callback;
 };
 

@@ -938,7 +938,7 @@ bool CSlrString::IsHexValue()
 
 void CSlrString::DebugPrint()
 {
-	char buf[1024];
+	char *buf = SYS_GetCharBuf();
 	u16 l = 0;
 	
 	//LOGD("len=%d", GetLength());
@@ -952,11 +952,12 @@ void CSlrString::DebugPrint()
 	buf[l] = 0x00;
 	
 	LOGD(buf);
+	SYS_ReleaseCharBuf(buf);
 }
 
 void CSlrString::DebugPrint(const char *name)
 {
-	char buf[1024];
+	char *buf = SYS_GetCharBuf();
 	sprintf(buf, "%s", name);
 
 	u16 l = strlen(buf);
@@ -972,11 +973,12 @@ void CSlrString::DebugPrint(const char *name)
 	buf[l] = 0x00;
 
 	LOGD(buf);
+	SYS_ReleaseCharBuf(buf);
 }
 
 void CSlrString::DebugPrint(const char *name, u32 pos)
 {
-	char buf[1024];
+	char *buf = SYS_GetCharBuf();
 	sprintf(buf, "pos=%d %s", pos, name);
 
 	u16 l = strlen(buf);
@@ -1000,6 +1002,7 @@ void CSlrString::DebugPrint(const char *name, u32 pos)
 	buf[l] = 0x00;
 
 	LOGD(buf);
+	SYS_ReleaseCharBuf(buf);
 }
 
 void CSlrString::DebugPrint(FILE *fp)

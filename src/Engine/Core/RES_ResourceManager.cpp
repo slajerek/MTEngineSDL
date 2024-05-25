@@ -625,10 +625,10 @@ CSlrFile *RES_GetFile(const char *fileName, u8 fileType)
 
 CSlrFileZlib *RES_GetFileZlib(const char *fileName)
 {
-	return RES_GetZlibFile(fileName, DEPLOY_FILE_TYPE_DATA);
+	return RES_GetFileZlib(fileName, DEPLOY_FILE_TYPE_DATA);
 }
 
-CSlrFileZlib *RES_GetZlibFile(const char *fileName, u8 fileType)
+CSlrFileZlib *RES_GetFileZlib(const char *fileName, u8 fileType)
 {
 	CSlrFile *file = RES_GetFile(fileName, fileType);	
 	CByteBuffer *byteBuffer = new CByteBuffer(file, false);

@@ -33,6 +33,9 @@ public:
 	virtual void SetImageData(CImageData *imageData, bool clearZoom);
 	virtual void SetImage(CSlrImage *setImage, bool clearZoom);
 	
+	virtual void SetImageKeepAspect(CSlrImage *setImage);
+	virtual void SetImageKeepAspect(CSlrImage *setImage, bool clearZoom);
+
 	CSlrFont *font;
 	float fontScale;
 

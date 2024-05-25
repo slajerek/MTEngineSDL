@@ -12,6 +12,8 @@ CGuiEditHex::CGuiEditHex(CGuiEditHexCallback *callback)
 
 void CGuiEditHex::SetValue(int value, int numDigits)
 {
+	originalValueBeforeEsc = value;
+	
 	char *buf = SYS_GetCharBuf();
 	char *bufFormat = SYS_GetCharBuf();
 	
@@ -47,6 +49,9 @@ void CGuiEditHex::SetText(CSlrString *str)
 
 void CGuiEditHex::UpdateValue()
 {
+	if (text == NULL)
+		return;
+	
 	for (int i = 0; i < text->GetLength(); i++)
 	{
 		u16 chr = this->text->GetChar(i);
@@ -71,7 +76,14 @@ void CGuiEditHex::CancelEntering()
 
 void CGuiEditHex::FinalizeEntering(u32 keyCode, bool isCancelled)
 {
-	UpdateValue();
+	if (isCancelled == false)
+	{
+		UpdateValue();
+	}
+	else
+	{
+		value = originalValueBeforeEsc;
+	}
 	this->callback->GuiEditHexEnteredValue(this, keyCode, isCancelled);
 }
 
@@ -151,6 +163,7 @@ void CGuiEditHex::KeyDown(u32 keyCode)
 
 void CGuiEditHex::SetCursorPos(int newPos)
 {
+	LOGD("CGuiEditHex::SetCursorPos=%d", newPos);
 	this->cursorPos = newPos;
 	UpdateCursor();
 }

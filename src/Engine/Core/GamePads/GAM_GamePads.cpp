@@ -6,6 +6,7 @@
 #include "CSlrString.h"
 #include "CGuiMain.h"
 #include "CGuiView.h"
+#include "gamecontrollerdb_txt_zlib.h"
 
 // https://cpp.hotexamples.com/examples/-/-/SDL_GameControllerAddMappingsFromFile/cpp-sdl_gamecontrolleraddmappingsfromfile-function-examples.html
 // https://gist.github.com/urkle/6701236
@@ -17,6 +18,9 @@ void GAM_InitGamePads()
 {
 	LOGM("GAM_InitGamepads");
 	
+	// controllers data
+	RES_AddEmbeddedDataToDeploy("/gamecontrollerdb", DEPLOY_FILE_TYPE_DATA, gamecontrollerdb_txt_zlib, gamecontrollerdb_txt_zlib_length);
+
 	mutexGamePads = new CSlrMutex("mutexGamePads");
 	for (int i = 0; i < MAX_GAMEPADS; i++)
 	{
@@ -173,7 +177,14 @@ void CGamePad::Open(int deviceId)
 	LOGD("CGamePad::Open: deviceId=%d", deviceId);
 	sdlGamePad = SDL_GameControllerOpen(deviceId);
 	
-	this->name = STRALLOC(SDL_JoystickNameForIndex(deviceId));
+	const char *joyName = SDL_JoystickNameForIndex(deviceId);
+	if (joyName == NULL)
+	{
+		LOGError("CGamePad::Open: %s", SDL_GetError());
+		joyName = "";
+	}
+	
+	this->name = STRALLOC(joyName);
 	LOGD("...name=%s", name);
 
 	SDL_Joystick *j = SDL_GameControllerGetJoystick(sdlGamePad);

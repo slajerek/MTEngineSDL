@@ -48,12 +48,12 @@
 FILE *fpLog = NULL;
 #endif
 
-#ifdef FINAL_RELEASE
-#define BUFSIZE 256
-#else
+//#ifdef FINAL_RELEASE
+//#define BUFSIZE 256
+//#else
 // 2 MB
 #define BUFSIZE 1024*1024*2
-#endif
+//#endif
 
 #if defined(USE_DEBUG_LOG_TO_VIEW)
 #include "CGuiViewDebugLog.h"

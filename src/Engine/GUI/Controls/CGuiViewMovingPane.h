@@ -5,9 +5,12 @@
 
 enum MovingPaneStyle
 {
+	MovingPaneStyle_None,
 	MovingPaneStyle_MultiTouch,
 	MovingPaneStyle_LeftClick,
-	MovingPaneStyle_RightClick
+	MovingPaneStyle_RightClick,
+	MovingPaneStyle_Spacebar,
+	MovingPaneStyle_RightClickAndSpacebar
 };
 
 class CGuiViewMovingPane : public CGuiView
@@ -83,6 +86,8 @@ public:
 	bool mouseInvert;
 //	bool changeCursorOnMove;
 	
+	// called when layout parameter is changed by UI or deserialized
+	virtual void LayoutParameterChanged(CLayoutParameter *layoutParameter);
 };
 
 #endif

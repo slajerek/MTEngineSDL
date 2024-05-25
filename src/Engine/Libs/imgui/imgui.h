@@ -2170,6 +2170,9 @@ struct ImGuiIO
 
     // Option to audit .ini data
     bool        ConfigDebugIniSettings;         // = false          // Save .ini data with extra comments (particularly helpful for Docking, but makes saving slower)
+	
+	//
+	bool		ConfigIsTabBarTriangleHidden;
 
     //------------------------------------------------------------------
     // Platform Functions

@@ -17,6 +17,7 @@ void SYS_SetCommandLineArguments(int argc, const char **argv)
 	
 	for (int i = 1; i < argc; i++)
 	{
+		LOGD("sysArgv[%d]=%s", sysArgv[i]);
 		sysCommandLineArguments.push_back(argv[i]);
 	}
 }

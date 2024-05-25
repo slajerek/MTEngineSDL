@@ -114,7 +114,7 @@ CSlrFile *RES_GetFile(bool fromResources, const char *fileName, u8 fileType);
 CSlrFile *RES_CreateFile(const char *fileName, u8 fileType);
 
 CSlrFileZlib *RES_GetFileZlib(const char *fileName);
-CSlrFileZlib *RES_GetZlibFile(const char *fileName, u8 fileType);
+CSlrFileZlib *RES_GetFileZlib(const char *fileName, u8 fileType);
 
 CSlrFileMemory *RES_GetSound(const char *fileName);
 CSlrFileMemory *RES_GetSound(bool fromResources, const char *fileName);

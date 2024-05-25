@@ -1,4 +1,4 @@
-﻿#include "SYS_Platform.h"
+#include "SYS_Platform.h"
 #include <SDL.h>
 #include <SDL_syswm.h>
 #include "SYS_Defs.h"
@@ -126,7 +126,9 @@ void VID_StoreMainWindowPosition()
 	SDL_GetWindowPosition(sdlMainWindow, &x, &y);
 	SDL_GetWindowSize(sdlMainWindow, &width, &height);
 
-	int hb = GetSystemMetrics(SM_CYCAPTION);
+	// does not work on Isildur's Windows
+	// int hb = GetSystemMetrics(SM_CYCAPTION);
+	int hb = 0;
 	y -= hb;
 
 	width = SDL_GetWindowSurface(sdlMainWindow)->w;
@@ -223,6 +225,16 @@ void VID_GetStartupMainWindowPosition(int* x, int* y, int* width, int* height, b
 	if (windowHeight > maxY)
 	{
 		windowHeight = SCREEN_HEIGHT;
+	}
+	
+	if (windowWidth < 3)
+	{
+		windowWidth = 20;
+	}
+
+	if (windowHeight < 3)
+	{
+		windowHeight = 20;
 	}
 
 	*x = windowLeft;

@@ -78,6 +78,7 @@ void CGuiView::Init(const char *name, float posX, float posY, float posZ, float 
 	windowInnerRectPosEndX = posX + sizeX;
 	windowInnterRectPosEndY = posY + sizeY;
 
+	numNotHiddenLayoutParameters = 0;
 
 	fullScreenSizeX = -1;
 	fullScreenSizeY = -1;
@@ -1575,7 +1576,7 @@ void CGuiView::PostRenderImGui()
 		ImGui::PopStyleVar();
 	}
 
-	if (isShowingContextMenu || HasContextMenuItems() || layoutParameters.size() > 0)
+	if (isShowingContextMenu || HasContextMenuItems() || numNotHiddenLayoutParameters > 0)
 	{
 		if (ImGui::BeginPopupContextWindow())
 		{
@@ -1620,6 +1621,9 @@ void CGuiView::RenderContextMenuLayoutParameters(bool forced)
 	for (std::list<CLayoutParameter *>::iterator it = layoutParameters.begin(); it != layoutParameters.end(); it++)
 	{
 		CLayoutParameter *param = *it;
+		if (param->isHidden)
+			continue;
+		
 		if (param->RenderImGui())
 		{
 			this->LayoutParameterChanged(param);
@@ -1863,6 +1867,9 @@ void CGuiView::AddLayoutParameter(CLayoutParameter *layoutParameter)
 	u64 hash = GetHashCode64(layoutParameter->name);
 	layoutParametersByHash[hash] = layoutParameter;
 	layoutParameters.push_back(layoutParameter);
+	
+	if (layoutParameter->isHidden == false)
+		numNotHiddenLayoutParameters++;
 }
 
 void CGuiView::LayoutParameterChanged(CLayoutParameter *layoutParameter)
@@ -1885,6 +1892,7 @@ void CGuiView::SerializeLayout(CByteBuffer *byteBuffer)
 	{
 		CLayoutParameter *parameter = *it;
 
+		LOGD("...parameter=%s", parameter->name);
 		byteBuffer->putString(parameter->name);
 		parameter->Serialize(byteBuffer);
 	}	

@@ -125,7 +125,8 @@ void CLayoutManager::SerializeLayouts(CByteBuffer *byteBuffer)
 		SerializeLayout(layoutData, byteBuffer);
 	}
 	
-	if (currentLayout)
+	// TODO: bug: after returning from full screen the current layoutName is NULL
+	if (currentLayout && currentLayout->layoutName)
 	{
 		byteBuffer->PutString(currentLayout->layoutName);
 	}
@@ -172,8 +173,9 @@ void CLayoutManager::DeserializeLayouts(CByteBuffer *byteBuffer, u16 version)
 	CLayoutData *layoutData = GetLayoutByName(currentLayoutName);
 	if (layoutData != NULL)
 	{
-		CUiThreadTaskSetLayout *task = new CUiThreadTaskSetLayout(layoutData, false);
-		guiMain->AddUiThreadTask(task);
+		SetLayoutAsync(layoutData, false);
+//		CUiThreadTaskSetLayout *task = new CUiThreadTaskSetLayout(layoutData, false);
+//		guiMain->AddUiThreadTask(task);
 	}
 }
 
@@ -375,5 +377,7 @@ bool CLayoutManager::ProcessKeyboardShortcut(u32 zone, u8 actionType, CSlrKeyboa
 	CLayoutData *layoutData = (CLayoutData *)keyboardShortcut->userData;
 	SetLayoutAsync(layoutData, true);
 	
-	return false;
+//	guiMain->ShowNotification("Layout restored", layoutData->layoutName);
+	
+	return true;
 }

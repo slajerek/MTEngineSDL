@@ -57,7 +57,7 @@ bool MACOS_IsApplicationFullScreen()
 static volatile bool VID_isMouseCursorVisible = true;
 void VID_ShowMouseCursor()
 {
-        LOGM("VID_ShowMouseCursor");
+        LOGG("VID_ShowMouseCursor");
         dispatch_async(dispatch_get_main_queue(), ^{
                 if (VID_isMouseCursorVisible == false)
                 {
@@ -69,7 +69,7 @@ void VID_ShowMouseCursor()
 
 void VID_HideMouseCursor()
 {
-        LOGM("VID_HideMouseCursor");
+        LOGG("VID_HideMouseCursor");
         dispatch_async(dispatch_get_main_queue(), ^{
                 if (VID_isMouseCursorVisible == true)
                 {

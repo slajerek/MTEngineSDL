@@ -34,21 +34,6 @@ bool CGuiViewImageWithLayer::UpdateImageData()
 	return false;
 }
 
-void CGuiViewImageWithLayer::SetImageKeepAspect(CSlrImage *setImage)
-{
-	SetImageKeepAspect(setImage, true);
-}
-
-void CGuiViewImageWithLayer::SetImageKeepAspect(CSlrImage *setImage, bool clearZoom)
-{
-//	LOGD("CGuiViewImageWithLayer::SetImageKeepAspect: setImage=%x width=%f height=%f aspect=%f", setImage, setImage->width, setImage->height, (setImage->width / setImage->height));
-	if (setImage != NULL)
-	{
-		SetKeepAspectRatio(true, setImage->width / setImage->height);
-	}
-	SetImage(setImage, clearZoom);
-}
-
 //
 void CGuiViewImageWithLayer::SetImage(CSlrImage *setImage)
 {

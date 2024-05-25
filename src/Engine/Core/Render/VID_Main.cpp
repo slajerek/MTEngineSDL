@@ -34,7 +34,7 @@
 
 CRenderBackend *gRenderBackend = NULL;
 
-// TODO: remove these below, we need dynamic access to this
+// default screen width and height
 int SCREEN_WIDTH;
 int SCREEN_HEIGHT;
 
@@ -117,6 +117,7 @@ void VID_Init()
 	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;           // Enable Docking
 	
 	io.ConfigDockingWithShift = gApplicationDefaultConfig->GetBool("uiDockingWithShift", true);
+	io.ConfigIsTabBarTriangleHidden = gApplicationDefaultConfig->GetBool("ConfigIsTabBarTriangleHidden", false);
 	
 	if (VID_IsViewportsEnable())
 	{
@@ -155,7 +156,7 @@ void VID_Init()
 	SDL_EventState(SDL_SYSWMEVENT, SDL_ENABLE);
 #endif
 	
-	// Note, SDL_CaptureMouse breaks ImGui starting from SDL 2.0.22. We actually need to capture mouse to have a DoNotTouchedMove event to GUIs
+	// Note, SDL_CaptureMouse breaks ImGui starting from SDL 2.0.22. We actually needed to capture mouse to have a DoNotTouchedMove event to GUIs
 //	SDL_CaptureMouse(SDL_TRUE);
 //	SDL_SetHint(SDL_HINT_MOUSE_AUTO_CAPTURE, "0");
 
@@ -261,11 +262,9 @@ void VID_Render()
 	if( avgFPS > 2000000 )
 		avgFPS = 0;
 	
-	
 	// Start the Dear ImGui frame
 
 	// OPENGL3
-	
 	gRenderBackend->NewFrame(clearColor);
 	
 	ImGui_ImplSDL2_NewFrame(gMainWindow);
@@ -284,6 +283,7 @@ void VID_Render()
 	gCurrentFrameNumber++;
 	
 	GUI_Render();
+
 	ImGui::EndFrame();
 	ImGui::Render();
 	
@@ -291,14 +291,14 @@ void VID_Render()
 	
 	// present framebuffer
 	gRenderBackend->PresentFrameBuffer(clearColor);
-		
+	
 	// TODO: LOGIC & RENDER
 	countedRenderFrames += 1;
 	
 	//		doLogic();
 	countedLogicFrames += 1;
 
-		long t2 = SYS_GetCurrentTimeInMillis();
+	long t2 = SYS_GetCurrentTimeInMillis();
 //	LOGD("render took %dms", t2-t1);
 	
 	// TODO: remove me when confirmed it is working OK
@@ -515,6 +515,12 @@ void VID_ProcessEvents()
 			guiMain->isLeftSuperPressed = ((SDL_GetModState() & PLATFORM_KMOD_LGUI) != 0);
 			guiMain->isRightSuperPressed = ((SDL_GetModState() & PLATFORM_KMOD_RGUI) != 0);
 			
+//			LOGD("shift=%s lshift=%s rshift=%s | alt=%s lalt=%s ralt=%s | ctrl=%s lctrl=%s rctrl=%s | super=%s lsuper=%s rsuper=%s",
+//				 STRBOOL(guiMain->isShiftPressed), 	 STRBOOL(guiMain->isLeftShiftPressed),	 STRBOOL(guiMain->isRightShiftPressed),
+//				 STRBOOL(guiMain->isAltPressed), 	 STRBOOL(guiMain->isLeftAltPressed), 	 STRBOOL(guiMain->isRightAltPressed),
+//				 STRBOOL(guiMain->isControlPressed), STRBOOL(guiMain->isLeftControlPressed), STRBOOL(guiMain->isRightControlPressed),
+//				 STRBOOL(guiMain->isSuperPressed), 	 STRBOOL(guiMain->isLeftShiftPressed),   STRBOOL(guiMain->isRightShiftPressed));
+
 			// this code below also bugs in SDL2 and does not work either
 //#if defined(MACOS)
 //#define PLATFORM_SCANCODE_LCTRL	SDL_SCANCODE_LGUI
@@ -594,6 +600,7 @@ void VID_ProcessEvents()
 			
 			
 			u32 keyCode = event.key.keysym.sym;
+			
 			u32 keyValue = SYS_GetShiftedKey(keyCode,
 											 guiMain->isShiftPressed,
 											 guiMain->isAltPressed,

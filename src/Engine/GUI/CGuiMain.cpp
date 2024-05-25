@@ -212,9 +212,10 @@ void CGuiMain::DebugPrintViews()
 #define LAYOUT_VERSION 1
 
 //
-void CGuiMain::SerializeLayout(CLayoutData *layoutData)
+void CGuiMain::SerializeLayout(CLayoutData *layout)
 {
-	CByteBuffer *byteBuffer = layoutData->serializedLayoutBuffer;
+//	LOGD("CGuiMain::SerializeLayout: layout=%x", layout);
+	CByteBuffer *byteBuffer = layout->serializedLayoutBuffer;
 	
 	byteBuffer->Clear();
 	
@@ -246,6 +247,7 @@ void CGuiMain::SerializeLayout(CLayoutData *layoutData)
 // returns if failed
 bool CGuiMain::DeserializeLayout(CLayoutData *layout)
 {
+//	LOGD("CGuiMain::DeserializeLayout: layout=%x", layout);
 	CByteBuffer *byteBuffer = layout->serializedLayoutBuffer;
 	
 	if (!byteBuffer ||byteBuffer->length < 1)
@@ -273,9 +275,14 @@ bool CGuiMain::DeserializeLayout(CLayoutData *layout)
 	LOGD("CGuiMain::DeserializeLayout: version=%d", version);
 	
 	u8 *data = byteBuffer->GetBytes(len);
+
+	// debug dump layout
+//	FILE *fp = fopen("/Users/mars/Desktop/layout.txt", "wb");
+//	fwrite(data, len, 1, fp);
+//	fclose(fp);
 	
 	ImGui::LoadIniSettingsFromMemory((const char*)data);
-	
+
 	delete [] data;
 	
 	u32 numViews = byteBuffer->GetU32();
@@ -295,12 +302,12 @@ bool CGuiMain::DeserializeLayout(CLayoutData *layout)
 		}
 		
 		u64 hash = GetHashCode64(str);
-		LOGD("  view %s hash %x", str, hash);
+//		LOGD("  view %s hash %x", str, hash);
 		std::map<u64, CGuiView *>::iterator it = layoutViews.find(hash);
 		if (it == layoutViews.end())
 		{
 			// view not found? error, break restore
-			LOGError("   view not found %s hash %08x, skipping", str, hash);
+//			LOGError("   view not found %s hash %08x, skipping", str, hash);
 			STRFREE(str);
 			
 			if (version > 0)
@@ -946,7 +953,7 @@ bool CGuiMain::DoTap(float x, float y)
 			LOGI("....view=NULL");
 		}
 
-		LOGD("window->Hidden=%s window->WasActive=%s", STRBOOL(window->Hidden), STRBOOL(window->WasActive));
+//		LOGD("window->Hidden=%s window->WasActive=%s", STRBOOL(window->Hidden), STRBOOL(window->WasActive));
 		
 		if (!window->WasActive || window->Hidden)
 			continue;
@@ -1579,6 +1586,54 @@ void CGuiMain::RenderImGui()
 		// TODO: refactor DoNotTouchedMove to not return anything
 	}
 
+	////////////////////
+	
+	// notifications
+	notificationMutex->Lock();
+	ImGui::RenderNotifications();
+	notificationMutex->Unlock();
+
+	// message boxes
+	if (beginMessageBoxPopup)
+	{
+		ImGui::OpenPopup(messageBoxTitle);
+		beginMessageBoxPopup = false;
+	}
+	if (messageBoxTitle)
+	{
+		// Always center this window when appearing
+		ImGuiPlatformIO platformIO = ImGui::GetPlatformIO();
+		ImVec2 center = platformIO.Monitors[0].MainSize;
+		center.x = center.x * 0.5f;
+		center.y = center.y * 0.5f;
+		ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, ImVec2(200, 75));
+			
+		bool popen = true;
+		if (ImGui::BeginPopupModal(messageBoxTitle, &popen, ImGuiWindowFlags_AlwaysAutoResize))
+		{
+			ImGui::Text("%s", messageBoxText);
+			if (ImGui::Button("  OK  "))
+			{
+				STRFREE(messageBoxTitle);
+				STRFREE(messageBoxText);
+				ImGui::CloseCurrentPopup();
+				
+				if (messageBoxCallback)
+				{
+					messageBoxCallback->MessageBoxCallback();
+				}
+				messageBoxCallback = NULL;
+			}
+			ImGui::EndPopup();
+		}
+		ImGui::PopStyleVar();
+	}
+}
+
+void CGuiMain::UpdateLayouts()
+{
+	//
 	if (layoutJustRestored)
 	{
 		layoutJustRestored = false;
@@ -1628,48 +1683,6 @@ void CGuiMain::RenderImGui()
 		else LOGError("CGuiMain::RenderImGui: unknown LayoutStorageTask=%d", layoutStoreOrRestore);
 	}
 
-	// notifications
-	notificationMutex->Lock();
-	ImGui::RenderNotifications();
-	notificationMutex->Unlock();
-
-	// message boxes
-	if (beginMessageBoxPopup)
-	{
-		ImGui::OpenPopup(messageBoxTitle);
-		beginMessageBoxPopup = false;
-	}
-	if (messageBoxTitle)
-	{
-		// Always center this window when appearing
-		ImGuiPlatformIO platformIO = ImGui::GetPlatformIO();
-		ImVec2 center = platformIO.Monitors[0].MainSize;
-		center.x = center.x * 0.5f;
-		center.y = center.y * 0.5f;
-		ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-		ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, ImVec2(200, 75));
-			
-		bool popen = true;
-		if (ImGui::BeginPopupModal(messageBoxTitle, &popen, ImGuiWindowFlags_AlwaysAutoResize))
-		{
-			ImGui::Text("%s", messageBoxText);
-			if (ImGui::Button("  OK  "))
-			{
-				STRFREE(messageBoxTitle);
-				STRFREE(messageBoxText);
-				ImGui::CloseCurrentPopup();
-				
-				if (messageBoxCallback)
-				{
-					messageBoxCallback->MessageBoxCallback();
-				}
-				messageBoxCallback = NULL;
-			}
-			ImGui::EndPopup();
-		}
-		ImGui::PopStyleVar();
-	}
-	
 }
 
 void CGuiMain::PostRenderEndFrame()
@@ -2002,7 +2015,7 @@ CUiThreadTaskSetMouseCursorVisible::CUiThreadTaskSetMouseCursorVisible(bool mous
 	
 void CUiThreadTaskSetMouseCursorVisible::RunUIThreadTask()
 {
-	LOGD(" CUiThreadTaskSetMouseCursorVisible::RunUIThreadTask: VID_IsMouseCursorVisible=%d, set=%d", VID_IsMouseCursorVisible(), mouseCursorVisible);
+	LOGG("CUiThreadTaskSetMouseCursorVisible::RunUIThreadTask: VID_IsMouseCursorVisible=%d, set=%d", VID_IsMouseCursorVisible(), mouseCursorVisible);
 	if (VID_IsMouseCursorVisible() == mouseCursorVisible)
 	{
 		return;
@@ -2095,9 +2108,24 @@ void CGuiMain::SetViewFullScreen(SetFullScreenMode setFullScreenMode, CGuiView *
 	SetViewFullScreen(setFullScreenMode, view, view ? view->sizeX : 0, view ? view->sizeY : 0);
 }
 
+const char *GetFullScreenModeText(SetFullScreenMode setFullScreenMode)
+{
+	switch(setFullScreenMode)
+	{
+		case SetFullScreenMode::MainWindowEnterFullScreen:
+			return "MainWindowEnterFullScreen";
+		case SetFullScreenMode::MainWindowLeaveFullScreen:
+			return "MainWindowLeaveFullScreen";
+		case SetFullScreenMode::ViewEnterFullScreen:
+			return "ViewEnterFullScreen";
+		case SetFullScreenMode::ViewLeaveFullScreen:
+			return "ViewLeaveFullScreen";
+	}
+}
+
 void CGuiMain::SetViewFullScreen(SetFullScreenMode setFullScreenMode, CGuiView *view, float fullScreenSizeX, float fullScreenSizeY)
 {
-	LOGD("CGuiMain::SetViewFullScreen: view=%s", view ? view->name : "NULL");
+	LOGD("CGuiMain::SetViewFullScreen: setFullScreenMode=%s view=%s currentLayout=%x '%s'", GetFullScreenModeText(setFullScreenMode), view ? view->name : "NULL", layoutManager->currentLayout, layoutManager->currentLayout ? layoutManager->currentLayout->layoutName : "NULL");
 
 	if (setFullScreenMode == SetFullScreenMode::ViewEnterFullScreen
 		|| setFullScreenMode == SetFullScreenMode::MainWindowEnterFullScreen)

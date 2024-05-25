@@ -17,9 +17,13 @@ class CLayoutParameter
 {
 public:
 	CLayoutParameter(const char *name);
+	CLayoutParameter(const char *name, bool isHidden);
 	virtual ~CLayoutParameter();
 	
 	const char *name;
+	
+	// do not show in view's context menu
+	bool isHidden;
 	
 	// @returns if layout parameter has changed
 	virtual bool RenderImGui();
@@ -32,6 +36,7 @@ class CLayoutParameterBool : public CLayoutParameter
 {
 public:
 	CLayoutParameterBool(const char *name, bool *value);
+	CLayoutParameterBool(const char *name, bool isHidden, bool *value);
 	CLayoutParameterBool(const char *name, bool *value, ImGuiInputTextFlags flags);
 	bool *value;
 
@@ -46,6 +51,7 @@ class CLayoutParameterInt : public CLayoutParameter
 {
 public:
 	CLayoutParameterInt(const char *name, int *value);
+	CLayoutParameterInt(const char *name, bool isHidden, int *value);
 	CLayoutParameterInt(const char *name, int *value, int step, int step_fast, ImGuiInputTextFlags flags);
 	int *value;
 
@@ -62,6 +68,7 @@ class CLayoutParameterFloat : public CLayoutParameter
 {
 public:
 	CLayoutParameterFloat(const char *name, float *value);
+	CLayoutParameterFloat(const char *name, bool isHidden, float *value);
 	CLayoutParameterFloat(const char *name, float *value, float minValue, float maxValue);
 	CLayoutParameterFloat(const char *name, float *value, float minValue, float maxValue, float step, float step_fast, const char* format, ImGuiInputTextFlags flags);
 	float *value;
