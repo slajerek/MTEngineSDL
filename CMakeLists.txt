@@ -9,7 +9,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED On)
 set(CMAKE_CXX_EXTENSIONS Off)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fpermissive")
-set(CMAKE_C_FLAGS "$(CMAKE_C_FLAGS) -fpermissive")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fpermissive")
 
 add_definitions(
     -DLINUX
