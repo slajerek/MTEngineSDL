@@ -37,6 +37,7 @@ Fast Log Console C# project: https://sourceforge.net/projects/fastlogconsole/
 # Linux
 
 ```
+sudo apt-get install build-essential libgtk-3-dev libsdl2-dev libglew-dev
 mkdir build
 cd build
 cmake ./../
