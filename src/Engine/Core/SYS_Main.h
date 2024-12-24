@@ -123,4 +123,7 @@ else SYS_StrFree(&(point));                                             \
 
 void LOG_PrintHexArray(u8 *data, int size);
 
+const char *SYS_GetPlatformNameString();
+const char *SYS_GetPlatformArchitectureString();
+
 #endif // __SYS_MAIN_H__

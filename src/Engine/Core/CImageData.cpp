@@ -2031,6 +2031,11 @@ void CImageData::ConvertToByte(u8 componentNum)
 void CImageData::ConvertToRGBA()
 {
 	//LOGD("CImageData::ConvertToRGBA");
+	if (this->type == IMG_TYPE_RGBA)
+	{
+		return;
+	}
+	
 	if (this->type == IMG_TYPE_GRAYSCALE)
 	{
 		u8 *newData = new u8[this->width * this->height * 4];
@@ -2597,6 +2602,10 @@ bool CImageData::Load(const char *fileName, bool dealloc)
 
 	this->type = IMG_TYPE_RGBA;
 	this->resultData = stbi_load(fileName, &this->width, &this->height, NULL, 4);
+	if (this->resultData == NULL)
+	{
+		LOGError("CImageData::Load: %s failed", fileName);
+	}
 
 	/*
 	

@@ -1,3 +1,5 @@
+# CMakeLists.txt is supported for Linux only
+
 cmake_minimum_required(VERSION 3.10)
 project(MTEngineSDL)
 
@@ -9,12 +11,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED On)
 set(CMAKE_CXX_EXTENSIONS Off)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fpermissive")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fpermissive")
+set(CMAKE_C_FLAGS "$(CMAKE_C_FLAGS) -fpermissive")
 
 add_definitions(
     -DLINUX
     -DIMGUI_IMPL_OPENGL_LOADER_GL3W
-    
 )
 
 find_package(PkgConfig REQUIRED)
@@ -73,6 +74,7 @@ include_directories(
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/md5"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/minizip"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/mtrand"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/nlohmann"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/nfd"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/pugixml"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/rtmidi"
@@ -80,6 +82,7 @@ include_directories(
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/tremor"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/tremor/Ogg"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/utf8"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/uWebSockets"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/zlib"
 )
 
@@ -148,6 +151,7 @@ add_library(MTEngineSDL STATIC
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/CSlrDate.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/CSlrTexture.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/CSystemFileDialogCallback.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/DBG_LogForCWrapper.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/MTH_FastMath.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/MTH_FixedPoint.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/MTH_Random.cpp"
@@ -176,6 +180,7 @@ add_library(MTEngineSDL STATIC
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Funct/ImageProcessing/IMG_SimpleSegmentation.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Funct/CFeatureConfig.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Funct/FUN_IntervalTree.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Funct/FUN_GenerateSinTab.cpp"
 
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/GUI/AudioMixer/CViewAudioMixer.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/GUI/Controls/CColorsTheme.cpp"

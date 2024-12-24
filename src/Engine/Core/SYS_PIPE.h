@@ -29,6 +29,12 @@
 
 class CByteBuffer;
 
+class CPipeProtocolCallback
+{
+public:
+	virtual bool PipeProtocolCallbackInterpretPacket(CByteBuffer *inByteBuffer);
+};
+
 void PIPE_Init(const char *pipeName);
 void PIPE_Printf(const char *format, ...);
 void PIPE_SendStr(const char *buffer);
@@ -38,6 +44,8 @@ bool PIPE_SendByteBuffer(CByteBuffer *byteBuffer);
 int PIPE_Open(char *device);
 void PIPE_SetOptions(char *device, int baudRate);
 void PIPE_SetOptions(int fd, int baudRate);
+
+void PIPE_AddCallback(CPipeProtocolCallback *callback);
 
 #endif
 

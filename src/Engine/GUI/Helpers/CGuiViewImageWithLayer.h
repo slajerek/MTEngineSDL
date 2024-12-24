@@ -12,7 +12,7 @@ public:
 	
 	virtual void UpdateLayer(CImageData *imageDataLayer);
 
-	virtual void CreateImageData();
+	virtual void RefreshEmulatorScreenImageData();
 	virtual bool UpdateImageData();
 		
 	//

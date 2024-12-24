@@ -2053,6 +2053,9 @@ void CUiThreadTaskSetAlwaysOnTop::RunUIThreadTask()
 
 void CGuiMain::SetMouseCursorVisible(bool isVisible)
 {
+	if (IsMouseCursorVisible() == isVisible)
+		return;
+	
 	CUiThreadTaskSetMouseCursorVisible *task = new CUiThreadTaskSetMouseCursorVisible(isVisible);
 	AddUiThreadTask(task);
 }

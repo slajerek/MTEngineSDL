@@ -183,6 +183,8 @@ char* NOT_TESTED_Utf8StrCiStr(const char* s1, const char* s2);
 
 std::string Utf8StringToLowercase(const std::string& utf8_str);
 
+std::vector<u16> StringToUtf16(const std::string& utf8String);
+
 #endif
 //_CSLRSTRING_H_
 

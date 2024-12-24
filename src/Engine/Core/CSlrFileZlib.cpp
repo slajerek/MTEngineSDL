@@ -253,7 +253,7 @@ void CSlrFileZlib::Close()
 		fileMode = SLR_FILE_MODE_NOT_OPENED;
 	}
 
-	LOGD("CSlrFileZlib::Close: done");
+//	LOGD("CSlrFileZlib::Close: done");
 }
 
 CSlrFileZlib::~CSlrFileZlib()

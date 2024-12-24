@@ -44,7 +44,7 @@ void CGuiViewMovingPaneImage::InitImage()
 {
 	imageData = NULL;
 	
-	CreateImageData();
+	RefreshEmulatorScreenImageData();
 	
 	if (imageData == NULL)
 		return;
@@ -60,7 +60,7 @@ void CGuiViewMovingPaneImage::InitImage()
 	renderTextureEndY = ((float)paneHeight / (float)rasterHeight);
 }
 
-void CGuiViewMovingPaneImage::CreateImageData()
+void CGuiViewMovingPaneImage::RefreshEmulatorScreenImageData()
 {
 	imageData = NULL;
 //	CreateEmptyImageData(256, 256);
@@ -191,6 +191,14 @@ void CGuiViewMovingPaneImage::SetImage(CSlrImage *setImage, bool clearZoom)
 	SetKeepAspectRatio(true, paneWidth / paneHeight);
 
 	guiMain->UnlockMutex();
+}
+
+void CGuiViewMovingPaneImage::RefreshRenderTextureParameters()
+{
+	renderTextureStartX = 0.0f;
+	renderTextureEndX = ((float)paneWidth / (float)rasterWidth);
+	renderTextureStartY = 0.0f;
+	renderTextureEndY = ((float)paneHeight / (float)rasterHeight);
 }
 
 void CGuiViewMovingPaneImage::SetImageKeepAspect(CSlrImage *setImage)

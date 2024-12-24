@@ -11,6 +11,7 @@
 #include "SYS_Main.h"
 #include "SYS_FileSystem.h"
 #include "CSlrString.h"
+#include "json.hpp"
 
 #if !defined(WIN32) && !defined(ANDROID)
 #include <unistd.h>
@@ -238,6 +239,31 @@ u32 FUN_HexStrToValue(char *str)
 	u32 value;
 	sscanf(str, "%x", &value);
 	return value;
+}
+
+u64 FUN_DecOrHexStrWithPrefixToU64(const char *str)
+{
+	// If the string starts with "0x" or "0X", interpret as hexadecimal
+	if (str[0] == '0' && (str[1] == 'x' || str[1] == 'X')) {
+		return strtoul(str, NULL, 16);
+	}
+
+	// If the string starts with "$", interpret as hexadecimal (after the $)
+	if (str[0] == '$') {
+		return strtoul(str + 1, NULL, 16);
+	}
+
+	// Otherwise, interpret as a normal decimal integer
+	return strtoul(str, NULL, 10);
+}
+
+u64 FUN_JsonValueDecOrHexStrWithPrefixToU64(const nlohmann::json& value)
+{
+	if (value.is_string())
+	{
+		return FUN_DecOrHexStrWithPrefixToU64(value.get<string>().c_str());
+	}
+	return value.get<u64>();
 }
 
 void FUN_IntToBinaryStr(unsigned value, char* binaryStr, int n)
@@ -701,6 +727,17 @@ int FUN_FuzzySearch( const char *str, int num, const char *words[] )
 		}
 	}
 	return best;
+}
+
+// convert 8 numbers (bits 0 or 1) to 8-bit value
+u8 FUN_BitsToByte(u8 bits[8])
+{
+	u8 result = 0;
+	for (int i = 0; i < 8; i++) 
+	{
+		result |= (bits[i] & 1) << (7 - i);  // Shift and OR the bits into the result
+	}
+	return result;
 }
 
 /*

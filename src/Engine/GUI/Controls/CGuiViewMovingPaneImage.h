@@ -17,7 +17,7 @@ public:
 	
 	virtual void InitPane();
 	virtual void InitImage();
-	virtual void CreateImageData();
+	virtual void RefreshEmulatorScreenImageData();
 	virtual void CreateEmptyImageData(int imageWidth, int imageHeight);
 	virtual bool UpdateImageData();
 	
@@ -32,6 +32,8 @@ public:
 
 	virtual void SetImageData(CImageData *imageData, bool clearZoom);
 	virtual void SetImage(CSlrImage *setImage, bool clearZoom);
+	
+	virtual void RefreshRenderTextureParameters();
 	
 	virtual void SetImageKeepAspect(CSlrImage *setImage);
 	virtual void SetImageKeepAspect(CSlrImage *setImage, bool clearZoom);
