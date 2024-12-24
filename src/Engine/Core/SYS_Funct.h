@@ -11,6 +11,8 @@
 #define __SYS_FUNCT_H__
 
 #include "SYS_Defs.h"
+#include "json.hpp"
+
 // const std::string &text
 // [[NSString alloc] initWithUTF8String:text.c_str()]
 
@@ -38,7 +40,10 @@ bool FUN_IsHexDigit(char c);
 bool FUN_IsHexNumber(char *str);
 char FUN_HexDigitToChar(u8 hexDigit);
 u32 FUN_HexStrToValue(char *str);
+u64 FUN_DecOrHexStrWithPrefixToU64(const char *str);
+u64 FUN_JsonValueDecOrHexStrWithPrefixToU64(const nlohmann::json& value);
 void FUN_IntToBinaryStr(unsigned value, char* binaryStr, int n=8);
+u8 FUN_BitsToByte(u8 bits[8]);
 
 void FUN_ToUpperCaseStr(char *str);
 

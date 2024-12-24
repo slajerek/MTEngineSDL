@@ -1578,7 +1578,7 @@ void CGuiView::PostRenderImGui()
 
 	if (isShowingContextMenu || HasContextMenuItems() || numNotHiddenLayoutParameters > 0)
 	{
-		if (ImGui::BeginPopupContextWindow())
+		if (ImGui::BeginPopupContextWindow("CGuiViewContextMenu"))
 		{
 			RenderContextMenuItems();
 			RenderContextMenuLayoutParameters(false);
@@ -1892,7 +1892,7 @@ void CGuiView::SerializeLayout(CByteBuffer *byteBuffer)
 	{
 		CLayoutParameter *parameter = *it;
 
-		LOGD("...parameter=%s", parameter->name);
+//		LOGD("...parameter=%s", parameter->name);
 		byteBuffer->putString(parameter->name);
 		parameter->Serialize(byteBuffer);
 	}	

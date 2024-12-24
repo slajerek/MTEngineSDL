@@ -1,6 +1,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #ifdef STB_IMAGE_IMPLEMENTATION
 
+#include "DBG_LogForCWrapper.h"
 #include "stb_image.h"
 
 #ifndef STBI_NO_HDR
@@ -183,6 +184,8 @@ STBIDEF const char *stbi_failure_reason(void)
 
 static int stbi__err(const char *str)
 {
+//	DBG_LOGError(str);
+	
 	stbi__g_failure_reason = str;
 	return 0;
 }

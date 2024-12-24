@@ -15,7 +15,7 @@ CGuiViewImageWithLayer::CGuiViewImageWithLayer(const char *name, float posX, flo
 	editLayerImage = NULL;
 }
 
-void CGuiViewImageWithLayer::CreateImageData()
+void CGuiViewImageWithLayer::RefreshEmulatorScreenImageData()
 {
 //	CreateEmptyImageData(256, 256);
 //

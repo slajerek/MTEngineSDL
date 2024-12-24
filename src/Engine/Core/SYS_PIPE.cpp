@@ -7,6 +7,7 @@
 //#include "INT_BinaryProtocol.h"
 #include <stdio.h>
 #include <fcntl.h>
+#include <list>
 
 #if !defined(WIN32)
 #include <unistd.h>
@@ -48,6 +49,7 @@ public:
 	virtual void ThreadRun(void *data);
 };
 
+std::list<CPipeProtocolCallback *> pipeCallbacks;
 
 CPipeReadPacketsThread *threadPipeReadPackets;
 
@@ -159,6 +161,11 @@ void PIPE_Init(const char *pipeName)
 	
 	threadPipeReadPackets = new CPipeReadPacketsThread();
 	SYS_StartThread(threadPipeReadPackets);
+}
+
+void PIPE_AddCallback(CPipeProtocolCallback *callback)
+{
+	pipeCallbacks.push_back(callback);
 }
 
 void PIPE_Printf(const char *format, ...)
@@ -379,10 +386,14 @@ void CPipeReadPacketsThread::ThreadRun(void *data)
 						pipeReadByteBuffer->Rewind();
 						
 						// parse & interpret received data
-//						LOGD("   INT_InterpretBinaryPacket");
-						
-						LOGTODO("INT_InterpretBinaryPacket");
-//						INT_InterpretBinaryPacket(pipeReadByteBuffer);
+						LOGD("   INT_InterpretBinaryPacket");
+
+						for(std::list<CPipeProtocolCallback *>::iterator it = pipeCallbacks.begin(); it != pipeCallbacks.end(); it++)
+						{
+							CPipeProtocolCallback *callback = *it;
+							if (callback->PipeProtocolCallbackInterpretPacket(pipeReadByteBuffer))
+								break;
+						}
 						
 						// move data
 						long bytesLeft = bufferCount - (4+4) - (long)packetLength;
@@ -428,6 +439,12 @@ void CPipeReadPacketsThread::ThreadRun(void *data)
 	
 	LOGM("PIPE Read Packets Thread finished");
 }
+
+bool CPipeProtocolCallback::PipeProtocolCallbackInterpretPacket(CByteBuffer *inByteBuffer)
+{
+	return false;
+}
+
 
 int PIPE_Open(char *device)
 {

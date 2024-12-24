@@ -2152,8 +2152,21 @@ std::string Utf8StringToLowercase(const std::string& utf8_str)
 	return conv.to_bytes(wide_str);
 }
 
+std::vector<u16> StringToUtf16(const std::string& utf8String)
+{
+	// Create a UTF-8 to UTF-16 converter
+	std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> convert;
+
+	// Convert the UTF-8 string to UTF-16 (stored in a u16string)
+	std::u16string utf16String = convert.from_bytes(utf8String);
+
+	// Convert the UTF-16 u16string to a vector of uint16_t
+	std::vector<uint16_t> utf16Vector(utf16String.begin(), utf16String.end());
+
+	return utf16Vector;
+}
+
 #ifdef USE_STRINGS_POOL
 CPool CSlrString::poolStrings(POOL_SIZE_STRINGS, sizeof(CSlrString));
 #endif
-
 

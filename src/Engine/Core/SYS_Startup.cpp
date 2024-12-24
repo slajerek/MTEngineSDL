@@ -42,6 +42,7 @@ void SYS_Shutdown();
 void SYS_MTEngineStartup()
 {
 	SYS_PlatformInit();
+	LOGM("Platform: %s Architecture: %s", SYS_GetPlatformNameString(), SYS_GetPlatformArchitectureString());
 
 	SYS_InitCharBufPool();
 	SYS_InitStrings();

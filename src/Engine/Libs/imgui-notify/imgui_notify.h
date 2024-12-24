@@ -432,7 +432,7 @@ namespace ImGui
 
 		int size;
 		const unsigned char *fa_solid_900 = GetFontAwesomeSolid900(&size);
-		LOGD("size=%d", size);
+//		LOGD("size=%d", size);
 		GetIO().Fonts->AddFontFromMemoryTTF((void*)fa_solid_900, size, font_size, &icons_config, icons_ranges);
 	}
 }
