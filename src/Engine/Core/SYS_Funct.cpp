@@ -368,7 +368,7 @@ char *SYS_GetFileNameWithExtensionFromFullPath(const char *fileNameFull)
 	// path sign is not found, just dup the original path as filename
 	if (foundPathSign == false)
 	{
-		char *ret = new char[len];
+		char *ret = new char[len+1];
 		strcpy(ret, fileNameFull);
 		return ret;
 	}
