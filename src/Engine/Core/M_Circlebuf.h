@@ -21,6 +21,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <cstdint>
 
 #define bfree 		free
 #define brealloc	realloc
