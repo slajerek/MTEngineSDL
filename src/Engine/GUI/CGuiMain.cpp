@@ -470,17 +470,21 @@ bool CGuiMain::KeyDown(u32 keyCode)
 		}
 	}
 	
-	for (int i = context->Windows.Size - 1; i >= 0; i--) // Iterate front to back
+	// check view in focus
+	if (this->focusedView)
 	{
-		ImGuiWindow *window = context->Windows[i];
-		CGuiView *view = (CGuiView*)window->userData;
-
-		if (view != NULL)
+		if ((io.WantTextInput && focusedView->imGuiSkipKeyPressWhenIoWantsTextInput == false)
+			|| io.WantTextInput == false)
 		{
-			view->KeyDownGlobal(keyCode, isShiftPressed, isAltPressed, isControlPressed, isSuperPressed);
+			// consumed?
+			LOGI("CGuiMain::KeyDown: keyDown focusElement=%s", this->focusedView->name);
+			if (this->focusedView->KeyDown(keyCode, isShiftPressed, isAltPressed, isControlPressed, isSuperPressed))
+			{
+				return true;
+			}
 		}
 	}
-	
+
 	// then change current view
 	if (this->currentView != NULL)
 	{
@@ -495,17 +499,15 @@ bool CGuiMain::KeyDown(u32 keyCode)
 		}
 	}
 	
-	if (this->focusedView)
+	// then global key
+	for (int i = context->Windows.Size - 1; i >= 0; i--) // Iterate front to back
 	{
-		if ((io.WantTextInput && focusedView->imGuiSkipKeyPressWhenIoWantsTextInput == false)
-			|| io.WantTextInput == false)
+		ImGuiWindow *window = context->Windows[i];
+		CGuiView *view = (CGuiView*)window->userData;
+
+		if (view != NULL)
 		{
-			// consumed?
-			LOGI("CGuiMain::KeyDown: keyDown focusElement=%s", this->focusedView->name);
-			if (this->focusedView->KeyDown(keyCode, isShiftPressed, isAltPressed, isControlPressed, isSuperPressed))
-			{
-				return true;
-			}
+			view->KeyDownGlobal(keyCode, isShiftPressed, isAltPressed, isControlPressed, isSuperPressed);
 		}
 	}
 	
@@ -575,19 +577,6 @@ bool CGuiMain::KeyDownRepeat(u32 keyCode)
 	LOGI("CGuiMain::KeyDownRepeat: keyCode=%d (0x%2.2x = %c) isShift=%s isAlt=%s isControl=%s isSuper=%s | io.WantTextInput=%s", keyCode, keyCode, keyCode,
 		 STRBOOL(isShiftPressed), STRBOOL(isAltPressed), STRBOOL(isControlPressed), STRBOOL(isSuperPressed), STRBOOL(io.WantTextInput));
 
-	if (this->currentView != NULL)
-	{
-		if ((io.WantTextInput && currentView->imGuiSkipKeyPressWhenIoWantsTextInput == false)
-			|| io.WantTextInput == false)
-		{
-			LOGI("                > currentView=%s", currentView->name);
-			if (currentView->KeyDownRepeat(keyCode, isShiftPressed, isAltPressed, isControlPressed, isSuperPressed))
-			{
-				return true;
-			}
-		}
-	}
-	
 	if (this->focusedView)
 	{
 		if ((io.WantTextInput && focusedView->imGuiSkipKeyPressWhenIoWantsTextInput == false)
@@ -601,7 +590,21 @@ bool CGuiMain::KeyDownRepeat(u32 keyCode)
 			}
 		}
 	}
+
+	if (this->currentView != NULL)
+	{
+		if ((io.WantTextInput && currentView->imGuiSkipKeyPressWhenIoWantsTextInput == false)
+			|| io.WantTextInput == false)
+		{
+			LOGI("                > currentView=%s", currentView->name);
+			if (currentView->KeyDownRepeat(keyCode, isShiftPressed, isAltPressed, isControlPressed, isSuperPressed))
+			{
+				return true;
+			}
+		}
+	}
 	
+
 //	for (std::list<CGlobalKeyboardCallback *>::const_iterator itKeybardCallbacks =
 //			this->globalKeyboardCallbacks.begin();
 //			itKeybardCallbacks != this->globalKeyboardCallbacks.end();
@@ -685,19 +688,6 @@ bool CGuiMain::KeyUp(u32 keyCode)
 		}
 	}
 	
-	//
-	if (this->currentView != NULL)
-	{
-		if ((io.WantTextInput && currentView->imGuiSkipKeyPressWhenIoWantsTextInput == false)
-			|| io.WantTextInput == false)
-		{
-			if (currentView->KeyUp(keyCode, isShiftPressed, isAltPressed, isControlPressed, isSuperPressed))
-			{
-				return true;
-			}
-		}
-	}
-		
 	if (this->focusedView)
 	{
 		if ((io.WantTextInput && focusedView->imGuiSkipKeyPressWhenIoWantsTextInput == false)
@@ -712,6 +702,19 @@ bool CGuiMain::KeyUp(u32 keyCode)
 		}
 	}
 	
+	//
+	if (this->currentView != NULL)
+	{
+		if ((io.WantTextInput && currentView->imGuiSkipKeyPressWhenIoWantsTextInput == false)
+			|| io.WantTextInput == false)
+		{
+			if (currentView->KeyUp(keyCode, isShiftPressed, isAltPressed, isControlPressed, isSuperPressed))
+			{
+				return true;
+			}
+		}
+	}
+		
 	if (io.WantTextInput)
 		return false;
 	
@@ -781,20 +784,6 @@ bool CGuiMain::KeyTextInput(const char *text)
 //	}
 	
 	
-	// then change current view
-	if (this->currentView != NULL)
-	{
-		if ((io.WantTextInput && currentView->imGuiSkipKeyPressWhenIoWantsTextInput == false)
-			|| io.WantTextInput == false)
-		{
-			LOGI("                > currentView=%s", currentView->name);
-			if (currentView->KeyTextInput(text))
-			{
-				return true;
-			}
-		}
-	}
-	
 	if (this->focusedView)
 	{
 		if ((io.WantTextInput && focusedView->imGuiSkipKeyPressWhenIoWantsTextInput == false)
@@ -803,6 +792,20 @@ bool CGuiMain::KeyTextInput(const char *text)
 			// consumed?
 			LOGI("CGuiMain::KeyTextInput: focusElement=%s", this->focusedView->name);
 			if (focusedView->KeyTextInput(text))
+			{
+				return true;
+			}
+		}
+	}
+
+	// then change current view
+	if (this->currentView != NULL)
+	{
+		if ((io.WantTextInput && currentView->imGuiSkipKeyPressWhenIoWantsTextInput == false)
+			|| io.WantTextInput == false)
+		{
+			LOGI("                > currentView=%s", currentView->name);
+			if (currentView->KeyTextInput(text))
 			{
 				return true;
 			}
