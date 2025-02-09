@@ -2127,6 +2127,7 @@ const char *GetFullScreenModeText(SetFullScreenMode setFullScreenMode)
 		case SetFullScreenMode::ViewLeaveFullScreen:
 			return "ViewLeaveFullScreen";
 	}
+	return "UnknownFullScreen";
 }
 
 void CGuiMain::SetViewFullScreen(SetFullScreenMode setFullScreenMode, CGuiView *view, float fullScreenSizeX, float fullScreenSizeY)
