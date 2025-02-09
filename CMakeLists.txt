@@ -10,8 +10,9 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED On)
 set(CMAKE_CXX_EXTENSIONS Off)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fpermissive")
-set(CMAKE_C_FLAGS "$(CMAKE_C_FLAGS) -fpermissive")
+set(CMAKE_CXX_FLAGS "$(CMAKE_CXX_FLAGS) -fpermissive")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-implicit-function-declaration")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wint-conversion")
 
 add_definitions(
     -DLINUX
