@@ -277,6 +277,12 @@ void CRenderBackendOpenGL3::UpdateTextureLinearScaling(CSlrImage *image)
 void CRenderBackendOpenGL3::ReBindTexture(CSlrImage *image)
 {
 //	LOGD("CRenderBackendOpenGL3::ReBindTexture: image=%x");
+	if (!image)
+	{
+		LOGError("CRenderBackendOpenGL3::ReBindTexture: image is NULL");
+		return;
+	}
+	
 	if (!image->isBound)
 	{
 		LOGError("CRenderBackendOpenGL3::ReBindTexture: image is not bound, CreateTexture");
@@ -322,7 +328,12 @@ void CRenderBackendOpenGL3::ReBindTexture(CSlrImage *image)
 void CRenderBackendOpenGL3::DeleteTexture(CSlrImage *image)
 {
 //	LOGD("CRenderBackendOpenGL3::DeleteTexture: %x", image);
-	
+	if (!image)
+	{
+		LOGError("CRenderBackendOpenGL3::DeleteTexture: image is NULL");
+		return;
+	}
+
 	if (!image->isBound)
 	{
 		LOGError("CRenderBackendOpenGL3::DeleteTexture: image is not bound");
