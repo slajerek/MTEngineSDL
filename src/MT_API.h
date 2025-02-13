@@ -11,7 +11,7 @@ void MT_PreInit();
 // then we init drivers and
 void MT_GuiPreInit();
 
-// finally when engine is done
+// finally when engine init is completed
 void MT_PostInit();
 
 // and in the loop
