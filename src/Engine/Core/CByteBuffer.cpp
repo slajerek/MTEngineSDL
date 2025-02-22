@@ -1375,17 +1375,19 @@ bool CByteBuffer::loadFromTemp(CSlrString *fileName)
 
 bool CByteBuffer::storeToSettings(CSlrString *fileName)
 {
-//	fileName->DebugPrint("fileName=");
-//	gUTFPathToSettings->DebugPrint("gUTFPathToSettings=");
+	LOGD("CByteBuffer::storeToSettings");
+	
+	fileName->DebugPrint("CByteBuffer::storeToSettings: fileName=");
+	gUTFPathToSettings->DebugPrint("CByteBuffer::storeToSettings: gUTFPathToSettings=");
 
 	CSlrString *str = new CSlrString(gUTFPathToSettings);
 
-//	str->DebugPrint("str=");
-//	fileName->DebugPrint("fileName=");
+	str->DebugPrint("CByteBuffer::storeToSettings: str=");
+	fileName->DebugPrint("CByteBuffer::storeToSettings: fileName=");
 
 	str->Concatenate(fileName);
 	
-//	str->DebugPrint("storeToFile, str=");
+	str->DebugPrint("CByteBuffer::storeToSettings: storeToFile, path str=");
 	
 	bool ret = storeToFile(str);
 	delete str;

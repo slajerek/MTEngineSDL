@@ -1,6 +1,6 @@
 #ifndef _MT_VERSION_
 #define _MT_VERSION_
 
-#define MT_VERSION_STRING	"3.14b"
+#define MT_VERSION_STRING	"3.15"
 
 #endif

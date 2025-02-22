@@ -103,7 +103,7 @@ void CSlrFileFromOS::ReopenForWrite()
 	
 	if (this->fp == NULL)
 	{
-		LOGError("CSlrFileFromOS: failed to open %s for write", this->osFilePath);
+		LOGWarning("CSlrFileFromOS: failed to open %s for write", this->osFilePath);
 		this->fileMode = SLR_FILE_MODE_ERROR;
 		return;
 	}
@@ -128,7 +128,7 @@ void CSlrFileFromOS::Reopen()
 
 	if (this->fp == NULL)
 	{
-		LOGError("CSlrFileFromOS: failed to open %s", this->osFilePath);
+		LOGWarning("CSlrFileFromOS: failed to open %s", this->osFilePath);
 		this->fileMode = SLR_FILE_MODE_ERROR;
 		return;
 	}

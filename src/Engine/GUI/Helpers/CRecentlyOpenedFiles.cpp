@@ -265,12 +265,16 @@ bool CRecentlyOpenedFiles::Deserialize(CByteBuffer *byteBuffer)
 
 void CRecentlyOpenedFiles::StoreToSettings()
 {
+	LOGD("CRecentlyOpenedFiles::StoreToSettings");
 	filesListMutex->Lock();
 
 	CByteBuffer *b = new CByteBuffer();
 	Serialize(b);
 	settingsFileName->DebugPrint("settingsFileName=");
-	b->storeToSettings(settingsFileName);
+	if (b->storeToSettings(settingsFileName) == false)
+	{
+		LOGError("CRecentlyOpenedFiles::StoreToSettings: save failed");
+	}
 	delete b;
 
 	filesListMutex->Unlock();
@@ -278,6 +282,7 @@ void CRecentlyOpenedFiles::StoreToSettings()
 
 void CRecentlyOpenedFiles::RestoreFromSettings()
 {
+	LOGD("CRecentlyOpenedFiles::RestoreFromSettings");
 	filesListMutex->Lock();
 
 	Clear();

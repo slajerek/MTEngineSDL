@@ -436,6 +436,16 @@ bool CGuiMain::KeyDown(u32 keyCode)
 	LOGI("CGuiMain::KeyDown: keyCode=%d (0x%2.2x = %c) isShift=%s isAlt=%s isControl=%s isSuper=%s | io.WantTextInput=%s", keyCode, keyCode, keyCode,
 		 STRBOOL(isShiftPressed), STRBOOL(isAltPressed), STRBOOL(isControlPressed), STRBOOL(isSuperPressed), STRBOOL(io.WantTextInput));
 
+	// pre-event first, sent always
+	for (std::list<CGlobalKeyboardCallback *>::const_iterator itKeybardCallbacks =
+			this->globalKeyboardCallbacks.begin();
+			itKeybardCallbacks != this->globalKeyboardCallbacks.end();
+			itKeybardCallbacks++)
+	{
+		CGlobalKeyboardCallback *callback = (CGlobalKeyboardCallback *) *itKeybardCallbacks;
+		callback->GlobalPreKeyDownCallback(keyCode, isShiftPressed, isAltPressed, isControlPressed, isSuperPressed);
+	}
+
 	// check not active views first. we iterate top-down and if mouse is on a window we pass the key in a special event
 	// this is to allow key presses even if window is not focused, for example space-bar moving content like in image viewer
 	
@@ -518,8 +528,7 @@ bool CGuiMain::KeyDown(u32 keyCode)
 			itKeybardCallbacks != this->globalKeyboardCallbacks.end();
 			itKeybardCallbacks++)
 	{
-		CGlobalKeyboardCallback *callback =
-		(CGlobalKeyboardCallback *) *itKeybardCallbacks;
+		CGlobalKeyboardCallback *callback = (CGlobalKeyboardCallback *) *itKeybardCallbacks;
 		if (callback->GlobalKeyDownCallback(keyCode, isShiftPressed, isAltPressed, isControlPressed, isSuperPressed) == true)
 		{
 			return true;
@@ -640,6 +649,16 @@ bool CGuiMain::KeyUp(u32 keyCode)
 	if (io.WantTextInput)
 		return false;
 
+	// pre-event first, sent always
+	for (std::list<CGlobalKeyboardCallback *>::const_iterator itKeybardCallbacks =
+			this->globalKeyboardCallbacks.begin();
+			itKeybardCallbacks != this->globalKeyboardCallbacks.end();
+			itKeybardCallbacks++)
+	{
+		CGlobalKeyboardCallback *callback = (CGlobalKeyboardCallback *) *itKeybardCallbacks;
+		callback->GlobalPreKeyUpCallback(keyCode, isShiftPressed, isAltPressed, isControlPressed, isSuperPressed);
+	}
+
 	// check not active views first. we iterate top-down and if mouse is on a window we pass the key in a special event
 	// this is to allow key presses even if window is not fouces, for example space-bar moving of content like in image viewer
 	
@@ -723,8 +742,7 @@ bool CGuiMain::KeyUp(u32 keyCode)
 			itKeybardCallbacks != this->globalKeyboardCallbacks.end();
 			itKeybardCallbacks++)
 	{
-		CGlobalKeyboardCallback *callback =
-		(CGlobalKeyboardCallback *) *itKeybardCallbacks;
+		CGlobalKeyboardCallback *callback = (CGlobalKeyboardCallback *) *itKeybardCallbacks;
 		if (callback->GlobalKeyUpCallback(keyCode, isShiftPressed, isAltPressed, isControlPressed, isSuperPressed) == true)
 			return true;
 	}
@@ -1885,6 +1903,13 @@ void CGuiMain::CreateUiFontsTexture(float fontSize)
 }
 
 //
+void CGlobalKeyboardCallback::GlobalPreKeyDownCallback(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper)
+{
+}
+
+void CGlobalKeyboardCallback::GlobalPreKeyUpCallback(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper)
+{
+}
 
 bool CGlobalKeyboardCallback::GlobalKeyDownCallback(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper)
 {
