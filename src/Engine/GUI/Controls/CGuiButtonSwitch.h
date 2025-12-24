@@ -60,12 +60,12 @@ public:
 	virtual void Render(float posX, float posY);
 	virtual void RenderUTFButton(float posX, float posY);
 
-	bool DoTap(float x, float y);
-	bool DoFinishTap(float x, float y);
-	bool DoFinishDoubleTap(float x, float y);
-	bool DoMove(float x, float y, float distX, float distY, float diffX, float diffY);
-	bool FinishMove(float x, float y, float distX, float distY, float accelerationX, float accelerationY);
-	void DoLogic();
+	virtual bool DoTap(float x, float y);
+	virtual bool DoFinishTap(float x, float y);
+	virtual bool DoFinishDoubleTap(float x, float y);
+	virtual bool DoMove(float x, float y, float distX, float distY, float diffX, float diffY);
+	virtual bool FinishMove(float x, float y, float distX, float distY, float accelerationX, float accelerationY);
+	virtual void DoLogic();
 
 	CSlrImage *imageOn;
 	CSlrImage *imageOff;

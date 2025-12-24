@@ -119,7 +119,7 @@ void CGuiViewUiDebug::RenderImGui()
 	CSlrString *keyName = SYS_KeyName(keyCode);
 	if (keyName != NULL)
 	{
-		char *k = keyName->GetStdASCII();
+		char *k = keyName->GetUTF8();
 		sprintf(buf, "Key name: %s", k);
 		STRFREE(k);
 	}

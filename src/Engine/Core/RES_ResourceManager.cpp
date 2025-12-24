@@ -467,7 +467,7 @@ CSlrImage *RES_GetImageOrPlaceholder(const char *imageName, bool linearScaling, 
 
 CSlrImage *RES_LoadImageFromFileOS(CSlrString *path, bool linearScaling)
 {
-	char *cPath = path->GetStdASCII();
+	char *cPath = path->GetUTF8();
 	CSlrImage *ret = RES_LoadImageFromFileOS(path, linearScaling);
 	delete [] cPath;
 	return ret;

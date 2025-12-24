@@ -18,18 +18,21 @@
 #include <sys/time.h>
 #endif
 
-//#define ASSERT_CHECK_ReleaseCharBuf
-//#define SAFEMALLOC_USEMARKER
-//#define SAFEMALLOC_MARKER ((unsigned int) 0x4400DEAD)
+#define ASSERT_CHECK_ReleaseCharBuf
+#define SAFEMALLOC_USEMARKER
+#define SAFEMALLOC_MARKER ((unsigned int) 0x4400DEAD)
 
 // remove me:
 namespace fs = std::filesystem;
 
 void testFilesystem()
 {
-	const std::string path_as_string = "\xe4\xb8\xad";
-	const std::filesystem::path correct_path = std::filesystem::u8path(path_as_string);
+	const std::filesystem::path correct_path = u8"\xe4\xb8\xad";
+	// deprecated:
+	//	const std::string path_as_string = "\xe4\xb8\xad";
+	//	const std::filesystem::path correct_path = std::filesystem::u8path(path_as_string);
 }
+
 
 unsigned long SYS_GetCurrentTimeInMillis()
 {
@@ -49,7 +52,7 @@ void SYS_FatalExit(char *fmt, ... )
     va_list args;
 
     va_start(args, fmt);
-    vsprintf(buffer, fmt, args);
+	vsnprintf(buffer, 4096, fmt, args);
     va_end(args);
 
 	LOGError(buffer);
@@ -65,7 +68,7 @@ void SYS_FatalExit(const char *fmt, ... )
     va_list args;
 
     va_start(args, fmt);
-    vsprintf(buffer, fmt, args);
+	vsnprintf(buffer, 4096, fmt, args);
     va_end(args);
 
 	LOGError(buffer);
@@ -88,7 +91,7 @@ void SYS_ShowError(char *fmt, ... )
 	va_list args;
 	
 	va_start(args, fmt);
-	vsprintf(buffer, fmt, args);
+	vsnprintf(buffer, 4096, fmt, args);
 	va_end(args);
 	
 	LOGError(buffer);
@@ -101,7 +104,7 @@ void SYS_ShowError(const char *fmt, ... )
 	va_list args;
 	
 	va_start(args, fmt);
-	vsprintf(buffer, fmt, args);
+	vsnprintf(buffer, 4096, fmt, args);
 	va_end(args);
 	
 	LOGError(buffer);
@@ -115,7 +118,7 @@ void SYS_CleanExit(char *fmt, ... )
     va_list args;
 	
     va_start(args, fmt);
-    vsprintf(buffer, fmt, args);
+	vsnprintf(buffer, 4096, fmt, args);
     va_end(args);
 	
 	LOGError(buffer);
@@ -131,7 +134,7 @@ void SYS_CleanExit(const char *fmt, ... )
     va_list args;
 	
     va_start(args, fmt);
-    vsprintf(buffer, fmt, args);
+	vsnprintf(buffer, 4096, fmt, args);
     va_end(args);
 	
 	LOGError(buffer);
@@ -157,7 +160,7 @@ void SYS_Assert(bool condition, const char *fmt, ...)
 		va_list args;
 		
 		va_start(args, fmt);
-		vsprintf(buffer, fmt, args);
+		vsnprintf(buffer, 4096, fmt, args);
 		va_end(args);
 		
 		LOGError(buffer);
@@ -174,7 +177,7 @@ void SYS_AssertCrash(const char *fmt, ...)
 	va_list args;
 	
 	va_start(args, fmt);
-	vsprintf(buffer, fmt, args);
+	vsnprintf(buffer, 4096, fmt, args);
 	va_end(args);
 	
 	LOGError(buffer);
@@ -249,9 +252,13 @@ void SYS_Free(void **ptr)
 	if (*p != SAFEMALLOC_MARKER)
 	{
 		if (*p == (SAFEMALLOC_MARKER ^ 0xFFFFFFFF))
+		{
 			LOGError("SYS_FREE: freeing pointer twice");
+		}
 		else
+		{
 			LOGError("SYS_FREE: freeing not alloced pointer");
+		}
 	}
 	*p = SAFEMALLOC_MARKER ^ 0xFFFFFFFF;
 
@@ -322,10 +329,16 @@ void SYS_ReleaseCharBuf(char *buf)
 		{
 			LOGError("SYS_ReleaseCharBuf: freeing twice %x", buf);
 			LOGError("SYS_ReleaseCharBuf: %x = '%s'", buf, buf);
-//			SYS_FatalExit("SYS_ReleaseCharBuf failed");
+			SYS_FatalExit("SYS_ReleaseCharBuf failed: releasing twice");
 			charBufsMutex->Unlock();
 			return;
 		}
+	}
+	
+	// check sanity of the buffer, i.e. check case when not our buffer is being released
+	for (int i = 0; i < MAX_STRING_LENGTH; i++)
+	{
+		buf[i] = 0;
 	}
 #endif
 	charBufsPool.push_back(buf);

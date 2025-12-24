@@ -55,6 +55,11 @@ nfdresult_t NFD_SaveDialog( const nfdchar_t *filterList,
 nfdresult_t NFD_PickFolder( const nfdchar_t *defaultPath,
                             nfdchar_t **outPath);
 
+#if defined(MACOS)
+void NFD_PickFolder_Async(const nfdchar_t *defaultPath,
+						  void (^completionHandler)(nfdresult_t result, nfdchar_t *outPath));
+#endif
+
 /* nfd_common.c */
 
 /* get last error -- set when nfdresult_t returns NFD_ERROR */

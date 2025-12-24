@@ -10,18 +10,19 @@
 #include "SYS_Funct.h"
 #include "NET_Main.h"
 #include "NET_Includes.h"
+#include "CNetPacket.h"
 
-CNetClient::CNetClient(const char *serverConnectAddress, int serverConnectPort, u64 serverId, const char *clientLoginName, u8 *passwordHash, u32 passwordHashLen)
+CNetClient::CNetClient(const char *serverConnectAddress, int serverConnectPort, u64 serverId, std::string clientLoginName, std::vector<u8> passwordHash)
 {
-	this->Init(NULL, NULL, serverConnectAddress, serverConnectPort, serverId, clientLoginName, passwordHash, passwordHashLen);
+	this->Init(NULL, NULL, serverConnectAddress, serverConnectPort, serverId, clientLoginName, passwordHash);
 }
 
-CNetClient::CNetClient(CNetClientCallback *clientCallback, CNetPacketCallback *packetCallback, const char *serverConnectAddress, int serverConnectPort, u64 serverId, const char *clientLoginName, u8 *passwordHash, u32 passwordHashLen)
+CNetClient::CNetClient(CNetClientCallback *clientCallback, CNetPacketCallback *packetCallback, const char *serverConnectAddress, int serverConnectPort, u64 serverId, std::string clientLoginName, std::vector<u8> passwordHash)
 {
-	this->Init(clientCallback, packetCallback, serverConnectAddress, serverConnectPort, serverId, clientLoginName, passwordHash, passwordHashLen);
+	this->Init(clientCallback, packetCallback, serverConnectAddress, serverConnectPort, serverId, clientLoginName, passwordHash);
 }
 
-void CNetClient::Init(CNetClientCallback *clientCallback, CNetPacketCallback *packetCallback, const char *serverConnectAddress, int serverConnectPort, u64 serverId, const char *clientLoginName, u8 *passwordHash, u32 passwordHashLen)
+void CNetClient::Init(CNetClientCallback *clientCallback, CNetPacketCallback *packetCallback, const char *serverConnectAddress, int serverConnectPort, u64 serverId, std::string clientLoginName, std::vector<u8> passwordHash)
 {
 	this->packetMutex = new CSlrMutex("CNetClient");
 	
@@ -34,9 +35,8 @@ void CNetClient::Init(CNetClientCallback *clientCallback, CNetPacketCallback *pa
 	this->serverPort = serverConnectPort;
 
 	this->serverId = serverId;
-	this->clientLoginName = strdup(clientLoginName);
+	this->clientLoginName = clientLoginName;
 	this->passwordHash = passwordHash;
-	this->passwordHashLen = passwordHashLen;
 
 	this->peer = NULL;
 
@@ -45,18 +45,34 @@ void CNetClient::Init(CNetClientCallback *clientCallback, CNetPacketCallback *pa
 	byteBufferIn = new CByteBuffer();
 	byteBufferReliableOut = new CByteBuffer();
 	byteBufferNotReliableOut = new CByteBuffer();
-
-
 }
 
 CNetClient::~CNetClient()
 {
-	delete [] this->clientLoginName;
-	delete [] this->passwordHash;
-
 	delete byteBufferIn;
 	delete byteBufferReliableOut;
 	delete byteBufferNotReliableOut;
+}
+
+void CNetClient::SetClientLoginDetails(std::string clientLoginName, vector<u8> passwordHash)
+{
+	LOGD("CNetClient::SetClientLoginDetails");
+	LockMutex();
+	
+	this->clientLoginName = clientLoginName;
+	
+	this->passwordHash = passwordHash;
+	
+	if (status == NET_CLIENT_STATUS_OFFLINE)
+	{
+		status = NET_CLIENT_STATUS_CONNECTING;
+	}
+	else 
+	{
+		status = NET_CLIENT_STATUS_RECONNECT;
+	}
+	
+	UnlockMutex();
 }
 
 void CNetClient::Connect()
@@ -64,7 +80,10 @@ void CNetClient::Connect()
 	this->status = NET_CLIENT_STATUS_CONNECTING;
 
 	LOGD("CNetClient::Connect");
-	SYS_StartThread(this);
+	if (isRunning == false)
+	{
+		SYS_StartThread(this);
+	}
 }
 
 void CNetClient::ThreadRun(void *data)
@@ -75,11 +94,17 @@ void CNetClient::ThreadRun(void *data)
 
 	while (status != NET_CLIENT_STATUS_SHUTDOWN)
 	{
-		if (status == NET_CLIENT_STATUS_DISCONNECTED)
+		if (status == NET_CLIENT_STATUS_RECONNECT)
 		{
-			LOGD("NET_CLIENT_STATUS_DISCONNECTED sleep");
+			LOGD("NET_CLIENT_STATUS_RECONNECT sleep");
 			SYS_Sleep(reconnectDelay);
-			LOGD("NET_CLIENT_STATUS_DISCONNECTED sleep done");
+			LOGD("NET_CLIENT_STATUS_RECONNECT sleep done");
+		}
+
+		if (status == NET_CLIENT_STATUS_OFFLINE)
+		{
+			SYS_Sleep(reconnectDelay);
+			continue;
 		}
 
 		this->status = NET_CLIENT_STATUS_CONNECTING;
@@ -95,7 +120,7 @@ void CNetClient::ThreadRun(void *data)
 		if (client == NULL)
 		{
 			LOGError("An error occurred while trying to create an ENet client host");
-			this->status = NET_CLIENT_STATUS_DISCONNECTED;
+			this->status = NET_CLIENT_STATUS_RECONNECT;
 			continue;
 		}
 
@@ -111,7 +136,7 @@ void CNetClient::ThreadRun(void *data)
 		if (peer == NULL)
 		{
 			LOGError("No available peers for initiating an ENet connection");
-			this->status = NET_CLIENT_STATUS_DISCONNECTED;
+			this->status = NET_CLIENT_STATUS_RECONNECT;
 			continue;
 		}
 
@@ -130,7 +155,7 @@ void CNetClient::ThreadRun(void *data)
 			// had run out without any significant event.
 			enet_peer_reset (peer);
 			LOGError("Connection to %s:%d failed", serverAddress, serverPort);
-			this->status = NET_CLIENT_STATUS_DISCONNECTED;
+			this->status = NET_CLIENT_STATUS_RECONNECT;
 			continue;
 		}
 
@@ -138,18 +163,20 @@ void CNetClient::ThreadRun(void *data)
 
 		//enet_peer_ping_interval(peer, 1);
 
-		this->LockMutex();
+		LockMutex();
+		
 		// login / authorize packet
 		byteBufferReliableOut->Reset();
 		byteBufferReliableOut->PutByte(NET_PACKET_TYPE_AUTHORIZE);
 		byteBufferReliableOut->PutU32(NET_PROTOCOL_VERSION);
 		byteBufferReliableOut->PutU64(serverId);
-		byteBufferReliableOut->PutString(clientLoginName);
-		byteBufferReliableOut->PutU16(passwordHashLen);
-		byteBufferReliableOut->PutBytes(passwordHash, passwordHashLen);
+		byteBufferReliableOut->PutStdString(clientLoginName);
+		byteBufferReliableOut->PutU16(passwordHash.size());
+		byteBufferReliableOut->PutBytes(passwordHash.data(), passwordHash.size());
 
 		this->SendReliableBufferAsync(byteBufferReliableOut);
-		this->UnlockMutex();
+		
+		UnlockMutex();
 
 		// check login
 		while (status == NET_CLIENT_STATUS_CONNECTED)
@@ -176,7 +203,7 @@ void CNetClient::ThreadRun(void *data)
 					if (byteBufferIn->error)
 					{
 						LOGError("FROM: parse error, disconnect");
-						this->Disconnect();
+						this->SetStatusDisconnectAndReconnect();
 						break;
 					}
 
@@ -184,12 +211,28 @@ void CNetClient::ThreadRun(void *data)
 					{
 						LOGCFROM("AUTHORIZED, go online");
 						this->status = NET_CLIENT_STATUS_ONLINE;
+						
+						for (std::list<CNetClientCallback *>::iterator it = this->clientCallbacks.begin();
+							it != this->clientCallbacks.end(); it++)
+						{
+							CNetClientCallback *callback = (*it);
+							callback->NetClientCallbackConnected(this);
+						}
+
 						break;
 					}
 					else
 					{
 						LOGError("CONNECTED: not authorized");
 						this->Disconnect();
+						
+						for (std::list<CNetClientCallback *>::iterator it = this->clientCallbacks.begin();
+							it != this->clientCallbacks.end(); it++)
+						{
+							CNetClientCallback *callback = (*it);
+							callback->NetClientCallbackNotAuthorized(this);
+						}
+
 						break;
 					}
 
@@ -204,14 +247,13 @@ void CNetClient::ThreadRun(void *data)
 				case ENET_EVENT_TYPE_DISCONNECT:
 					LOGCC("CONNECTED: disconnected from %s:%d", serverAddress, serverPort);
 					event.peer->data = NULL;
-					this->Disconnect();
+					this->SetStatusDisconnectAndReconnect();
 					break;
 
 				default:
 					LOGError("CONNECTED: enet_host_service: unknown event %d", event.type);
-					this->Disconnect();
+					this->SetStatusDisconnectAndReconnect();
 					break;
-
 				}
 			}
 		}
@@ -225,7 +267,7 @@ void CNetClient::ThreadRun(void *data)
 		while(status == NET_CLIENT_STATUS_ONLINE)
 		{
 			//LOGD("status == NET_CLIENT_STATUS_ONLINE");
-
+			
 			if(enet_host_service (client, & event, NET_SERVICE_EVENT_SLEEP_TIME) > 0)
 			{
 				switch (event.type)
@@ -246,24 +288,23 @@ void CNetClient::ThreadRun(void *data)
 						if (byteBufferIn->error)
 						{
 							LOGError("FROM: parse error, disconnect");
-							this->Disconnect();
+							this->SetStatusDisconnectAndReconnect();
 						}
 					}
 					break;
 
-				case ENET_EVENT_TYPE_DISCONNECT:
-				{
-					LOGCC("FROM: EVENT DISCONNECT");
+					case ENET_EVENT_TYPE_DISCONNECT:
+					{
+						LOGCC("FROM: EVENT DISCONNECT");
 
-					// Reset the peer's client information.
-					event.peer->data = NULL;
-					this->Disconnect();
-					break;
-				}
-				default:
-					LOGError("CNetClient::ThreadRun enet_host_service: unknown event %d", event.type);
-					break;
-
+						// Reset the peer's client information.
+						event.peer->data = NULL;
+						this->SetStatusDisconnectAndReconnect();
+						break;
+					}
+					default:
+						LOGError("CNetClient::ThreadRun enet_host_service: unknown event %d", event.type);
+						break;
 				}
 			}
 			
@@ -274,9 +315,7 @@ void CNetClient::ThreadRun(void *data)
 		this->LockMutex();
 		enet_host_destroy(client);
 		this->peer = NULL;
-		this->status = NET_CLIENT_STATUS_DISCONNECTED;
 		this->UnlockMutex();
-		
 	}
 
 	LOGD("CNetClient::ThreadRun: thread finished");
@@ -300,7 +339,7 @@ void CNetClient::NetLogic()
 		CNetPacket *packet = (CNetPacket *)*it;
 		this->receivedPackets.pop_front();
 		this->UnlockMutex();
-
+		
 		for (std::list<CNetClientCallback *>::iterator it = this->clientCallbacks.begin();
 			it != this->clientCallbacks.end(); it++)
 		{
@@ -350,7 +389,7 @@ void CNetClient::IssuePacket(bool isReliable, CNetPacket *packet)
 {
 	LOGD("CNetClient::IssuePacket: status=%s", GetStatusName());
 	
-	LOGCCTO(this->clientLoginName, packet->protocolType, packet->packetType, "IssuePacket");
+	LOGCCTO(this->clientLoginName.c_str(), packet->protocolType, packet->packetType, "IssuePacket");
 
 	this->LockMutex();
 
@@ -433,7 +472,7 @@ void CNetClient::ParseDataBuffer(CByteBuffer *byteBuffer)
 				LOGError("CNetClient::ParseDataBuffer: unknown packet type=%4.4x data=%s index=%d",
 					packetType, hexStr, byteBuffer->index);
 				free(hexStr);
-				this->Disconnect();
+				this->SetStatusDisconnectAndReconnect();
 				return;
 			}
 		}
@@ -493,10 +532,16 @@ bool CNetClient::IsOnline()
 	return (this->status == NET_CLIENT_STATUS_ONLINE);
 }
 
+void CNetClient::SetStatusDisconnectAndReconnect()
+{
+	LOGCFROM("CNetClient::SetStatusDisconnectAndReconnect");
+	this->status = NET_CLIENT_STATUS_RECONNECT;
+}
+
 void CNetClient::Disconnect()
 {
-	LOGCFROM("CNetClient::Disconnect");
-	this->status = NET_CLIENT_STATUS_DISCONNECTED;
+	LOGCFROM("CNetClient::SetStatusDisconnectAndReconnect");
+	this->status = NET_CLIENT_STATUS_OFFLINE;
 }
 
 const char *CNetClient::GetStatusName()
@@ -507,10 +552,8 @@ const char *CNetClient::GetStatusName()
 			return "SHUTDOWN";
 		case NET_CLIENT_STATUS_OFFLINE:
 			return "OFFLINE";
-		case NET_CLIENT_STATUS_DISCONNECTED:
-			return "DISCONNECTED";
-		case NET_CLIENT_STATUS_DISCONNECT:
-			return "DISCONNECT";
+		case NET_CLIENT_STATUS_RECONNECT:
+			return "RECONNECT";
 		case NET_CLIENT_STATUS_CONNECTING:
 			return "CONNECTING";
 		case NET_CLIENT_STATUS_CONNECTED:
@@ -540,6 +583,12 @@ CNetClientCallback::~CNetClientCallback()
 
 void CNetClientCallback::NetClientCallbackConnected(CNetClient *netClient)
 {
+	LOGD("CNetClientCallback::NetClientCallbackConnected");
+}
+
+void CNetClientCallback::NetClientCallbackNotAuthorized(CNetClient *netClient)
+{
+	LOGWarning("CNetClientCallback::NetClientCallbackNotAuthorized");
 }
 
 void CNetClientCallback::NetClientProcessPacket(CNetPacket *packet)

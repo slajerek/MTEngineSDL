@@ -553,16 +553,31 @@ char *CByteBuffer::getString()
 
 void CByteBuffer::PutStdString(std::string str)
 {
-	const char *cStr = str.c_str();
-	this->putString(cStr);
+	LOGD("CByteBuffer::PutStdString");
+	cout << str << endl;
+
+	const uint8_t* data = reinterpret_cast<const uint8_t*>(str.data());
+	int len = static_cast<int>(str.size());
+	CByteBuffer *byteBuffer = new CByteBuffer((u8*)data, len);
+	this->PutByteBuffer(byteBuffer);
+	
+//	const char *cStr = str.c_str();
+//	this->putString(cStr);
 }
 
 std::string CByteBuffer::GetStdString()
 {
-	char *cStr = this->getString();
-	std::string ret(cStr);
-	free(cStr);
-	return ret;
+	CByteBuffer *byteBuffer = this->GetByteBuffer();
+	std::string str(reinterpret_cast<const char*>(byteBuffer->data), byteBuffer->length);
+	
+	cout << str << endl;
+	
+	return str;
+	
+//	char *cStr = this->getString();
+//	std::string ret(cStr);
+//	free(cStr);
+//	return ret;
 }
 
 
@@ -877,7 +892,7 @@ bool CByteBuffer::storeToFileWithHeader(CSlrString *filePath)
 	LOGD("CByteBuffer::storeToFile");
 	filePath->DebugPrint("filePath=");
 		
-	char *f = filePath->GetStdASCII();
+	char *f = filePath->GetUTF8();
 	SYS_FixFileNameSlashes(f);
 
 	FILE *fp = fopen(f, "wb");
@@ -1078,7 +1093,7 @@ bool CByteBuffer::readFromFileWithHeader(CSlrString *filePath)
 //	FILE *fp = fopen([strFilePath fileSystemRepresentation], "rb");
 //	
 //#else
-	char *f = filePath->GetStdASCII();
+	char *f = filePath->GetUTF8();
 	
 	SYS_FixFileNameSlashes(f);
 	
@@ -1375,19 +1390,18 @@ bool CByteBuffer::loadFromTemp(CSlrString *fileName)
 
 bool CByteBuffer::storeToSettings(CSlrString *fileName)
 {
-	LOGD("CByteBuffer::storeToSettings");
-	
-	fileName->DebugPrint("CByteBuffer::storeToSettings: fileName=");
-	gUTFPathToSettings->DebugPrint("CByteBuffer::storeToSettings: gUTFPathToSettings=");
+//	LOGD("CByteBuffer::storeToSettings");
+//	fileName->DebugPrint("CByteBuffer::storeToSettings: fileName=");
+//	gUTFPathToSettings->DebugPrint("CByteBuffer::storeToSettings: gUTFPathToSettings=");
 
 	CSlrString *str = new CSlrString(gUTFPathToSettings);
 
-	str->DebugPrint("CByteBuffer::storeToSettings: str=");
-	fileName->DebugPrint("CByteBuffer::storeToSettings: fileName=");
+//	str->DebugPrint("CByteBuffer::storeToSettings: str=");
+//	fileName->DebugPrint("CByteBuffer::storeToSettings: fileName=");
 
 	str->Concatenate(fileName);
 	
-	str->DebugPrint("CByteBuffer::storeToSettings: storeToFile, path str=");
+//	str->DebugPrint("CByteBuffer::storeToSettings: storeToFile, path str=");
 	
 	bool ret = storeToFile(str);
 	delete str;
@@ -1803,7 +1817,7 @@ bool CByteBuffer::ReadBufferFromFile(CSlrString *filePath, unsigned char *buffer
 	if (!filePath)
 		return false;
 	
-	char *p = filePath->GetStdASCII();
+	char *p = filePath->GetUTF8();
 	FILE *fp = fopen(p, "rb");
 	STRFREE(p);
 	if (!fp)

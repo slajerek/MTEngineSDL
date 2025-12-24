@@ -638,7 +638,10 @@ bool CGuiButton::DoTap(float posX, float posY)
 
 bool CGuiButton::DoFinishTap(float posX, float posY)
 {
-//	LOGD("CGuiButton::DoFinishTap: name=%s", this->name);
+	LOGD("CGuiButton::DoFinishTap: name=%s", this->name);
+	textUTF->DebugPrint("CGuiButton::DoFinishTap: text=");
+	LOGD("... posx=%f posy=%f x=%f y=%f", this->posX, this->posY, posX, posY);
+
 	if (!this->visible)
 		return false;
 

@@ -120,6 +120,8 @@ const char *getLevelStr(unsigned int level)
 		return "[ANIM] ";
 	if (level == DBGLVL_LEVEL)
 		return "[LEVL] ";
+	if (level == DBGLVL_DATA)
+		return "[DATA] ";
 	if (level == DBGLVL_SCRIPT)
 		return ">SCRPT< ";
 	if (level == DBGLVL_MEMORY)
@@ -284,6 +286,9 @@ void DBG_SendLog(int debugLevel, char *message)
 			fprintf(stdout, "\033[01;31m");
 			break;
 		case DBGLVL_DATABASE:
+			fprintf(stdout, "\033[22;36m");
+			break;
+		case DBGLVL_DATA:
 			fprintf(stdout, "\033[22;36m");
 			break;
 		case DBGLVL_DEBUG:

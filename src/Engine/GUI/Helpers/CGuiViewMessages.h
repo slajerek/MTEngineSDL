@@ -8,6 +8,7 @@ class CSlrMutex;
 class CGuiViewMessages : public CGuiView
 {
 public:
+	CGuiViewMessages(const char *name, float posX, float posY, float sizeX, float sizeY);
 	CGuiViewMessages(const char *name, float posX, float posY, float posZ, float sizeX, float sizeY);
 	virtual ~CGuiViewMessages();
 	

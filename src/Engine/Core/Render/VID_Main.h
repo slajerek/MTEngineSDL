@@ -99,12 +99,15 @@ void VID_SetVSyncScreenRefresh(bool isVSyncRefresh);
 
 void VID_RaiseMainWindow();
 
+CRenderBackend *VID_GetRenderBackend();
+
 void VID_GetStartupMainWindowPosition(int *x, int *y, int *width, int *height, bool *maximized);
 void VID_StoreMainWindowPosition();
 void VID_RestoreMainWindowPosition();
 
+void VID_SetMainWindowTitle(const char *title);
+
 void VID_LockRenderMutex();
 void VID_UnlockRenderMutex();
-
 
 #endif

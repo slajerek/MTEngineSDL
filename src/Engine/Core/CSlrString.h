@@ -14,7 +14,7 @@
 #include "CPool.h"
 
 #define USE_STRINGS_POOL
-#define POOL_SIZE_STRINGS	20000
+#define POOL_SIZE_STRINGS	65535
 
 void SYS_InitStrings();
 
@@ -29,6 +29,7 @@ public:
 	CSlrString(const char16_t *value);
 	CSlrString(CSlrString *copy);
 	CSlrString(std::vector<u16> copy);
+	CSlrString(std::string copy);
 	CSlrString(u8 *buffer, u32 bufferLen);
 	CSlrString(CByteBuffer *byteBuffer);
 #if defined(IOS)
@@ -96,6 +97,7 @@ public:
 	char *GetStdASCII();
 	char *GetUTF8();
 	char16_t *GetChar16Str();
+	std::string GetStdStringUTF8();
 
 	int ToInt();
 	int ToIntFromHex();
@@ -181,7 +183,8 @@ int NOT_TESTED_Utf8StrnCiCmp(const char* s1, const char* s2, size_t ztCount);
 int NOT_TESTED_Utf8StrCiCmp(const char* s1, const char* s2);
 char* NOT_TESTED_Utf8StrCiStr(const char* s1, const char* s2);
 
-std::string Utf8StringToLowercase(const std::string& utf8_str);
+std::string Utf8StringToLowercase(const std::string& input);
+std::string Utf8StringToUppercase(const std::string& input);
 
 std::vector<u16> StringToUtf16(const std::string& utf8String);
 

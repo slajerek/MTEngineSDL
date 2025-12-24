@@ -18,6 +18,8 @@ void MT_PostInit();
 void MT_Render();
 void MT_PostRenderEndFrame();
 
+void MT_Shutdown();
+
 // TODO:
 //int MT_GetDefaultFPS();
 

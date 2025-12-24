@@ -560,7 +560,7 @@ void CGuiListTree::MoveView(float diffX, float diffY)
 			if (fits)
 			{
 				newStartDrawY += fontSize;
-				firstShowElement++;
+				firstShowElement = firstShowElement + 1;
 			}
 			else
 			{
@@ -578,7 +578,7 @@ void CGuiListTree::MoveView(float diffX, float diffY)
 			else
 			{
 				newStartDrawY -= fontSize;
-				firstShowElement--;
+				firstShowElement = firstShowElement - 1;
 			}
 		}
 		else

@@ -679,8 +679,28 @@ void Blit(CSlrImage *image, float destX, float destY, float z, float sizeX, floa
 	ImDrawList *drawList = ImGui::GetWindowDrawList();
 	drawList->AddImage(image->texturePtr, pMin, pMax, uv0, uv1,
 					   ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 1.0f, 1.0f, 1.0f)));
-	
 }
+
+void BlitFlipVertical(CSlrImage *image, float destX, float destY, float z, float sizeX, float sizeY,
+		  float texStartX, float texStartY,
+		  float texEndX, float texEndY)
+{
+//	LOGD("destX=%f destY=%f", destX, destY);
+	ImVec2 uv0 = ImVec2(texStartX, texStartY);
+	ImVec2 uv1 = ImVec2(texEndX, texEndY);
+	
+//	ImGuiWindow* window = ImGui::GetCurrentWindow();
+//	ImVec2 pMin(window->ContentRegionRect.Min.x + destX,			window->ContentRegionRect.Min.y + destY);
+//	ImVec2 pMax(window->ContentRegionRect.Min.x + destX + sizeX,	window->ContentRegionRect.Min.y + destY + sizeY);
+
+	ImVec2 pMin(destX,			destY);
+	ImVec2 pMax(destX + sizeX,	destY + sizeY);
+	
+	ImDrawList *drawList = ImGui::GetWindowDrawList();
+	drawList->AddImage(image->texturePtr, pMin, pMax, uv0, uv1,
+					   ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 1.0f, 1.0f, 1.0f)));
+}
+
 
 void BlitInImGuiWindow(CSlrImage *image, float destX, float destY, float z, float sizeX, float sizeY,
 					   float texStartX, float texStartY,
@@ -982,6 +1002,13 @@ void BlitLine(float startX, float startY, float endX, float endY, float posZ,
 {
 	ImDrawList *drawList = ImGui::GetWindowDrawList();
 	drawList->AddLine(ImVec2(startX, startY), ImVec2(endX, endY), ImGui::ColorConvertFloat4ToU32(ImVec4(colorR, colorG, colorB, alpha)));
+}
+
+void BlitLine(float startX, float startY, float endX, float endY, float posZ,
+			  float colorR, float colorG, float colorB, float alpha, float thickness)
+{
+	ImDrawList *drawList = ImGui::GetWindowDrawList();
+	drawList->AddLine(ImVec2(startX, startY), ImVec2(endX, endY), ImGui::ColorConvertFloat4ToU32(ImVec4(colorR, colorG, colorB, alpha)), thickness);
 }
 
 void BlitCircle(float centerX, float centerY, float radius, float colorR, float colorG, float colorB, float colorA)

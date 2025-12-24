@@ -1,5 +1,9 @@
 #include "CSlrDate.h"
 
+#if !defined(WIN32)
+#include <sys/time.h>
+#endif
+
 CSlrDate::CSlrDate()
 {
 	RefreshFromCurrentSystemTime();
@@ -16,6 +20,10 @@ void CSlrDate::RefreshFromCurrentSystemTime()
 	this->day = timeinfo->tm_mday;
 	this->month = timeinfo->tm_mon+1;
 	this->year = timeinfo->tm_year+1900;
+	
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	this->milliseconds = tv.tv_usec / 1000;
 #else
 	SYSTEMTIME tmeCurrent;
 	GetLocalTime(&tmeCurrent);
@@ -23,6 +31,7 @@ void CSlrDate::RefreshFromCurrentSystemTime()
 	this->hour = tmeCurrent.wHour;
 	this->minute = tmeCurrent.wMinute;
 	this->second = tmeCurrent.wSecond;
+	this->milliseconds = tmeCurrent.wMilliseconds;
 	this->day = tmeCurrent.wDay;
 	this->month = tmeCurrent.wMonth;
 	this->year = tmeCurrent.wYear;

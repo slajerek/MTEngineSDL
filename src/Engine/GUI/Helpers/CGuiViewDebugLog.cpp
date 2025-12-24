@@ -70,6 +70,8 @@ void CGuiViewDebugLog::RenderImGui()
 	ImGui::SameLine();
 	RenderLevelSwitch(DBGLVL_MEMORY, "MEMORY");
 	ImGui::SameLine();
+	RenderLevelSwitch(DBGLVL_SCRIPT, "DATA");
+	ImGui::SameLine();
 	RenderLevelSwitch(DBGLVL_DEBUG2, "DEBUG2");
 	ImGui::SameLine();
 	RenderLevelSwitch(DBGLVL_TODO, "TODO");

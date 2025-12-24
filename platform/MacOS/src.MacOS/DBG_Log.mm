@@ -38,7 +38,7 @@
 
 #if !defined (GLOBAL_DEBUG_OFF)
 
-//#define LOGGER_LOG_TO_FILE
+#define LOGGER_LOG_TO_FILE
 //#define LOGGER_FORCE_LOG_FULL
 //#define LOGGER_FORCE_LOG_OFF
 
@@ -102,6 +102,7 @@ void LOG_Init(void)
 	LOG_SetLevel(DBGLVL_RES, false);
 	LOG_SetLevel(DBGLVL_INPUT, false);
 	LOG_SetLevel(DBGLVL_GUI, false);
+	LOG_SetLevel(DBGLVL_DATA, false);
 	LOG_SetLevel(DBGLVL_MEMORY, false);
 	LOG_SetLevel(DBGLVL_ANIMATION, true);
 	LOG_SetLevel(DBGLVL_LEVEL, true);
@@ -203,7 +204,9 @@ int _LOGGER(unsigned int level, const char *fileName, unsigned int lineNum, cons
 		sprintf(buffer, "%02d:%02d:%02d,%03d ",
 				tm->tm_hour, tm->tm_min, tm->tm_sec, ms);
 		
-        fprintf(stderr, buffer);
+		// int len = strlen(buffer);
+		const int len = 13;
+		fwrite(buffer, 1, len, stderr);
 		
 #ifdef LOGGER_LOG_TO_FILE
         if (fpLog)
@@ -219,8 +222,8 @@ int _LOGGER(unsigned int level, const char *fileName, unsigned int lineNum, cons
 	if (logger_showFileName)
 	{
 		sprintf(buffer, "%s:%d ", fileName, lineNum);
-		
-		fprintf(stderr, buffer);
+		fwrite(buffer, 1, strlen(buffer), stderr);
+
 #ifdef LOGGER_LOG_TO_FILE
         if (fpLog)
             fprintf(fpLog, buffer);
@@ -238,8 +241,8 @@ int _LOGGER(unsigned int level, const char *fileName, unsigned int lineNum, cons
         if (threadName == nil || [threadName length] == 0)
         {
 			sprintf(buffer, "%8ld ", (unsigned long)pthread_self());
-			
-			fprintf(stderr, buffer);
+			fwrite(buffer, 1, strlen(buffer), stderr);
+
 #ifdef LOGGER_LOG_TO_FILE
             if (fpLog)
                 fprintf(fpLog, buffer);
@@ -253,8 +256,8 @@ int _LOGGER(unsigned int level, const char *fileName, unsigned int lineNum, cons
         else
         {
 			sprintf(buffer, "%s ", [threadName UTF8String]);
+			fwrite(buffer, 1, strlen(buffer), stderr);
 
-			fprintf(stderr, buffer);
 #ifdef LOGGER_LOG_TO_FILE
             if (fpLog)
                 fprintf(fpLog, buffer);
@@ -270,8 +273,8 @@ int _LOGGER(unsigned int level, const char *fileName, unsigned int lineNum, cons
     if (logger_showCurrentLevel)
     {
 		sprintf(buffer, "%s ", getLevelStr(level));
+		fwrite(buffer, 1, strlen(buffer), stderr);
 
-		fprintf(stderr, buffer);
 #ifdef LOGGER_LOG_TO_FILE
         if (fpLog)
 			fprintf(fpLog, buffer);
@@ -289,7 +292,7 @@ int _LOGGER(unsigned int level, const char *fileName, unsigned int lineNum, cons
     vsnprintf(buffer, BUFSIZE, format, args);
     va_end(args);
 
-	int l = strlen(buffer);
+	size_t l = strlen(buffer);
 	for (int i = 0; i < l; i++)
 	{
 		if (buffer[i] < 32 && buffer[i] != 0x0A && buffer[i] != 0x0D && buffer[i] != 0x09)
@@ -299,7 +302,7 @@ int _LOGGER(unsigned int level, const char *fileName, unsigned int lineNum, cons
 	}
 	buffer[BUFSIZE-1] = 0x00;
 
-	fprintf(stderr, "%s", buffer);
+	fwrite(buffer, 1, strlen(buffer), stderr);
 	fprintf(stderr, "\n");
 	fflush(stderr);
 
@@ -411,7 +414,7 @@ int _LOGGER(unsigned int level, const char *fileName, unsigned int lineNum, cons
     }
 	else
     {
-		unsigned buflen = CFStringGetLength(log) * 4;
+		unsigned long buflen = CFStringGetLength(log) * 4;
 		ptr = (char*)malloc(buflen);
 		if (CFStringGetCString(log, ptr, buflen, kCFStringEncodingUTF8))
 		{
@@ -479,8 +482,8 @@ const char *getLevelStr(unsigned int level)
 		return "[PLUG ]";
 	if (level == DBGLVL_WEBSERVICE)
 		return "[WEBS ]";
-	if (level == DBGLVL_XML)
-		return "[XML  ]";
+	if (level == DBGLVL_DATA)
+		return "[DATA ]";
 	if (level == DBGLVL_HTTP)
 		return "[HTTP ]";
 	if (level == DBGLVL_XMPLAYER)

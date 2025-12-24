@@ -382,7 +382,7 @@ void CGuiRichTextLabel::Parse()
 			{
 				value->DebugPrint("image");
 
-				char *imagePath = value->GetStdASCII();
+				char *imagePath = value->GetUTF8();
 				CSlrImage *image = RES_GetImageOrPlaceholder(imagePath, true, true);
 				delete imagePath;
 				

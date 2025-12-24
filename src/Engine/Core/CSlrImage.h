@@ -26,6 +26,7 @@ public:
 	// load from resources
 	CSlrImage(CImageData *imageData);
 	CSlrImage(CImageData *imageData, bool linearScaling);
+	CSlrImage(CImageData *imageData, bool linearScaling, bool bindNow);
 	CSlrImage(const char *fileName);
 	CSlrImage(CSlrFile *imgFile, bool linearScaling);
 	CSlrImage(const char *fileName, bool linearScaling);

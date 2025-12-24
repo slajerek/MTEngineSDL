@@ -192,7 +192,7 @@ void CRecentlyOpenedFiles::RenderImGuiMenu(const char *menuItemLabel)
 			// TODO: replace below with const char *menuLabelText = guiMain->isAltPressed ? file->filePath : file->fileName;
 			if (guiMain->isAltPressed)
 			{
-				char *cstr = file->filePath->GetStdASCII();
+				char *cstr = file->filePath->GetUTF8();
 				if (ImGui::MenuItem(cstr, "", false, file->isAvailable))
 				{
 					fileSelected = file;
@@ -370,7 +370,7 @@ CRecentFile::CRecentFile(CSlrString *filePath)
 	isAvailable = true;
 	
 	CSlrString *fn = this->filePath->GetFileNameComponentFromPath();
-	this->fileName = fn->GetStdASCII();
+	this->fileName = fn->GetUTF8();
 	delete fn;
 }
 

@@ -1,6 +1,4 @@
-#ifndef _CGuiViewDummySimple_h_
-#define _CGuiViewDummySimple_h_
-
+#pragma once
 #include "CGuiView.h"
 
 class CGuiViewDummySimple : public CGuiView
@@ -17,5 +15,3 @@ public:
 	virtual void ActivateView();
 	virtual void DeactivateView();
 };
-
-#endif //_CGuiViewDummySimple_h_

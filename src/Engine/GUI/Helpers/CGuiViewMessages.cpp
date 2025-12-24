@@ -2,6 +2,14 @@
 #include "CGuiMain.h"
 #include "SYS_Threading.h"
 
+CGuiViewMessages::CGuiViewMessages(const char *name, float posX, float posY, float sizeX, float sizeY)
+: CGuiView(name, posX, posY, -1, sizeX, sizeY)
+{
+	mutex = new CSlrMutex("CGuiViewMessages");
+	AutoScroll = true;
+	Clear();
+}
+
 CGuiViewMessages::CGuiViewMessages(const char *name, float posX, float posY, float posZ, float sizeX, float sizeY)
 : CGuiView(name, posX, posY, posZ, sizeX, sizeY)
 {

@@ -16,6 +16,7 @@ public:
 	u8 hour;
 	u8 minute;
 	u8 second;
+	u16 milliseconds;
 
 	u8 day;
 	u8 month;

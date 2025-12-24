@@ -132,8 +132,7 @@ void CGuiViewConsole::PrintSingleLine(char *text)
 
 void CGuiViewConsole::PrintLine(CSlrString *str)
 {
-	// TODO: print UTF line
-	char *buf = str->GetStdASCII();
+	char *buf = str->GetUTF8();
 	
 	this->PrintSingleLine(buf);
 	
@@ -281,7 +280,7 @@ bool CGuiViewConsole::KeyDown(u32 keyCode)
 	}
 	else
 	{
-		consumed = true;
+//		consumed = true;
 //		LOGD("commandLine=%s", commandLine);
 //		if (commandLine[commandLineCursorPos] == 0x00)
 //		{

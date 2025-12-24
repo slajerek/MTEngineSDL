@@ -39,7 +39,7 @@ bool FUN_IsNumber(char *str);
 bool FUN_IsHexDigit(char c);
 bool FUN_IsHexNumber(char *str);
 char FUN_HexDigitToChar(u8 hexDigit);
-u32 FUN_HexStrToValue(char *str);
+u32 FUN_HexStrToValue(const char *str);
 u64 FUN_DecOrHexStrWithPrefixToU64(const char *str);
 u64 FUN_JsonValueDecOrHexStrWithPrefixToU64(const nlohmann::json& value);
 void FUN_IntToBinaryStr(unsigned value, char* binaryStr, int n=8);
@@ -73,6 +73,11 @@ inline int MTH_NormalizeAngle(int angle)
 
 int FUN_FuzzyScore( const char *str1, const char *str2 );
 int FUN_FuzzySearch( const char *str, int num, const char *words[] );
+
+inline bool FUN_IsApproximatelyEqual(float a, float b, float epsilon = 0.0001f)
+{
+	return fabsf(a - b) < epsilon;
+}
 
 /*
  double **d = allocate2DArray< double >(10000, 10000);

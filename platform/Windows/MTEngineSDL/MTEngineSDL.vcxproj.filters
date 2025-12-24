@@ -172,6 +172,21 @@
     <Filter Include="Source Files\src\Engine\Core\Net">
       <UniqueIdentifier>{18b17773-cfb9-42bf-8d99-de56a89cb950}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\src\Engine\Funct\ContinuousParam">
+      <UniqueIdentifier>{c30fe844-540f-4525-88d8-fc1355eb4a54}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Libs\crow">
+      <UniqueIdentifier>{56cbfc13-cb51-4bae-90cd-c701c7f0cc0a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Libs\httplib">
+      <UniqueIdentifier>{4a46abed-15eb-4b15-867d-8baab0acf23e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Libs\sgSHA256">
+      <UniqueIdentifier>{8c94d282-b456-4a73-94c2-ac6f57a3655a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Tools">
+      <UniqueIdentifier>{fe172705-1946-43d2-978f-8f869bd776f9}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\Engine\Audio\WAV\SND_WavReader.cpp">
@@ -840,15 +855,6 @@
     <ClCompile Include="..\..\..\src\Engine\Core\CConfigStorage.cpp">
       <Filter>Source Files\src\Engine\Core</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\Engine\Core\CContinuousParamLinear.cpp">
-      <Filter>Source Files\src\Engine\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\Engine\Core\CContinuousParamSin.cpp">
-      <Filter>Source Files\src\Engine\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\Engine\Core\CContinuousParamSinHalf.cpp">
-      <Filter>Source Files\src\Engine\Core</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\Core\CImageData.cpp">
       <Filter>Source Files\src\Engine\Core</Filter>
     </ClCompile>
@@ -1026,12 +1032,6 @@
     <ClCompile Include="..\src.Windows\win-registry.cpp">
       <Filter>Source Files\src.Windows</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\Engine\Core\CContinuousParam.cpp">
-      <Filter>Source Files\src\Engine\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\Engine\Core\CContinuousParamBezier.cpp">
-      <Filter>Source Files\src\Engine\Core</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\Core\CSlrImageMask.cpp">
       <Filter>Source Files\src\Engine\Core</Filter>
     </ClCompile>
@@ -1048,9 +1048,6 @@
       <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\Core\Render\CRenderBackend.cpp">
-      <Filter>Source Files\src\Engine\Core\Render</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\Engine\Core\Render\CRenderBackendOpenGL3.cpp">
       <Filter>Source Files\src\Engine\Core\Render</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\Core\Render\VID_Blits.cpp">
@@ -1160,6 +1157,51 @@
     </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\Core\Net\NET_Main.cpp">
       <Filter>Source Files\src\Engine\Core\Net</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\Render\CRenderShader.cpp">
+      <Filter>Source Files\src\Engine\Core\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\Render\CRenderShaderOpenGL4.cpp">
+      <Filter>Source Files\src\Engine\Core\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\Render\CRenderShaderOpenGL4ShaderToy.cpp">
+      <Filter>Source Files\src\Engine\Core\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\Render\CRenderBackendOpenGL4.cpp">
+      <Filter>Source Files\src\Engine\Core\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Funct\ContinuousParam\CContinuousParam.cpp">
+      <Filter>Source Files\src\Engine\Funct\ContinuousParam</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Funct\ContinuousParam\CContinuousParamBezier.cpp">
+      <Filter>Source Files\src\Engine\Funct\ContinuousParam</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Funct\ContinuousParam\CContinuousParamLinear.cpp">
+      <Filter>Source Files\src\Engine\Funct\ContinuousParam</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Funct\ContinuousParam\CContinuousParamSin.cpp">
+      <Filter>Source Files\src\Engine\Funct\ContinuousParam</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Funct\ContinuousParam\CContinuousParamSinHalf.cpp">
+      <Filter>Source Files\src\Engine\Funct\ContinuousParam</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Funct\CHjsonSerializer.cpp">
+      <Filter>Source Files\src\Engine\Funct</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\imguiext\imgui_stdlib.cpp">
+      <Filter>Source Files\src\Engine\Libs\imguiext</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\sgSHA256\sgSHA256.cpp">
+      <Filter>Source Files\src\Engine\Libs\sgSHA256</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tools\CInterruptibleSleep.cpp">
+      <Filter>Source Files\src\Engine\Tools</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tools\CTask.cpp">
+      <Filter>Source Files\src\Engine\Tools</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tools\CTaskScheduler.cpp">
+      <Filter>Source Files\src\Engine\Tools</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1757,25 +1799,7 @@
     <ClInclude Include="..\..\..\src\Engine\Core\CByteBuffer.h">
       <Filter>Source Files\src\Engine\Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\Engine\Core\CCombinations.h">
-      <Filter>Source Files\src\Engine\Core</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\Core\CConfigStorage.h">
-      <Filter>Source Files\src\Engine\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\Engine\Core\CContinuousParam.h">
-      <Filter>Source Files\src\Engine\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\Engine\Core\CContinuousParamBezier.h">
-      <Filter>Source Files\src\Engine\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\Engine\Core\CContinuousParamLinear.h">
-      <Filter>Source Files\src\Engine\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\Engine\Core\CContinuousParamSin.h">
-      <Filter>Source Files\src\Engine\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\Engine\Core\CContinuousParamSinHalf.h">
       <Filter>Source Files\src\Engine\Core</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\Core\CGlobalKeyboardCallback.h">
@@ -2000,9 +2024,6 @@
     <ClInclude Include="..\..\..\src\Engine\Core\Render\CRenderBackend.h">
       <Filter>Source Files\src\Engine\Core\Render</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\Engine\Core\Render\CRenderBackendOpenGL3.h">
-      <Filter>Source Files\src\Engine\Core\Render</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\Core\Render\VID_Blits.h">
       <Filter>Source Files\src\Engine\Core\Render</Filter>
     </ClInclude>
@@ -2140,6 +2161,63 @@
     </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\Core\Net\NET_Main.h">
       <Filter>Source Files\src\Engine\Core\Net</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\Render\CRenderShader.h">
+      <Filter>Source Files\src\Engine\Core\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\Render\CRenderShaderOpenGL4.h">
+      <Filter>Source Files\src\Engine\Core\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\Render\CRenderShaderOpenGL4ShaderToy.h">
+      <Filter>Source Files\src\Engine\Core\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\Render\CRenderBackendOpenGL4.h">
+      <Filter>Source Files\src\Engine\Core\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Funct\CCombinations.h">
+      <Filter>Source Files\src\Engine\Funct</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Funct\ContinuousParam\CContinuousParam.h">
+      <Filter>Source Files\src\Engine\Funct\ContinuousParam</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Funct\ContinuousParam\CContinuousParamBezier.h">
+      <Filter>Source Files\src\Engine\Funct\ContinuousParam</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Funct\ContinuousParam\CContinuousParamLinear.h">
+      <Filter>Source Files\src\Engine\Funct\ContinuousParam</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Funct\ContinuousParam\CContinuousParamSin.h">
+      <Filter>Source Files\src\Engine\Funct\ContinuousParam</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Funct\ContinuousParam\CContinuousParamSinHalf.h">
+      <Filter>Source Files\src\Engine\Funct\ContinuousParam</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Funct\CHjsonSerializer.h">
+      <Filter>Source Files\src\Engine\Funct</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\crow\crow_all.h">
+      <Filter>Source Files\src\Engine\Libs\crow</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\httplib\httplib.h">
+      <Filter>Source Files\src\Engine\Libs\httplib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\imguiext\imgui_stdlib.h">
+      <Filter>Source Files\src\Engine\Libs\imguiext</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\imguiext\imspinner.h">
+      <Filter>Source Files\src\Engine\Libs\imguiext</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\sgSHA256\sgSHA256.h">
+      <Filter>Source Files\src\Engine\Libs\sgSHA256</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tools\CInterruptibleSleep.h">
+      <Filter>Source Files\src\Engine\Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tools\CTask.h">
+      <Filter>Source Files\src\Engine\Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tools\CTaskScheduler.h">
+      <Filter>Source Files\src\Engine\Tools</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

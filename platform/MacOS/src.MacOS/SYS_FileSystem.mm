@@ -28,6 +28,9 @@
 #include <sys/mman.h>
 #include <dirent.h>
 #include <fstream>
+#include <iostream>
+#include <filesystem>
+
 
 #include "nfd.h"
 
@@ -480,6 +483,8 @@ void SYS_DialogOpenFile(CSystemFileDialogCallback *callback, std::list<CSlrStrin
 		for (std::list<CSlrString *>::iterator it = extensions->begin(); it != extensions->end(); it++)
 		{
 			CSlrString *str = *it;
+//			str->DebugPrint("...=");
+
 			NSString *nsStr = FUN_ConvertCSlrStringToNSString(str);
 			[extensionsArray addObject:nsStr];
 		}
@@ -527,14 +532,16 @@ void SYS_DialogOpenFile(CSystemFileDialogCallback *callback, std::list<CSlrStrin
 		}
 		
 		VID_SetVSyncScreenRefresh(false);
-		[panel beginWithCompletionHandler:^(NSInteger result)
+		
+		NSWindow *mainWindow = [[[NSApplication sharedApplication] windows] objectAtIndex:0];
+		[panel beginSheetModalForWindow:mainWindow completionHandler:^(NSInteger result)
 		{
 			LOGD("SYS_DialogOpenFile: dialog result=%d", result);
 			
 			VID_SetMainWindowAlwaysOnTopTemporary(SYS_windowAlwaysOnTopBeforeFileDialog);
 			VID_SetVSyncScreenRefresh(true);
 
-			if (result == NSFileHandlingPanelOKButton)
+			if (result == NSModalResponseOK)
 			{
 				for (NSURL *fileURL in [panel URLs])
 				{
@@ -571,8 +578,6 @@ void SYS_DialogSaveFile(CSystemFileDialogCallback *callback, std::list<CSlrStrin
 						CSlrString *defaultFileName, CSlrString *defaultFolder,
 						CSlrString *windowTitle)
 {
-//	SYS_FatalExit("TODO");
-	
 //	// temporary remove always on top window flag
 	SYS_windowAlwaysOnTopBeforeFileDialog = VID_IsMainWindowAlwaysOnTop();
 	VID_SetMainWindowAlwaysOnTopTemporary(false);
@@ -636,15 +641,16 @@ void SYS_DialogSaveFile(CSystemFileDialogCallback *callback, std::list<CSlrStrin
 		}
 
 		VID_SetVSyncScreenRefresh(false);
-
-		[panel beginWithCompletionHandler:^(NSInteger result)
+		
+		NSWindow *mainWindow = [[[NSApplication sharedApplication] windows] objectAtIndex:0];
+		[panel beginSheetModalForWindow:mainWindow completionHandler:^(NSInteger result)
 		 {
 			 LOGD("SYS_DialogSaveFile: dialog result=%d", result);
 			 
 			 VID_SetMainWindowAlwaysOnTopTemporary(SYS_windowAlwaysOnTopBeforeFileDialog);
 			 VID_SetVSyncScreenRefresh(true);
 
-			 if (result == NSFileHandlingPanelOKButton)
+			 if (result == NSModalResponseOK)
 			 {
 				 NSString *strPath = [[panel URL] path];
 				 CSlrString *outPath = FUN_ConvertNSStringToCSlrString(strPath);
@@ -676,22 +682,20 @@ void SYS_DialogSaveFile(CSystemFileDialogCallback *callback, std::list<CSlrStrin
 
 void SYS_DialogPickFolder(CSystemFileDialogCallback *callback, CSlrString *defaultFolder)
 {
-	dispatch_async(dispatch_get_main_queue(), ^{
-		char *defaultPath = NULL;
-		if (defaultFolder)
-		{
-			defaultPath = defaultFolder->GetStdASCII();
-		}
-		else
-		{
-			defaultPath = STRALLOC(gPathToDocuments);
-		}
-		char *outPath = NULL;
-		
-		VID_SetVSyncScreenRefresh(false);
-		nfdresult_t result = NFD_PickFolder(defaultPath, &outPath);
+	__block char *defaultPath = NULL;
+	if (defaultFolder)
+	{
+		defaultPath = defaultFolder->GetUTF8();
+	}
+	else
+	{
+		defaultPath = STRALLOC(gPathToDocuments);
+	}
+	
+	VID_SetVSyncScreenRefresh(false);
+
+	NFD_PickFolder_Async(defaultPath, ^(nfdresult_t result, nfdchar_t *outPath) {
 		VID_SetVSyncScreenRefresh(true);
-		
 		STRFREE(defaultPath);
 		
 		if (result == NFD_OKAY)
@@ -734,7 +738,7 @@ bool SYS_FileExists(CSlrString *path)
 	if (path == NULL)
 		return false;
 
-	char *cPath = path->GetStdASCII();
+	char *cPath = path->GetUTF8();
 	
 	struct stat info;
 	
@@ -752,7 +756,7 @@ bool SYS_FileExists(CSlrString *path)
 
 bool SYS_FileDirExists(CSlrString *path)
 {
-	char *cPath = path->GetStdASCII();
+	char *cPath = path->GetUTF8();
 	
 	struct stat info;
 	
@@ -852,7 +856,7 @@ void SYS_CreateFolder(CSlrString *path)
 {
 	LOGD("SYS_CreateFolder");
 	path->DebugPrint("SYS_CreateFolder: ");
-	char *cPath = path->GetStdASCII();
+	char *cPath = path->GetUTF8();
 	mkdir(cPath, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
 	
 	delete [] cPath;
@@ -862,7 +866,7 @@ void SYS_SetCurrentFolder(CSlrString *path)
 {
 	LOGD("SYS_SetCurrentFolder");
 	path->DebugPrint("SYS_SetCurrentFolder: ");
-	char *cPath = path->GetStdASCII();
+	char *cPath = path->GetUTF8();
 	chdir(cPath);
 	
 	delete [] cPath;
@@ -949,6 +953,28 @@ char *SYS_GetFileExtension(const char *fileName)
 	buf[z] = 0x00;
 	return buf;
 }
+
+std::string SYS_GetRelativePath(const char* pathToFolder, const char* pathToFile)
+{
+	namespace fs = std::filesystem;
+
+	fs::path base = fs::absolute(pathToFolder);
+	fs::path target = fs::absolute(pathToFile);
+
+	return fs::relative(target, base).generic_string();
+}
+
+std::string SYS_GetAbsolutePath(const char* pathToFolder, const char* relativePath)
+{
+	namespace fs = std::filesystem;
+	
+	fs::path base = fs::absolute(pathToFolder);
+	fs::path relative = relativePath;
+	
+	fs::path fullPath = fs::absolute(base / relative);
+	return fullPath.generic_string();
+}
+
 
 char *SYS_GetPathToDocuments()
 {

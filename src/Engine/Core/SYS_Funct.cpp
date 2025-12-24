@@ -234,7 +234,7 @@ char FUN_HexDigitToChar(u8 hexDigit)
 	return hexDigits[h];
 }
 
-u32 FUN_HexStrToValue(char *str)
+u32 FUN_HexStrToValue(const char *str)
 {
 	u32 value;
 	sscanf(str, "%x", &value);

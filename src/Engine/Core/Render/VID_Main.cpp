@@ -8,7 +8,7 @@
 #include "SYS_FileSystem.h"
 #include "SYS_Platform.h"
 #include "SYS_SharedMemory.h"
-#include "CRenderBackendOpenGL3.h"
+#include "CRenderBackendOpenGL4.h"
 #include "CGuiView.h"
 #include "CLayoutManager.h"
 #include "implot.h"
@@ -62,9 +62,9 @@ void VID_Init()
 	
 #if defined(MACOS)
 //	gRenderBackend = new CRenderBackendMetal();
-	gRenderBackend = new CRenderBackendOpenGL3();
+	gRenderBackend = new CRenderBackendOpenGL4();
 #else
-	gRenderBackend = new CRenderBackendOpenGL3();
+	gRenderBackend = new CRenderBackendOpenGL4();
 #endif
 	
 	// Create window with graphics context
@@ -250,8 +250,7 @@ void VID_Render()
 	
 	if (guiMain->IsViewFullScreen() == false)
 	{
-		clearColor = ImVec4(11.0f/256.0f, 34.0f/256.0f, 44.0f/255.0f, 1.0f); //0.45f, 0.55f, 0.60f, 1.00f);
-		clearColor = ImVec4(11.0f/256.0f, 34.0f/256.0f, 44.0f/255.0f, 1.0f); //0.45f, 0.55f, 0.60f, 1.00f);
+		clearColor = ImVec4(11.0f/255.0f, 34.0f/255.0f, 44.0f/255.0f, 1.0f); //0.45f, 0.55f, 0.60f, 1.00f);
 	}
 	else
 	{
@@ -852,6 +851,11 @@ void VID_SetVSyncScreenRefresh(bool isVSyncRefresh)
 	eventsLoopWithFpsCap = !isVSyncRefresh;
 }
 
+CRenderBackend *VID_GetRenderBackend()
+{
+	return gRenderBackend;
+}
+
 void VID_Shutdown()
 {
 	LOGM("VID_Shutdown");
@@ -1113,6 +1117,11 @@ float VID_GetScreenHeight()
 	SDL_Rect r2;
 	SDL_GetDisplayUsableBounds(displayNum, &r2);
 	return r2.h;
+}
+
+void VID_SetMainWindowTitle(const char *title)
+{
+	SDL_SetWindowTitle(gMainWindow, title);
 }
 
 ImGuiStyleType VID_GetDefaultImGuiStyle()

@@ -490,15 +490,17 @@ bool CGuiView::DoTapNoBackground(float x, float y)
 
 bool CGuiView::DoFinishTap(float x, float y)
 {
-	LOGG("CGuiView::DoFinishTap: %f %f", x, y);
+	LOGG("CGuiView::DoFinishTap: %s %f %f", name, x, y);
 
 	for (std::map<float, CGuiElement *, compareZdownwards>::iterator enumGuiElems = guiElementsDownwards.begin();
 		 enumGuiElems != guiElementsDownwards.end(); enumGuiElems++)
 	{
 		CGuiElement *guiElement = (*enumGuiElems).second;
+		LOGG("CGuiView::DoFinishTap: guiElement=%s", guiElement->name);
+
 		if (!guiElement->visible)
 			continue;
-
+		
 		if (guiElement->DoFinishTap(x, y))
 			return true;
 	}
@@ -1415,6 +1417,7 @@ bool CGuiView::IsVisible()
 
 void CGuiView::PreRenderImGui()
 {
+	LOGG("CGuiView::PreRenderImGui: %x %s", this, this->name);
 	ImGuiContext& g = *GImGui;
 		
 	bool isFullScreen = (guiMain->viewFullScreen == this);
@@ -1560,10 +1563,10 @@ void CGuiView::PreRenderImGui()
 
 	if (imGuiWindowSkipFocusCheck == false)
 	{
-//		LOGD("check focus %s", this->name);
+		LOGG("check focus %s", this->name);
 		if (ImGui::IsWindowFocused())
 		{
-//			LOGD("..ImGui::IsWindowFocused %s", this->name);
+			LOGG("..ImGui::IsWindowFocused %s", this->name);
 			guiMain->SetInternalViewFocus(this);
 		}
 	}
@@ -1881,10 +1884,10 @@ void CGuiView::SerializeLayout(CByteBuffer *byteBuffer)
 	LOGG("CGuiView::SerializeLayout: %s", name);
 	
 	byteBuffer->PutBool(IsVisible());
-//	viewByteBuffer->PutI32(posX);
-//	viewByteBuffer->PutI32(posY);
-//	viewByteBuffer->PutI32(sizeX);
-//	viewByteBuffer->PutI32(sizeY);
+	byteBuffer->PutFloat(posX);
+	byteBuffer->PutFloat(posY);
+	byteBuffer->PutFloat(sizeX);
+	byteBuffer->PutFloat(sizeY);
 	
 	byteBuffer->PutU32(layoutParameters.size());
 	
@@ -1904,11 +1907,15 @@ bool CGuiView::DeserializeLayout(CByteBuffer *byteBuffer, int version)
 	
 	bool isRestoreCorrect = true;
 	bool setVisible = byteBuffer->GetBool();
-//	int px = byteBuffer->GetI32();
-//	int py = byteBuffer->GetI32();
-//	int sx = byteBuffer->GetI32();
-//	int sy = byteBuffer->GetI32();
-//	this->SetPosition(px, py, -1, sx, sy);
+	
+	if (version >= 2)
+	{
+		float px = byteBuffer->GetFloat();
+		float py = byteBuffer->GetFloat();
+		float sx = byteBuffer->GetFloat();
+		float sy = byteBuffer->GetFloat();
+		this->SetPosition(px, py, -1, sx, sy);
+	}
 	
 	u32 numParameters = byteBuffer->GetU32();
 

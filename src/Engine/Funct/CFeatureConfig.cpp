@@ -9,7 +9,10 @@
 
 CFeatureConfig::CFeatureConfig()
 {
-	featureErrorText[0] = 0;
+	featureConfigErrorText[0] = 0;
+	EMPTY_PATH_ALLOC(featureConfigPath);
+	EMPTY_PATH_ALLOC(featureRootFolderPath);
+	isFromSettings = true;
 }
 
 CFeatureConfig::~CFeatureConfig()
@@ -20,16 +23,15 @@ CFeatureConfig::~CFeatureConfig()
 void CFeatureConfig::InitConfig(const char *featureName)
 {
 	LOGD("CFeatureConfig::InitConfig name=%s", featureName);
-	featureErrorText[0] = 0;
-	
+	featureConfigErrorText[0] = 0;
+	isFromSettings = true;
+
 	char *buf = SYS_GetCharBuf();
 	sprintf(buf, "%s.hjson", featureName);
 	
 	// default program config
-	this->featureSettings = new CConfigStorageHjson(buf);
+	this->featureSettings = new CConfigStorageHjson(buf, true);
 	
-	EMPTY_PATH_ALLOC(featureConfigPath);
-	EMPTY_PATH_ALLOC(featureRootFolderPath);
 	featureSettings->GetSlrString("DefaultFolder", &featureDefaultFolder, gUTFPathToDocuments);
 	featureSettings->GetSlrString("DefaultConfigPath", &featureDefaultConfigPath, NULL);
 
@@ -41,6 +43,17 @@ void CFeatureConfig::InitConfig(const char *featureName)
 	SYS_ReleaseCharBuf(buf);
 }
 
+void CFeatureConfig::InitConfigFromPath(std::string path)
+{
+	LOGD("CFeatureConfig::InitConfigFromPath path=%s", path.c_str());
+	featureConfigErrorText[0] = 0;
+	isFromSettings = false;
+
+	this->featureSettings = new CConfigStorageHjson(path, false);
+
+	LoadConfig(path);
+}
+
 void CFeatureConfig::SetFeatureRootFolderPath(CSlrString *path)
 {
 	CSlrString *folder = path->GetFilePathWithoutFileNameComponentFromPath();
@@ -48,7 +61,7 @@ void CFeatureConfig::SetFeatureRootFolderPath(CSlrString *path)
 	featureDefaultFolder->Set(folder);
 	featureSettings->SetSlrString("DefaultFolder", &folder);
 	folder->AddPathSeparatorAtEnd();
-	char *strFolder = folder->GetStdASCII();
+	char *strFolder = folder->GetUTF8();
 	delete folder;
 	
 	strcpy(featureRootFolderPath, strFolder);
@@ -56,12 +69,21 @@ void CFeatureConfig::SetFeatureRootFolderPath(CSlrString *path)
 	STRFREE(strFolder);
 }
 
-void CFeatureConfig::LoadConfig(CSlrString *path)
+bool CFeatureConfig::LoadConfig(std::string path)
 {
-	char *cstr = path->GetStdASCII();
+	CSlrString *str = new CSlrString(path);
+	bool ret = LoadConfig(str);
+	delete str;
+	return ret;
+}
+
+bool CFeatureConfig::LoadConfig(CSlrString *path)
+{
+	char *cstr = path->GetUTF8();
 	strcpy(featureConfigPath, cstr);
 	delete [] cstr;
 	
+	LOGD("CFeatureConfig::LoadConfig: %s", featureConfigPath);
 	CByteBuffer *byteBuffer = new CByteBuffer(featureConfigPath);
 	if (!byteBuffer->IsEmpty())
 	{
@@ -82,40 +104,52 @@ void CFeatureConfig::LoadConfig(CSlrString *path)
 		catch(const std::exception& e)
 		{
 			LOGError("CFeatureConfig::InitFromHjson error: %s", e.what());
-			sprintf(featureErrorText, "Config file not correct, %s", e.what());
+			sprintf(featureConfigErrorText, "Config file not correct, %s", e.what());
 			hjsonRoot.clear();
 			delete [] jsonText;
-			return;
+			return false;
 		}
 		delete [] jsonText;
 	}
 	else
 	{
 		LOGError("CFeatureConfig::LoadConfig: empty CByteBuffer, failed to init");
-		sprintf(featureErrorText, "Config file not correct, empty CByteBuffer, failed to init");
-		return;
+		sprintf(featureConfigErrorText, "Config file not correct, empty CByteBuffer, failed to init");
+		return false;
 	}
 
-	CSlrString *folder = path->GetFilePathWithoutFileNameComponentFromPath();
-	featureSettings->SetSlrString("DefaultFolder", &folder);
-	folder->AddPathSeparatorAtEnd();
-	char *strFolder = folder->GetStdASCII();
-	delete folder;
+	if (isFromSettings)
+	{
+		CSlrString *folder = path->GetFilePathWithoutFileNameComponentFromPath();
+		featureSettings->SetSlrString("DefaultFolder", &folder);
+		folder->AddPathSeparatorAtEnd();
+		char *strFolder = folder->GetUTF8();
+		delete folder;
+		LOGD("Config loaded, root folder=%s", strFolder);
+		strcpy(featureRootFolderPath, strFolder);
+		
+		STRFREE(strFolder);
+		
+		featureSettings->SetSlrString("DefaultConfigPath", &path);
+	}
+
+	featureConfigErrorText[0] = 0;
 	
-	LOGD("Config loaded, root folder=%s", strFolder);
-	strcpy(featureRootFolderPath, strFolder);
-	
-	STRFREE(strFolder);
-	
-	featureSettings->SetSlrString("DefaultConfigPath", &path);
-	featureErrorText[0] = 0;
+	return true;
+}
+
+void CFeatureConfig::SaveConfig(std::string path)
+{
+	CSlrString *str = new CSlrString(path);
+	SaveConfig(str);
+	delete str;
 }
 
 void CFeatureConfig::SaveConfig(CSlrString *path)
 {
-	featureErrorText[0] = 0;
+	featureConfigErrorText[0] = 0;
 
-	const char *cstrPath = path->GetStdASCII();
+	const char *cstrPath = path->GetUTF8();
 	strcpy(featureConfigPath, cstrPath);
 	delete [] cstrPath;
 	
@@ -147,6 +181,13 @@ void CFeatureConfig::SaveConfig(CSlrString *path)
 	fprintf(fp, "%s", cstrHjson);
 	
 	fclose(fp);
+}
+
+void CFeatureConfig::SaveConfig()
+{
+	CSlrString *fc = new CSlrString(featureConfigPath);
+	SaveConfig(fc);
+	delete fc;
 }
 
 void CFeatureConfig::InitFromHjson(Hjson::Value hjsonRoot)

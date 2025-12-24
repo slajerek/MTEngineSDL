@@ -343,7 +343,7 @@ void CLayoutManager::SerializeLayoutAsync(CLayoutData *layoutData)
 
 void CLayoutManager::SetLayoutAsync(CLayoutData *layoutData, bool saveCurrentLayout)
 {
-	LOGD("CLayoutManager::SetLayoutAsync: saveCurrentLayout=%s", STRBOOL(saveCurrentLayout));
+	LOGD("CLayoutManager::SetLayoutAsync: %s | saveCurrentLayout=%s", layoutData ? layoutData->layoutName : "NULL", STRBOOL(saveCurrentLayout));
 	guiMain->LockMutex();
 
 	if (layoutData == NULL)

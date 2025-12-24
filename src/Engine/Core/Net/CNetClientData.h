@@ -31,10 +31,8 @@ public:
 	u32 peerId;
 	u32 totalNumReceived;
 
-	int componentId;
-	
-	char clientName[32];
-	void SetClientName(char *userName);
+	std::string clientName;
+	void SetClientName(std::string userName);
 
 	CNetServer *server;
 	ENetPeer *peer;

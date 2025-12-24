@@ -189,7 +189,7 @@ bool CGuiEditBoxHex::ButtonPressed(CGuiButton *button)
 		{
 			this->value = (this->value & 0xF0) | (digit);
 		}
-		editingDigitNum--;
+		editingDigitNum = editingDigitNum -1;
 		if (editingDigitNum == 0)
 		{
 			this->editing = false;

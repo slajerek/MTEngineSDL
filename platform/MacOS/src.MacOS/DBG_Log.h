@@ -34,7 +34,7 @@
 #define DBGLVL_PAINT		(1 << 4)
 #define DBGLVL_LEVEL		(1 << 5)
 #define DBGLVL_WEBSERVICE	(1 << 6)
-#define DBGLVL_XML			(1 << 7)
+#define DBGLVL_DATA			(1 << 7)
 #define DBGLVL_HTTP			(1 << 8)
 #define DBGLVL_PLUGIN		(1 << 9)
 #define DBGLVL_XMPLAYER		(1 << 10)
@@ -88,6 +88,7 @@ void LOG_Shutdown(void);
 #define LOGG(...) _LOGGER(DBGLVL_GUI, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
 #define LOGF(...) _LOGGER(DBGLVL_PAINT, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
 #define LOGH(...) _LOGGER(DBGLVL_HTTP, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOGDATA(...) _LOGGER(DBGLVL_DATA, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
 #define LOGA(...) _LOGGER(DBGLVL_AUDIO, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
 #define LOGAD(...) _LOGGER(DBGLVL_ADS, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
 #define LOGL(...) _LOGGER(DBGLVL_LEVEL, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
@@ -134,53 +135,54 @@ int _LOGGER(unsigned int level, const char *fileName, unsigned int lineNum, cons
 
 #else
 
-#define LOGD(...) ; 
-#define LOGD2(...) ;
-#define LOGM(...) ;
-#define LOGI(...) ;
-#define LOGP(...) ;
-#define LOGR(...) ; 
-#define LOGG(...) ; 
-#define LOGF(...) ; 
-#define LOGH(...) ; 
-#define LOGA(...) ; 
-#define LOGN(...) ; 
-#define LOGS(...) ;
-#define LOGC(...) ;
-#define LOGCS(...) ;
-#define LOGCC(...) ;
-#define LOGMEM(...) ;
-#define LOGL(...) ; 
-#define LOGW(...) ; 
-#define LOGX(...) ;
-#define LOGVM(...) ;
-#define LOGVD(...) ;
-#define LOGVV(...) ;
+#define LOGD(...) {};
+#define LOGD2(...) {};
+#define LOGM(...) {};
+#define LOGI(...) {};
+#define LOGP(...) {};
+#define LOGR(...) {};
+#define LOGG(...) {};
+#define LOGF(...) {};
+#define LOGH(...) {};
+#define LOGA(...) {};
+#define LOGDATA(...) {};
+#define LOGN(...) {};
+#define LOGS(...) {};
+#define LOGC(...) {};
+#define LOGCS(...) {};
+#define LOGCC(...) {};
+#define LOGMEM(...) {};
+#define LOGL(...) {};
+#define LOGW(...) {};
+#define LOGX(...) {};
+#define LOGVM(...) {};
+#define LOGVD(...) {};
+#define LOGVV(...) {};
 
-#define LOG_Atari_Main(...) ;
-#define LOG_Atari_Debug(...) ;
+#define LOG_Atari_Main(...) {};
+#define LOG_Atari_Debug(...) {};
 
-#define LOGTODO(...) ;
-#define LOGWarning(...) ; 
-#define LOGError(...) ; 
+#define LOGTODO(...) {};
+#define LOGWarning(...) {};
+#define LOGError(...) {};
 
-#define LOGND(...) ; 
-#define LOGNM(...) ; 
-#define LOGNP(...) ;
-#define LOGNR(...) ; 
-#define LOGNG(...) ; 
-#define LOGNF(...) ; 
-#define LOGNH(...) ; 
-#define LOGNA(...) ; 
-#define LOGNN(...) ;
-#define LOGNS(...) ;
-#define LOGNMEM(...) ;
-#define LOGNL(...) ; 
-#define LOGNW(...) ; 
-#define LOGNX(...) ; 
-#define LOGNTODO(...) ; 
-#define LOGNWarning(...) ; 
-#define LOGNError(...) ; 
+#define LOGND(...) {};
+#define LOGNM(...) {};
+#define LOGNP(...) {};
+#define LOGNR(...) {};
+#define LOGNG(...) {};
+#define LOGNF(...) {};
+#define LOGNH(...) {};
+#define LOGNA(...) {};
+#define LOGNN(...) {};
+#define LOGNS(...) {};
+#define LOGNMEM(...) {};
+#define LOGNL(...) {};
+#define LOGNW(...) {};
+#define LOGNX(...) {};
+#define LOGNTODO(...) {};
+#define LOGNWarning(...) {};
+#define LOGNError(...) {};
 
 #endif
 // GLOBAL_DEBUG_OFF
@@ -223,7 +225,7 @@ int _LOGGER(unsigned int level, const char *fileName, unsigned int lineNum, cons
 #define DBGLVL_XMPLAYER 5
 #define DBGLVL_AUDIO 6
 #define DBGLVL_SQL	7
-#define DBGLVL_XML	8
+#define DBGLVL_DATA	8
 #define DBGLVL_HTTP 10
 #define DBGLVL_ERROR 100
 #define DBGLVL_TODO 101

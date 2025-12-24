@@ -47,6 +47,12 @@ void SND_Init()
 {
 	LOGA("SND_Init");
 	
+	if (SDL_InitSubSystem(SDL_INIT_AUDIO) < 0)
+	{
+		LOGError("SDL_InitSubSystem(SDL_INIT_AUDIO) failed: %s\n", SDL_GetError());
+		SYS_FatalExit();
+	}
+	
 	SND_MainInitialize();
 	
 	gSoundEngine = new CSoundEngine();
@@ -165,6 +171,15 @@ bool CSoundEngine::SetOutputAudioDevice(const char *deviceName)
 			LOGError("Couldn't open audio: %s\n", SDL_GetError());
 			SYS_FatalExit();
 		}
+		
+		// BUG: this causes emulation fps to drop, although it is recommended version by the SDL authors, it does not work properly for some reason
+//		currentAudioDevice = SDL_OpenAudioDevice(NULL, false, &wanted, NULL, 0);
+//		if (currentAudioDevice == 0)
+//		{
+//			LOGError("Couldn't open default audio output device: %s\n", SDL_GetError());
+//			SYS_FatalExit();
+//		}
+		
 		deviceOutName[0] = 0;
 		currentAudioDevice = 1;
 	}

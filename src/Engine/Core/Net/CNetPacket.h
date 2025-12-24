@@ -65,20 +65,20 @@ void LOGCSTO(CNetClientData *netClientData, u8 protocolType, u16 packetType, con
 void LOGCSFROM(CNetClientData *netClientData, u8 protocolType, u16 packetType, const char *fmt, ... );
 
 // log connection server TO
-void LOGCCTO(char *clientName, const char *fmt, ... );
+void LOGCCTO(std::string clientName, const char *fmt, ... );
 #define LOGCTO(...) LOGCCTO(clientLoginName, __VA_ARGS__)
 #define LOGCT(...) LOGCCTO(netClient->clientLoginName, __VA_ARGS__)
 
 // log connection server FROM
-void LOGCCFROM(char *clientName, const char *fmt, ... );
+void LOGCCFROM(std::string clientName, const char *fmt, ... );
 #define LOGCFROM(...) LOGCCFROM(clientLoginName, __VA_ARGS__)
 #define LOGCF(...) LOGCCFROM(netClient->clientLoginName, __VA_ARGS__)
 
 // log connection server TO
-void LOGCCTO(char *clientName, u8 protocolType, u16 packetType, const char *fmt, ... );
+void LOGCCTO(std::string clientName, u8 protocolType, u16 packetType, const char *fmt, ... );
 
 // log connection server FROM
-void LOGCCFROM(char *clientName, u8 protocolType, u16 packetType, const char *fmt, ... );
+void LOGCCFROM(std::string clientName, u8 protocolType, u16 packetType, const char *fmt, ... );
 
 #endif
 

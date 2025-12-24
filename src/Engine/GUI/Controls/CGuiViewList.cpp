@@ -331,7 +331,7 @@ void CGuiViewList::MoveView(float diffX, float diffY)
 			{
 //				LOGD(" (1) fits");
 				newStartDrawY += (this->listElements[firstShowElement]->sizeY + this->listElements[firstShowElement]->gapY);
-				firstShowElement++;
+				firstShowElement = firstShowElement + 1;
 			}
 			else
 			{
@@ -352,7 +352,7 @@ void CGuiViewList::MoveView(float diffX, float diffY)
 			else
 			{
 //				LOGD("firstShowElement--");
-				firstShowElement--;
+				firstShowElement = firstShowElement - 1;
 				newStartDrawY -= (this->listElements[firstShowElement]->sizeY + this->listElements[firstShowElement]->gapY);
 			}
 		}
@@ -755,7 +755,7 @@ void CGuiViewList::SetElement(int elementNum, bool updatePosition)
 			element = this->listElements[elementNum];
 			if (elementNum >= numElements-2)
 			{
-				this->firstShowElement++;
+				this->firstShowElement = this->firstShowElement + 1;
 				if (firstShowElement >= numElements)
 				{
 					firstShowElement = numElements-1;

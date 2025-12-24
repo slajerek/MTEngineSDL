@@ -62,7 +62,7 @@ void CNetServer::ThreadRun(void *data)
 {
 	LOGCS("CNetServer::ThreadRun: thread started");
 
-	strcpy(threadName, "Net >Server<");
+	SYS_SetThreadName("Net >Server<");
 
 	ENetAddress address;
 	ENetHost * server;
@@ -157,7 +157,7 @@ void CNetServer::ThreadRun(void *data)
 					if (byteBufferIn->error)
 					{
 #if defined(FINAL_RELEASE)
-						LOGError("FROM %s: parse error, disconnect", netClientData->clientName);
+						LOGError("FROM %s: parse error, disconnect", netClientData->clientName.c_str());
 						this->Disconnect(netClientData);
 #else
 						LOGError("FROM %s: parse error", netClientData->clientName);
@@ -171,7 +171,7 @@ void CNetServer::ThreadRun(void *data)
 					if (netClientData == NULL)
 						break;
 
-					LOGCS("FROM %s: disconnect", netClientData->clientName);
+					LOGCS("FROM %s: disconnect", netClientData->clientName.c_str());
 					this->Disconnected(netClientData);
 
 					event.peer->data = NULL;
@@ -183,7 +183,7 @@ void CNetServer::ThreadRun(void *data)
 					if (netClientData == NULL)
 						break;
 
-					LOGError("CNetServer enet_host_service: unknown event %d from %s", event.type, netClientData->clientName);
+					LOGError("CNetServer enet_host_service: unknown event %d from %s", event.type, netClientData->clientName.c_str());
 					this->Disconnect(netClientData);
 					break;
 				}
@@ -195,8 +195,15 @@ void CNetServer::ThreadRun(void *data)
 		{
 			if (clients[i]->state == NET_CLIENT_STATE_DISCONNECT)
 			{
-				enet_peer_disconnect(clients[i]->peer, 0);
-				this->Disconnected(clients[i]);
+				if (clients[i]->peer)
+				{
+					enet_peer_disconnect(clients[i]->peer, 0);
+					this->Disconnected(clients[i]);
+				}
+				else
+				{
+					clients[i]->state = NET_CLIENT_STATE_EMPTY;
+				}
 			}
 		}
 		
@@ -238,7 +245,7 @@ void CNetServer::Disconnect(CNetClientData *netClientData)
 
 void CNetServer::Disconnected(CNetClientData *netClientData)
 {
-	LOGCS("%s DISCONNECTED", netClientData->clientName);
+	LOGCS("%s DISCONNECTED", netClientData->clientName.c_str());
 
 	for (std::list<CNetServerCallback *>::iterator it = this->serverCallbacks.begin();
 		 it != this->serverCallbacks.end(); it++)
@@ -375,7 +382,7 @@ void CNetServer::ParseDataBuffer(CNetClientData *netClientData, CByteBuffer *byt
 		{
 			char *hexStr = byteBuffer->toHexString();
 			LOGError("CNetServer::ParseDataBuffer: unknown packet type=%d from %s data=%s index=%d",
-				packetType, netClientData->clientName, hexStr, byteBuffer->index);
+				packetType, netClientData->clientName.c_str(), hexStr, byteBuffer->index);
 			free(hexStr);
 
 #if !defined(FINAL_RELEASE)
@@ -432,7 +439,7 @@ void CNetServer::ParseDataBuffer(CNetClientData *netClientData, CByteBuffer *byt
 				{
 					char *hexStr = byteBuffer->toHexString();
 					LOGError("CNetServer::ParseDataBuffer: unknown packet type=%d from %s data=%s index=%d",
-						packetType, netClientData->clientName, hexStr, byteBuffer->index);
+						packetType, netClientData->clientName.c_str(), hexStr, byteBuffer->index);
 					free(hexStr);
 
 	#if !defined(FINAL_RELEASE)
@@ -455,32 +462,61 @@ void CNetServer::ParseDataBuffer(CNetClientData *netClientData, CByteBuffer *byt
 
 }
 
-void CNetServer::ParseAuthorize(CNetClientData *netClientData, CByteBuffer *byteBuffer)
+bool CNetServer::ParseAuthorize(CNetClientData *netClientData, CByteBuffer *byteBuffer)
 {
-	LOGSF("ParseAuthorize");
+	LOGSF("CNetServer::ParseAuthorize");
 	u32 v = byteBuffer->GetU32();
 	if (!(v <= NET_PROTOCOL_VERSION))
 	{
 		LOGError("CNetServer::ParseAuthorize: unknown version %d", v);
 		this->Disconnect(netClientData);
-		return;
+		return false;
 	}
 
 	u64 serverId = byteBuffer->GetU64();
-	char *userName = byteBuffer->getString();
+	string userName = byteBuffer->GetStdString();
 	u16 passwordHashLen = byteBuffer->getU16();
-	u8 *passwordHash = byteBuffer->getBytes(passwordHashLen);
+	u8 *passwordHashBytes = byteBuffer->getBytes(passwordHashLen);
+	std::vector<uint8_t> passwordHashVector(passwordHashBytes, passwordHashBytes + passwordHashLen);
+	
+	LOGSF("ParseAuthorize: serverId=%llu userName='%s' passwordHashLen=%d", serverId, userName.c_str(), passwordHashLen);
 
-	LOGSF("ParseAuthorize: serverId=%llu userName='%s' passwordHashLen=%d", serverId, userName, passwordHashLen);
-
-	if (v == 1)
+	u8 authStatus = NET_SERVER_CALLBACK_AUTHORIZE_NOT_AVAILABLE;
+	for (std::list<CNetServerCallback *>::iterator it = this->serverCallbacks.begin();
+		it != this->serverCallbacks.end(); it++)
 	{
-		// TODO: check login/password and serverId
-		netClientData->SetClientName(userName);
+		CNetServerCallback *callback = (*it);
+		authStatus = callback->NetServerAuthorize(netClientData, userName, passwordHashVector);
+		if (authStatus != NET_SERVER_CALLBACK_AUTHORIZE_NOT_AVAILABLE)
+			break;
 	}
-//	else if (v == 2)
-//	{
-//	}
+
+	if (authStatus == NET_SERVER_CALLBACK_AUTHORIZE_WRONG_PASSWORD)
+	{
+		// send authorization confirmed
+		byteBufferReliableOut->Reset();
+		byteBufferReliableOut->PutByte(NET_PACKET_TYPE_AUTHORIZED);
+		byteBufferReliableOut->PutBool(false);
+
+		this->SendReliableBufferAsync(netClientData, byteBufferReliableOut);
+		this->Disconnect(netClientData);
+
+		LOGST("AUTHORIZATION FAILED");
+		return false;
+	}
+	
+	// authorized OK, check if we have already other user session and drop it
+	for (int i = 0; i < NET_MAX_CLIENTS; i++)
+	{
+		CNetClientData *client = clients[i];
+		if (client->clientName == userName)
+		{
+			client->clientName = "<PEER#" + std::to_string(client->peerId) + "> (" + client->clientName + ")";
+			Disconnect(client);
+		}
+	}
+	
+	netClientData->SetClientName(userName);
 
 	// send authorization confirmed
 	byteBufferReliableOut->Reset();
@@ -491,9 +527,6 @@ void CNetServer::ParseAuthorize(CNetClientData *netClientData, CByteBuffer *byte
 
 	LOGST("AUTHORIZED successfully");
 	
-	int componentId = atoi(userName);
-	netClientData->componentId = componentId;
-
 	netClientData->state = NET_CLIENT_STATE_ONLINE;
 
 	for (std::list<CNetServerCallback *>::iterator it = this->serverCallbacks.begin();
@@ -503,7 +536,8 @@ void CNetServer::ParseAuthorize(CNetClientData *netClientData, CByteBuffer *byte
 		callback->NetServerCallbackClientConnected(netClientData);
 	}
 
-	LOGSF("ParseAuthorize done");
+	LOGSF("CNetServer::ParseAuthorize done");
+	return true;
 }
 
 void CNetServer::AddServerCallback(CNetServerCallback *serverCallback)
@@ -545,6 +579,7 @@ void CNetServer::SendReliableBufferAsync(CNetClientData *netClientData, CByteBuf
 	LOGST("SendReliableBufferAsync: len=%d", byteBuffer->length);
 	ENetPacket *packet = enet_packet_create (byteBuffer->data, byteBuffer->length, ENET_PACKET_FLAG_RELIABLE);
 	enet_peer_send (netClientData->peer, 0, packet);
+	enet_host_flush(netClientData->peer->host);
 }
 
 void CNetServer::SendNotReliableBufferAsync(CNetClientData *netClientData, CByteBuffer *byteBuffer)
@@ -552,6 +587,7 @@ void CNetServer::SendNotReliableBufferAsync(CNetClientData *netClientData, CByte
 	LOGST("SendNotReliableBufferAsync: len=%d", byteBuffer->length);
 	ENetPacket *packet = enet_packet_create (byteBuffer->data, byteBuffer->length, ENET_PACKET_FLAG_UNSEQUENCED);
 	enet_peer_send (netClientData->peer, 0, packet);
+	enet_host_flush(netClientData->peer->host);
 }
 
 const char *CNetServer::GetStatusName()
@@ -603,6 +639,11 @@ void CNetServerCallback::NetServerProcessPacket(CNetPacket *packet)
 
 void CNetServerCallback::NetServerLogic(CNetServer *netServer)
 {
+}
+
+u8 CNetServerCallback::NetServerAuthorize(CNetClientData *clientData, string userName, vector<u8> passwordHash)
+{
+	return NET_SERVER_CALLBACK_AUTHORIZE_NOT_AVAILABLE;
 }
 
 CNetServerCallback::~CNetServerCallback()

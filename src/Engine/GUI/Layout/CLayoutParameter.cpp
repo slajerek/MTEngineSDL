@@ -213,6 +213,87 @@ bool CLayoutParameterFloat::Deserialize(CByteBuffer *byteBuffer)
 }
 
 //
+CLayoutParameterDouble::CLayoutParameterDouble(const char *name, double *value)
+: CLayoutParameter(name)
+{
+	this->value = value;
+	this->minValue = 0.1f;
+	this->maxValue = 50.0f;
+	this->step = 0.0f;
+	this->step_fast = 0.0f;
+	this->format = "%.2f";
+	this->flags = 0;
+}
+
+CLayoutParameterDouble::CLayoutParameterDouble(const char *name, bool isHidden, double *value)
+: CLayoutParameter(name, isHidden)
+{
+	this->value = value;
+	this->minValue = 0.1f;
+	this->maxValue = 50.0f;
+	this->step = 0.0f;
+	this->step_fast = 0.0f;
+	this->format = "%.2f";
+	this->flags = 0;
+}
+
+CLayoutParameterDouble::CLayoutParameterDouble(const char *name, double *value, float minValue, float maxValue)
+: CLayoutParameter(name)
+{
+	this->value = value;
+	this->minValue = minValue;
+	this->maxValue = maxValue;
+	this->step = 0.0f;
+	this->step_fast = 0.0f;
+	this->format = "%.2f";
+	this->flags = 0;
+}
+
+CLayoutParameterDouble::CLayoutParameterDouble(const char *name, double *value, float minValue, float maxValue, float step, float step_fast, const char* format, ImGuiInputTextFlags flags)
+: CLayoutParameter(name)
+{
+	this->value = value;
+	this->minValue = minValue;
+	this->maxValue = maxValue;
+	this->step = step;
+	this->step_fast = step_fast;
+	this->format = format;
+	this->flags = flags;
+}
+
+// returns if parameter has changed
+bool CLayoutParameterDouble::RenderImGui()
+{
+//	ImGui::Text(name);
+//	ImGui::SameLine();
+	
+	char *buf = SYS_GetCharBuf();
+	sprintf(buf, "%s##float2", name);
+	float v = (float)*value;
+	if (ImGui::SliderFloat(buf, &v, minValue, maxValue, format, flags))
+	{
+		*value = (double)v;
+		guiMain->StoreLayoutInSettingsAtEndOfThisFrame();
+		return true;
+	}
+	*value = (double)v;
+
+	SYS_ReleaseCharBuf(buf);
+	return false;
+}
+
+void CLayoutParameterDouble::Serialize(CByteBuffer *byteBuffer)
+{
+	byteBuffer->PutFloat(*value);
+}
+
+bool CLayoutParameterDouble::Deserialize(CByteBuffer *byteBuffer)
+{
+	*value = byteBuffer->GetFloat();
+	return true;
+}
+
+//
 CLayoutParameterCombo::CLayoutParameterCombo(const char *name, int *selectedItem, const char **items, int itemsCount)
 : CLayoutParameter(name)
 {

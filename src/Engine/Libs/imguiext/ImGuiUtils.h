@@ -414,6 +414,25 @@ namespace ImGui
             }
             ImGui::End();
         }
+		
+		void SeparatorWithText(const char* label)
+		{
+			ImGuiStyle& style = ImGui::GetStyle();
+			float fullWidth = ImGui::GetContentRegionAvail().x;
+			float textWidth = ImGui::CalcTextSize(label).x;
+			float separatorWidth = (fullWidth - textWidth - style.ItemSpacing.x * 2.0f) * 0.5f;
+
+			if (separatorWidth > 0.0f) {
+				ImGui::Separator();
+				ImGui::SameLine(0.0f, style.ItemSpacing.x);
+				ImGui::SetCursorPosX(ImGui::GetCursorPosX() + separatorWidth);
+				ImGui::TextUnformatted(label);
+				ImGui::SameLine();
+				ImGui::Separator();
+			} else {
+				ImGui::TextUnformatted(label);
+			}
+		}
     };
 
 };

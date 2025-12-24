@@ -123,11 +123,13 @@ public:
 	void StoreLayoutInSettingsAtEndOfThisFrame();
 	
 	void SetView(CGuiView *view);
-
+	
 	CGuiView *focusedView;
 	void SetFocus(CGuiView *view);
 	void SetInternalViewFocus(CGuiView *view);
 	bool ClearInternalViewFocus();
+
+	CGuiView *focusedViewThisFrameOnly;
 
 	void RaiseMainWindow();
 	void SetWindowOnTop(CGuiView *view);
@@ -146,6 +148,7 @@ public:
 	
 	// notification toast
 	void ShowNotification(const char *title, const char *message);
+	void ShowNotificationError(const char *title, const char *message);
 	void ShowNotification(ImGuiToastType_ toastType, int dismissTime, const char *title, const char *message);
 	
 	volatile bool isShiftPressed;

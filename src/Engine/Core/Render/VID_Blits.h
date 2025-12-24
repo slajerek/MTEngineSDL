@@ -80,6 +80,9 @@ void Blit(CSlrImage *image, float destX, float destY, float z, float sizeX, floa
 		  float texStartX, float texStartY,
 		  float texEndX, float texEndY);
 
+void BlitFlipVertical(CSlrImage *image, float destX, float destY, float z, float sizeX, float sizeY,
+		  float texStartX, float texStartY, float texEndX, float texEndY);
+
 void BlitInImGuiWindow(CSlrImage *image, float destX, float destY, float z, float sizeX, float sizeY,
 					   float texStartX, float texStartY,
 					   float texEndX, float texEndY, float colorR, float colorG, float colorB, float alpha);

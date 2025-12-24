@@ -23,7 +23,7 @@
 #define DBGLVL_GUI		(1 << 3)
 #define DBGLVL_INFO		(1 << 4)
 #define DBGLVL_MAIN		(DBGLVL_INFO)
-#define DBGLVL_TRANSACTION	(1 << 5)
+#define DBGLVL_DATA		(1 << 5)
 #define DBGLVL_CONNECTION	(1 << 6)
 #define DBGLVL_HTTP			(DBGLVL_CONNECTION)
 #define DBGLVL_DEBUG		(1 << 7)

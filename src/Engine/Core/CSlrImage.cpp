@@ -43,6 +43,31 @@ CSlrImage::CSlrImage(CImageData *imageData, bool linearScaling)
 	VID_PostImageBinding(this, NULL);
 }
 
+CSlrImage::CSlrImage(CImageData *imageData, bool linearScaling, bool bindNow)
+: CSlrImageTexture()
+{
+	this->isActive = false;
+
+	this->resourceState = RESOURCE_STATE_DEALLOCATED;
+	
+	this->shouldDeallocLoadImageData = false;
+	this->loadImageData = NULL;
+
+	this->InitImageLoad(linearScaling);
+	this->LoadImage(imageData);
+	if (bindNow)
+	{
+		this->BindImage();
+		this->FreeLoadImage();
+		this->resourceState = RESOURCE_STATE_LOADED;
+	}
+	else
+	{
+		VID_PostImageBinding(this, NULL);
+	}
+}
+
+
 CSlrImage::CSlrImage(const char *fileName)
 {
 	this->name = NULL;
@@ -141,7 +166,13 @@ CSlrImage::CSlrImage(const char *fileName, bool linearScaling, bool fromResource
 						fclose(fp);
 						this->LoadImage(buf, "");
 					}
-					else SYS_FatalExit("file not found");
+					else
+					{
+						LOGError("File not found: %s", fileName);
+						this->resourceState = RESOURCE_STATE_ERROR;
+						this->resourceIsActive = true;
+						return;
+					}
 				}
 			}
 		}
@@ -224,7 +255,13 @@ CSlrImage::CSlrImage(const char *fileName, bool linearScaling)
 						this->LoadImage(buf, "");
 						ResourceSetPath(fileName, true);
 					}
-					else SYS_FatalExit("file not found");
+					else
+					{
+						LOGError("File not found: %s", fileName);
+						this->resourceState = RESOURCE_STATE_ERROR;
+						this->resourceIsActive = true;
+						return;
+					}
 				}
 			}
 		}
@@ -347,8 +384,6 @@ void CSlrImage::PreloadImage(const char *fileName, bool fromResources)
 	LOGR("CSlrImage::PreloadImage: rasterWidth=%d rasterHeight=%d resourceLoadingSize=%d resourceIdleSize=%d", rasterWidth, rasterHeight, resourceLoadingSize, resourceIdleSize);
 
 }
-
-
 
 void CSlrImage::LoadImage(const char *fileName, const char *fileExt)
 {

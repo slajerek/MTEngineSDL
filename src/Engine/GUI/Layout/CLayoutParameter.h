@@ -85,6 +85,27 @@ public:
 	virtual bool Deserialize(CByteBuffer *byteBuffer);
 };
 
+class CLayoutParameterDouble : public CLayoutParameter
+{
+public:
+	CLayoutParameterDouble(const char *name, double *value);
+	CLayoutParameterDouble(const char *name, bool isHidden, double *value);
+	CLayoutParameterDouble(const char *name, double *value, float minValue, float maxValue);
+	CLayoutParameterDouble(const char *name, double *value, float minValue, float maxValue, float step, float step_fast, const char* format, ImGuiInputTextFlags flags);
+	double *value;
+
+	float minValue;
+	float maxValue;
+	float step;
+	float step_fast;
+	const char* format;
+	ImGuiInputTextFlags flags;
+	
+	virtual bool RenderImGui();
+	virtual void Serialize(CByteBuffer *byteBuffer);
+	virtual bool Deserialize(CByteBuffer *byteBuffer);
+};
+
 class CLayoutParameterCombo : public CLayoutParameter
 {
 public:

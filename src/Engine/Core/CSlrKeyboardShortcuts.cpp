@@ -425,7 +425,7 @@ void CSlrKeyboardShortcut::SetKeyCode(i32 keyCode, bool isShift, bool isAlt, boo
 	if (keyCode > 0)
 	{
 		str = SYS_KeyCodeToString(keyCode, isShift, isAlt, isControl, isSuper);
-		cstr = str->GetStdASCII();
+		cstr = str->GetUTF8();
 	}
 }
 

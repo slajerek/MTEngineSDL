@@ -52,14 +52,14 @@ CPool::~CPool()
 
 void* CPool::New(const size_t size)
 {
-	//LOGD("CPool::New: size=%d pool=%x", (u64)size, m_pPool);
+//	LOGD("CPool::New: pool=%x size=%d", m_pPool, (u64)size);
 
 	// If the item being requested is not the right size then use the generalised
 	// new operator.  This will occur if the object is derived from the allocated
 	// class.
 	if (size != m_nItemSize)
 	{
-		LOGError("size=%d != m_nItemSize=%d", size, m_nItemSize);
+//		LOGError("size=%d != m_nItemSize=%d", size, m_nItemSize);
 		return ::operator new(size);
 	}
 
@@ -75,6 +75,7 @@ void* CPool::New(const size_t size)
 			BYTE*	pReturn = m_pAvailable;
 			m_pAvailable += m_nItemSize;
 			mutex->Unlock();
+//			LOGD("CPool::New: pool=%x pReturn=%x", m_pPool, pReturn);
 			return reinterpret_cast<void*>(pReturn);
 		}
 		else
@@ -106,13 +107,15 @@ void* CPool::New(const size_t size)
 	else
 	{
 		mutex->Unlock();
-		return reinterpret_cast<void*>(m_pFreeStack[--m_nTOS]);
+		void *pReturn = reinterpret_cast<void*>(m_pFreeStack[--m_nTOS]);
+//		LOGD("CPool::New: pool=%x pReturn=%x", m_pPool, pReturn);
+		return pReturn;
 	}
 }
 
 void CPool::Delete(void* pVoid)
 {
-	//LOGD("CPool::Delete pVoid=%x pool=%x", pVoid, m_pPool);
+//	LOGD("CPool::Delete: pool=%x pVoid=%x ", m_pPool, pVoid);
 	
 	mutex->Lock();
 	if (pVoid)
@@ -128,6 +131,8 @@ void CPool::Delete(void* pVoid)
 				m_pNext->Delete(pItem);
 			else
 				::operator delete(pVoid);
+			
+			mutex->Unlock();
 		}
 		else
 		{
@@ -140,12 +145,20 @@ void CPool::Delete(void* pVoid)
 				static_cast<long>(m_nTOS * m_nItemSize) == m_pAvailable - m_pPool)
 			{
 				m_pPrev->m_pNext = 0;
+				
+				mutex->Unlock();
 				delete this;
+			}
+			else
+			{
+				mutex->Unlock();
 			}
 		}
 	}
-
-	mutex->Unlock();
+	else
+	{
+		mutex->Unlock();
+	}
 }
 
 // Reset all the pointers and indices, effectively deleting the allocated

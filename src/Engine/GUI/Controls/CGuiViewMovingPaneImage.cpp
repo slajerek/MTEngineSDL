@@ -4,6 +4,7 @@
 #include "CGuiViewMovingPaneImage.h"
 #include "SYS_KeyCodes.h"
 #include "VID_ImageBinding.h"
+#include "CRenderShader.h"
 
 CGuiViewMovingPaneImage::CGuiViewMovingPaneImage(const char *name, float posX, float posY, float posZ, float sizeX, float sizeY)
 : CGuiViewMovingPane(name, posX, posY, posZ, sizeX, sizeY, 1, 1)
@@ -19,9 +20,9 @@ CGuiViewMovingPaneImage::CGuiViewMovingPaneImage(const char *name, float posX, f
 	
 	imageData = NULL;
 	image = NULL;
+	shader = NULL;
 
-	imageChanged = false;
-	
+	imageChanged = false;	
 	// derived constructor should load image and call InitImage()
 }
 
@@ -252,11 +253,21 @@ void CGuiViewMovingPaneImage::RenderImGui()
 
 		if (image->isBound)
 		{
+			if (shader)
+			{
+				shader->UseShaderProgram();
+			}
+			
 			Blit(image, renderMapPosX, renderMapPosY, -1, renderMapSizeX, renderMapSizeY,
 				 renderTextureStartX,
 				 renderTextureStartY,
 				 renderTextureEndX,
 				 renderTextureEndY);
+			
+			if (shader)
+			{
+				shader->ResetState();
+			}
 		}
 	}
 	
@@ -277,3 +288,7 @@ void CGuiViewMovingPaneImage::ScreenPosToImagePos(float screenX, float screenY, 
 	ScreenPosToPanePos(screenX, screenY, imageX, imageY);
 }
 
+void CGuiViewMovingPaneImage::SetShader(CRenderShader *shader)
+{
+	this->shader = shader;
+}

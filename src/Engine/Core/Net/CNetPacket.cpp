@@ -135,7 +135,7 @@ void LOGCSFROM(CNetClientData *netClientData, u8 protocolType, u16 packetType, c
 }
 
 // log connection client TO
-void LOGCCTO(char *clientName, const char *fmt, ... )
+void LOGCCTO(std::string clientName, const char *fmt, ... )
 {
 #if !defined(FINAL_RELEASE)
     char buffer[LOG_BUFFER_LENGTH] = {0};
@@ -151,7 +151,7 @@ void LOGCCTO(char *clientName, const char *fmt, ... )
 }
 
 // log connection client FROM
-void LOGCCFROM(char *clientName, const char *fmt, ... )
+void LOGCCFROM(std::string clientName, const char *fmt, ... )
 {
 #if !defined(FINAL_RELEASE)
     char buffer[LOG_BUFFER_LENGTH] = {0};
@@ -167,7 +167,7 @@ void LOGCCFROM(char *clientName, const char *fmt, ... )
 }
 
 // log connection client TO
-void LOGCCTO(char *clientName, u8 protocolType, u16 packetType, const char *fmt, ... )
+void LOGCCTO(std::string clientName, u8 protocolType, u16 packetType, const char *fmt, ... )
 {
 #if !defined(FINAL_RELEASE)
     char buffer[LOG_BUFFER_LENGTH] = {0};
@@ -183,7 +183,7 @@ void LOGCCTO(char *clientName, u8 protocolType, u16 packetType, const char *fmt,
 }
 
 // log connection client FROM
-void LOGCCFROM(char *clientName, u8 protocolType, u16 packetType, const char *fmt, ... )
+void LOGCCFROM(std::string clientName, u8 protocolType, u16 packetType, const char *fmt, ... )
 {
 #if !defined(FINAL_RELEASE)
     char buffer[LOG_BUFFER_LENGTH] = {0};

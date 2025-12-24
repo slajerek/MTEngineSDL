@@ -9,10 +9,13 @@ class CSlrString;
 class CConfigStorageHjson
 {
 public:
-	CConfigStorageHjson(const char *configFileName);
+	CConfigStorageHjson(const char *configFilePath, bool isFromSettings);
+	CConfigStorageHjson(std::string configFilePath, bool isFromSettings);
 	virtual ~CConfigStorageHjson();
 	
 	CSlrString *configFileName;
+	
+	bool isFromSettings;
 	
 	void ReadConfig();
 	bool SaveConfig();

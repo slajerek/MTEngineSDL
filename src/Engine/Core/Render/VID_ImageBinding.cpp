@@ -128,6 +128,11 @@ void VID_PostImageBinding(CSlrImage *image, CSlrImage **dest, u8 mode)
 
 void VID_PostImageDealloc(CSlrImage *image)
 {
+	if (image == NULL)
+	{
+		LOGError("VID_PostImageDealloc: image NULL");
+		return;
+	}
 	LOGR("VID_PostImageDealloc: '%s' width=%f height=%f", (image->resourcePath != NULL ? image->resourcePath : "NULL"), image->width, image->height);
 		
 	VID_LockImageBindingMutex();

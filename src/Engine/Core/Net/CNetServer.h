@@ -12,6 +12,7 @@
 #include "SYS_Defs.h"
 #include "SYS_Threading.h"
 #include <list>
+#include <vector>
 
 class CNetConnection;
 class CNetClient;
@@ -28,6 +29,10 @@ class CByteBuffer;
 #define NET_SERVER_STATUS_ONLINE	3
 #define NET_SERVER_STATUS_SHUTDOWN	4
 
+#define NET_SERVER_CALLBACK_AUTHORIZE_NOT_AVAILABLE 0
+#define NET_SERVER_CALLBACK_AUTHORIZE_WRONG_PASSWORD 1
+#define NET_SERVER_CALLBACK_AUTHORIZE_CORRECT 2
+
 class CNetServer;
 
 class CNetServerCallback
@@ -38,6 +43,7 @@ public:
 	virtual void NetServerCallbackClientDisconnected(CNetClientData *clientData);
 	virtual void NetServerProcessPacket(CNetPacket *packet);
 	virtual void NetServerLogic(CNetServer *netServer);
+	virtual u8 NetServerAuthorize(CNetClientData *clientData, std::string userName, std::vector<u8> passwordHash);
 };
 
 class CNetServer : public CSlrThread
@@ -68,7 +74,7 @@ public:
 	CNetClientData *ConnectPeer(ENetPeer *peer);
 
 	void ParseDataBuffer(CNetClientData *netClientData, CByteBuffer *byteBuffer);
-	void ParseAuthorize(CNetClientData *netClientData, CByteBuffer *byteBuffer);
+	bool ParseAuthorize(CNetClientData *netClientData, CByteBuffer *byteBuffer);
 
 	void Disconnect(CNetClientData *netClientData);
 	void Disconnected(CNetClientData *netClientData);

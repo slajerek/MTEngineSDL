@@ -3,6 +3,8 @@
 
 #include "CGuiViewMovingPane.h"
 
+class CRenderShader;
+
 class CGuiViewMovingPaneImage : public CGuiViewMovingPane
 {
 public:
@@ -26,6 +28,9 @@ public:
 	bool shouldDeallocImage;
 	
 	bool imageChanged;
+	
+	CRenderShader *shader;
+	void SetShader(CRenderShader *shader);
 
 	virtual void SetImageData(CImageData *imageData);
 	virtual void SetImage(CSlrImage *setImage);

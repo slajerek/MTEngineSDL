@@ -18,8 +18,12 @@ public:
 	
 	virtual void SetFeatureRootFolderPath(CSlrString *path);
 	virtual void InitConfig(const char *featureName);
-	virtual void LoadConfig(CSlrString *path);
+	virtual void InitConfigFromPath(std::string path);
+	virtual bool LoadConfig(std::string path);
+	virtual bool LoadConfig(CSlrString *path);
+	virtual void SaveConfig(std::string path);
 	virtual void SaveConfig(CSlrString *path);
+	virtual void SaveConfig();
 	virtual void InitFromHjson(Hjson::Value hjsonRoot);
 	virtual void StoreToHjson(Hjson::Value hjsonRoot);
 
@@ -28,7 +32,9 @@ public:
 	CSlrString *featureDefaultConfigPath;
 	char *featureConfigPath;
 	char *featureRootFolderPath;
-	char featureErrorText[256];
+	char featureConfigErrorText[256];
+	
+	bool isFromSettings;
 };
 
 #endif

@@ -209,7 +209,7 @@ void CGuiMain::DebugPrintViews()
 //	LOGD("--------------------------------------------");
 }
 
-#define LAYOUT_VERSION 1
+#define LAYOUT_VERSION 2
 
 //
 void CGuiMain::SerializeLayout(CLayoutData *layout)
@@ -225,10 +225,10 @@ void CGuiMain::SerializeLayout(CLayoutData *layout)
 	// put imgui ini
 	size_t len = 0;
 	const char *data = ImGui::SaveIniSettingsToMemory(&len);
-	byteBuffer->PutU32(len+1);
-	byteBuffer->PutBytes((u8*)data, len+1);
+	byteBuffer->PutU32((unsigned int)len+1);
+	byteBuffer->PutBytes((u8*)data, (unsigned int)len+1);
 	
-	byteBuffer->PutU32(layoutViews.size());
+	byteBuffer->PutU32((unsigned int)layoutViews.size());
 	
 	CByteBuffer *viewByteBuffer = new CByteBuffer();
 	for (std::map<u64, CGuiView *>::iterator it = layoutViews.begin(); it != layoutViews.end(); it++)
@@ -260,19 +260,12 @@ bool CGuiMain::DeserializeLayout(CLayoutData *layout)
 	
 	version = byteBuffer->GetU32();
 //	LOGD("read %d", version);
-	if (version != LAYOUT_VERSION)
-	{
-		// we have old version, so this u32 means length
-		len = version;
-//		LOGD("len=%d", len);
-		version = 0;
-	}
-	else
-	{
-		len = byteBuffer->GetU32();
-	}
+	len = byteBuffer->GetU32();
 	
 	LOGD("CGuiMain::DeserializeLayout: version=%d", version);
+	
+	if (version > LAYOUT_VERSION)
+		return false;
 	
 	u8 *data = byteBuffer->GetBytes(len);
 
@@ -350,7 +343,7 @@ void CGuiMain::SetFocus(CGuiView *view)
 
 	if (!view->imGuiWindow)
 	{
-		LOGError("CGuiMain::SetFocus: %s has no imGuiWindow", view->name ? view->name : "NULL");
+		LOGWarning("CGuiMain::SetFocus: %s has no imGuiWindow", view->name ? view->name : "NULL");
 		return;
 	}
 
@@ -362,7 +355,7 @@ void CGuiMain::SetFocus(CGuiView *view)
 
 void CGuiMain::SetInternalViewFocus(CGuiView *viewToFocus)
 {
-//	LOGG("CGuiMain::SetViewFocus: %s", viewToFocus->name);
+	LOGG("CGuiMain::SetInternalViewFocus: %s", viewToFocus ? viewToFocus->name : "NULL");
 	if (this->focusedView != viewToFocus)
 	{
 //		skip check, ImGui controls is view is focusable. if (viewToFocus->IsFocusableElement())
@@ -373,16 +366,20 @@ void CGuiMain::SetInternalViewFocus(CGuiView *viewToFocus)
 //				LOGG("... SetFocus: %s", viewToFocus->name);
 				if (viewToFocus->WillReceiveFocus())
 				{
-//					LOGG("... focusElement: %s", viewToFocus->name);
+					LOGG("... focusElement: %s", viewToFocus->name);
 					this->focusedView = viewToFocus;
 				}
 			}
 		}
 	}
+	
+	focusedViewThisFrameOnly = viewToFocus;
 }
 
+// clear focus, returns true when current focused view allows that
 bool CGuiMain::ClearInternalViewFocus()
 {
+	LOGG("CGuiMain::ClearInternalViewFocus");
 	if (focusedView != NULL)
 	{
 		if (focusedView->WillClearFocus())
@@ -397,7 +394,7 @@ bool CGuiMain::ClearInternalViewFocus()
 
 void CGuiMain::AddKeyboardShortcut(CSlrKeyboardShortcut *keyboardShortcut)
 {
-	LOGD("CGuiMain::AddKeyboardShortcut: name=%s %s", keyboardShortcut->name, keyboardShortcut->cstr);
+	LOGG("CGuiMain::AddKeyboardShortcut: name=%s %s zone=%d", keyboardShortcut->name, keyboardShortcut->cstr, keyboardShortcut->zone);
 	this->keyboardShortcuts->AddShortcut(keyboardShortcut);
 }
 
@@ -1042,15 +1039,23 @@ bool CGuiMain::DoFinishTap(float x, float y)
 			continue;
 
 		CGuiView *view = (CGuiView*)window->userData;
-//		LOGI("...view=%s visible=%s", view ? view->name : "NULL", view ? STRBOOL(view->IsVisible()) : "");
+		LOGI("...view=%s visible=%s", view ? view->name : "NULL", view ? STRBOOL(view->IsVisible()) : "");
 		
 		if (view != NULL && view->IsVisible())
 		{
-//			LOGI("...DoFinishTap");
-			if (view->DoFinishTap(x, y))
+			LOGI("....view=%s IsInside?", view->name);
+			if (view->IsInsideView(x, y))
 			{
-//				LOGI("...iterate view DoFinishTap consumed");
-				return true;
+				LOGI("....... IsInsideView, DoFinishTap(): %s", view->name);
+				if (view->DoFinishTap(x, y))
+				{
+					LOGI("......... view %s consumed tap", view->name);
+					return true;
+				}
+			}
+			else
+			{
+				LOGI("....view=%s not IsInsideView");
 			}
 		}
 	}
@@ -1565,6 +1570,13 @@ void CGuiMain::ShowNotification(const char *title, const char *message)
 	notificationMutex->Unlock();
 }
 
+void CGuiMain::ShowNotificationError(const char *title, const char *message)
+{
+	notificationMutex->Lock();
+	ImGui::InsertNotification({ ImGuiToastType_Error, title, 3000, message });
+	notificationMutex->Unlock();
+}
+
 void CGuiMain::ShowNotification(ImGuiToastType_ toastType, int dismissTime, const char *title, const char *message)
 {
 	notificationMutex->Lock();
@@ -1574,8 +1586,10 @@ void CGuiMain::ShowNotification(ImGuiToastType_ toastType, int dismissTime, cons
 
 void CGuiMain::RenderImGui()
 {
+	focusedViewThisFrameOnly = NULL;
+	
 	ImGuiIO& io = ImGui::GetIO();
-	ImGuiContext *context = ImGui::GetCurrentContext();
+//	ImGuiContext *context = ImGui::GetCurrentContext();
 	
 //	LOGD("mousePoxX=%f mousePosY=%f", mousePosX, mousePosY);
 //	LOGD("	io.WantCaptureMouse=%s 	io.WantCaptureKeyboard=%s  io.WantTextInput=%s  io.context.OpenPopupStack.Size=%d",
@@ -1622,12 +1636,18 @@ void CGuiMain::RenderImGui()
 	}
 	if (messageBoxTitle)
 	{
-		// Always center this window when appearing
-		ImGuiPlatformIO platformIO = ImGui::GetPlatformIO();
-		ImVec2 center = platformIO.Monitors[0].MainSize;
-		center.x = center.x * 0.5f;
-		center.y = center.y * 0.5f;
+		// Center this window inside the main application window (not the monitor)
+		ImGuiViewport* viewport = ImGui::GetMainViewport(); // or GetWindowViewport() if called inside another window
+
+		// Use WorkPos/WorkSize so the centering ignores menu bars and dockspace toolbars
+		ImVec2 center(viewport->WorkPos.x + viewport->WorkSize.x * 0.5f,
+					  viewport->WorkPos.y + viewport->WorkSize.y * 0.5f);
+
+		// Ensure the window spawns on the intended viewport and is centered there
+		ImGui::SetNextWindowViewport(viewport->ID);
 		ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+
+		// Keep your min size (optional)
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, ImVec2(200, 75));
 			
 		bool popen = true;
@@ -1650,6 +1670,14 @@ void CGuiMain::RenderImGui()
 		}
 		ImGui::PopStyleVar();
 	}
+	
+	if (focusedViewThisFrameOnly == NULL)
+	{
+		ClearInternalViewFocus();
+//		LOGD("focusedViewThisFrameOnly=%x focusedView=%x", focusedViewThisFrameOnly, focusedView);
+	}
+	
+	LOGG("Render: focusedView=%x focusedViewThisFrameOnly=%x", focusedView, focusedViewThisFrameOnly);
 }
 
 void CGuiMain::UpdateLayouts()
@@ -1662,7 +1690,7 @@ void CGuiMain::UpdateLayouts()
 	
 	if (layoutStoreCurrentInSettings)
 	{
-		LOGD("layoutStoreCurrentInSettings: store layout now");
+		LOGG("layoutStoreCurrentInSettings: store layout now");
 		// store previous layout
 		if (layoutManager->currentLayout != NULL
 			&& layoutManager->currentLayout->doNotUpdateViewsPositions == false)
@@ -1679,13 +1707,13 @@ void CGuiMain::UpdateLayouts()
 	{
 		if (layoutStoreOrRestore == LayoutStorageTask::StoreLayout)
 		{
-			LOGD("CGuiMain::RenderImGui: LayoutStorageTask::StoreLayout");
+			LOGG("CGuiMain::RenderImGui: LayoutStorageTask::StoreLayout");
 			this->SerializeLayout(layoutForThisFrame);
 			layoutForThisFrame = NULL;
 		}
 		else if (layoutStoreOrRestore == LayoutStorageTask::RestoreLayout)
 		{
-			LOGD("CGuiMain::RenderImGui: LayoutStorageTask::RestoreLayout");
+			LOGG("CGuiMain::RenderImGui: LayoutStorageTask::RestoreLayout");
 			// store previous layout
 			if (layoutManager->currentLayout != NULL
 				&& layoutManager->currentLayout->doNotUpdateViewsPositions == false)
@@ -2005,7 +2033,7 @@ void CUiThreadTaskCallback::RunUIThreadTask()
 
 void CUiThreadTaskSetView::RunUIThreadTask()
 {
-	LOGD("CUiThreadTaskSetView::RunUIThreadTask");
+	LOGG("CUiThreadTaskSetView::RunUIThreadTask");
 	
 	// TODO: FIX ME  guiMain->SetViewAsync(this->view);
 }

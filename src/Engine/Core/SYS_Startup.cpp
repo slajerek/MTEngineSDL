@@ -104,6 +104,8 @@ void SYS_MTEngineStartup()
 	VID_RenderLoop();
 
 	// shutdown
+//	MT_Shutdown();
+
 	ImGuiContext& g = *GImGui;
 	if (guiMain->IsViewFullScreen() == false && 
 		guiMain->layoutManager->currentLayout)

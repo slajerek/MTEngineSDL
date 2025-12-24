@@ -11,7 +11,7 @@ CSlrFile::CSlrFile()
 
 void CSlrFile::OpenSlrStr(CSlrString *str)
 {
-	char *path = str->GetStdASCII();
+	char *path = str->GetUTF8();
 	
 	this->Open(path);
 	

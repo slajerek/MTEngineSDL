@@ -245,8 +245,47 @@ nfdresult_t NFD_SaveDialog( const nfdchar_t *filterList,
     return nfdResult;
 }
 
-nfdresult_t NFD_PickFolder(const nfdchar_t *defaultPath,
-    nfdchar_t **outPath)
+void NFD_PickFolder_Async(const nfdchar_t *defaultPath,
+						   void (^completionHandler)(nfdresult_t result, nfdchar_t *outPath))
+{
+	dispatch_async(dispatch_get_main_queue(), ^{
+		NSWindow *mainWindow = [[NSApplication sharedApplication] keyWindow];
+		NSOpenPanel *dialog = [NSOpenPanel openPanel];
+		[dialog setAllowsMultipleSelection:NO];
+		[dialog setCanChooseDirectories:YES];
+		[dialog setCanCreateDirectories:YES];
+		[dialog setCanChooseFiles:NO];
+
+		SetDefaultPath(dialog, defaultPath);
+
+		[dialog beginSheetModalForWindow:mainWindow completionHandler:^(NSModalResponse result) {
+			if (result == NSModalResponseOK)
+			{
+				NSURL *url = [dialog URL];
+				const char *utf8Path = [[url path] UTF8String];
+				size_t len = strlen(utf8Path);
+
+				nfdchar_t *allocatedPath = NFDi_Malloc(len + 1);
+				if (!allocatedPath)
+				{
+					completionHandler(NFD_ERROR, NULL);
+					return;
+				}
+
+				memcpy(allocatedPath, utf8Path, len + 1);
+				completionHandler(NFD_OKAY, allocatedPath);
+			}
+			else
+			{
+				completionHandler(NFD_CANCEL, NULL);
+			}
+		}];
+
+		[NSApp activateIgnoringOtherApps:YES];
+	});
+}
+
+nfdresult_t NFD_PickFolder(const nfdchar_t *defaultPath, nfdchar_t **outPath)
 {
 //    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
 
@@ -276,7 +315,7 @@ nfdresult_t NFD_PickFolder(const nfdchar_t *defaultPath,
             [keyWindow makeKeyAndOrderFront:nil];
             return NFD_ERROR;
         }
-        memcpy( *outPath, utf8Path, len+1 ); /* copy null term */
+        memcpy( *outPath, utf8Path, len+1 ); // copy null term
         nfdResult = NFD_OKAY;
     }
 //    [pool release];
@@ -284,3 +323,4 @@ nfdresult_t NFD_PickFolder(const nfdchar_t *defaultPath,
     [keyWindow makeKeyAndOrderFront:nil];
     return nfdResult;
 }
+

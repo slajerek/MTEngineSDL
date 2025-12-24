@@ -15,11 +15,10 @@
 
 #define NET_CLIENT_STATUS_SHUTDOWN		0
 #define NET_CLIENT_STATUS_OFFLINE		1
-#define NET_CLIENT_STATUS_DISCONNECTED	2
-#define NET_CLIENT_STATUS_DISCONNECT	3
-#define NET_CLIENT_STATUS_CONNECTING	4
-#define NET_CLIENT_STATUS_CONNECTED		5
-#define NET_CLIENT_STATUS_ONLINE		6
+#define NET_CLIENT_STATUS_RECONNECT		2
+#define NET_CLIENT_STATUS_CONNECTING	3
+#define NET_CLIENT_STATUS_CONNECTED		4
+#define NET_CLIENT_STATUS_ONLINE		5
 
 class CNetConnection;
 class CNetServer;
@@ -33,6 +32,7 @@ class CNetClientCallback
 public:
 	virtual ~CNetClientCallback();
 	virtual void NetClientCallbackConnected(CNetClient *netClient);
+	virtual void NetClientCallbackNotAuthorized(CNetClient *netClient);
 	virtual void NetClientProcessPacket(CNetPacket *packet);
 	virtual void NetClientLogic(CNetClient *netClient);
 };
@@ -40,9 +40,9 @@ public:
 class CNetClient : public CSlrThread
 {
 public:
-	CNetClient(const char *serverConnectAddress, int serverConnectPort, u64 serverId, const char *clientLoginName, u8 *passwordHash, u32 passwordHashLen);
-	CNetClient(CNetClientCallback *clientCallback, CNetPacketCallback *packetCallback, const char *serverConnectAddress, int serverConntectPort, u64 serverId, const char *clientLoginName, u8 *passwordHash, u32 passwordHashLen);
-	void Init(CNetClientCallback *clientCallback, CNetPacketCallback *packetCallback, const char *serverConnectAddress, int serverConntectPort, u64 serverId, const char *clientLoginName, u8 *passwordHash, u32 passwordHashLen);
+	CNetClient(const char *serverConnectAddress, int serverConnectPort, u64 serverId, std::string clientLoginName, std::vector<u8> passwordHash);
+	CNetClient(CNetClientCallback *clientCallback, CNetPacketCallback *packetCallback, const char *serverConnectAddress, int serverConntectPort, u64 serverId, std::string clientLoginName, std::vector<u8> passwordHash);
+	void Init(CNetClientCallback *clientCallback, CNetPacketCallback *packetCallback, const char *serverConnectAddress, int serverConntectPort, u64 serverId, std::string clientLoginName, std::vector<u8> passwordHash);
 
 	virtual ~CNetClient();
 	
@@ -52,9 +52,10 @@ public:
 	virtual void ThreadRun(void *data);
 
 	u64 serverId;
-	char *clientLoginName;
-	u8 *passwordHash;
-	u16 passwordHashLen;
+	std::string clientLoginName;
+	std::vector<u8> passwordHash;
+	
+	void SetClientLoginDetails(std::string clientLoginName, std::vector<u8> passwordHash);
 
 	bool Receive(u32 frameNum);
 	void Send(u32 frameNum);
@@ -90,6 +91,7 @@ public:
 	void UnlockMutex();
 	
 	bool IsOnline();
+	void SetStatusDisconnectAndReconnect();
 	void Disconnect();
 	
 	const char *GetStatusName();

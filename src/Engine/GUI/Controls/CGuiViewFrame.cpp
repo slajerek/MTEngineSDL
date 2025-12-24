@@ -33,7 +33,7 @@ void CGuiViewFrame::Initialize(CGuiView *view, CSlrString *barTitle, u32 mode)
 	{
 		// debug set name
 		char *buf = SYS_GetCharBuf();
-		char *t = barTitle->GetStdASCII();
+		char *t = barTitle->GetUTF8();
 		sprintf(buf, "CGuiViewFrame (%s)", t);
 		this->name = STRALLOC(buf);
 		SYS_ReleaseCharBuf(buf);

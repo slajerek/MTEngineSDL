@@ -6,9 +6,17 @@
 #include <string>
 #include <sstream>
 
-CConfigStorageHjson::CConfigStorageHjson(const char *configFileName)
+CConfigStorageHjson::CConfigStorageHjson(const char *configFileName, bool isFromSettings)
 {
-	this->configFileName = new CSlrString(configFileName);	
+	this->isFromSettings = isFromSettings;
+	this->configFileName = new CSlrString(configFileName);
+	ReadConfig();
+}
+
+CConfigStorageHjson::CConfigStorageHjson(std::string configFilePath, bool isFromSettings)
+{
+	this->isFromSettings = isFromSettings;
+	this->configFileName = new CSlrString(configFilePath);
 	ReadConfig();
 }
 
@@ -16,14 +24,24 @@ CConfigStorageHjson::~CConfigStorageHjson()
 {
 	delete configFileName;
 }
-	
 
 void CConfigStorageHjson::ReadConfig()
 {
 	hjsonRoot.clear();
 
-	CByteBuffer *byteBuffer = new CByteBuffer();
-	bool available = byteBuffer->loadFromSettings(configFileName);
+	CByteBuffer *byteBuffer = NULL;
+	bool available = false;
+	
+	if (isFromSettings)
+	{
+		byteBuffer = new CByteBuffer();
+		available = byteBuffer->loadFromSettings(configFileName);
+	}
+	else
+	{
+		byteBuffer = new CByteBuffer(configFileName);
+		available = byteBuffer->data == NULL ? false : true;
+	}
 
 	if (available)
 	{
@@ -304,7 +322,7 @@ void CConfigStorageHjson::SetSlrString(const char *name, CSlrString **value)
 //	LOGD("CConfigStorageHjson::SetSlrString: name=%s", name);
 //	(*value)->DebugPrint("value=");
 	
-	char *str = (*value)->GetStdASCII();
+	char *str = (*value)->GetUTF8();
 	hjsonRoot[name] = str;
 	delete [] str;
 	SaveConfig();
