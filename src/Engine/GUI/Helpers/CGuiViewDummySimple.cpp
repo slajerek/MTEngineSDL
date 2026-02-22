@@ -1,8 +1,8 @@
 #include "CGuiViewDummySimple.h"
 #include "CGuiMain.h"
 
-CGuiViewDummySimple::CGuiViewDummySimple(const char *name, float posX, float posY, float posZ, float sizeX, float sizeY)
-: CGuiView(name, posX, posY, posZ, sizeX, sizeY)
+CGuiViewDummySimple::CGuiViewDummySimple(const char *name, float posX, float posY, float sizeX, float sizeY)
+: CGuiView(name, posX, posY, sizeX, sizeY)
 {
 //	imGuiNoWindowPadding = true;
 //	imGuiNoScrollbar = true;

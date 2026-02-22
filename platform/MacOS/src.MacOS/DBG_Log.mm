@@ -83,8 +83,26 @@ void LOG_Init(void)
 	time ( &rawtime );
 	timeinfo = localtime ( &rawtime );
 
+    // Check for --log-dir command-line option (parsed early via NSProcessInfo
+    // so it works before MT_PostInit command-line parsing)
+    NSString *logDir = nil;
+    NSArray *args = [[NSProcessInfo processInfo] arguments];
+    for (NSUInteger i = 0; i < [args count]; i++)
+    {
+        if ([[args objectAtIndex:i] isEqualToString:@"--log-dir"] && i + 1 < [args count])
+        {
+            logDir = [args objectAtIndex:i + 1];
+            break;
+        }
+    }
+
+    if (logDir == nil)
+    {
+        logDir = [NSSearchPathForDirectoriesInDomains(NSDesktopDirectory, NSUserDomainMask, YES) objectAtIndex:0];
+    }
+
     NSString *path = [NSString stringWithFormat:@"%@/MTEngineSDL-%02d%02d%02d-%02d%02d.txt",
-                      [NSSearchPathForDirectoriesInDomains(NSDesktopDirectory, NSUserDomainMask, YES) objectAtIndex:0],
+                      logDir,
                       (timeinfo->tm_year-100), (timeinfo->tm_mon+1), timeinfo->tm_mday, timeinfo->tm_hour, timeinfo->tm_min];
 
     NSLog(@"logger file path=%@", path);
@@ -295,7 +313,8 @@ int _LOGGER(unsigned int level, const char *fileName, unsigned int lineNum, cons
 	size_t l = strlen(buffer);
 	for (int i = 0; i < l; i++)
 	{
-		if (buffer[i] < 32 && buffer[i] != 0x0A && buffer[i] != 0x0D && buffer[i] != 0x09)
+		unsigned char c = (unsigned char)buffer[i];
+		if (c < 32 && c != 0x0A && c != 0x0D && c != 0x09)
 		{
 			buffer[i] = '?';
 		}
@@ -495,7 +514,7 @@ const char *getLevelStr(unsigned int level)
 	if (level == DBGLVL_ANIMATION)
 		return "[ANIM ]";
 	if (level == DBGLVL_SCRIPT)
-		return ">SCRPT<";
+		return "[TEST]";
 	if (level == DBGLVL_NET)
 		return "[NET ] ";
 	if (level == DBGLVL_NET_SERVER)

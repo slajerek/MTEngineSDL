@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string>
+#include <type_traits>
 
 #define GLOBAL_DEBUG_OFF
 
@@ -65,127 +66,77 @@ void LOG_Shutdown(void);
 
 #if !defined(GLOBAL_DEBUG_OFF)
 
-#define LOGAD LOGD
-#define LOGD2 LOGD
+#define IS_SET(flag, bit)       ((flag) & (bit))
+#define SET_BIT(var, bit)       ((var) |= (bit))
+#define REMOVE_BIT(var, bit)    ((var) &= ~(bit))
+#define TOGGLE_BIT(var, bit)    ((var) ^= (bit))
 
-#define LOGVV LOGD
-#define LOGVM LOGD
+#define LOGD(...) _LOGGER_S(DBGLVL_DEBUG, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOGVD(...) _LOGGER_S(DBGLVL_VICE_DEBUG, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOGD2(...) _LOGGER_S(DBGLVL_DEBUG2, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOGM(...) _LOGGER_S(DBGLVL_MAIN, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOGVM(...) _LOGGER_S(DBGLVL_VICE_MAIN, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOGVV(...) _LOGGER_S(DBGLVL_VICE_VERBOSE, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOGI(...) _LOGGER_S(DBGLVL_INPUT, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOGP(...) _LOGGER_S(DBGLVL_PLUGIN, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOGR(...) _LOGGER_S(DBGLVL_RES, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOGG(...) _LOGGER_S(DBGLVL_GUI, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOGF(...) _LOGGER_S(DBGLVL_PAINT, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOGH(...) _LOGGER_S(DBGLVL_HTTP, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOGDATA(...) _LOGGER_S(DBGLVL_TRANSACTION, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOGA(...) _LOGGER_S(DBGLVL_AUDIO, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOGAD(...) _LOGGER_S(DBGLVL_DEBUG, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOGL(...) _LOGGER_S(DBGLVL_LEVEL, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOGW(...) _LOGGER_S(DBGLVL_CONNECTION, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOGX(...) _LOGGER_S(DBGLVL_XMPLAYER, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOGN(...) _LOGGER_S(DBGLVL_ANIMATION, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOGS(...) _LOGGER_S(DBGLVL_SCRIPT, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOGC(...) _LOGGER_S(DBGLVL_NET, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOGCS(...) _LOGGER_S(DBGLVL_NET_SERVER, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOGCC(...) _LOGGER_S(DBGLVL_NET_CLIENT, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
 
-void _LOGF(int level, std::string *what);
+#define LOG_Atari_Main(...) _LOGGER_S(DBGLVL_ATARI_MAIN, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOG_Atari_Debug(...) _LOGGER_S(DBGLVL_ATARI_DEBUG, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+
+#define LOGMEM(...) _LOGGER_S(DBGLVL_MEMORY, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOGTODO(...) _LOGGER_S(DBGLVL_TODO, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOGWarning(...) _LOGGER_S(DBGLVL_WARN, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOGError(...) _LOGGER_S(DBGLVL_ERROR, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+
+#define LOGND(...) _LOGGER_S(DBGLVL_DEBUG, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOGNM(...) _LOGGER_S(DBGLVL_MAIN, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOGNP(...) _LOGGER_S(DBGLVL_PLUGIN, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOGNR(...) _LOGGER_S(DBGLVL_RES, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOGNG(...) _LOGGER_S(DBGLVL_GUI, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOGNF(...) _LOGGER_S(DBGLVL_PAINT, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOGNN(...) _LOGGER_S(DBGLVL_ANIMATION, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOGNH(...) _LOGGER_S(DBGLVL_HTTP, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOGNA(...) _LOGGER_S(DBGLVL_AUDIO, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOGNL(...) _LOGGER_S(DBGLVL_LEVEL, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOGNW(...) _LOGGER_S(DBGLVL_CONNECTION, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOGNS(...) _LOGGER_S(DBGLVL_SCRIPT, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOGNMEM(...) _LOGGER_S(DBGLVL_MEMORY, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOGNX(...) _LOGGER_S(DBGLVL_XMPLAYER, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOGNTODO(...) _LOGGER_S(DBGLVL_TODO, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOGNWarning(...) _LOGGER_S(DBGLVL_WARN, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOGNError(...) _LOGGER_S(DBGLVL_ERROR, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+
 void _LOGF(int level, char *fmt, ... );
 void _LOGF(int level, const char *fmt, ... );
 
-// 
-void LOGF(std::string *what);
-void LOGF(char *fmt, ... );
-void LOGF(const char *fmt, ... );
+int _LOGGER(unsigned int level, const char *fileName, unsigned int lineNum, const char *functionName, const char *format, ...);
 
-// GUI
-void LOGG(std::string *what);
-void LOGG(char *fmt, ... );
-void LOGG(const char *fmt, ... );
+inline const char* _logArg(const std::string& s) { return s.c_str(); }
+template<typename T>
+inline typename std::enable_if<!std::is_same<typename std::decay<T>::type, std::string>::value, T&&>::type
+_logArg(T&& arg) { return static_cast<T&&>(arg); }
 
-// DEBUG
-void LOGD(std::string *what);
-void LOGD(char *fmt, ... );
-void LOGD(const char *fmt, ... );
+template<typename... Args>
+inline int _LOGGER_S(unsigned int level, const char *fileName, unsigned int lineNum,
+                     const char *functionName, const char *format, Args&&... args) {
+    return _LOGGER(level, fileName, lineNum, functionName, format, _logArg(static_cast<Args&&>(args))...);
+}
 
-// PLUGIN
-void LOGP(std::string *what);
-void LOGP(char *fmt, ... );
-void LOGP(const char *fmt, ... );
-
-// DEBUG
-void LOGVD(std::string *what);
-void LOGVD(char *fmt, ... );
-void LOGVD(const char *fmt, ... );
-
-// XM PLAYER
-void LOGX(std::string *what);
-void LOGX(char *fmt, ... );
-void LOGX(const char *fmt, ... );
-
-// I
-void LOGI(std::string *what);
-void LOGI(char *fmt, ... );
-void LOGI(const char *fmt, ... );
-
-// AUDIO EFFECT
-void LOGA(std::string *what);
-void LOGA(char *fmt, ... );
-void LOGA(const char *fmt, ... );
-
-// CONNECTION
-void LOGC(std::string *what);
-void LOGC(char *fmt, ... );
-void LOGC(const char *fmt, ... );
-
-// CONNECTION-server
-void LOGCS(std::string *what);
-void LOGCS(char *fmt, ... );
-void LOGCS(const char *fmt, ... );
-
-// CONNECTION-client
-void LOGCC(std::string *what);
-void LOGCC(char *fmt, ... );
-void LOGCC(const char *fmt, ... );
-
-// MAIN
-void LOGS(std::string *what);
-void LOGS(char *fmt, ... );
-void LOGS(const char *fmt, ... );
-
-// MAIN
-void LOGM(std::string *what);
-void LOGM(char *fmt, ... );
-void LOGM(const char *fmt, ... );
-
-// MAIN
-void LOGMEM(std::string *what);
-void LOGMEM(char *fmt, ... );
-void LOGMEM(const char *fmt, ... );
-
-// LOGL
-void LOGL(std::string *what);
-void LOGL(char *fmt, ... );
-void LOGL(const char *fmt, ... );
-
-// ANIMATION
-void LOGN(std::string *what);
-void LOGN(char *fmt, ... );
-void LOGN(const char *fmt, ... );
-
-// RESOURCES
-void LOGR(std::string *what);
-void LOGR(char *fmt, ... );
-void LOGR(const char *fmt, ... );
-
-void LOG_Atari_Main(std::string *what);
-void LOG_Atari_Main(char *fmt, ... );
-void LOG_Atari_Main(const char *fmt, ... );
-
-void LOG_Atari_Debug(std::string *what);
-void LOG_Atari_Debug(char *fmt, ... );
-void LOG_Atari_Debug(const char *fmt, ... );
-
-
-// TODO
-void LOGTODO(std::string *what);
-void LOGTODO(char *fmt, ... );
-void LOGTODO(const char *fmt, ... );
-
-#define LOGWarning LOGError
-
-//void LOGWarning(std::string *what);
-//void LOGWarning(char *fmt, ... );
-//void LOGWarning(const char *fmt, ... );
-
-void LOGError(std::string *what);
-void LOGError(char *fmt, ... );
-void LOGError(const char *fmt, ... );
-
-void LOGT(unsigned char level, char *what);
-void LOGT(unsigned char level, const char *what);
 void SYS_Errorf(char *fmt, ...);
 void SYS_Errorf(const char *fmt, ...);
 
@@ -205,8 +156,10 @@ void DBG_LogTime();
 #define LOGG(...) ; 
 #define LOGF(...) ; 
 #define LOGH(...) ; 
-#define LOGA(...) ; 
-#define LOGN(...) ; 
+#define LOGA(...) ;
+#define LOGAD(...) ;
+#define LOGDATA(...) ;
+#define LOGN(...) ;
 #define LOGS(...) ;
 #define LOGC(...) ;
 #define LOGCS(...) ;

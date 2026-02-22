@@ -39,6 +39,7 @@ u64  VID_GetCurrentFrameNumber();
 unsigned long VID_GetTickCount();
 extern u64 gCurrentFrameTime;
 extern bool gViewportsEnableInitAtStartup;
+extern bool gHeadlessMode;
 
 enum ImGuiStyleType : int
 {

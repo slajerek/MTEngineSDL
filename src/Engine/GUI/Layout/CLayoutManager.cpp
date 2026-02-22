@@ -3,6 +3,7 @@
 #include "CByteBuffer.h"
 #include "CGuiMain.h"
 #include "CSlrKeyboardShortcuts.h"
+#include "VID_Main.h"
 
 CLayoutData::CLayoutData()
 {
@@ -193,6 +194,9 @@ CLayoutData *CLayoutManager::GetLayoutByName(const char *name)
 
 void CLayoutManager::StoreLayouts()
 {
+	if (gHeadlessMode)
+		return;
+
 	CByteBuffer *byteBuffer = new CByteBuffer();
 	
 	byteBuffer->PutU8('L');

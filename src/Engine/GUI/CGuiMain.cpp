@@ -11,12 +11,16 @@
 #include "CLayoutManager.h"
 #include "GAM_GamePads.h"
 #include "CSlrKeyboardShortcuts.h"
+#include "CGuiViewUiDebug.h"
+#include "CGuiViewDebugLog.h"
 #include "imgui_notify.h"
 
 #define CONSOLE_FONT_SIZE_X		0.03125
 #define CONSOLE_FONT_SIZE_Y		0.03125
 #define CONSOLE_FONT_PITCH_X	0.035156251
 #define CONSOLE_FONT_PITCH_Y	0.035156251
+
+#define CREATE_MTENGINESDL_DEBUG_VIEW
 
 CGuiMain::CGuiMain()
 {
@@ -132,6 +136,19 @@ CGuiMain::CGuiMain()
 	mouseScrollWheelScaleY = 5.0f;
 #else
 	mouseScrollWheelScaleY = 1.0f;
+#endif
+	
+#ifdef CREATE_MTENGINESDL_DEBUG_VIEW
+	// this is MTEngineSDL debug view that can be added by user via main menu, mainly to debug multiple monitor DPI-issues
+	viewUiDebug = new CGuiViewUiDebug(100, 100, -1, 500, 300);
+	viewUiDebug->visible = false;
+#else
+	viewUiDebug = NULL;
+#endif
+	
+	// this is MTEngineSDL debug log
+#if !defined(GLOBAL_DEBUG_OFF)
+	AddView(guiViewDebugLog);
 #endif
 	
 	layoutManager->LoadLayouts();

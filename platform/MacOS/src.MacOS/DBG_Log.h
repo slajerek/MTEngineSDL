@@ -25,6 +25,11 @@
 #ifndef __DBG_LOGF_H__
 #define __DBG_LOGF_H__
 
+#ifdef __cplusplus
+#include <string>
+#include <type_traits>
+#endif
+
 #define GLOBAL_DEBUG_OFF
 
 #define DBGLVL_DEBUG		(1 << 0)
@@ -76,62 +81,77 @@ void LOG_Shutdown(void);
 #define REMOVE_BIT(var, bit)    ((var) &= ~(bit))
 #define TOGGLE_BIT(var, bit)    ((var) ^= (bit))
 
-#define LOGD(...) _LOGGER(DBGLVL_DEBUG, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-#define LOGVD(...) _LOGGER(DBGLVL_VICE_DEBUG, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-#define LOGD2(...) _LOGGER(DBGLVL_DEBUG2, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-#define LOGM(...) _LOGGER(DBGLVL_MAIN, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-#define LOGVM(...) _LOGGER(DBGLVL_VICE_MAIN, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-#define LOGVV(...) _LOGGER(DBGLVL_VICE_VERBOSE, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-#define LOGI(...) _LOGGER(DBGLVL_INPUT, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-#define LOGP(...) _LOGGER(DBGLVL_PLUGIN, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-#define LOGR(...) _LOGGER(DBGLVL_RES, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-#define LOGG(...) _LOGGER(DBGLVL_GUI, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-#define LOGF(...) _LOGGER(DBGLVL_PAINT, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-#define LOGH(...) _LOGGER(DBGLVL_HTTP, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-#define LOGDATA(...) _LOGGER(DBGLVL_DATA, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-#define LOGA(...) _LOGGER(DBGLVL_AUDIO, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-#define LOGAD(...) _LOGGER(DBGLVL_ADS, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-#define LOGL(...) _LOGGER(DBGLVL_LEVEL, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-#define LOGW(...) _LOGGER(DBGLVL_WEBSERVICE, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-#define LOGX(...) _LOGGER(DBGLVL_XMPLAYER, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-#define LOGN(...) _LOGGER(DBGLVL_ANIMATION, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-#define LOGS(...) _LOGGER(DBGLVL_SCRIPT, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-#define LOGC(...) _LOGGER(DBGLVL_NET, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-#define LOGCS(...) _LOGGER(DBGLVL_NET_SERVER, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-#define LOGCC(...) _LOGGER(DBGLVL_NET_CLIENT, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOGD(...) _LOGGER_S(DBGLVL_DEBUG, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOGVD(...) _LOGGER_S(DBGLVL_VICE_DEBUG, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOGD2(...) _LOGGER_S(DBGLVL_DEBUG2, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOGM(...) _LOGGER_S(DBGLVL_MAIN, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOGVM(...) _LOGGER_S(DBGLVL_VICE_MAIN, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOGVV(...) _LOGGER_S(DBGLVL_VICE_VERBOSE, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOGI(...) _LOGGER_S(DBGLVL_INPUT, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOGP(...) _LOGGER_S(DBGLVL_PLUGIN, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOGR(...) _LOGGER_S(DBGLVL_RES, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOGG(...) _LOGGER_S(DBGLVL_GUI, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOGF(...) _LOGGER_S(DBGLVL_PAINT, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOGH(...) _LOGGER_S(DBGLVL_HTTP, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOGDATA(...) _LOGGER_S(DBGLVL_DATA, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOGA(...) _LOGGER_S(DBGLVL_AUDIO, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOGAD(...) _LOGGER_S(DBGLVL_ADS, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOGL(...) _LOGGER_S(DBGLVL_LEVEL, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOGW(...) _LOGGER_S(DBGLVL_WEBSERVICE, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOGX(...) _LOGGER_S(DBGLVL_XMPLAYER, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOGN(...) _LOGGER_S(DBGLVL_ANIMATION, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOGS(...) _LOGGER_S(DBGLVL_SCRIPT, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOGC(...) _LOGGER_S(DBGLVL_NET, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOGCS(...) _LOGGER_S(DBGLVL_NET_SERVER, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOGCC(...) _LOGGER_S(DBGLVL_NET_CLIENT, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
 
-#define LOG_Atari_Main(...) _LOGGER(DBGLVL_ATARI_MAIN, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-#define LOG_Atari_Debug(...) _LOGGER(DBGLVL_ATARI_DEBUG, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOG_Atari_Main(...) _LOGGER_S(DBGLVL_ATARI_MAIN, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOG_Atari_Debug(...) _LOGGER_S(DBGLVL_ATARI_DEBUG, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
 
 
-#define LOGMEM(...) _LOGGER(DBGLVL_MEMORY, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-#define LOGTODO(...) _LOGGER(DBGLVL_TODO, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-//#define LOGERROR(...) _LOGGER(DBGLVL_ERROR, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-#define LOGWarning(...) _LOGGER(DBGLVL_WARN, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-#define LOGError(...) _LOGGER(DBGLVL_ERROR, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOGMEM(...) _LOGGER_S(DBGLVL_MEMORY, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOGTODO(...) _LOGGER_S(DBGLVL_TODO, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+//#define LOGERROR(...) _LOGGER_S(DBGLVL_ERROR, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOGWarning(...) _LOGGER_S(DBGLVL_WARN, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOGError(...) _LOGGER_S(DBGLVL_ERROR, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
 
-#define LOGND(...) _LOGGER(DBGLVL_DEBUG, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-#define LOGNM(...) _LOGGER(DBGLVL_MAIN, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-#define LOGNP(...) _LOGGER(DBGLVL_PLUGIN, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-#define LOGNR(...) _LOGGER(DBGLVL_RES, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-#define LOGNG(...) _LOGGER(DBGLVL_GUI, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-#define LOGNF(...) _LOGGER(DBGLVL_PAINT, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-#define LOGNN(...) _LOGGER(DBGLVL_ANIMATION, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-#define LOGNH(...) _LOGGER(DBGLVL_HTTP, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-#define LOGNA(...) _LOGGER(DBGLVL_AUDIO, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-#define LOGNL(...) _LOGGER(DBGLVL_LEVEL, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-#define LOGNW(...) _LOGGER(DBGLVL_WEBSERVICE, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-#define LOGNN(...) _LOGGER(DBGLVL_ANIMATION, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-#define LOGNS(...) _LOGGER(DBGLVL_SCRIPT, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-#define LOGNMEM(...) _LOGGER(DBGLVL_MEMORY, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-#define LOGNX(...) _LOGGER(DBGLVL_XMPLAYER, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOGND(...) _LOGGER_S(DBGLVL_DEBUG, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOGNM(...) _LOGGER_S(DBGLVL_MAIN, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOGNP(...) _LOGGER_S(DBGLVL_PLUGIN, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOGNR(...) _LOGGER_S(DBGLVL_RES, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOGNG(...) _LOGGER_S(DBGLVL_GUI, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOGNF(...) _LOGGER_S(DBGLVL_PAINT, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOGNN(...) _LOGGER_S(DBGLVL_ANIMATION, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOGNH(...) _LOGGER_S(DBGLVL_HTTP, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOGNA(...) _LOGGER_S(DBGLVL_AUDIO, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOGNL(...) _LOGGER_S(DBGLVL_LEVEL, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOGNW(...) _LOGGER_S(DBGLVL_WEBSERVICE, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOGNN(...) _LOGGER_S(DBGLVL_ANIMATION, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOGNS(...) _LOGGER_S(DBGLVL_SCRIPT, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOGNMEM(...) _LOGGER_S(DBGLVL_MEMORY, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOGNX(...) _LOGGER_S(DBGLVL_XMPLAYER, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
 
-#define LOGNTODO(...) _LOGGER(DBGLVL_TODO, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-//#define LOGNERROR(...) _LOGGER(DBGLVL_ERROR, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-#define LOGNWarning(...) _LOGGER(DBGLVL_WARN, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
-#define LOGNError(...) _LOGGER(DBGLVL_ERROR, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOGNTODO(...) _LOGGER_S(DBGLVL_TODO, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+//#define LOGNERROR(...) _LOGGER_S(DBGLVL_ERROR, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOGNWarning(...) _LOGGER_S(DBGLVL_WARN, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOGNError(...) _LOGGER_S(DBGLVL_ERROR, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
 
 int _LOGGER(unsigned int level, const char *fileName, unsigned int lineNum, const char *functionName, const char *format, ...);
+
+#ifdef __cplusplus
+inline const char* _logArg(const std::string& s) { return s.c_str(); }
+template<typename T>
+inline typename std::enable_if<!std::is_same<typename std::decay<T>::type, std::string>::value, T&&>::type
+_logArg(T&& arg) { return static_cast<T&&>(arg); }
+
+template<typename... Args>
+inline int _LOGGER_S(unsigned int level, const char *fileName, unsigned int lineNum,
+                     const char *functionName, const char *format, Args&&... args) {
+    return _LOGGER(level, fileName, lineNum, functionName, format, _logArg(static_cast<Args&&>(args))...);
+}
+#else
+#define _LOGGER_S _LOGGER
+#endif
 
 #else
 

@@ -3,6 +3,7 @@
 
 void SYS_PlatformInit();
 void SYS_PlatformShutdown();
+void SYS_PlatformSleep(unsigned long milliseconds);
 void SYS_AttachConsole();
 
 void PLATFORM_SetThreadName(const char *name);

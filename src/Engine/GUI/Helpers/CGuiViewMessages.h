@@ -2,6 +2,8 @@
 #define _CGuiViewMessages_h_
 
 #include "CGuiView.h"
+#include <string>
+#include <type_traits>
 
 class CSlrMutex;
 
@@ -52,9 +54,23 @@ public:
 	bool                AutoScroll;  // Keep scrolling if already at the bottom.
 	
 	void Clear();
-	void AddLog(const char* fmt, ...) IM_FMTARGS(2);
+
+	// AddLog supports both C strings and std::string arguments with %s
+	template<typename... Args>
+	void AddLog(const char* fmt, Args&&... args)
+	{
+		_AddLogImpl(fmt, _addLogArg(static_cast<Args&&>(args))...);
+	}
 
 	CSlrMutex *mutex;
+
+private:
+	void _AddLogImpl(const char* fmt, ...) IM_FMTARGS(2);
+
+	static inline const char* _addLogArg(const std::string& s) { return s.c_str(); }
+	template<typename T>
+	static inline typename std::enable_if<!std::is_same<typename std::decay<T>::type, std::string>::value, T&&>::type
+	_addLogArg(T&& arg) { return static_cast<T&&>(arg); }
 };
 
 #endif //_VIEW_C64GOATTRACKER_

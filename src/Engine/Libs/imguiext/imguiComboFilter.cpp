@@ -258,7 +258,7 @@ bool ImGui::ComboFilter(const char *label, char *buffer, int bufferlen, const ch
 	
 	bool arrowScroll = false;
 	
-	if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_UpArrow)))
+	if (ImGui::IsKeyPressed(ImGuiKey_UpArrow))
 	{
 		if (s.activeIdx > 0)
 		{
@@ -267,7 +267,7 @@ bool ImGui::ComboFilter(const char *label, char *buffer, int bufferlen, const ch
 			ImGui::SetWindowFocus();
 		}
 	}
-	if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_DownArrow)))
+	if (ImGui::IsKeyPressed(ImGuiKey_DownArrow))
 	{
 		if (s.activeIdx < num_hints-1)
 		{
@@ -315,9 +315,10 @@ bool ImGui::ComboFilter(const char *label, char *buffer, int bufferlen, const ch
 		const ImGuiID id = window->GetID("##inputText");
 		ImGuiInputTextState* state = GetInputTextState(id);
 		
-		const char* buf_end = NULL;
-		state->CurLenW = ImTextStrFromUtf8(state->TextW.Data, state->TextW.Size, buffer, NULL, &buf_end);
-		state->CurLenA = (int)(buf_end - buffer);
+		int len = (int)strlen(buffer);
+		state->TextA.resize(len + 1);
+		memcpy(state->TextA.Data, buffer, len + 1);
+		state->TextLen = len;
 		state->CursorClamp();
 	}
 

@@ -1342,6 +1342,23 @@ std::vector<std::string> SYS_Win32GetAvailableDrivesPaths()
 	return drives;
 }
 
+std::string SYS_GetRelativePath(const char* pathToFolder, const char* pathToFile)
+{
+	fs::path base = fs::absolute(pathToFolder);
+	fs::path target = fs::absolute(pathToFile);
+
+	return fs::relative(target, base).generic_string();
+}
+
+std::string SYS_GetAbsolutePath(const char* pathToFolder, const char* relativePath)
+{
+	fs::path base = fs::absolute(pathToFolder);
+	fs::path relative = relativePath;
+
+	fs::path fullPath = fs::absolute(base / relative);
+	return fullPath.generic_string();
+}
+
 void SYS_OpenURLInBrowser(const char *url)
 {
 	// The function opens the document or file specified by lpFile in the application specified by lpOperation

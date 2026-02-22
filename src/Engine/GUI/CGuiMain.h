@@ -13,6 +13,8 @@ class CGlobalDropFileCallback;
 class CSlrKeyboardShortcut;
 class CSlrKeyboardShortcuts;
 
+class CGuiViewUiDebug;
+
 class CLayoutManager;
 class CLayoutData;
 
@@ -299,6 +301,9 @@ public:
 	void LockMutex();
 	bool TryLockMutex();
 	void UnlockMutex();
+	
+	// MTEngineSDL debug view
+	CGuiViewUiDebug *viewUiDebug;
 	
 private:
 	CSlrMutex *renderMutex;

@@ -747,6 +747,15 @@
     <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewDummy.cpp">
       <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewDummySimple.cpp">
+      <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewTableItem.cpp">
+      <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewTableWithFilterAndButtons.cpp">
+      <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\GUI_Debug.cpp">
       <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
     </ClCompile>
@@ -1165,6 +1174,12 @@
       <Filter>Source Files\src\Engine\Core\Render</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\Core\Render\CRenderShaderOpenGL4ShaderToy.cpp">
+      <Filter>Source Files\src\Engine\Core\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\Render\CRenderShaderMaskedTile.cpp">
+      <Filter>Source Files\src\Engine\Core\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\Render\CRenderShaderMaskedTileQueued.cpp">
       <Filter>Source Files\src\Engine\Core\Render</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\Core\Render\CRenderBackendOpenGL4.cpp">
@@ -1614,6 +1629,15 @@
       <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewDummy.h">
+      <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewDummySimple.h">
+      <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewTableItem.h">
+      <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewTableWithFilterAndButtons.h">
       <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\GUI_Debug.h">
@@ -2169,6 +2193,12 @@
       <Filter>Source Files\src\Engine\Core\Render</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\Core\Render\CRenderShaderOpenGL4ShaderToy.h">
+      <Filter>Source Files\src\Engine\Core\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\Render\CRenderShaderMaskedTile.h">
+      <Filter>Source Files\src\Engine\Core\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\Render\CRenderShaderMaskedTileQueued.h">
       <Filter>Source Files\src\Engine\Core\Render</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\Core\Render\CRenderBackendOpenGL4.h">

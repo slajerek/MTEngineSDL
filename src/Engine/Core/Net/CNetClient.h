@@ -12,6 +12,8 @@
 #include "SYS_Defs.h"
 #include "SYS_Threading.h"
 #include <list>
+#include <vector>
+#include <string>
 
 #define NET_CLIENT_STATUS_SHUTDOWN		0
 #define NET_CLIENT_STATUS_OFFLINE		1
@@ -32,6 +34,7 @@ class CNetClientCallback
 public:
 	virtual ~CNetClientCallback();
 	virtual void NetClientCallbackConnected(CNetClient *netClient);
+	virtual void NetClientCallbackDisconnected(CNetClient *netClient);
 	virtual void NetClientCallbackNotAuthorized(CNetClient *netClient);
 	virtual void NetClientProcessPacket(CNetPacket *packet);
 	virtual void NetClientLogic(CNetClient *netClient);
@@ -80,6 +83,7 @@ public:
 	void SendNotReliableBufferAsync(CByteBuffer *byteBuffer);
 	void SendReliableBufferAsync(CByteBuffer *byteBuffer);
 	void AddClientCallback(CNetClientCallback *clientCallback);
+	void RemoveClientCallback(CNetClientCallback *clientCallback);
 	void AddPacketCallback(CNetPacketCallback *packetCallback);
 
 	void ParseDataBuffer(CByteBuffer *byteBuffer);

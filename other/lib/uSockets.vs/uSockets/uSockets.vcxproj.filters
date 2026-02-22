@@ -1,0 +1,114 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="Source Files\crypto">
+      <UniqueIdentifier>{692e5ec5-01ab-4b0b-a977-1c0555b98039}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\eventing">
+      <UniqueIdentifier>{b2d5bf7f-fcc7-41bc-9ba5-c2faa96eb83e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\internal">
+      <UniqueIdentifier>{4546d169-7ba1-43ff-881a-81604dc74bef}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\internal\eventing">
+      <UniqueIdentifier>{d74c7593-85ba-44cd-84dd-a7b5df999c10}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\internal\networking">
+      <UniqueIdentifier>{a3ad67d0-b6ad-4cce-b3eb-b105d5713d39}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\io_uring">
+      <UniqueIdentifier>{db2f8021-7436-4c62-90d0-6e0b5dbd99b6}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\uSockets\src\crypto\openssl.c">
+      <Filter>Source Files\crypto</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\uSockets\src\crypto\sni_tree.cpp">
+      <Filter>Source Files\crypto</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\uSockets\src\eventing\asio.cpp">
+      <Filter>Source Files\eventing</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\uSockets\src\eventing\epoll_kqueue.c">
+      <Filter>Source Files\eventing</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\uSockets\src\eventing\gcd.c">
+      <Filter>Source Files\eventing</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\uSockets\src\eventing\libuv.c">
+      <Filter>Source Files\eventing</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\uSockets\src\io_uring\io_context.c">
+      <Filter>Source Files\io_uring</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\uSockets\src\io_uring\io_loop.c">
+      <Filter>Source Files\io_uring</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\uSockets\src\io_uring\io_socket.c">
+      <Filter>Source Files\io_uring</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\uSockets\src\bsd.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\uSockets\src\context.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\uSockets\src\loop.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\uSockets\src\quic.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\uSockets\src\socket.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\uSockets\src\udp.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\uSockets\src\internal\eventing\asio.h">
+      <Filter>Source Files\internal\eventing</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\uSockets\src\internal\eventing\epoll_kqueue.h">
+      <Filter>Source Files\internal\eventing</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\uSockets\src\internal\eventing\gcd.h">
+      <Filter>Source Files\internal\eventing</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\uSockets\src\internal\eventing\libuv.h">
+      <Filter>Source Files\internal\eventing</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\uSockets\src\internal\networking\bsd.h">
+      <Filter>Source Files\internal\networking</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\uSockets\src\internal\internal.h">
+      <Filter>Source Files\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\uSockets\src\internal\loop_data.h">
+      <Filter>Source Files\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\uSockets\src\io_uring\internal.h">
+      <Filter>Source Files\io_uring</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\uSockets\src\libusockets.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\uSockets\src\quic.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

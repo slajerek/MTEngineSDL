@@ -128,7 +128,7 @@ static bool ToggleInternal(const char* label, bool* v, ImGuiToggleFlags flags, f
 
     const ImRect toggle_bb(pos, pos + ImVec2(width, height));
 
-    bool mixed_value = (g.LastItemData.InFlags & ImGuiItemFlags_MixedValue) != 0;
+    bool mixed_value = (g.LastItemData.ItemFlags & ImGuiItemFlags_MixedValue) != 0;
 
     // calculate the lerp percentage for animation,
     // but default to 1/0 for if we aren't animating at all,

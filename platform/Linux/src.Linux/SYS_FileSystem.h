@@ -94,6 +94,9 @@ long SYS_GetFileModifiedTime(const char *filePath);
 
 char* SYS_GetPathToDocuments();
 
+std::string SYS_GetRelativePath(const char* pathToFolder, const char* pathToFile);
+std::string SYS_GetAbsolutePath(const char* pathToFolder, const char* relativePath);
+
 void SYS_OpenURLInBrowser(const char *url);
 
 #endif //__SYS_FILESYSTEM_H__

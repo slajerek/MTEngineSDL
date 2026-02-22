@@ -189,7 +189,10 @@ void SYS_ApplicationShutdown()
 	}
 	UnlockPauseResumeListenersListMutex();
 	
-	VID_StoreMainWindowPosition();
+	if (!gHeadlessMode)
+	{
+		VID_StoreMainWindowPosition();
+	}
 	LOGM("SYS_ApplicationShutdown completed");
 }
 

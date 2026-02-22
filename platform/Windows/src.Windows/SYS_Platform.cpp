@@ -7,15 +7,88 @@
 #include "MT_API.h"
 #include "VID_Main.h"
 #include "SYS_DefaultConfig.h"
+#include <timeapi.h>
+#include <Windows.h>
+#include <stdio.h>
+#pragma comment(lib, "Winmm.lib") // timeGetDevCaps, timeBeginPeriod
+
+HANDLE W32Timer;
+int W32SchedulerPeriodMs;
+INT64 W32QpcPerSecond;
 
 void SYS_PlatformInit()
 {
+	timeBeginPeriod(8);
+	
+	/*
+	// precision timer code from: https://github.com/blat-blatnik/Snippets/blob/main/precise_sleep.c
+	W32Timer = CreateWaitableTimerExW(NULL, NULL, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS);
+	TIMECAPS caps;
+	timeGetDevCaps(&caps, sizeof caps);
+	timeBeginPeriod(caps.wPeriodMin);
+	W32SchedulerPeriodMs = (int)caps.wPeriodMin;
+	LARGE_INTEGER qpf;
+	QueryPerformanceFrequency(&qpf);
+	W32QpcPerSecond = qpf.QuadPart;
+	*/
 }
 
 void SYS_PlatformShutdown()
 {
+	timeEndPeriod(8);
 	SYS_DetachWindowsConsole();
 }
+
+void SYS_PlatformSleep(unsigned long milliseconds)
+{
+	Sleep(milliseconds);
+	return;
+
+	// code from: https://github.com/blat-blatnik/Snippets/blob/main/precise_sleep.c
+	// (does not work)
+	/*
+	double seconds = (double)milliseconds / 1000.0;
+
+	LARGE_INTEGER qpc;
+	QueryPerformanceCounter(&qpc);
+	INT64 targetQpc = (INT64)(qpc.QuadPart + seconds * W32QpcPerSecond);
+
+	if (W32Timer) // Try using a high resolution timer first.
+	{
+		const double TOLERANCE = 0.001'02;
+		INT64 maxTicks = (INT64)W32SchedulerPeriodMs * 9'500;
+		for (;;) // Break sleep up into parts that are lower than scheduler period.
+		{
+			double remainingSeconds = (targetQpc - qpc.QuadPart) / (double)W32QpcPerSecond;
+			INT64 sleepTicks = (INT64)((remainingSeconds - TOLERANCE) * 10'000'000);
+			if (sleepTicks <= 0)
+				break;
+
+			LARGE_INTEGER due;
+			due.QuadPart = -(sleepTicks > maxTicks ? maxTicks : sleepTicks);
+			SetWaitableTimerEx(W32Timer, &due, 0, NULL, NULL, NULL, 0);
+			WaitForSingleObject(W32Timer, INFINITE);
+			QueryPerformanceCounter(&qpc);
+		}
+	}
+	else // Fallback to Sleep.
+	{
+		const double TOLERANCE = 0.000'02;
+		double sleepMs = (seconds - TOLERANCE) * 1000 - W32SchedulerPeriodMs; // Sleep for 1 scheduler period less than requested.
+		int sleepSlices = (int)(sleepMs / W32SchedulerPeriodMs);
+		if (sleepSlices > 0)
+			Sleep((DWORD)sleepSlices * W32SchedulerPeriodMs);
+		QueryPerformanceCounter(&qpc);
+	}
+
+	while (qpc.QuadPart < targetQpc) // Spin for any remaining time.
+	{
+		YieldProcessor();
+		QueryPerformanceCounter(&qpc);
+	}
+	*/
+}
+
 
 void SYS_RestartApplication()
 {

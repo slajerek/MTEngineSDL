@@ -1515,7 +1515,8 @@ void CGuiView::PreRenderImGui()
 	const float offsetY = 0.0f;	// TODO: take from theme
 	
 	bool isDocked = IsDocked();
-	if (previousViewIsDocked != isDocked
+	if (guiMain->layoutJustRestored
+		|| previousViewIsDocked != isDocked
 		|| fabs(sx - previousViewSizeX) > 0.0f
 		|| fabs(sy - previousViewSizeY) > 0.0f
 		|| fabs(window->InnerRect.Min.x - previousViewPosX) > 0.0f

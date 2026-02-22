@@ -17,6 +17,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <algorithm>
+#include <filesystem>
 #include <functional>
 #include "CSlrString.h"
 #include "CGuiMain.h"
@@ -724,6 +725,27 @@ long SYS_GetFileModifiedTime(const char *filePath)
 	}
 
 	return 0;
+}
+
+std::string SYS_GetRelativePath(const char* pathToFolder, const char* pathToFile)
+{
+	namespace fs = std::filesystem;
+
+	fs::path base = fs::absolute(pathToFolder);
+	fs::path target = fs::absolute(pathToFile);
+
+	return fs::relative(target, base).generic_string();
+}
+
+std::string SYS_GetAbsolutePath(const char* pathToFolder, const char* relativePath)
+{
+	namespace fs = std::filesystem;
+
+	fs::path base = fs::absolute(pathToFolder);
+	fs::path relative = relativePath;
+
+	fs::path fullPath = fs::absolute(base / relative);
+	return fullPath.generic_string();
 }
 
 void SYS_OpenURLInBrowser(const char *url)

@@ -1,0 +1,2 @@
+Added in Makefile to compile both arm64 and x86 architectures on macOS:
+-arch arm64 -arch x86_64

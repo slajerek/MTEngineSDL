@@ -118,7 +118,7 @@ const char *CRenderBackendOpenGL4::GetGlSlVersion()
 
 void CRenderBackendOpenGL4::CreateFontsTexture()
 {
-	ImGui_ImplOpenGL3_CreateFontsTexture();
+	// No longer needed: new ImGui backend handles texture creation/updates automatically via ImGui_ImplOpenGL3_UpdateTexture()
 }
 
 void CRenderBackendOpenGL4::NewFrame(ImVec4 clearColor)

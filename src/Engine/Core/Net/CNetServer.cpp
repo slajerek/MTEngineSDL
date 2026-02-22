@@ -294,7 +294,9 @@ void CNetServer::NetLogic()
 
 	for (u16 i = 0; i < NET_MAX_CLIENTS; i++)
 	{
-		if (this->clients[i]->state == NET_CLIENT_STATE_ONLINE)
+		// Also flush buffers for clients pending disconnect (e.g. error packet from DisconnectWithError)
+		if (this->clients[i]->state == NET_CLIENT_STATE_ONLINE
+			|| this->clients[i]->state == NET_CLIENT_STATE_DISCONNECT)
 		{
 			// send out packets
 			if (this->clients[i]->byteBufferReliableOut->length != 0)
@@ -308,7 +310,7 @@ void CNetServer::NetLogic()
 			if (this->clients[i]->byteBufferNotReliableOut->length != 0)
 			{
 				//this->byteBufferNotReliableOut->InsertBytes(this->byteBuffer)
-				
+
 				SendNotReliableBufferAsync(this->clients[i], this->clients[i]->byteBufferNotReliableOut);
 				this->clients[i]->byteBufferNotReliableOut->Reset();
 			}

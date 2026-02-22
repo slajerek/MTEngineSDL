@@ -12,6 +12,7 @@
 #include "SYS_FileSystem.h"
 #include "CSlrString.h"
 #include "json.hpp"
+#include "SYS_Platform.h"
 
 #if !defined(WIN32) && !defined(ANDROID)
 #include <unistd.h>
@@ -158,22 +159,7 @@ void SYS_RemoveFileNameExtension(char *fileName)
 void SYS_Sleep(unsigned long milliseconds)
 {
 	//LOGD("SYS_Sleep %d", milliseconds);
-	
-#ifdef WIN32
-	Sleep(milliseconds);
-#else
-	
-	long milisec = milliseconds;
-	
-	struct timespec req={0};
-	time_t sec=(int)(milisec/1000);
-	milisec = milisec-(sec*1000);
-	req.tv_sec=sec;
-	req.tv_nsec=milisec*1000000L;
-	while(nanosleep(&req,&req)==-1)
-		continue;
-	
-#endif
+	SYS_PlatformSleep(milliseconds);
 	
 	//LOGD("SYS_Sleep of %d done", milliseconds);
 }

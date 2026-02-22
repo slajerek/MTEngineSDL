@@ -43,7 +43,7 @@ void CGuiViewMessages::Clear()
 	mutex->Unlock();
 }
 
-void CGuiViewMessages::AddLog(const char* fmt, ...) IM_FMTARGS(2)
+void CGuiViewMessages::_AddLogImpl(const char* fmt, ...) IM_FMTARGS(2)
 {
 	mutex->Lock();
 

@@ -107,7 +107,8 @@ void SYS_MTEngineStartup()
 //	MT_Shutdown();
 
 	ImGuiContext& g = *GImGui;
-	if (guiMain->IsViewFullScreen() == false && 
+	if (!gHeadlessMode &&
+		guiMain->IsViewFullScreen() == false &&
 		guiMain->layoutManager->currentLayout)
 	{
 		// store ImGui layout

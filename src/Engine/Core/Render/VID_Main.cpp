@@ -32,6 +32,11 @@
 #include "GUI_Main.h"
 #include "GAM_GamePads.h"
 
+#ifdef ENABLE_IMGUI_TEST_ENGINE
+#include "imgui_te_engine.h"
+#include "CImGuiTestEngine.h"
+#endif
+
 CRenderBackend *gRenderBackend = NULL;
 
 // default screen width and height
@@ -44,6 +49,7 @@ u64 gCurrentFrameTime = 0;
 u64 gCurrentFrameNumber = 0;
 
 bool gViewportsEnableInitAtStartup = false;
+bool gHeadlessMode = false;
 
 SDL_Window *VID_GetMainSDLWindow()
 {
@@ -171,12 +177,15 @@ void VID_PostInit()
 {
 	LOGM("VID_PostInit: show window, restore position");
 	
-	if (initWindowMaxmized)
+	if (!gHeadlessMode)
 	{
-		SDL_MaximizeWindow(gMainWindow);
+		if (initWindowMaxmized)
+		{
+			SDL_MaximizeWindow(gMainWindow);
+		}
+		SDL_ShowWindow(gMainWindow);
+		VID_RestoreMainWindowPosition();
 	}
-	SDL_ShowWindow(gMainWindow);
-	VID_RestoreMainWindowPosition();
 
 	LOGD("VID_PostInit: completed");
 }
@@ -241,6 +250,57 @@ int startTicks = SDL_GetTicks();
 int countedRenderFrames = 0;
 int countedLogicFrames = 0;
 
+#ifdef ENABLE_IMGUI_TEST_ENGINE
+static float teInputPrevMouseX = -FLT_MAX;
+static float teInputPrevMouseY = -FLT_MAX;
+
+static void VID_ForwardTestEngineInputToGuiMain()
+{
+	ImGuiTestEngine *te = CImGuiTestEngine::GetEngine();
+	if (!te || !ImGuiTestEngine_IsUsingSimulatedInputs(te))
+		return;
+
+	ImGuiIO &io = ImGui::GetIO();
+	float mx = io.MousePos.x;
+	float my = io.MousePos.y;
+
+	// Update modifier state on guiMain
+	guiMain->isShiftPressed = io.KeyShift;
+	guiMain->isControlPressed = io.KeyCtrl;
+	guiMain->isAltPressed = io.KeyAlt;
+	guiMain->isSuperPressed = io.KeySuper;
+
+	// Mouse movement
+	if (mx != teInputPrevMouseX || my != teInputPrevMouseY)
+	{
+		guiMain->DoNotTouchedMove((int)mx, (int)my);
+		if (io.MouseDown[0])
+			guiMain->DoMove((int)mx, (int)my);
+		if (io.MouseDown[1])
+			guiMain->DoRightClickMove((int)mx, (int)my);
+	}
+
+	// Left mouse button transitions
+	if (io.MouseClicked[0])
+		guiMain->DoTap((int)mx, (int)my);
+	if (io.MouseReleased[0])
+		guiMain->DoFinishTap((int)mx, (int)my);
+
+	// Right mouse button transitions
+	if (io.MouseClicked[1])
+		guiMain->DoRightClick((int)mx, (int)my);
+	if (io.MouseReleased[1])
+		guiMain->DoFinishRightClick((int)mx, (int)my);
+
+	// Scroll wheel
+	if (io.MouseWheelH != 0.0f || io.MouseWheel != 0.0f)
+		guiMain->DoScrollWheel(io.MouseWheelH, io.MouseWheel);
+
+	teInputPrevMouseX = mx;
+	teInputPrevMouseY = my;
+}
+#endif
+
 void VID_Render()
 {
 //	SDL_CaptureMouse(SDL_TRUE);
@@ -266,9 +326,13 @@ void VID_Render()
 	// OPENGL3
 	gRenderBackend->NewFrame(clearColor);
 	
-	ImGui_ImplSDL2_NewFrame(gMainWindow);
+	ImGui_ImplSDL2_NewFrame();
 	
 	ImGui::NewFrame();
+
+#ifdef ENABLE_IMGUI_TEST_ENGINE
+	VID_ForwardTestEngineInputToGuiMain();
+#endif
 
 	ImGuiIO& io = ImGui::GetIO();
 	
@@ -438,7 +502,13 @@ void VID_ProcessEvents()
 
 	// not let event processing starve rendering
 	long tFrameMax = SYS_GetTickCount() + frameMaxTimeInMillis;
-		
+
+#ifdef ENABLE_IMGUI_TEST_ENGINE
+	bool suppressInput = false;
+	if (ImGuiTestEngine *te = CImGuiTestEngine::GetEngine())
+		suppressInput = ImGuiTestEngine_IsUsingSimulatedInputs(te);
+#endif
+
 	// check MouseMotion event
 	int posX, posY;
 	u32 button = VID_GetMousePos(&posX, &posY);
@@ -446,19 +516,28 @@ void VID_ProcessEvents()
 	{
 //		LOGI("VID_ProcessEvents: DoNotTouchedMove: (%d %d) left=%d right=%d", posX, posY,
 //			 button & SDL_BUTTON(SDL_BUTTON_LEFT), button & SDL_BUTTON(SDL_BUTTON_RIGHT));
-		
+
 		prevGlobalMousePosX = posX;
 		prevGlobalMousePosY = posY;
-		
+
+#ifdef ENABLE_IMGUI_TEST_ENGINE
+		if (!suppressInput)
+#endif
 		guiMain->DoNotTouchedMove(posX, posY);
-		
+
 		if (button & SDL_BUTTON(SDL_BUTTON_LEFT))
 		{
+#ifdef ENABLE_IMGUI_TEST_ENGINE
+			if (!suppressInput)
+#endif
 			guiMain->DoMove(posX, posY);
 		}
 
 		if (button & SDL_BUTTON(SDL_BUTTON_RIGHT))
 		{
+#ifdef ENABLE_IMGUI_TEST_ENGINE
+			if (!suppressInput)
+#endif
 			guiMain->DoRightClickMove(posX, posY);
 		}
 	}
@@ -484,6 +563,9 @@ void VID_ProcessEvents()
 		{
 			// https://wiki.libsdl.org/Tutorials-TextInput
 			LOGI("VID_ProcessEvents: SDL_TEXTINPUT: %d %x '%s'", event.text.text[0], event.text.text[0], event.text.text);
+#ifdef ENABLE_IMGUI_TEST_ENGINE
+			if (!suppressInput)
+#endif
 			guiMain->KeyTextInput(event.text.text);
 		}
 
@@ -495,7 +577,11 @@ void VID_ProcessEvents()
 		else if (event.type == SDL_KEYDOWN || event.type == SDL_KEYUP)
 		{
 			LOGI("VID_ProcessEvents: %s: keysym.sym=%d", (event.type == SDL_KEYDOWN ? "KeyDown" : "KeyUp"), event.key.keysym.sym);
-			
+
+#ifdef ENABLE_IMGUI_TEST_ENGINE
+		  if (!suppressInput)
+		  {
+#endif
 			// BUG: DOES NOT WORK on macOS and SDL 2.0.10. Problem is that CMD KEYUP is received even though the key is still pressed
 			// 		https://github.com/libsdl-org/SDL/issues/5090
 			guiMain->isShiftPressed = ((SDL_GetModState() & KMOD_SHIFT) != 0);
@@ -641,16 +727,23 @@ void VID_ProcessEvents()
 			}
 			
 //			LOGD("VID_ProcessEvents: key consumed");
+#ifdef ENABLE_IMGUI_TEST_ENGINE
+		  } // if (!suppressInput)
+#endif
 		}
-		
+
 		else if (event.type == SDL_MOUSEBUTTONDOWN)
 		{
 			LOGI("%lu SDL_MOUSEBUTTONDOWN button=%d", SYS_GetTickCount(), event.button.button);
-			
+
+#ifdef ENABLE_IMGUI_TEST_ENGINE
+		  if (!suppressInput)
+		  {
+#endif
 			int posX, posY;
 			VID_GetMousePos(&posX, &posY);
 //			LOGD("SDL_MOUSEBUTTONDOWN: %d %d (%d %d)", event.motion.x, event.motion.y, posX, posY);
-			
+
 			if (event.button.button == SDL_BUTTON_LEFT)
 			{
 				guiMain->DoTap(posX, posY);
@@ -659,13 +752,20 @@ void VID_ProcessEvents()
 			{
 				guiMain->DoRightClick(posX, posY);
 			}
+#ifdef ENABLE_IMGUI_TEST_ENGINE
+		  }
+#endif
 		}
 		else if (event.type == SDL_MOUSEBUTTONUP)
 		{
+#ifdef ENABLE_IMGUI_TEST_ENGINE
+		  if (!suppressInput)
+		  {
+#endif
 			int posX, posY;
 			VID_GetMousePos(&posX, &posY);
 			LOGI("SDL_MOUSEBUTTONUP: %d %d (%d %d)", event.motion.x, event.motion.y, posX, posY);
-			
+
 			if (event.button.button == SDL_BUTTON_LEFT)
 			{
 				guiMain->DoFinishTap(posX, posY);
@@ -674,6 +774,9 @@ void VID_ProcessEvents()
 			{
 				guiMain->DoFinishRightClick(posX, posY);
 			}
+#ifdef ENABLE_IMGUI_TEST_ENGINE
+		  }
+#endif
 		}
 		else if (event.type == SDL_MOUSEMOTION)
 		{
@@ -682,11 +785,17 @@ void VID_ProcessEvents()
 		else if (event.type == SDL_MOUSEWHEEL)
 		{
 			LOGI("SDL_MOUSEWHEEL");
+#ifdef ENABLE_IMGUI_TEST_ENGINE
+			if (!suppressInput)
+#endif
 			guiMain->DoScrollWheel((float)event.wheel.x, (float)event.wheel.y);
 		}
 		else if (event.type == SDL_WINDOWEVENT)
 		{
-			VID_StoreMainWindowPosition();
+			if (!gHeadlessMode)
+			{
+				VID_StoreMainWindowPosition();
+			}
 		}
 		else if (event.type == SDL_CONTROLLERDEVICEADDED || event.type == SDL_CONTROLLERDEVICEREMOVED
 				 || event.type == SDL_CONTROLLERAXISMOTION

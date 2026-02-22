@@ -553,9 +553,7 @@ char *CByteBuffer::getString()
 
 void CByteBuffer::PutStdString(std::string str)
 {
-	LOGD("CByteBuffer::PutStdString");
-	cout << str << endl;
-
+	LOGD("CByteBuffer::PutStdString: %s", str);
 	const uint8_t* data = reinterpret_cast<const uint8_t*>(str.data());
 	int len = static_cast<int>(str.size());
 	CByteBuffer *byteBuffer = new CByteBuffer((u8*)data, len);
@@ -569,9 +567,7 @@ std::string CByteBuffer::GetStdString()
 {
 	CByteBuffer *byteBuffer = this->GetByteBuffer();
 	std::string str(reinterpret_cast<const char*>(byteBuffer->data), byteBuffer->length);
-	
-	cout << str << endl;
-	
+	LOGD("CByteBuffer::GetStdString: %s", str.c_str());
 	return str;
 	
 //	char *cStr = this->getString();

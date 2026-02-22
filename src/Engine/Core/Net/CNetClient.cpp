@@ -211,7 +211,14 @@ void CNetClient::ThreadRun(void *data)
 					{
 						LOGCFROM("AUTHORIZED, go online");
 						this->status = NET_CLIENT_STATUS_ONLINE;
-						
+
+						// Clear buffers from auth phase before firing callbacks,
+						// so callbacks can safely queue new outgoing data
+						this->LockMutex();
+						byteBufferReliableOut->Reset();
+						byteBufferNotReliableOut->Reset();
+						this->UnlockMutex();
+
 						for (std::list<CNetClientCallback *>::iterator it = this->clientCallbacks.begin();
 							it != this->clientCallbacks.end(); it++)
 						{
@@ -257,12 +264,6 @@ void CNetClient::ThreadRun(void *data)
 				}
 			}
 		}
-
-		this->LockMutex();
-		byteBufferIn->Reset();
-		byteBufferReliableOut->Reset();
-		byteBufferNotReliableOut->Reset();
-		this->UnlockMutex();
 
 		while(status == NET_CLIENT_STATUS_ONLINE)
 		{
@@ -441,13 +442,13 @@ void CNetClient::ParseDataBuffer(CByteBuffer *byteBuffer)
 		{
 			bool parsed = false;
 
-			LOGD("parsing...");
+//			LOGD("parsing...");
 			for (std::list<CNetPacketCallback *>::iterator it = this->packetCallbacks.begin();
 				it != this->packetCallbacks.end(); it++)
 			{
 				CNetPacketCallback *callback = (*it);
 
-				LOGD("parsing callback");
+//				LOGD("parsing callback");
 				CNetPacket *packet = callback->NetDeserializePacket(protocolType, packetType, byteBuffer);
 
 				if (packet != NULL)
@@ -494,6 +495,7 @@ void CNetClient::SendReliableBufferAsync(CByteBuffer *byteBuffer)
 
 	ENetPacket *packet = enet_packet_create (byteBuffer->data, byteBuffer->length, ENET_PACKET_FLAG_RELIABLE);
 	enet_peer_send (peer, 0, packet);
+	enet_host_flush(peer->host);
 }
 
 void CNetClient::SendNotReliableBufferAsync(CByteBuffer *byteBuffer)
@@ -506,6 +508,7 @@ void CNetClient::SendNotReliableBufferAsync(CByteBuffer *byteBuffer)
 
 	ENetPacket *packet = enet_packet_create (byteBuffer->data, byteBuffer->length, ENET_PACKET_FLAG_UNSEQUENCED);
 	enet_peer_send (peer, 0, packet);
+	enet_host_flush(peer->host);
 }
 
 
@@ -516,6 +519,11 @@ void CNetClient::AddClientCallback(CNetClientCallback *clientCallback)
 		LOGCC("CNetClient::AddClientCallback");
 		this->clientCallbacks.push_back(clientCallback);
 	}
+}
+
+void CNetClient::RemoveClientCallback(CNetClientCallback *clientCallback)
+{
+	this->clientCallbacks.remove(clientCallback);
 }
 
 void CNetClient::AddPacketCallback(CNetPacketCallback *packetCallback)
@@ -535,12 +543,30 @@ bool CNetClient::IsOnline()
 void CNetClient::SetStatusDisconnectAndReconnect()
 {
 	LOGCFROM("CNetClient::SetStatusDisconnectAndReconnect");
+	if (this->status == NET_CLIENT_STATUS_ONLINE)
+	{
+		for (std::list<CNetClientCallback *>::iterator it = this->clientCallbacks.begin();
+			it != this->clientCallbacks.end(); it++)
+		{
+			CNetClientCallback *callback = (*it);
+			callback->NetClientCallbackDisconnected(this);
+		}
+	}
 	this->status = NET_CLIENT_STATUS_RECONNECT;
 }
 
 void CNetClient::Disconnect()
 {
-	LOGCFROM("CNetClient::SetStatusDisconnectAndReconnect");
+	LOGCFROM("CNetClient::Disconnect");
+	if (this->status == NET_CLIENT_STATUS_ONLINE)
+	{
+		for (std::list<CNetClientCallback *>::iterator it = this->clientCallbacks.begin();
+			it != this->clientCallbacks.end(); it++)
+		{
+			CNetClientCallback *callback = (*it);
+			callback->NetClientCallbackDisconnected(this);
+		}
+	}
 	this->status = NET_CLIENT_STATUS_OFFLINE;
 }
 
@@ -584,6 +610,11 @@ CNetClientCallback::~CNetClientCallback()
 void CNetClientCallback::NetClientCallbackConnected(CNetClient *netClient)
 {
 	LOGD("CNetClientCallback::NetClientCallbackConnected");
+}
+
+void CNetClientCallback::NetClientCallbackDisconnected(CNetClient *netClient)
+{
+	LOGD("CNetClientCallback::NetClientCallbackDisconnected");
 }
 
 void CNetClientCallback::NetClientCallbackNotAuthorized(CNetClient *netClient)

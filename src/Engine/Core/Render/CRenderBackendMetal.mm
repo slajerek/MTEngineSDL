@@ -7,7 +7,13 @@
 #import <QuartzCore/QuartzCore.h>
 #include <vector>
 
-NSMutableArray *textures;
+static NSMutableArray *textures;
+static CAMetalLayer *layer;
+static id<MTLCommandQueue> commandQueue;
+static MTLRenderPassDescriptor *renderPassDescriptor;
+static id<MTLCommandBuffer> commandBuffer;
+static id<MTLRenderCommandEncoder> renderEncoder;
+static id<CAMetalDrawable> drawable;
 
 CRenderBackendMetal::CRenderBackendMetal()
 : CRenderBackend("Metal")
@@ -44,10 +50,6 @@ void CRenderBackendMetal::CreateRenderContext()
 
 }
 
-CAMetalLayer* layer;
-id<MTLCommandQueue> commandQueue;
-MTLRenderPassDescriptor* renderPassDescriptor;
-
 void CRenderBackendMetal::InitRenderPipeline()
 {
 	// Setup Platform/Renderer backends
@@ -60,56 +62,55 @@ void CRenderBackendMetal::InitRenderPipeline()
 	renderPassDescriptor = [MTLRenderPassDescriptor new];
 }
 
-bool ImGui_ImplMetal_CreateFontsTexture();
-
 void CRenderBackendMetal::CreateFontsTexture()
 {
-	ImGui_ImplMetal_CreateFontsTexture(layer.device);
+	// No longer needed: new ImGui backend handles texture creation/updates automatically via ImGui_ImplMetal_UpdateTexture()
 }
-
-id<MTLCommandBuffer> commandBuffer;
-id <MTLRenderCommandEncoder> renderEncoder;
-id<CAMetalDrawable> drawable;
 
 void CRenderBackendMetal::NewFrame(ImVec4 clearColor)
 {
-	int width, height;
-	SDL_GetRendererOutputSize(renderer, &width, &height);
-	layer.drawableSize = CGSizeMake(width, height);
-	drawable = [layer nextDrawable];
+	@autoreleasepool
+	{
+		int width, height;
+		SDL_GetRendererOutputSize(renderer, &width, &height);
+		layer.drawableSize = CGSizeMake(width, height);
+		drawable = [layer nextDrawable];
 
-	commandBuffer = [commandQueue commandBuffer];
-//	renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColorMake(clearColor[0] * clear_color[3], clear_color[1] * clear_color[3], clear_color[2] * clear_color[3], clear_color[3]);
-	
-	renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColorMake(clearColor.x * clearColor.w, clearColor.y * clearColor.w, clearColor.z * clearColor.w, clearColor.w);
+		commandBuffer = [commandQueue commandBuffer];
 
-	renderPassDescriptor.colorAttachments[0].texture = drawable.texture;
-	renderPassDescriptor.colorAttachments[0].loadAction = MTLLoadActionClear;
-	renderPassDescriptor.colorAttachments[0].storeAction = MTLStoreActionStore;
-	renderEncoder = [commandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
-	[renderEncoder pushDebugGroup:@"CRenderBackendMetal"];
+		renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColorMake(clearColor.x * clearColor.w, clearColor.y * clearColor.w, clearColor.z * clearColor.w, clearColor.w);
 
-	// Start the Dear ImGui frame
-	ImGui_ImplMetal_NewFrame(renderPassDescriptor);
+		renderPassDescriptor.colorAttachments[0].texture = drawable.texture;
+		renderPassDescriptor.colorAttachments[0].loadAction = MTLLoadActionClear;
+		renderPassDescriptor.colorAttachments[0].storeAction = MTLStoreActionStore;
+		renderEncoder = [commandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
+		[renderEncoder pushDebugGroup:@"CRenderBackendMetal"];
+
+		// Start the Dear ImGui frame
+		ImGui_ImplMetal_NewFrame(renderPassDescriptor);
+	}
 }
 
 void CRenderBackendMetal::PresentFrameBuffer(ImVec4 clearColor)
 {
-	ImGui_ImplMetal_RenderDrawData(ImGui::GetDrawData(), commandBuffer, renderEncoder);
-
-	[renderEncoder popDebugGroup];
-	[renderEncoder endEncoding];
-
-	[commandBuffer presentDrawable:drawable];
-	[commandBuffer commit];
-
-	ImGuiIO& io = ImGui::GetIO();
-
-	// Update and Render additional Platform Windows
-	if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+	@autoreleasepool
 	{
-		ImGui::UpdatePlatformWindows();
-		ImGui::RenderPlatformWindowsDefault();
+		ImGui_ImplMetal_RenderDrawData(ImGui::GetDrawData(), commandBuffer, renderEncoder);
+
+		ImGuiIO& io = ImGui::GetIO();
+
+		// Update and Render additional Platform Windows
+		if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+		{
+			ImGui::UpdatePlatformWindows();
+			ImGui::RenderPlatformWindowsDefault();
+		}
+
+		[renderEncoder popDebugGroup];
+		[renderEncoder endEncoding];
+
+		[commandBuffer presentDrawable:drawable];
+		[commandBuffer commit];
 	}
 }
 
@@ -120,8 +121,14 @@ void CRenderBackendMetal::Shutdown()
 
 void CRenderBackendMetal::CreateTexture(CSlrImage *image)
 {
+	if (!image)
+	{
+		LOGError("CRenderBackendMetal::CreateTexture: image is NULL");
+		return;
+	}
+
 	id<MTLDevice> device = layer.device;
-	
+
 	MTLTextureDescriptor* textureDescriptor = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm
 																								 width:(NSUInteger)image->rasterWidth
 																								height:(NSUInteger)image->rasterHeight
@@ -133,6 +140,12 @@ void CRenderBackendMetal::CreateTexture(CSlrImage *image)
 	textureDescriptor.storageMode = MTLStorageModeShared;
 #endif
 	id <MTLTexture> texture = [device newTextureWithDescriptor:textureDescriptor];
+	if (!texture)
+	{
+		LOGError("CRenderBackendMetal::CreateTexture: newTextureWithDescriptor returned nil");
+		return;
+	}
+
 	[texture replaceRegion:MTLRegionMake2D(0, 0, (NSUInteger)image->rasterWidth, (NSUInteger)image->rasterHeight) mipmapLevel:0 withBytes:image->loadImageData->getRGBAResultData() bytesPerRow:(NSUInteger)image->rasterWidth * 4];
 
 	[textures addObject:texture];
@@ -143,11 +156,24 @@ void CRenderBackendMetal::CreateTexture(CSlrImage *image)
 
 void CRenderBackendMetal::UpdateTextureLinearScaling(CSlrImage *image)
 {
-//	if (image->linearScaling)
+	// Metal textures don't have per-texture filter state; filtering is set on the sampler in the shader pipeline
 }
 
 void CRenderBackendMetal::ReBindTexture(CSlrImage *image)
 {
+	if (!image)
+	{
+		LOGError("CRenderBackendMetal::ReBindTexture: image is NULL");
+		return;
+	}
+
+	if (!image->isBound)
+	{
+		LOGError("CRenderBackendMetal::ReBindTexture: image is not bound, CreateTexture");
+		CreateTexture(image);
+		return;
+	}
+
 //	LOGD("ReBindTexture image->texturePtr=%x", image->texturePtr);
 	id<MTLTexture> texture = (__bridge id<MTLTexture>)(image->texturePtr);
 	[texture replaceRegion:MTLRegionMake2D(0, 0, (NSUInteger)image->rasterWidth, (NSUInteger)image->rasterHeight) mipmapLevel:0 withBytes:image->loadImageData->getRGBAResultData() bytesPerRow:(NSUInteger)image->rasterWidth * 4];
@@ -155,13 +181,24 @@ void CRenderBackendMetal::ReBindTexture(CSlrImage *image)
 
 void CRenderBackendMetal::DeleteTexture(CSlrImage *image)
 {
-	LOGTODO("CRenderBackendMetal::DeleteTexture");
-//	GLuint textureId = (intptr_t)image->texturePtr;
-//	glDeleteTextures(1, &textureId);
+	if (!image)
+	{
+		LOGError("CRenderBackendMetal::DeleteTexture: image is NULL");
+		return;
+	}
+
+	if (!image->isBound)
+	{
+		LOGError("CRenderBackendMetal::DeleteTexture: image is not bound");
+		return;
+	}
+
+	id<MTLTexture> texture = (__bridge id<MTLTexture>)(image->texturePtr);
+	[textures removeObject:texture];
+	image->texturePtr = NULL;
 }
 
 CRenderBackendMetal::~CRenderBackendMetal()
 {
 	SDL_DestroyRenderer(renderer);
 }
-

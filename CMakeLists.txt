@@ -17,6 +17,7 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wint-conversion")
 add_definitions(
     -DLINUX
     -DIMGUI_IMPL_OPENGL_LOADER_GL3W
+    -DENABLE_IMGUI_TEST_ENGINE
 )
 
 find_package(PkgConfig REQUIRED)
@@ -89,6 +90,11 @@ include_directories(
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/utf8"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/uWebSockets"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/zlib"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/imgui_test_engine"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/imgui_test_engine/thirdparty"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/imgui_test_engine/thirdparty/Str"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/imgui_test_engine/thirdparty/stb"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Tests"
 )
 
 add_library(MTEngineSDL STATIC
@@ -128,6 +134,8 @@ add_library(MTEngineSDL STATIC
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/Render/CRenderShader.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/Render/CRenderShaderOpenGL4.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/Render/CRenderShaderOpenGL4ShaderToy.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/Render/CRenderShaderMaskedTile.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/Render/CRenderShaderMaskedTileQueued.cpp"
 
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/CByteBuffer.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/CConfigStorage.cpp"
@@ -242,7 +250,10 @@ add_library(MTEngineSDL STATIC
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/GUI/Helpers/CGuiViewProgressBarWindow.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/GUI/Helpers/CGuiViewConsole.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/GUI/Helpers/CGuiViewDummy.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/GUI/Helpers/CGuiViewDummySimple.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/GUI/Helpers/CGuiViewImageWithLayer.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/GUI/Helpers/CGuiViewTableItem.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/GUI/Helpers/CGuiViewTableWithFilterAndButtons.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/GUI/Helpers/CGuiViewSearch.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/GUI/Helpers/GUI_Debug.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/GUI/Layout/CLayoutManager.cpp"
@@ -294,6 +305,16 @@ add_library(MTEngineSDL STATIC
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/implot/implot_items.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/implot/implot_colors_extension.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/implot/implot.cpp"
+
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/imgui_test_engine/imgui_capture_tool.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/imgui_test_engine/imgui_te_context.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/imgui_test_engine/imgui_te_coroutine.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/imgui_test_engine/imgui_te_engine.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/imgui_test_engine/imgui_te_exporters.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/imgui_test_engine/imgui_te_perftool.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/imgui_test_engine/imgui_te_ui.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/imgui_test_engine/imgui_te_utils.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Tests/CImGuiTestEngine.cpp"
 
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jcapimin.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/transupp.c"
