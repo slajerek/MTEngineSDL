@@ -73,7 +73,8 @@ void CNetServer::ThreadRun(void *data)
 	address.host = ENET_HOST_ANY;
 
 	// Bind the server to port 5454
-	address.port = serverPort;
+	int actualPort = SYS_ApplyPortOffset(serverPort);
+	address.port = actualPort;
 
 
 	server = enet_host_create(&address,		// the address to bind the server host to
@@ -85,12 +86,14 @@ void CNetServer::ThreadRun(void *data)
 
 	if (server == NULL)
 	{
-		SYS_FatalExit("An error occurred while trying to create an ENet server host");
+		LOGError("CNetServer::ThreadRun: Failed to bind to port %d (actual %d) (is another instance already running?)", serverPort, actualPort);
+		this->status = NET_SERVER_STATUS_OFFLINE;
+		return;
 	}
 
 	status = NET_SERVER_STATUS_ONLINE;
 
-	LOGM("Server ready on port %d", serverPort);
+	LOGM("Server ready on port %d (base %d)", actualPort, serverPort);
 	
 	ENetEvent event;
 
@@ -205,6 +208,20 @@ void CNetServer::ThreadRun(void *data)
 					clients[i]->state = NET_CLIENT_STATE_EMPTY;
 				}
 			}
+
+			// Timeout pending auth challenges to prevent connection exhaustion DoS
+			if (clients[i]->state == NET_CLIENT_STATE_CONNECTED
+				&& clients[i]->authorizePending
+				&& clients[i]->authorizePendingIssuedAtMillis > 0)
+			{
+				u64 now = SYS_GetCurrentTimeInMillis();
+				if (now - clients[i]->authorizePendingIssuedAtMillis > NET_AUTH_CHALLENGE_TIMEOUT_MS)
+				{
+					LOGError("CNetServer: auth challenge timeout for peer %d (%s)",
+							 clients[i]->peerId, clients[i]->clientName.c_str());
+					this->Disconnect(clients[i]);
+				}
+			}
 		}
 		
 		this->NetLogic();
@@ -223,6 +240,16 @@ CNetClientData *CNetServer::ConnectPeer(ENetPeer *peer)
 	{
 		if (clients[i]->state == NET_CLIENT_STATE_EMPTY)
 		{
+			// Reset reused slot state before auth.
+			clients[i]->clientId = -1;
+			clients[i]->clientName = "<PEER#" + std::to_string(clients[i]->peerId) + ">";
+			clients[i]->voidData = NULL;
+			clients[i]->authorizePending = false;
+			clients[i]->authorizePendingServerId = 0;
+			clients[i]->authorizePendingUserName.clear();
+			clients[i]->authorizePendingChallenge.clear();
+			clients[i]->authorizePendingIssuedAtMillis = 0;
+
 			clients[i]->state = NET_CLIENT_STATE_CONNECTED;
 			clients[i]->peer = peer;
 			//	enet_peer_throttle_configure(
@@ -247,10 +274,12 @@ void CNetServer::Disconnected(CNetClientData *netClientData)
 {
 	LOGCS("%s DISCONNECTED", netClientData->clientName.c_str());
 
-	for (std::list<CNetServerCallback *>::iterator it = this->serverCallbacks.begin();
-		 it != this->serverCallbacks.end(); it++)
+	this->LockMutex();
+	std::list<CNetServerCallback *> callbacksCopy = this->serverCallbacks;
+	this->UnlockMutex();
+
+	for (auto *callback : callbacksCopy)
 	{
-		CNetServerCallback *callback = (*it);
 		callback->NetServerCallbackClientDisconnected(netClientData);
 	}
 
@@ -278,10 +307,13 @@ void CNetServer::NetLogic()
 		this->receivedPackets.pop_front();
 		this->UnlockMutex();
 
-		for (std::list<CNetServerCallback *>::iterator it = this->serverCallbacks.begin();
-			it != this->serverCallbacks.end(); it++)
+		// Copy callback list under mutex to allow safe removal during iteration
+		this->LockMutex();
+		std::list<CNetServerCallback *> callbacksCopy = this->serverCallbacks;
+		this->UnlockMutex();
+
+		for (auto *callback : callbacksCopy)
 		{
-			CNetServerCallback *callback = (*it);
 			callback->NetServerProcessPacket(packet);
 		}
 
@@ -317,12 +349,13 @@ void CNetServer::NetLogic()
 
 		}
 	}
+
+	// Copy callback list (still under mutex) for safe iteration
+	std::list<CNetServerCallback *> logicCallbacksCopy = this->serverCallbacks;
 	this->UnlockMutex();
 
-	for (std::list<CNetServerCallback *>::iterator it = this->serverCallbacks.begin();
-		 it != this->serverCallbacks.end(); it++)
+	for (auto *callback : logicCallbacksCopy)
 	{
-		CNetServerCallback *callback = (*it);
 		callback->NetServerLogic(this);
 	}
 	
@@ -379,6 +412,10 @@ void CNetServer::ParseDataBuffer(CNetClientData *netClientData, CByteBuffer *byt
 		if (packetType == NET_PACKET_TYPE_AUTHORIZE)
 		{
 			this->ParseAuthorize(netClientData, byteBuffer);
+		}
+		else if (packetType == NET_PACKET_TYPE_AUTHORIZE_RESPONSE)
+		{
+			this->ParseAuthorizeResponse(netClientData, byteBuffer);
 		}
 		else
 		{
@@ -483,6 +520,13 @@ bool CNetServer::ParseAuthorize(CNetClientData *netClientData, CByteBuffer *byte
 	
 	LOGSF("ParseAuthorize: serverId=%llu userName='%s' passwordHashLen=%d", serverId, userName.c_str(), passwordHashLen);
 
+	// Reset pending authorize state for this connection.
+	netClientData->authorizePending = false;
+	netClientData->authorizePendingServerId = 0;
+	netClientData->authorizePendingUserName.clear();
+	netClientData->authorizePendingChallenge.clear();
+	netClientData->authorizePendingIssuedAtMillis = 0;
+
 	u8 authStatus = NET_SERVER_CALLBACK_AUTHORIZE_NOT_AVAILABLE;
 	for (std::list<CNetServerCallback *>::iterator it = this->serverCallbacks.begin();
 		it != this->serverCallbacks.end(); it++)
@@ -491,6 +535,32 @@ bool CNetServer::ParseAuthorize(CNetClientData *netClientData, CByteBuffer *byte
 		authStatus = callback->NetServerAuthorize(netClientData, userName, passwordHashVector);
 		if (authStatus != NET_SERVER_CALLBACK_AUTHORIZE_NOT_AVAILABLE)
 			break;
+	}
+
+	if (authStatus == NET_SERVER_CALLBACK_AUTHORIZE_CHALLENGE)
+	{
+		if (netClientData->authorizePendingChallenge.empty())
+		{
+			LOGError("CNetServer::ParseAuthorize: challenge requested but authorizePendingChallenge is empty");
+			authStatus = NET_SERVER_CALLBACK_AUTHORIZE_WRONG_PASSWORD;
+		}
+		else
+		{
+			netClientData->authorizePending = true;
+			netClientData->authorizePendingServerId = serverId;
+			netClientData->authorizePendingUserName = userName;
+			netClientData->authorizePendingIssuedAtMillis = SYS_GetCurrentTimeInMillis();
+
+			// Send challenge payload and keep connection in CONNECTED state.
+			byteBufferReliableOut->Reset();
+			byteBufferReliableOut->PutByte(NET_PACKET_TYPE_AUTHORIZE_CHALLENGE);
+			byteBufferReliableOut->PutU16((u16)netClientData->authorizePendingChallenge.size());
+			byteBufferReliableOut->PutBytes(netClientData->authorizePendingChallenge.data(), (u32)netClientData->authorizePendingChallenge.size());
+
+			this->SendReliableBufferAsync(netClientData, byteBufferReliableOut);
+			LOGST("AUTHORIZATION CHALLENGE sent");
+			return true;
+		}
 	}
 
 	if (authStatus == NET_SERVER_CALLBACK_AUTHORIZE_WRONG_PASSWORD)
@@ -542,12 +612,126 @@ bool CNetServer::ParseAuthorize(CNetClientData *netClientData, CByteBuffer *byte
 	return true;
 }
 
+bool CNetServer::ParseAuthorizeResponse(CNetClientData *netClientData, CByteBuffer *byteBuffer)
+{
+	LOGSF("CNetServer::ParseAuthorizeResponse");
+	if (!netClientData->authorizePending)
+	{
+		LOGError("CNetServer::ParseAuthorizeResponse: received response but no authorizePending");
+		this->Disconnect(netClientData);
+		return false;
+	}
+
+	u32 v = byteBuffer->GetU32();
+	if (!(v <= NET_PROTOCOL_VERSION))
+	{
+		LOGError("CNetServer::ParseAuthorizeResponse: unknown version %d", v);
+		this->Disconnect(netClientData);
+		return false;
+	}
+
+	u64 serverId = byteBuffer->GetU64();
+	string userName = byteBuffer->GetStdString();
+	u16 responseLen = byteBuffer->getU16();
+	u8 *responseBytes = byteBuffer->getBytes(responseLen);
+	std::vector<uint8_t> responseVector(responseBytes, responseBytes + responseLen);
+
+	LOGSF("ParseAuthorizeResponse: serverId=%llu userName='%s' responseLen=%d", serverId, userName.c_str(), responseLen);
+
+	if (serverId != netClientData->authorizePendingServerId)
+	{
+		LOGError("CNetServer::ParseAuthorizeResponse: serverId mismatch (got=%llu expected=%llu)", serverId, netClientData->authorizePendingServerId);
+		netClientData->authorizePending = false;
+		this->Disconnect(netClientData);
+		return false;
+	}
+	if (userName != netClientData->authorizePendingUserName)
+	{
+		LOGError("CNetServer::ParseAuthorizeResponse: userName mismatch (got='%s' expected='%s')", userName.c_str(), netClientData->authorizePendingUserName.c_str());
+		netClientData->authorizePending = false;
+		this->Disconnect(netClientData);
+		return false;
+	}
+
+	u8 authStatus = NET_SERVER_CALLBACK_AUTHORIZE_NOT_AVAILABLE;
+	for (std::list<CNetServerCallback *>::iterator it = this->serverCallbacks.begin();
+		it != this->serverCallbacks.end(); it++)
+	{
+		CNetServerCallback *callback = (*it);
+		authStatus = callback->NetServerAuthorize(netClientData, userName, responseVector);
+		if (authStatus != NET_SERVER_CALLBACK_AUTHORIZE_NOT_AVAILABLE)
+			break;
+	}
+
+	// Clear pending state regardless of outcome.
+	netClientData->authorizePending = false;
+	netClientData->authorizePendingServerId = 0;
+	netClientData->authorizePendingUserName.clear();
+	netClientData->authorizePendingChallenge.clear();
+	netClientData->authorizePendingIssuedAtMillis = 0;
+
+	if (authStatus != NET_SERVER_CALLBACK_AUTHORIZE_CORRECT)
+	{
+		byteBufferReliableOut->Reset();
+		byteBufferReliableOut->PutByte(NET_PACKET_TYPE_AUTHORIZED);
+		byteBufferReliableOut->PutBool(false);
+		this->SendReliableBufferAsync(netClientData, byteBufferReliableOut);
+		this->Disconnect(netClientData);
+		LOGST("AUTHORIZATION FAILED (response)");
+		return false;
+	}
+
+	// authorized OK, check if we have already other user session and drop it
+	for (int i = 0; i < NET_MAX_CLIENTS; i++)
+	{
+		CNetClientData *client = clients[i];
+		if (client->clientName == userName)
+		{
+			client->clientName = "<PEER#" + std::to_string(client->peerId) + "> (" + client->clientName + ")";
+			Disconnect(client);
+		}
+	}
+
+	netClientData->SetClientName(userName);
+
+	// send authorization confirmed
+	byteBufferReliableOut->Reset();
+	byteBufferReliableOut->PutByte(NET_PACKET_TYPE_AUTHORIZED);
+	byteBufferReliableOut->PutBool(true);
+	this->SendReliableBufferAsync(netClientData, byteBufferReliableOut);
+
+	LOGST("AUTHORIZED successfully");
+	netClientData->state = NET_CLIENT_STATE_ONLINE;
+
+	for (std::list<CNetServerCallback *>::iterator it = this->serverCallbacks.begin();
+		it != this->serverCallbacks.end(); it++)
+	{
+		CNetServerCallback *callback = (*it);
+		callback->NetServerCallbackClientConnected(netClientData);
+	}
+
+	LOGSF("CNetServer::ParseAuthorizeResponse done");
+	return true;
+}
+
 void CNetServer::AddServerCallback(CNetServerCallback *serverCallback)
 {
 	if (serverCallback != NULL)
 	{
 		LOGCS("CNetServer::AddServerCallback");
+		this->LockMutex();
 		this->serverCallbacks.push_back(serverCallback);
+		this->UnlockMutex();
+	}
+}
+
+void CNetServer::RemoveServerCallback(CNetServerCallback *serverCallback)
+{
+	if (serverCallback != NULL)
+	{
+		this->LockMutex();
+		this->serverCallbacks.remove(serverCallback);
+		this->UnlockMutex();
 	}
 }
 
@@ -651,4 +835,3 @@ u8 CNetServerCallback::NetServerAuthorize(CNetClientData *clientData, string use
 CNetServerCallback::~CNetServerCallback()
 {
 }
-

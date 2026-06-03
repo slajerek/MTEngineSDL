@@ -15,9 +15,12 @@
 
 using namespace std;
 
-#include <map>
-#include <string.h>
+#include <atomic>
 #include <list>
+#include <map>
+#include <string>
+#include <string.h>
+#include <vector>
 
 #include "CSlrImage.h"
 #include "CSlrTexture.h"
@@ -30,8 +33,26 @@ using namespace std;
 
 class CDataTable;
 
-extern u64 gMaxMemoryForResources;
-extern u64 gCurrentResourceMemoryTaken;
+struct RES_ResourceSnapshot
+{
+	u64 id = 0;
+	u64 hashCode = 0;
+	std::string path;
+	std::string typeName;
+	std::string stateName;
+	u8 state = RESOURCE_STATE_DEALLOCATED;
+	u32 loadingSize = 0;
+	u32 idleSize = 0;
+	u32 bindSize = 0;
+	u64 activatedTime = 0;
+	int priority = 0;
+	bool isActive = false;
+	u64 cacheKey = 0;
+	bool cacheLinearScaling = false;
+};
+
+extern std::atomic<u64> gMaxMemoryForResources;
+extern std::atomic<u64> gCurrentResourceMemoryTaken;
 
 extern volatile u8 gResourceManagerState;
 #define RESOURCE_MANAGER_STATE_INITIALIZING	0
@@ -91,6 +112,20 @@ CSlrImage *RES_GetImage(const char *imageName);
 
 CSlrImage *RES_LoadImageFromFileOS(CSlrString *path, bool linearScaling);
 CSlrImage *RES_LoadImageFromFileOS(const char *path, bool linearScaling);
+
+CSlrImage *RES_CacheGetImage(const char *absolutePath, bool linearScaling);
+void RES_CachePreload(const char *absolutePath, bool linearScaling);
+void RES_CacheTouch(CSlrImage *image);
+u64 RES_CacheGetCacheUsedBytes();
+int RES_CacheGetCacheEntryCount();
+int RES_CacheGetCacheLoadedCount();
+int RES_CacheGetCacheLoadingCount();
+u64 RES_CacheGetTotalUsedBytes();
+u64 RES_CacheGetBudgetBytes();
+void RES_CacheDebugDump();
+void RES_CacheForceEvictLRU(u64 targetBytesToFree);
+void RES_CacheClearAll();
+bool RES_CacheRetry(const char *absolutePath, bool linearScaling);
 
 // synced image load (locks gui renderer), if no image returns placeholder
 CSlrImage *RES_GetImageOrPlaceholder(const char *imageName, bool linearScaling, bool fromResources);
@@ -154,7 +189,9 @@ void RES_ResourcesPreparingFinishedForLoadingScreen();
 void RES_DebugPrintResources();
 void RES_DebugPrintResourcesToLoad();
 void RES_DebugPrintMemory();
+// DEPRECATED — use RES_DebugSnapshotResources for new ImGui consumers.
 CDataTable *RES_DebugGetDataTable();
+void RES_DebugSnapshotResources(std::vector<RES_ResourceSnapshot> &out);
 void RES_DebugRender();
 
 u8 RES_GetResourceManagerState();

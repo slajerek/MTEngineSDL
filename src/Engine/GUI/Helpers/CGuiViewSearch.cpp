@@ -19,6 +19,18 @@ CGuiViewSearch::CGuiViewSearch(const char *name, float posX, float posY, float p
 	viewJustActivated = false;
 }
 
+CGuiViewSearch::CGuiViewSearch(const char *name, float posX, float posY, float posZ, float sizeX, float sizeY, CGuiViewSearchCallback *callback, const char *titleI18nKey, const char *stableId)
+: CGuiView(name, posX, posY, posZ, sizeX, sizeY, titleI18nKey, stableId)
+{
+	this->callback = callback;
+	this->userData = NULL;
+
+	imGuiSkipKeyPressWhenIoWantsTextInput = false;
+	hideWindowOnFocusLost = false;
+
+	viewJustActivated = false;
+}
+
 CGuiViewSearch::~CGuiViewSearch()
 {
 }

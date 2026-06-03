@@ -18,7 +18,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-//#include <ogg/ogg.h>
 #include "Ogg/ogg.h"
 #include "tremor-ivorbiscodec.h"
 #include "tremor-codec_internal.h"

@@ -5,6 +5,7 @@ class CGuiViewDummySimple : public CGuiView
 {
 public:
 	CGuiViewDummySimple(const char *name, float posX, float posY, float sizeX, float sizeY);
+	CGuiViewDummySimple(const char *name, float posX, float posY, float sizeX, float sizeY, const char *titleI18nKey, const char *stableId);
 	virtual ~CGuiViewDummySimple();
 
 	virtual void RenderImGui();

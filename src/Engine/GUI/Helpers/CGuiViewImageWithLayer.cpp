@@ -15,6 +15,20 @@ CGuiViewImageWithLayer::CGuiViewImageWithLayer(const char *name, float posX, flo
 	editLayerImage = NULL;
 }
 
+CGuiViewImageWithLayer::CGuiViewImageWithLayer(const char *name, float posX, float posY, float sizeX, float sizeY, const char *titleI18nKey, const char *stableId)
+: CGuiViewMovingPaneImage(name, posX, posY, -1, sizeX, sizeY, titleI18nKey, stableId)
+{
+	imGuiNoWindowPadding = true;
+	imGuiNoScrollbar = true;
+
+	InitImage();
+
+	resetLayerImageOnSetImage = true;
+
+	editLayerImageData = NULL;
+	editLayerImage = NULL;
+}
+
 void CGuiViewImageWithLayer::RefreshEmulatorScreenImageData()
 {
 //	CreateEmptyImageData(256, 256);
@@ -119,4 +133,3 @@ void CGuiViewImageWithLayer::RenderMovingPane()
 CGuiViewImageWithLayer::~CGuiViewImageWithLayer()
 {
 }
-

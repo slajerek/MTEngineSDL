@@ -17,6 +17,7 @@ class CGuiViewMovingPane : public CGuiView
 {
 public:
 	CGuiViewMovingPane(const char *name, float posX, float posY, float posZ, float sizeX, float sizeY, float paneWidth, float paneHeight);
+	CGuiViewMovingPane(const char *name, float posX, float posY, float posZ, float sizeX, float sizeY, float paneWidth, float paneHeight, const char *titleI18nKey, const char *stableId);
 	virtual ~CGuiViewMovingPane();
 	
 	virtual void SetPosition(float posX, float posY, float posZ, float sizeX, float sizeY);

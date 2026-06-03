@@ -3,6 +3,7 @@
 #include "DBG_Log.h"
 #include "SYS_Main.h"
 #include "SYS_Platform.h"
+#include "VID_Main.h"
 
 CRenderShaderMaskedTile::CRenderShaderMaskedTile(CRenderBackendOpenGL4 *renderBackend)
 : CRenderShaderOpenGL4(renderBackend, "MaskedTile")
@@ -75,10 +76,10 @@ void CRenderShaderMaskedTile::GetUniformsLocations()
 
 void CRenderShaderMaskedTile::SetShaderVars()
 {
-	// Get DPI scale for retina displays
+	// Get DPI scale for the current display (works after window moves between screens)
 	float dpiScale = 1.0f;
 #ifdef __APPLE__
-	dpiScale = MACOS_GetBackingScaleFactor(1);
+	dpiScale = MACOS_GetBackingScaleFactor(SDL_GetWindowDisplayIndex(VID_GetMainSDLWindow()));
 #endif
 
 	// Bind mask texture to unit 1

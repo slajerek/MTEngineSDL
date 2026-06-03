@@ -2,6 +2,7 @@
 #define _CViewAudioMixer_h_
 
 #include "CGuiView.h"
+#include <map>
 
 class CAudioChannel;
 
@@ -59,6 +60,7 @@ public:
 	
 	//
 	std::list<CAudioChannel *> *audioChannels;
+	std::map<CAudioChannel *, float> peakHoldLevels;
 };
 
 #endif //_GUI_VIEW_DUMMY_

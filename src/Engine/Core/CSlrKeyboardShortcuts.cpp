@@ -68,7 +68,13 @@ void CSlrKeyboardShortcutsZone::AddShortcut(CSlrKeyboardShortcut *shortcutToAdd)
 
 void CSlrKeyboardShortcutsZone::RemoveShortcut(CSlrKeyboardShortcut *shortcutToRemove)
 {
-	//this->shortcutByHashcode->erase(shortcutToRemove->hashCode);
+	if (!shortcutToRemove)
+		return;
+
+	// Keep internal maps/lists consistent. This must remove the shortcut from shortcutByHashcode,
+	// otherwise AddShortcut() may see a stale entry and treat it as a duplicate.
+	this->shortcutByHashcode->erase(shortcutToRemove->hashCode);
+	this->shortcuts.remove(shortcutToRemove);
 
 	if (shortcutToRemove->keyCode > 0)
 	{
@@ -76,24 +82,12 @@ void CSlrKeyboardShortcutsZone::RemoveShortcut(CSlrKeyboardShortcut *shortcutToR
 		if (itListOfShortcuts != this->shortcutsByKeycode->end())
 		{
 			std::list<CSlrKeyboardShortcut *> *listOfShortcuts = itListOfShortcuts->second;
-			
-			for (std::list<CSlrKeyboardShortcut *>::iterator it = listOfShortcuts->begin(); it != listOfShortcuts->end(); it++)
-			{
-				CSlrKeyboardShortcut *shortcut = *it;
-				if (shortcut->isShift == shortcutToRemove->isShift
-					&& shortcut->isAlt == shortcutToRemove->isAlt
-					&& shortcut->isControl == shortcutToRemove->isControl
-					&& shortcut->isSuper == shortcutToRemove->isSuper)
-				{
-					listOfShortcuts->remove(shortcut);
-					if (listOfShortcuts->empty())
-					{
-						this->shortcutsByKeycode->erase(shortcutToRemove->keyCode);
-						delete listOfShortcuts;
-					}
 
-					return;
-				}
+			listOfShortcuts->remove(shortcutToRemove);
+			if (listOfShortcuts->empty())
+			{
+				this->shortcutsByKeycode->erase(shortcutToRemove->keyCode);
+				delete listOfShortcuts;
 			}
 		}
 	}
@@ -478,4 +472,3 @@ bool CSlrKeyboardShortcutCallback::ProcessKeyboardShortcut(u32 zone, u8 actionTy
 	LOGError("CSlrKeyboardShortcutCallback::ProcessKeyboardShortcut: not implemented for keyboardShortcut=%s", keyboardShortcut->name);
 	return false;
 }
-

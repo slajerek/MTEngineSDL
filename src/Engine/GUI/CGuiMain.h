@@ -5,9 +5,11 @@
 #include "CSlrFontBitmap.h"
 #include <list>
 #include <map>
+#include <unordered_map>
 
 class CGlobalKeyboardCallback;
 class CGlobalLogicCallback;
+class CGlobalLayoutCallback;
 class CGlobalOSWindowChangedCallback;
 class CGlobalDropFileCallback;
 class CSlrKeyboardShortcut;
@@ -47,6 +49,15 @@ enum LayoutStorageTask
 	StoreLayout,
 	RestoreLayout
 };
+
+enum EAutoLayoutDockedPreserveScanTabBarMode
+{
+	AutoLayoutDockedPreserveScanTabBarMode_Default,
+	AutoLayoutDockedPreserveScanTabBarMode_TabBar,
+	AutoLayoutDockedPreserveScanTabBarMode_NoTabBar
+};
+
+ImGuiDockNodeFlags GetAutoLayoutDockedPreserveScanLeafFlags(ImGuiDockNodeFlags flags, EAutoLayoutDockedPreserveScanTabBarMode tabBarMode);
 
 class CUiThreadTaskCallback
 {
@@ -119,6 +130,7 @@ public:
 	CLayoutData *layoutForThisFrame;
 	LayoutStorageTask layoutStoreOrRestore;
 	bool layoutStoreCurrentInSettings;
+	int layoutStoreAfterFrameDelay;
 	void SerializeLayout(CLayoutData *layout);
 	bool DeserializeLayout(CLayoutData *layout);
 	bool layoutJustRestored;
@@ -130,6 +142,7 @@ public:
 	void SetFocus(CGuiView *view);
 	void SetInternalViewFocus(CGuiView *view);
 	bool ClearInternalViewFocus();
+	bool FocusTraverseVisibleViews(bool reverse);
 
 	CGuiView *focusedViewThisFrameOnly;
 
@@ -225,6 +238,11 @@ public:
 	void ClearGlobalOSWindowChangedCallbacks();
 	void NotifyGlobalOSWindowChangedCallbacks();
 
+	std::list<CGlobalLayoutCallback *> globalLayoutCallbacks;
+	void AddGlobalLayoutCallback(CGlobalLayoutCallback *callback);
+	void RemoveGlobalLayoutCallback(CGlobalLayoutCallback *callback);
+	void ClearGlobalLayoutCallbacks();
+
 	std::list<CGlobalDropFileCallback *> globalDropFileCallbacks;
 	void AddGlobalDropFileCallback(CGlobalDropFileCallback *callback);
 	void RemoveGlobalDropFileCallback(CGlobalDropFileCallback *callback);
@@ -297,6 +315,26 @@ public:
 	void UpdateLayouts();
 	void PostRenderEndFrame();
 
+	// Arrange currently visible windows on screen (next frame).
+	// This only affects floating windows and floating dock-node groups.
+	// It does not modify the main dockspace tree.
+	// Default mode: tries to preserve the existing relative layout/positions.
+	void RequestAutoLayoutVisibleViews();
+	// Compact mode: packs windows tightly.
+	void RequestAutoLayoutVisibleViewsCompact();
+	// Docked mode: docks visible floating windows to the main dockspace of their viewport.
+	void RequestAutoLayoutVisibleViewsDocked();
+	// Docked preserve-scan mode: rebuilds the main dockspace split tree to match the current
+	// on-screen window arrangement (using current window positions/sizes and z-order).
+	// Fully occluded or sliver-visible windows are hidden.
+	void RequestAutoLayoutVisibleViewsDockedPreserveScan();
+	void RequestAutoLayoutVisibleViewsDockedPreserveScan(EAutoLayoutDockedPreserveScanTabBarMode tabBarMode);
+	void OpenAutoLayoutSettingsWindow();
+	// Called from GUI_Render() before rendering views.
+	void RenderDockSpacesOverViewports();
+	// Called from GUI_Render() to apply a pending request.
+	void RunAutoLayoutIfRequested();
+
 	//
 	void LockMutex();
 	bool TryLockMutex();
@@ -308,6 +346,31 @@ public:
 private:
 	CSlrMutex *renderMutex;
 	CSlrMutex *notificationMutex;
+
+	enum EAutoLayoutMode
+	{
+		AutoLayoutMode_Preserve,
+		AutoLayoutMode_Compact,
+		AutoLayoutMode_Docked,
+		AutoLayoutMode_DockedPreserveScan
+	};
+
+	bool autoLayoutRequested;
+	EAutoLayoutMode autoLayoutRequestedMode;
+	EAutoLayoutDockedPreserveScanTabBarMode autoLayoutDockedPreserveScanTabBarMode;
+	bool autoLayoutSettingsWindowVisible;
+	std::unordered_map<ImGuiID, ImGuiID> dockSpaceIdByViewportId;
+
+	// Auto layout settings (persisted in application default config)
+	float autoLayoutMargin;
+	float autoLayoutGap;
+	float autoLayoutMinWindowSize;
+	float autoLayoutShrinkExpMin;
+	float autoLayoutShrinkExpMax;
+
+	void LoadAutoLayoutSettingsFromConfig();
+	bool SaveAutoLayoutSettingsToConfig();
+	void ResetAutoLayoutSettingsToDefaults();
 };
 
 // TODO: MOVE ME TO CPP

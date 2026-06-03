@@ -16,6 +16,7 @@
 #if defined(MACOS)
 #include "SYS_MacOSWrapper.h"
 #include "CRenderBackendMetal.h"
+#include <pthread.h>
 #endif
 
 #if defined(WIN32)
@@ -50,6 +51,7 @@ u64 gCurrentFrameNumber = 0;
 
 bool gViewportsEnableInitAtStartup = false;
 bool gHeadlessMode = false;
+bool gServiceMode = false;
 
 SDL_Window *VID_GetMainSDLWindow()
 {
@@ -67,9 +69,21 @@ void VID_Init()
 //	SCREEN_FPS = MT_GetDefaultFPS();
 	
 #if defined(MACOS)
-//	gRenderBackend = new CRenderBackendMetal();
-	gRenderBackend = new CRenderBackendOpenGL4();
+	{
+		const char *preferredBackend = VID_GetPreferredRenderBackend();
+		if (strcmp(preferredBackend, "metal") == 0)
+		{
+			LOGM("VID_Init: using Metal render backend");
+			gRenderBackend = new CRenderBackendMetal();
+		}
+		else
+		{
+			LOGM("VID_Init: using OpenGL4 render backend");
+			gRenderBackend = new CRenderBackendOpenGL4();
+		}
+	}
 #else
+	LOGM("VID_Init: using OpenGL4 render backend");
 	gRenderBackend = new CRenderBackendOpenGL4();
 #endif
 	
@@ -327,7 +341,7 @@ void VID_Render()
 	gRenderBackend->NewFrame(clearColor);
 	
 	ImGui_ImplSDL2_NewFrame();
-	
+
 	ImGui::NewFrame();
 
 #ifdef ENABLE_IMGUI_TEST_ENGINE
@@ -335,6 +349,29 @@ void VID_Render()
 #endif
 
 	ImGuiIO& io = ImGui::GetIO();
+
+	// Resync modifier state from ImGui's per-frame view of the keyboard.
+	// In VID_ProcessEvents we only update guiMain->is*Pressed on SDL
+	// KEYDOWN/KEYUP, which fails when SDL silently drops a KEYUP — most
+	// commonly when the user holds Shift while drag-docking a window
+	// (the macOS+SDL2 drag handover steals the Shift release event), or
+	// when the app loses keyboard focus mid-modifier. The stuck modifier
+	// then bleeds into every subsequent key: "Q" turns into Shift+Q
+	// (transpose-up in the GT2 pattern editor), "F" routes through
+	// Shift+F instead of the bare F hex digit, etc.
+	//
+	// ImGui already does the right thing here. ImGui_ImplSDL2_NewFrame
+	// reads SDL_GetKeyboardState directly each frame and writes io.Key*,
+	// so io.Key* reflects the live OS state — KEYUP delivery is not on
+	// the critical path. Mirroring those into guiMain right after
+	// NewFrame keeps the engine's modifier view in lockstep with what
+	// ImGui sees, and recovers from any missed KEYUP on the very next
+	// frame instead of staying stuck until the user explicitly retaps
+	// the modifier.
+	guiMain->isShiftPressed   = io.KeyShift;
+	guiMain->isControlPressed = io.KeyCtrl;
+	guiMain->isAltPressed     = io.KeyAlt;
+	guiMain->isSuperPressed   = io.KeySuper;
 	
 	VID_LockRenderMutex();
 	
@@ -382,23 +419,25 @@ int SDL_filterEventCallback(void *userdata, SDL_Event * event)
 {
 	if (VID_isChangingFullScreenState)
 		return 1;
-	
+
 	if (event->type == SDL_WINDOWEVENT && event->window.event == SDL_WINDOWEVENT_RESIZED)
 	{
-		//convert userdata pointer to yours and trigger your own draw function
-		//this is called very often now
-		
-		// TODO: check this, it seems this is indeed called on other thread which is WRONG
-		
-		//IMPORTANT: Might be called from a different thread, see SDL_SetEventFilter docs
-		//((MyApplicationClass *)userdata)->myDrawFunction();
-		
+		// SDL_SetEventFilter docs: "the callback may run in a different thread".
+		// On macOS, calling VID_Render() from a non-main thread triggers
+		// ImGui::UpdatePlatformWindows() which modifies SDL/Cocoa window
+		// properties, corrupting the window manager's XPC transaction state
+		// and causing intermittent CFHash crashes at startup.
+#if defined(MACOS)
+		if (pthread_main_np() == 0)
+			return 1;  // not main thread — skip render, let main loop handle it
+#endif
+
 		VID_Render();
-		
+
 		//return 0 if you don't want to handle this event twice
 		return 0;
 	}
-	
+
 	//important to allow all events, or your SDL_PollEvent doesn't get any event
 	return 1;
 }
@@ -899,9 +938,16 @@ void VID_RenderLoop()
 	while (mtQuitApplication == false)
 	{
 		VID_ProcessEvents();
-		
+
+		// Dock-Quit (macOS) posts SDL_QUIT mid-iteration while AppKit is already
+		// tearing down CVDisplayLink / NSOpenGLContext. Bail out before touching
+		// GL again — otherwise we hit glTexSubImage2D crashes or hang in
+		// Cocoa_GL_SwapWindow's cond wait.
+		if (mtQuitApplication)
+			break;
+
 		VID_Render();
-		
+
 		GUI_PostRenderEndFrame();
 		
 		if (eventsLoopWithFpsCap)
@@ -926,10 +972,10 @@ void VID_RenderLoop()
 				
 				VID_ProcessEvents();
 			}
+			SYS_Sleep(1);
 		}
-		SYS_Sleep(1);
 	}
-	
+
 	mtEventLoopRunning = false;
 }
 
@@ -965,6 +1011,38 @@ CRenderBackend *VID_GetRenderBackend()
 	return gRenderBackend;
 }
 
+const char *VID_GetPreferredRenderBackend()
+{
+	const char *value = nullptr;
+	gApplicationDefaultConfig->GetString("renderBackend", &value, "opengl");
+	return value ? value : "opengl";
+}
+
+void VID_SetPreferredRenderBackend(const char *name)
+{
+	if (!name)
+		return;
+	if (strcmp(name, "metal") != 0 && strcmp(name, "opengl") != 0)
+		return;
+	gApplicationDefaultConfig->SetString("renderBackend", name);
+}
+
+const char *VID_GetCurrentRenderBackendName()
+{
+	if (gRenderBackend)
+		return gRenderBackend->name;
+	return "none";
+}
+
+bool VID_IsRenderBackendSwitchable()
+{
+#if defined(MACOS)
+	return true;
+#else
+	return false;
+#endif
+}
+
 void VID_Shutdown()
 {
 	LOGM("VID_Shutdown");
@@ -988,9 +1066,18 @@ unsigned long VID_GetTickCount()
 	gettimeofday(&ts, 0);
 	return (long)(ts.tv_sec * 1000 + (ts.tv_usec / 1000));
 #elif defined(WIN32)
-	return GetTickCount();
+	// QueryPerformanceCounter gives sub-microsecond precision vs GetTickCount's ~15.6ms
+	static INT64 qpcFreq = 0;
+	if (qpcFreq == 0)
+	{
+		LARGE_INTEGER freq;
+		QueryPerformanceFrequency(&freq);
+		qpcFreq = freq.QuadPart;
+	}
+	LARGE_INTEGER counter;
+	QueryPerformanceCounter(&counter);
+	return (unsigned long)(counter.QuadPart * 1000 / qpcFreq);
 #endif
-
 }
 
 SDL_Window *ImGui_ImplSDL2_ImGuiViewportToSDLWindow(ImGuiViewport *imGuiViewport);

@@ -5,6 +5,7 @@
 #include "SYS_FileSystem.h"
 #include "CSlrString.h"
 #include "SYS_DefaultConfig.h"
+#include <cstring>
 
 //#define WRITE_AUDIO_OUT_TO_FILE
 
@@ -95,6 +96,7 @@ CSoundEngine::CSoundEngine()
 
 	this->deviceOutName[0] = 0;
 	this->currentAudioDevice = 0;
+	this->isUsingAudioDeviceApi = false;
 	this->isPlaybackOn = false;
 }
 
@@ -142,11 +144,23 @@ bool CSoundEngine::SetOutputAudioDevice(const char *deviceName)
 
 	this->LockMutex("CSoundEngine::SetOutputAudioDevice");
 	
-	SDL_CloseAudioDevice(currentAudioDevice);
-	SDL_CloseAudio();
+	if (isUsingAudioDeviceApi)
+	{
+		if (currentAudioDevice != 0)
+		{
+			SDL_CloseAudioDevice(currentAudioDevice);
+		}
+	}
+	else
+	{
+		SDL_CloseAudio();
+	}
+
 	currentAudioDevice = 0;
+	isUsingAudioDeviceApi = false;
 	
 	SDL_AudioSpec wanted;
+	memset(&wanted, 0x00, sizeof(SDL_AudioSpec));
 	
 	int bufferNumSamples = 512; //1024;  // Good low-latency value for callback
 	gApplicationDefaultConfig->GetInt("AudioBufferNumSamples", &bufferNumSamples, 512);
@@ -166,46 +180,60 @@ bool CSoundEngine::SetOutputAudioDevice(const char *deviceName)
 
 	if (deviceName == NULL)
 	{
-		if (SDL_OpenAudio(&wanted, NULL) < 0)
+		bool useDefaultOutputDeviceApi = false;
+		gApplicationDefaultConfig->GetBool("AudioUseDefaultOutputDeviceApi", &useDefaultOutputDeviceApi, false);
+
+		if (useDefaultOutputDeviceApi)
 		{
-			LOGError("Couldn't open audio: %s\n", SDL_GetError());
-			SYS_FatalExit();
+			currentAudioDevice = SDL_OpenAudioDevice(NULL, false, &wanted, NULL, 0);
+			if (currentAudioDevice != 0)
+			{
+				isUsingAudioDeviceApi = true;
+			}
+			else
+			{
+				LOGWarning("CSoundEngine::SetOutputAudioDevice: default SDL_OpenAudioDevice failed, using SDL_OpenAudio fallback: %s", SDL_GetError());
+			}
 		}
-		
-		// BUG: this causes emulation fps to drop, although it is recommended version by the SDL authors, it does not work properly for some reason
-//		currentAudioDevice = SDL_OpenAudioDevice(NULL, false, &wanted, NULL, 0);
-//		if (currentAudioDevice == 0)
-//		{
-//			LOGError("Couldn't open default audio output device: %s\n", SDL_GetError());
-//			SYS_FatalExit();
-//		}
-		
-		deviceOutName[0] = 0;
-		currentAudioDevice = 1;
-	}
-	else
-	{
-		strcpy(deviceOutName, deviceName);
-		currentAudioDevice = SDL_OpenAudioDevice(deviceName, false, &wanted, NULL, 0);
-		if (currentAudioDevice == 0)
+
+		if (!isUsingAudioDeviceApi)
 		{
-			LOGError("Couldn't open audio device: %s (device=%s)\n", SDL_GetError(), deviceName);
-			
-			// TODO: fallback to mono
 			if (SDL_OpenAudio(&wanted, NULL) < 0)
 			{
 				LOGError("Couldn't open audio: %s\n", SDL_GetError());
 				SYS_FatalExit();
 			}
-			currentAudioDevice = 1;
+			currentAudioDevice = 0;
+		}
+
+		deviceOutName[0] = 0;
+	}
+	else
+	{
+		strncpy(deviceOutName, deviceName, sizeof(deviceOutName)-1);
+		deviceOutName[sizeof(deviceOutName)-1] = 0;
+		currentAudioDevice = SDL_OpenAudioDevice(deviceName, false, &wanted, NULL, 0);
+		if (currentAudioDevice == 0)
+		{
+			LOGError("Couldn't open audio device: %s (device=%s)\n", SDL_GetError(), deviceName);
+			
+			// fallback to legacy default output
+			deviceOutName[0] = 0;
+			if (SDL_OpenAudio(&wanted, NULL) < 0)
+			{
+				LOGError("Couldn't open audio: %s\n", SDL_GetError());
+				SYS_FatalExit();
+			}
+			currentAudioDevice = 0;
+			isUsingAudioDeviceApi = false;
 		}
 		else
 		{
-			SDL_PauseAudioDevice(currentAudioDevice, 0);
+			isUsingAudioDeviceApi = true;
 		}
 	}
 
-	LOGM("CSoundEngine::SetOutputAudioDevice: opened device %d", currentAudioDevice);
+	LOGM("CSoundEngine::SetOutputAudioDevice: opened mode=%s device=%d", isUsingAudioDeviceApi ? "SDL_OpenAudioDevice" : "SDL_OpenAudio", currentAudioDevice);
 	
 	if (wasPlaybackOn)
 	{
@@ -214,7 +242,7 @@ bool CSoundEngine::SetOutputAudioDevice(const char *deviceName)
 	
 	this->UnlockMutex("CSoundEngine::SetOutputAudioDevice");
 	
-	return true;;
+	return true;
 }
 
 void CSoundEngine::RestartAudioDevice()
@@ -231,13 +259,27 @@ void CSoundEngine::RestartAudioDevice()
 
 void CSoundEngine::StartPlaying()
 {
-	SDL_PauseAudioDevice(currentAudioDevice, 0);
+	if (isUsingAudioDeviceApi)
+	{
+		SDL_PauseAudioDevice(currentAudioDevice, 0);
+	}
+	else
+	{
+		SDL_PauseAudio(0);
+	}
 	isPlaybackOn = true;
 }
 
 void CSoundEngine::StopPlaying()
 {
-	SDL_PauseAudioDevice(currentAudioDevice, 1);
+	if (isUsingAudioDeviceApi)
+	{
+		SDL_PauseAudioDevice(currentAudioDevice, 1);
+	}
+	else
+	{
+		SDL_PauseAudio(1);
+	}
 	isPlaybackOn = false;
 }
 
@@ -288,4 +330,3 @@ void CSoundEngine::UnlockMutex(const char *whoLocked)
 //	
 //	return ((chanR & 0x0000FFFF) << 16) | (chanL & 0x0000FFFF);
 //}
-

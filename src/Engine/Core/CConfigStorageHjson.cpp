@@ -170,6 +170,11 @@ void CConfigStorageHjson::SetFloat(const char *name, float *value)
 	SaveConfig();
 }
 
+void CConfigStorageHjson::SetFloatSkipConfigSave(const char *name, float *value)
+{
+	hjsonRoot[name] = *value;
+}
+
 void CConfigStorageHjson::GetFloat(const char *name, float *value, float defaultValue)
 {
 	Hjson::Value hValue;
@@ -196,6 +201,11 @@ void CConfigStorageHjson::SetDouble(const char *name, double *value)
 {
 	hjsonRoot[name] = *value;
 	SaveConfig();
+}
+
+void CConfigStorageHjson::SetDoubleSkipConfigSave(const char *name, double *value)
+{
+	hjsonRoot[name] = *value;
 }
 
 void CConfigStorageHjson::GetDouble(const char *name, double *value, double defaultValue)

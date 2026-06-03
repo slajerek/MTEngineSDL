@@ -8,6 +8,11 @@ CGuiViewDummySimple::CGuiViewDummySimple(const char *name, float posX, float pos
 //	imGuiNoScrollbar = true;
 }
 
+CGuiViewDummySimple::CGuiViewDummySimple(const char *name, float posX, float posY, float sizeX, float sizeY, const char *titleI18nKey, const char *stableId)
+: CGuiView(name, posX, posY, sizeX, sizeY, titleI18nKey, stableId)
+{
+}
+
 CGuiViewDummySimple::~CGuiViewDummySimple()
 {
 }

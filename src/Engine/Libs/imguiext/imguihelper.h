@@ -63,8 +63,8 @@ void ImDrawListAddRectWithHorizontalGradient(ImDrawList *dl, const ImVec2 &a, co
 #       define IMGUIHELPER_HAS_VERTICAL_TEXT_SUPPORT
 #   endif //IMGUIHELPER_HAS_VERTICAL_TEXT_SUPPORT
 ImVec2 CalcVerticalTextSize(const char* text, const char* text_end = NULL, bool hide_text_after_double_hash = false, float wrap_width = -1.0f);
-void RenderTextVertical(const ImFont* font,ImDrawList* draw_list, float size, ImVec2 pos, ImU32 col, const ImVec4& clip_rect, const char* text_begin, const char* text_end=NULL, float wrap_width=0.0f, bool cpu_fine_clip=false, bool rotateCCW=false);
-void AddTextVertical(ImDrawList* drawList,const ImFont* font, float font_size, const ImVec2& pos, ImU32 col, const char* text_begin, const char* text_end=NULL, float wrap_width=0.0f, const ImVec4* cpu_fine_clip_rect=NULL,bool rotateCCW = false);
+void RenderTextVertical(ImFont* font,ImDrawList* draw_list, float size, ImVec2 pos, ImU32 col, const ImVec4& clip_rect, const char* text_begin, const char* text_end=NULL, float wrap_width=0.0f, bool cpu_fine_clip=false, bool rotateCCW=false);
+void AddTextVertical(ImDrawList* drawList,ImFont* font, float font_size, const ImVec2& pos, ImU32 col, const char* text_begin, const char* text_end=NULL, float wrap_width=0.0f, const ImVec4* cpu_fine_clip_rect=NULL,bool rotateCCW = false);
 void AddTextVertical(ImDrawList* drawList,const ImVec2& pos, ImU32 col, const char* text_begin, const char* text_end=NULL,bool rotateCCW = false);
 void RenderTextVerticalClipped(const ImVec2& pos_min, const ImVec2& pos_max, const char* text, const char* text_end, const ImVec2* text_size_if_known,const ImVec2& align =  ImVec2(0.0f,0.0f), const ImVec2* clip_min=NULL, const ImVec2* clip_max=NULL,bool rotateCCW=false);
 #endif //NO_IMGUIHELPER_VERTICAL_TEXT_METHODS

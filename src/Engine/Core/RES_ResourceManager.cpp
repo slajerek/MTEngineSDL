@@ -55,7 +55,8 @@ u64 gMaxTotalSystemMemory = 999 * 1024 * 1024;
 u64 gMaxTotalSystemMemory = 999 * 1024 * 1024;
 #endif
 
-u64 gCurrentResourceMemoryTaken = 0;
+std::atomic<u64> gMaxMemoryForResources = 999 * 1024 * 1024;
+std::atomic<u64> gCurrentResourceMemoryTaken = 0;
 u64 gMemoryTakenAtStart = 0;
 
 u64 lastResourceId = 0;
@@ -82,6 +83,10 @@ CResourceLoaderThread *_resourceLoaderThread = NULL;
 
 void RES_LoadResourcesAsync();
 void RES_ResourcesLoadingFinished();
+static u64 ResComputeCacheKey(const char *absolutePath, bool linearScaling);
+static bool ResCachePathMatches(CSlrResourceBase *resource, const char *absolutePath);
+static bool ResClaimCacheResourceForEviction(CSlrResourceBase *resource);
+static void RES_CacheAutoTrim();
 
 // for debug purposes, will crash if trying to allocate more
 #define MAX_MEMORY_TOTAL		1024 *1024*1024
@@ -93,6 +98,7 @@ void RES_Init(u16 destScreenWidth)
 
 	gMemoryTakenAtStart = SYS_GetUsedMemory();
 	gCurrentResourceMemoryTaken = 0;
+	gMaxMemoryForResources = gMaxTotalSystemMemory;
 	lastResourceId = 0;
 
 	resourceManagerMutex = new CSlrMutex("resourceManagerMutex");
@@ -140,6 +146,7 @@ void RES_SetMaxSystemMemory(u32 maxMemory)
 	LOGR("RES_SetMaxSystemMemory: %d", maxMemory);
 	
 	gMaxTotalSystemMemory = maxMemory;
+	gMaxMemoryForResources = maxMemory;
 	
 	// release resources that extend this value
 	RES_PrepareMemory(0, true);
@@ -188,7 +195,47 @@ CSlrResourceBase *RES_GetResource(const char *resourceName)
 void RES_DeactivateResource(CSlrResourceBase *res)
 {
 	LOGR("RES_DeactivateResource: '%s'", res->ResourceGetPath());
-	res->ResourceDeactivate(true);
+	if (res == NULL)
+		return;
+
+	if (res->resourceState != RESOURCE_STATE_LOADED
+		&& res->resourceState != RESOURCE_STATE_EVICTING)
+	{
+		return;
+	}
+
+	u32 memFreed = res->ResourceDeactivate(true);
+	if (memFreed > 0)
+	{
+		gCurrentResourceMemoryTaken.fetch_sub(memFreed, std::memory_order_relaxed);
+	}
+}
+
+static u64 ResComputeCacheKey(const char *absolutePath, bool linearScaling)
+{
+	std::string keySource = "RES_CACHE|";
+	keySource += absolutePath;
+	keySource += linearScaling ? "|L" : "|N";
+	u64 key = GetHashCode64(keySource.c_str());
+	return key == 0 ? 1 : key;
+}
+
+static bool ResCachePathMatches(CSlrResourceBase *resource, const char *absolutePath)
+{
+	return resource != NULL && resource->resourcePath != NULL && !strcmp(resource->resourcePath, absolutePath);
+}
+
+static bool ResClaimCacheResourceForEviction(CSlrResourceBase *resource)
+{
+	if (resource == NULL)
+		return false;
+	if (resource->resourceState != RESOURCE_STATE_LOADED)
+		return false;
+	CSlrImage *image = dynamic_cast<CSlrImage *>(resource);
+	if (image == NULL || image->cacheKey == 0)
+		return false;
+	resource->resourceState = RESOURCE_STATE_EVICTING;
+	return true;
 }
 
 
@@ -468,7 +515,7 @@ CSlrImage *RES_GetImageOrPlaceholder(const char *imageName, bool linearScaling, 
 CSlrImage *RES_LoadImageFromFileOS(CSlrString *path, bool linearScaling)
 {
 	char *cPath = path->GetUTF8();
-	CSlrImage *ret = RES_LoadImageFromFileOS(path, linearScaling);
+	CSlrImage *ret = RES_LoadImageFromFileOS(cPath, linearScaling);
 	delete [] cPath;
 	return ret;
 }
@@ -487,6 +534,247 @@ CSlrImage *RES_LoadImageFromFileOS(const char *path, bool linearScaling)
 
 	delete file;
 	return image;
+}
+
+CSlrImage *RES_CacheGetImage(const char *absolutePath, bool linearScaling)
+{
+	if (absolutePath == NULL || absolutePath[0] == 0)
+		return NULL;
+
+	const u64 key = ResComputeCacheKey(absolutePath, linearScaling);
+	CSlrImage *image = NULL;
+	bool shouldActivate = false;
+
+	RES_LockMutex("RES_CacheGetImage");
+	auto it = resourcesByHashcode.find(key);
+	if (it != resourcesByHashcode.end())
+	{
+		image = dynamic_cast<CSlrImage *>(it->second);
+		if (image == NULL || !ResCachePathMatches(image, absolutePath))
+		{
+			LOGError("RES_CacheGetImage: cache hash collision key=%llu existing=%s requested=%s",
+					 key,
+					 (it->second && it->second->resourcePath) ? it->second->resourcePath : "NULL",
+					 absolutePath);
+			RES_UnlockMutex("RES_CacheGetImage");
+			return NULL;
+		}
+
+		if (image->resourceState == RESOURCE_STATE_DEALLOCATED)
+		{
+			image->resourceState = RESOURCE_STATE_LOADING;
+			shouldActivate = true;
+		}
+		else if (image->resourceState == RESOURCE_STATE_ERROR)
+		{
+			RES_UnlockMutex("RES_CacheGetImage");
+			return image;
+		}
+	}
+	else
+	{
+		image = new CSlrImage(true, linearScaling);
+		image->cacheKey = key;
+		image->cacheLinearScaling = linearScaling;
+		image->resourceHashCode = key;
+		image->resourceState = RESOURCE_STATE_LOADING;
+		image->ResourceSetPath(absolutePath, false);
+		resourcesByHashcode[key] = image;
+		shouldActivate = true;
+	}
+	RES_UnlockMutex("RES_CacheGetImage");
+
+	if (shouldActivate)
+	{
+		u32 memAdded = image->ResourceActivate(true);
+		if (image->resourceState != RESOURCE_STATE_ERROR && memAdded > 0)
+		{
+			gCurrentResourceMemoryTaken.fetch_add(memAdded, std::memory_order_relaxed);
+			RES_CacheAutoTrim();
+		}
+	}
+
+	return image;
+}
+
+void RES_CachePreload(const char *absolutePath, bool linearScaling)
+{
+	(void)RES_CacheGetImage(absolutePath, linearScaling);
+}
+
+void RES_CacheTouch(CSlrImage *image)
+{
+	if (image == NULL || image->cacheKey == 0)
+		return;
+	image->resourceActivatedTime.store(gCurrentFrameTime, std::memory_order_relaxed);
+}
+
+u64 RES_CacheGetCacheUsedBytes()
+{
+	u64 bytes = 0;
+	RES_LockMutex("RES_CacheGetCacheUsedBytes");
+	for (auto &entry : resourcesByHashcode)
+	{
+		CSlrImage *image = dynamic_cast<CSlrImage *>(entry.second);
+		if (image != NULL && image->cacheKey != 0 && image->resourceState == RESOURCE_STATE_LOADED)
+			bytes += image->resourceIdleSize;
+	}
+	RES_UnlockMutex("RES_CacheGetCacheUsedBytes");
+	return bytes;
+}
+
+int RES_CacheGetCacheEntryCount()
+{
+	int count = 0;
+	RES_LockMutex("RES_CacheGetCacheEntryCount");
+	for (auto &entry : resourcesByHashcode)
+	{
+		CSlrImage *image = dynamic_cast<CSlrImage *>(entry.second);
+		if (image != NULL && image->cacheKey != 0)
+			count++;
+	}
+	RES_UnlockMutex("RES_CacheGetCacheEntryCount");
+	return count;
+}
+
+int RES_CacheGetCacheLoadedCount()
+{
+	int count = 0;
+	RES_LockMutex("RES_CacheGetCacheLoadedCount");
+	for (auto &entry : resourcesByHashcode)
+	{
+		CSlrImage *image = dynamic_cast<CSlrImage *>(entry.second);
+		if (image != NULL && image->cacheKey != 0 && image->resourceState == RESOURCE_STATE_LOADED)
+			count++;
+	}
+	RES_UnlockMutex("RES_CacheGetCacheLoadedCount");
+	return count;
+}
+
+int RES_CacheGetCacheLoadingCount()
+{
+	int count = 0;
+	RES_LockMutex("RES_CacheGetCacheLoadingCount");
+	for (auto &entry : resourcesByHashcode)
+	{
+		CSlrImage *image = dynamic_cast<CSlrImage *>(entry.second);
+		if (image != NULL && image->cacheKey != 0 && image->resourceState == RESOURCE_STATE_LOADING)
+			count++;
+	}
+	RES_UnlockMutex("RES_CacheGetCacheLoadingCount");
+	return count;
+}
+
+u64 RES_CacheGetTotalUsedBytes()
+{
+	return gCurrentResourceMemoryTaken.load(std::memory_order_relaxed);
+}
+
+u64 RES_CacheGetBudgetBytes()
+{
+	return gMaxMemoryForResources.load(std::memory_order_relaxed);
+}
+
+void RES_CacheDebugDump()
+{
+	RES_DebugPrintResources();
+}
+
+void RES_CacheForceEvictLRU(u64 targetBytesToFree)
+{
+	std::vector<CSlrImage *> candidates;
+	RES_LockMutex("RES_CacheForceEvictLRU");
+	for (auto &entry : resourcesByHashcode)
+	{
+		CSlrImage *image = dynamic_cast<CSlrImage *>(entry.second);
+		if (image != NULL && image->cacheKey != 0 && image->resourceState == RESOURCE_STATE_LOADED)
+			candidates.push_back(image);
+	}
+	RES_UnlockMutex("RES_CacheForceEvictLRU");
+
+	std::sort(candidates.begin(), candidates.end(), [](CSlrImage *a, CSlrImage *b) {
+		return a->resourceActivatedTime.load(std::memory_order_relaxed) < b->resourceActivatedTime.load(std::memory_order_relaxed);
+	});
+
+	u64 freed = 0;
+	for (CSlrImage *image : candidates)
+	{
+		RES_LockMutex("RES_CacheForceEvictLRUClaim");
+		bool claimed = ResClaimCacheResourceForEviction(image);
+		RES_UnlockMutex("RES_CacheForceEvictLRUClaim");
+		if (!claimed)
+			continue;
+		freed += image->resourceIdleSize;
+		RES_DeactivateResource(image);
+		if (freed >= targetBytesToFree)
+			break;
+	}
+}
+
+void RES_CacheClearAll()
+{
+	std::vector<CSlrImage *> candidates;
+	RES_LockMutex("RES_CacheClearAll");
+	for (auto &entry : resourcesByHashcode)
+	{
+		CSlrImage *image = dynamic_cast<CSlrImage *>(entry.second);
+		if (image != NULL && image->cacheKey != 0 && image->resourceState == RESOURCE_STATE_LOADED)
+			candidates.push_back(image);
+	}
+	RES_UnlockMutex("RES_CacheClearAll");
+
+	for (CSlrImage *image : candidates)
+	{
+		RES_LockMutex("RES_CacheClearAllClaim");
+		bool claimed = ResClaimCacheResourceForEviction(image);
+		RES_UnlockMutex("RES_CacheClearAllClaim");
+		if (claimed)
+			RES_DeactivateResource(image);
+	}
+}
+
+bool RES_CacheRetry(const char *absolutePath, bool linearScaling)
+{
+	if (absolutePath == NULL || absolutePath[0] == 0)
+		return false;
+
+	const u64 key = ResComputeCacheKey(absolutePath, linearScaling);
+	CSlrImage *image = NULL;
+	RES_LockMutex("RES_CacheRetry");
+	auto it = resourcesByHashcode.find(key);
+	if (it == resourcesByHashcode.end())
+	{
+		RES_UnlockMutex("RES_CacheRetry");
+		return false;
+	}
+	image = dynamic_cast<CSlrImage *>(it->second);
+	if (image == NULL || !ResCachePathMatches(image, absolutePath) || image->resourceState != RESOURCE_STATE_ERROR)
+	{
+		RES_UnlockMutex("RES_CacheRetry");
+		return false;
+	}
+	image->resourceState = RESOURCE_STATE_LOADING;
+	RES_UnlockMutex("RES_CacheRetry");
+
+	u32 memAdded = image->ResourceActivate(true);
+	if (image->resourceState != RESOURCE_STATE_ERROR && memAdded > 0)
+	{
+		gCurrentResourceMemoryTaken.fetch_add(memAdded, std::memory_order_relaxed);
+		RES_CacheAutoTrim();
+	}
+	return image->resourceState != RESOURCE_STATE_ERROR;
+}
+
+static void RES_CacheAutoTrim()
+{
+	u64 taken = gCurrentResourceMemoryTaken.load(std::memory_order_relaxed);
+	u64 budget = gMaxMemoryForResources.load(std::memory_order_relaxed);
+	if (taken <= budget)
+		return;
+	u64 overage = taken - budget;
+	RES_CacheForceEvictLRU(overage);
+	if (gCurrentResourceMemoryTaken.load(std::memory_order_relaxed) > budget)
+		RES_PrepareMemory(0, true);
 }
 
 void RES_ReleaseImage(CSlrImageBase *image)
@@ -771,10 +1059,12 @@ bool compare_CSlrResourceBase_activation(CSlrResourceBase *first, CSlrResourceBa
 
 	if (first->resourcePriority < second->resourcePriority)
 		return true;
-	if (first->resourceActivatedTime < second->resourceActivatedTime)
+	u64 firstActivated = first->resourceActivatedTime.load(std::memory_order_relaxed);
+	u64 secondActivated = second->resourceActivatedTime.load(std::memory_order_relaxed);
+	if (firstActivated < secondActivated)
 		return true;
 
-	if (first->resourceActivatedTime == second->resourceActivatedTime)
+	if (firstActivated == secondActivated)
 	{
 		if (first->resourceIdleSize > second->resourceIdleSize)
 			return true;
@@ -799,7 +1089,7 @@ void RES_CalculateMemoryTaken()
 		gCurrentResourceMemoryTaken += resource->ResourceGetIdleSize();
 	}
 
-	LOGRD("RES_CalculateMemoryTaken gCurrentResourceMemoryTaken=%lld", gCurrentResourceMemoryTaken);
+	LOGRD("RES_CalculateMemoryTaken gCurrentResourceMemoryTaken=%lld", gCurrentResourceMemoryTaken.load(std::memory_order_relaxed));
 }
 
 void RES_SortResourcesByActivation()
@@ -1277,10 +1567,11 @@ void RES_DebugPrintResources()
 		CSlrResourceBase *res = (*it).second;
 
 		char buf[1024];
+		u64 activatedTime = res->resourceActivatedTime.load(std::memory_order_relaxed);
 
 #if !defined(FINAL_RELEASE)		
 		sprintf(buf, "%llu | >%14llu < %s | %3d %9d | %11s | %8s | %s",
-				res->resourceId, res->resourceActivatedTime,
+				res->resourceId, activatedTime,
 				res->resourceIsActive ? "actv" : " not",
 						res->resourcePriority, res->resourceIdleSize,
 						res->ResourceGetStateName(),
@@ -1289,7 +1580,7 @@ void RES_DebugPrintResources()
 		
 		LOGR(buf);
 #else
-		sprintf(buf, "%llu | >%10llu < %s | %3d %9d", res->resourceId, res->resourceActivatedTime, res->resourceIsActive ? "actv" : " not", res->resourcePriority, res->resourceIdleSize);
+		sprintf(buf, "%llu | >%10llu < %s | %3d %9d", res->resourceId, activatedTime, res->resourceIsActive ? "actv" : " not", res->resourcePriority, res->resourceIdleSize);
 		LOGR(buf);
 #endif
 	}
@@ -1307,10 +1598,11 @@ void RES_DebugPrintResourcesToLoad()
 		CSlrResourceBase *res = (*it).second;
 		
 		char buf[1024];
+		u64 activatedTime = res->resourceActivatedTime.load(std::memory_order_relaxed);
 		
 #if !defined(FINAL_RELEASE)
 		sprintf(buf, "%llu | >%14llu < %s | %3d I=%9d L=%9d B=%9d | %11s | %s",
-				res->resourceId, res->resourceActivatedTime,
+				res->resourceId, activatedTime,
 				res->resourceIsActive ? "actv" : " not",
 				res->resourcePriority,
 				res->resourceIdleSize,
@@ -1321,7 +1613,7 @@ void RES_DebugPrintResourcesToLoad()
 		
 		LOGR(buf);
 #else
-		sprintf(buf, "%llu | >%10llu < %s | %3d %9d", res->resourceId, res->resourceActivatedTime, res->resourceIsActive ? "actv" : " not", res->resourcePriority, res->resourceIdleSize);
+		sprintf(buf, "%llu | >%10llu < %s | %3d %9d", res->resourceId, activatedTime, res->resourceIsActive ? "actv" : " not", res->resourcePriority, res->resourceIdleSize);
 		LOGR(buf);
 #endif
 	}
@@ -1409,6 +1701,37 @@ CDataTable *RES_DebugGetDataTable()
 	return dataTable;
 }
 
+void RES_DebugSnapshotResources(std::vector<RES_ResourceSnapshot> &out)
+{
+	out.clear();
+	RES_LockMutex("RES_DebugSnapshotResources");
+	out.reserve(resourcesByHashcode.size());
+	for (auto &entry : resourcesByHashcode)
+	{
+		CSlrResourceBase *res = entry.second;
+		RES_ResourceSnapshot snapshot;
+		snapshot.id = res->resourceId;
+		snapshot.hashCode = res->resourceHashCode;
+		snapshot.path = res->ResourceGetPath() ? res->ResourceGetPath() : "";
+		snapshot.typeName = res->ResourceGetTypeName();
+		snapshot.stateName = res->ResourceGetStateName();
+		snapshot.state = res->resourceState;
+		snapshot.loadingSize = res->resourceLoadingSize;
+		snapshot.idleSize = res->resourceIdleSize;
+		snapshot.bindSize = res->resourceBindSize;
+		snapshot.activatedTime = res->resourceActivatedTime.load(std::memory_order_relaxed);
+		snapshot.priority = res->resourcePriority;
+		snapshot.isActive = res->resourceIsActive;
+		if (CSlrImage *image = dynamic_cast<CSlrImage *>(res))
+		{
+			snapshot.cacheKey = image->cacheKey;
+			snapshot.cacheLinearScaling = image->cacheLinearScaling;
+		}
+		out.push_back(std::move(snapshot));
+	}
+	RES_UnlockMutex("RES_DebugSnapshotResources");
+}
+
 void RES_DebugRender()
 {
 	return;
@@ -1423,7 +1746,7 @@ void RES_DebugRender()
 	const float oneMB = (1024.0f*1024.0f);
 	
 	char buf[128];
-	sprintf(buf, "%.1f", (float)gCurrentResourceMemoryTaken/oneMB);
+	sprintf(buf, "%.1f", (float)gCurrentResourceMemoryTaken.load(std::memory_order_relaxed)/oneMB);
 	
 	u32 l = strlen(buf);
 	px = SCREEN_WIDTH - ((float)l *fontSize);

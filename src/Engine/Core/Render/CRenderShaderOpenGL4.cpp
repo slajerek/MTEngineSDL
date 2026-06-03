@@ -150,8 +150,8 @@ void CRenderShaderOpenGL4::UseShaderProgram()
 	
 	float dpiScale = 1.0f; // Default
 	#ifdef __APPLE__
-		// Get macOS scaling factor
-		dpiScale = MACOS_GetBackingScaleFactor(1);
+		// Get DPI scale for the current display (works after window moves between screens)
+		dpiScale = MACOS_GetBackingScaleFactor(SDL_GetWindowDisplayIndex(VID_GetMainSDLWindow()));
 	#endif
 
 //	LOGD("dpiScale=%f", dpiScale);

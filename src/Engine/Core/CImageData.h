@@ -23,8 +23,24 @@ typedef enum
 	IMG_TYPE_LONG_INT,
 	IMG_TYPE_RGB,
 	IMG_TYPE_RGBA,		// =5
-	IMG_TYPE_CIELAB
+	IMG_TYPE_CIELAB,
+	IMG_TYPE_GPU_COMPRESSED	// =7  KTX2/UASTC-transcoded GPU block data, NO resultData
 } imageTypes;
+
+// Per-mip GPU-compressed block payload for an IMG_TYPE_GPU_COMPRESSED image.
+// GOTCHA (design note §8.1): for tiny mips the logical (orig) dimensions
+// (e.g. 2x2, 1x1) are smaller than the physical block-padded dimensions
+// (multiple of 4). Both are stored — logical drives the upload region/extent,
+// physical drives bytesPerRow and total payload size.
+struct SCompressedMip
+{
+	int origWidth;      // logical mip width (texels), may be < block size
+	int origHeight;     // logical mip height (texels), may be < block size
+	int physWidth;      // block-padded width (multiple of block size)
+	int physHeight;     // block-padded height (multiple of block size)
+	u8 *blockData;      // transcoded GPU block bytes (BC7/ASTC), owned by CImageData
+	u32 blockDataSize;  // size of blockData in bytes
+};
 
 typedef enum
 {
@@ -69,6 +85,14 @@ public:
 
 	//int originalWidth, originalHeight;
 	int width, height;
+
+	// GPU-compressed payload (KTX2/UASTC path). Empty/0 for the normal RGBA path.
+	bool isCompressed;                          // true <=> type == IMG_TYPE_GPU_COMPRESSED
+	u8 compressedGpuFormat;                     // EImageGpuFormat value of the transcoded blocks
+	int compressedMipCount;                     // number of valid entries in compressedMips
+	SCompressedMip *compressedMips;             // owned array, compressedMipCount entries, mip 0 = largest
+	void DeallocCompressed();                   // frees compressedMips + all blockData (leak-free on reload)
+
 	void AllocImage(/*bool allocOrig,*/ bool allocTemp, bool allocResult);
 	void AllocTempImage();	// additional alloc if necessary
 	void AllocResultImage();
@@ -152,6 +176,7 @@ public:
 	void Save(const char *fileName);
 	void SaveScaled(const char *fileName, short int min, short int max);
 	bool Load(const char *fileName, bool dealloc);
+	bool LoadKTX2(const char *fileName);  // KTX2/UASTC decode: compressed blocks or RGBA32 fallback
 	const char *GetLoadError();
 	void RawSave(const char *fileName);
 	void RawLoad(const char *fileName);

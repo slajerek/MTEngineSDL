@@ -5,9 +5,12 @@
 #include "imgui_te_ui.h"
 #include "imgui_te_coroutine.h"
 #include "DBG_Log.h"
+#include <signal.h>
 
 ImGuiTestEngine *CImGuiTestEngine::engine = nullptr;
 bool CImGuiTestEngine::initialized = false;
+bool CImGuiTestEngine::showUI = true;
+void (*CImGuiTestEngine::onVisibilityChanged)(bool visible) = nullptr;
 
 void CImGuiTestEngine::Init()
 {
@@ -34,7 +37,25 @@ void CImGuiTestEngine::Shutdown()
 		return;
 
 	LOGM("CImGuiTestEngine::Shutdown");
+
+	// Restore default signal handlers before destroying the engine context.
+	// ImGuiTestEngine_InstallDefaultCrashHandler() hooks SIGABRT etc., and the
+	// Unix handler calls abort() which re-raises SIGABRT, causing infinite spam
+	// if any signal fires after the engine context is gone.
+#if !defined(_WIN32)
+	signal(SIGILL, SIG_DFL);
+	signal(SIGABRT, SIG_DFL);
+	signal(SIGFPE, SIG_DFL);
+	signal(SIGSEGV, SIG_DFL);
+	signal(SIGPIPE, SIG_DFL);
+	signal(SIGBUS, SIG_DFL);
+#endif
+
 	ImGuiTestEngine_Stop(engine);
+	// MT_Shutdown() is called before VID_Shutdown(), so the ImGui context is still alive here.
+	// ConfigSavedSettings=false skips the assert that requires ImGui::DestroyContext() first,
+	// allowing DestroyContext to unbind the context itself.
+	ImGuiTestEngine_GetIO(engine).ConfigSavedSettings = false;
 	ImGuiTestEngine_DestroyContext(engine);
 	engine = nullptr;
 	initialized = false;
@@ -48,10 +69,14 @@ void CImGuiTestEngine::PostSwap()
 
 void CImGuiTestEngine::ShowUI()
 {
-	if (engine)
+	if (engine && showUI)
 	{
-		static bool show = true;
-		ImGuiTestEngine_ShowTestEngineWindows(engine, &show);
+		bool wasTrueBeforeRender = true;
+		ImGuiTestEngine_ShowTestEngineWindows(engine, &showUI);
+		if (wasTrueBeforeRender && !showUI && onVisibilityChanged)
+		{
+			onVisibilityChanged(false);
+		}
 	}
 }
 

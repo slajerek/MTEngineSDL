@@ -19,6 +19,8 @@ public:
 	static void GetResultSummary(int *tested, int *success);
 
 	static ImGuiTestEngine *GetEngine() { return engine; }
+	static bool showUI;
+	static void (*onVisibilityChanged)(bool visible);
 
 private:
 	static ImGuiTestEngine *engine;

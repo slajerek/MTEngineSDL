@@ -23,13 +23,13 @@ int _mt_OggSeekFunct (void *datasource, ogg_int64_t offset, int whence)
 int _mt_OggCloseFunct (void *datasource)
 {
 	CSlrFile *file = (CSlrFile *)datasource;
-	file->Close();
+	if (file)
+		file->Close();
 	return 0;
 }
 
 long _mt_OggTellFunct (void *datasource)
 {
-	LOGD("OggTell");
 	CSlrFile *file = (CSlrFile *)datasource;
 	return file->Tell();
 }
@@ -64,6 +64,9 @@ CSlrMusicFileOgg::CSlrMusicFileOgg(const char *channelName)
 {
 	this->type = MUSIC_TYPE_OGG;
 	oggFileMutex = new CSlrMutex("CSlrMusicFileOgg");
+	oggFileHandle = NULL;
+	ownsOggFileHandle = false;
+	oggVorbisDataInitialized = false;
 
 	oggMixBuffer = new int[SOUND_BUFFER_SIZE];
 	oggAudioBuffer = new int[SOUND_BUFFER_SIZE];
@@ -78,6 +81,9 @@ CSlrMusicFileOgg::CSlrMusicFileOgg(const char *channelName, const char *fileName
 {
 	this->type = MUSIC_TYPE_OGG;
 	oggFileMutex = new CSlrMutex("CSlrMusicFileOgg");
+	oggFileHandle = NULL;
+	ownsOggFileHandle = false;
+	oggVorbisDataInitialized = false;
 
 	oggMixBuffer = new int[SOUND_BUFFER_SIZE];
 	oggAudioBuffer = new int[SOUND_BUFFER_SIZE];
@@ -95,6 +101,9 @@ CSlrMusicFileOgg::CSlrMusicFileOgg(const char *channelName, CSlrFile *file, bool
 {
 	this->type = MUSIC_TYPE_OGG;
 	oggFileMutex = new CSlrMutex("CSlrMusicFileOgg");
+	oggFileHandle = NULL;
+	ownsOggFileHandle = false;
+	oggVorbisDataInitialized = false;
 	
 	oggMixBuffer = new int[SOUND_BUFFER_SIZE];
 	oggAudioBuffer = new int[SOUND_BUFFER_SIZE];
@@ -112,7 +121,7 @@ bool CSlrMusicFileOgg::Init(const char *fileName, bool seekable, bool fromResour
 	ResourceSetPath(fileName, fromResources);
 
 	CSlrFile *file = RES_OpenFile(fromResources, fileName, DEPLOY_FILE_TYPE_OGG);
-	bool ret = this->Init(file, seekable);
+	bool ret = this->Init(file, seekable, true);
 	if (ret == false && fromResources == true)
 	{
 		SYS_FatalExit("CSlrMusicFileOgg::Init: input does not appear to be an Ogg bitstream (fromResources=true)");
@@ -122,9 +131,22 @@ bool CSlrMusicFileOgg::Init(const char *fileName, bool seekable, bool fromResour
 
 bool CSlrMusicFileOgg::Init(CSlrFile *file, bool seekable)
 {
+	return this->Init(file, seekable, false);
+}
+
+bool CSlrMusicFileOgg::Init(CSlrFile *file, bool seekable, bool takeOwnership)
+{
 	this->LockMutex();
 
+	DeleteVorbisData();
+
+	if (this->oggFileHandle != NULL && this->ownsOggFileHandle)
+	{
+		delete this->oggFileHandle;
+	}
+
 	this->oggFileHandle = file;
+	this->ownsOggFileHandle = takeOwnership;
 
 	this->bypass = false;
 
@@ -133,7 +155,6 @@ bool CSlrMusicFileOgg::Init(CSlrFile *file, bool seekable)
 
 	isPlaying = false;
 
-	DeleteVorbisData();
 	this->oggVorbisData = (OggVorbis_File *) malloc(sizeof(OggVorbis_File));
 
 	int ret;
@@ -147,32 +168,66 @@ bool CSlrMusicFileOgg::Init(CSlrFile *file, bool seekable)
 		ret = ov_open_callbacks(this->oggFileHandle, oggVorbisData, NULL, 0, OV_CALLBACKS_MTENGINE_NOT_SEEKABLE);
 	}
 
-	this->UnlockMutex();
-
 	if (ret < 0)
 	{
+		DeleteVorbisData();
+
+		if (this->oggFileHandle != NULL && this->ownsOggFileHandle)
+		{
+			delete this->oggFileHandle;
+		}
+		this->oggFileHandle = NULL;
+		this->ownsOggFileHandle = false;
+
+		this->UnlockMutex();
+
 		LOGError("CSlrMusicFileOgg::Init: input does not appear to be an Ogg bitstream");
 		return false;
 	}
+
+	oggVorbisDataInitialized = true;
+
+	this->UnlockMutex();
 
 	return true;
 }
 
 void CSlrMusicFileOgg::DeleteVorbisData()
 {
-	ov_clear(oggVorbisData);
-	free(oggVorbisData);
+	if (oggVorbisData == NULL)
+		return;
+
+	if (oggVorbisDataInitialized)
+	{
+		ov_clear(oggVorbisData);
+	}
+	else
+	{
+		free(oggVorbisData);
+	}
+
 	oggVorbisData = NULL;
+	oggVorbisDataInitialized = false;
 }
 
 CSlrMusicFileOgg::~CSlrMusicFileOgg()
 {
-	SYS_FatalExit("CSlrMusicFileOgg::~CSlrMusicFileOgg: %s", this->ResourceGetPath());
-
-	if (this->oggFileHandle != NULL)
-		delete this->oggFileHandle;
-
+	this->LockMutex();
 	DeleteVorbisData();
+
+	if (this->oggFileHandle != NULL && this->ownsOggFileHandle)
+	{
+		delete this->oggFileHandle;
+	}
+
+	this->oggFileHandle = NULL;
+	this->ownsOggFileHandle = false;
+	this->UnlockMutex();
+
+	delete [] oggMixBuffer;
+	delete [] oggAudioBuffer;
+
+	delete oggFileMutex;
 }
 
 void CSlrMusicFileOgg::Play()
@@ -342,28 +397,34 @@ void CSlrMusicFileOgg::SeekToMillisecond(u64 millisecond)
 
 u64 CSlrMusicFileOgg::GetLengthSeconds()
 {
-	gSoundEngine->LockMutex("CSlrMusicFileOgg::SeekToMillisecond");
+	gSoundEngine->LockMutex("CSlrMusicFileOgg::GetLengthSeconds");
 	this->LockMutex();
-	//LOGD("CSlrMusicFileOgg::Seek: %d", millisecond);
+
+	ogg_int64_t lenMs = ov_time_total(oggVorbisData, -1);
 	
-	u64 len = ov_raw_total(oggVorbisData, -1);
 	this->UnlockMutex();
-	gSoundEngine->UnlockMutex("CSlrMusicFileOgg::Seek");
+	gSoundEngine->UnlockMutex("CSlrMusicFileOgg::GetLengthSeconds");
+
+	if (lenMs < 0)
+		return 0;
 	
-	return len;
+	return (u64)lenMs / 1000;
 }
 
 u64 CSlrMusicFileOgg::GetLengthSamples()
 {
-	gSoundEngine->LockMutex("CSlrMusicFileOgg::SeekToMillisecond");
+	gSoundEngine->LockMutex("CSlrMusicFileOgg::GetLengthSamples");
 	this->LockMutex();
-	//LOGD("CSlrMusicFileOgg::Seek: %d", millisecond);
+
+	ogg_int64_t len = ov_pcm_total(oggVorbisData, -1);
 	
-	u64 len = ov_raw_total(oggVorbisData, -1);
 	this->UnlockMutex();
-	gSoundEngine->UnlockMutex("CSlrMusicFileOgg::Seek");
+	gSoundEngine->UnlockMutex("CSlrMusicFileOgg::GetLengthSamples");
+
+	if (len < 0)
+		return 0;
 	
-	return len;
+	return (u64)len;
 }
 
 
@@ -521,6 +582,21 @@ void CSlrMusicFileOgg::OggMix(u32 numSamples)
 	}
 }
 
+void CSlrMusicFileOgg::FillBuffer(int *mixBuffer, u32 numSamples)
+{
+	this->OggMix(numSamples);
+
+	signed short *outBuf = (signed short *)mixBuffer;
+	signed short *inBuf = (signed short *)oggMixBuffer;
+
+	u32 j = 0;
+	for (u32 i = 0; i < numSamples; i++)
+	{
+		outBuf[j] = inBuf[j]; j++;
+		outBuf[j] = inBuf[j]; j++;
+	}
+}
+
 void CSlrMusicFileOgg::Mix(int *mixBuffer, u32 numSamples)
 {
 	this->OggMix(numSamples);
@@ -598,7 +674,7 @@ void CSlrMusicFileOgg::MixFloat(float *mixBufferL, float *mixBufferR, u32 numSam
 		}
 	}
 
-	LOGD("------ CSlrMusicFileOgg::MixFloat %d samples -------", numSamples);
+	// keep this path free of per-buffer logging (realtime callback)
 //	u32 j = 0;
 //	inBuf = (signed short *)oggMixBuffer;
 //
@@ -741,4 +817,3 @@ void CSlrMusicFileOgg::UnlockMutex()
 {
 	this->oggFileMutex->Unlock();
 }
-

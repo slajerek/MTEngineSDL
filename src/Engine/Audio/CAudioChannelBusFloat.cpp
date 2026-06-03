@@ -30,7 +30,26 @@ CAudioChannelBusFloat::CAudioChannelBusFloat(const char *name, u16 numChannels)
 
 CAudioChannelBusFloat::~CAudioChannelBusFloat()
 {
+	if (this->fMixBufferL)
+	{
+		delete [] this->fMixBufferL;
+		this->fMixBufferL = NULL;
+	}
 
+	if (this->fMixBufferR)
+	{
+		delete [] this->fMixBufferR;
+		this->fMixBufferR = NULL;
+	}
+
+	for (u16 i = 0; i < numChannels; i++)
+	{
+		delete oggAudioChannelsPool[i];
+		delete oggAudioFilesPool[i];
+	}
+
+	delete [] oggAudioChannelsPool;
+	delete [] oggAudioFilesPool;
 }
 
 void CAudioChannelBusFloat::PreMixFloat(u32 numSamples)

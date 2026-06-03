@@ -13,6 +13,8 @@
 #include "CSlrFileZlib.h"
 #include "CSlrFileMemory.h"
 #include "stb_image.h"
+#include "VID_Main.h"           // gRenderBackend + (transitively, via CRenderBackend.h) EImageGpuFormat.h
+#include "basisu_transcoder.h"  // KTX2/UASTC transcoder
 
 #if defined(ANDROID)
 #include "SYS_ApkManager.h"
@@ -72,6 +74,14 @@ struct CImageDataRowIter
 	std::vector<unsigned char> buffer;
 };
 
+// extension of a file name (with leading dot), "" if none.
+static inline const char *IMG_FileExtension(const char *fileName)
+{
+	if (!fileName) return "";
+	const char *dot = strrchr(fileName, '.');
+	return dot ? dot : "";
+}
+
 CImageData::CImageData()
 {
 	this->tempData = NULL;
@@ -81,6 +91,10 @@ CImageData::CImageData()
 	this->mask = NULL;
 	this->width = 0;
 	this->height = 0;
+	this->isCompressed = false;
+	this->compressedGpuFormat = 0;
+	this->compressedMipCount = 0;
+	this->compressedMips = NULL;
 }
 
 CImageData::CImageData(const char *fileName)
@@ -94,10 +108,23 @@ CImageData::CImageData(const char *fileName)
 	this->mask = NULL;
 	this->width = 0;
 	this->height = 0;
-	this->Load(fileName, true);
+	this->isCompressed = false;
+	this->compressedGpuFormat = 0;
+	this->compressedMipCount = 0;
+	this->compressedMips = NULL;
+
+	// dispatch by extension: .ktx2 -> compressed/transcode path, all else unchanged.
+	if (strcasecmp(IMG_FileExtension(fileName), ".ktx2") == 0)
+	{
+		this->LoadKTX2(fileName);
+	}
+	else
+	{
+		this->Load(fileName, true);
+	}
 
 #ifdef USE_BUFFER_OFFSETS
-	if (this->type != IMG_TYPE_UNKNOWN)
+	if (this->type != IMG_TYPE_UNKNOWN && this->type != IMG_TYPE_GPU_COMPRESSED)
 	{
 		this->bufferOffsets = IMG_GetBufferOffsets(this->type, this->height, this->width);
 	}
@@ -117,6 +144,10 @@ CImageData::CImageData(CByteBuffer *byteBuffer)
 	this->mask = NULL;
 	this->width = 0;
 	this->height = 0;
+	this->isCompressed = false;
+	this->compressedGpuFormat = 0;
+	this->compressedMipCount = 0;
+	this->compressedMips = NULL;
 	this->LoadFromByteBufferUncompressed(byteBuffer);
 	
 #ifdef USE_BUFFER_OFFSETS
@@ -142,11 +173,15 @@ CImageData::CImageData(int width, int height)
 	this->row_pointers = NULL;
 	this->type = IMG_TYPE_RGBA;
 	this->mask = NULL;
-	
+	this->isCompressed = false;
+	this->compressedGpuFormat = 0;
+	this->compressedMipCount = 0;
+	this->compressedMips = NULL;
+
 #ifdef USE_BUFFER_OFFSETS
 	this->bufferOffsets = IMG_GetBufferOffsets(this->type, this->height, this->width);
 #endif
-	
+
 	this->AllocImage(false, true);
 	
 	//LOGD("pool test CImageData: %d", ++poolTestCImageData);
@@ -164,6 +199,10 @@ CImageData::CImageData(int width, int height, u8 type)
 	this->row_pointers = NULL;
 	this->type = type;
 	this->mask = NULL;
+	this->isCompressed = false;
+	this->compressedGpuFormat = 0;
+	this->compressedMipCount = 0;
+	this->compressedMips = NULL;
 
 #ifdef USE_BUFFER_OFFSETS
 	this->bufferOffsets = IMG_GetBufferOffsets(this->type, this->height, this->width);
@@ -184,13 +223,17 @@ CImageData::CImageData(int width, int height, u8 type, bool allocTemp, bool allo
 	this->row_pointers = NULL;
 	this->type = type;
 	this->mask = NULL;
-	
+	this->isCompressed = false;
+	this->compressedGpuFormat = 0;
+	this->compressedMipCount = 0;
+	this->compressedMips = NULL;
+
 #ifdef USE_BUFFER_OFFSETS
 	this->bufferOffsets = IMG_GetBufferOffsets(this->type, this->height, this->width);
 #endif
-	
+
 	//LOGD("pool test CImageData: %d", ++poolTestCImageData);
-	
+
 	this->AllocImage(allocTemp, allocResult);
 }
 
@@ -207,6 +250,10 @@ CImageData::CImageData(int width, int height, u8 type, u8 *data)
 	this->resultData = data;
 	this->row_pointers = NULL;
 	this->mask = NULL;
+	this->isCompressed = false;
+	this->compressedGpuFormat = 0;
+	this->compressedMipCount = 0;
+	this->compressedMips = NULL;
 
 #ifdef USE_BUFFER_OFFSETS
 	this->bufferOffsets = IMG_GetBufferOffsets(this->type, this->height, this->width);
@@ -217,12 +264,24 @@ CImageData::CImageData(int width, int height, u8 type, u8 *data)
 
 CImageData::CImageData(CImageData *src)
 {
+	// GPU-compressed images are immutable, load-once, and ownership-transferred,
+	// never deep-copied. The copy ctor memcpy's src->resultData, which is NULL
+	// for a compressed image -> crash. Guard it as unreachable (design note §2).
+	if (src->isCompressed || src->type == IMG_TYPE_GPU_COMPRESSED)
+	{
+		SYS_FatalExit("CImageData copy ctor: GPU-compressed images cannot be deep-copied");
+	}
+
 	this->width = src->width;
 	//this->originalWidth = src->width;
 	this->height = src->height;
 	//this->originalHeight = src->height;
 	this->type = src->type;
 	this->mask = NULL;
+	this->isCompressed = false;
+	this->compressedGpuFormat = 0;
+	this->compressedMipCount = 0;
+	this->compressedMips = NULL;
 
 	//this->origData = NULL;
 	this->tempData = NULL;
@@ -430,6 +489,10 @@ void CImageData::DeallocTemp()
 			case IMG_TYPE_CIELAB:
 				delete [] (int *)tempData;
 				break;
+			case IMG_TYPE_GPU_COMPRESSED:
+				// compressed images have no tempData; defensive no-op so a stray
+				// pointer doesn't cryptically fatal-exit. Blocks live in compressedMips.
+				break;
 		}
 	}
 	this->tempData = NULL;
@@ -459,6 +522,10 @@ void CImageData::DeallocResult()
 				break;
 			case IMG_TYPE_CIELAB:
 				delete [] (int *)resultData;
+				break;
+			case IMG_TYPE_GPU_COMPRESSED:
+				// compressed images have no resultData; defensive no-op so a stray
+				// pointer doesn't cryptically fatal-exit. Blocks live in compressedMips.
 				break;
 		}
 	}
@@ -494,6 +561,7 @@ void CImageData::DeallocImage()
 
 	this->DeallocTemp();
 	this->DeallocResult();
+	this->DeallocCompressed();   // free GPU-compressed mip buffers if any (no-op otherwise)
 	if (this->mask)
 	{
 		delete [] this->mask;
@@ -503,6 +571,24 @@ void CImageData::DeallocImage()
 
 	//this->origData = NULL;
 	//LOGD("DeallocImage finished");
+}
+
+// Free GPU-compressed mip block buffers. Safe to call when none allocated
+// (compressedMips == NULL), and idempotent across reload (design note §5).
+void CImageData::DeallocCompressed()
+{
+	if (this->compressedMips)
+	{
+		for (int i = 0; i < this->compressedMipCount; i++)
+		{
+			delete [] this->compressedMips[i].blockData;
+			this->compressedMips[i].blockData = NULL;
+		}
+		delete [] this->compressedMips;
+		this->compressedMips = NULL;
+	}
+	this->compressedMipCount = 0;
+	this->isCompressed = false;
 }
 
 void CImageData::AllocImage(bool allocTemp, bool allocResult)
@@ -2597,6 +2683,13 @@ const char *CImageData::GetLoadError()
 bool CImageData::Load(const char *fileName, bool dealloc)
 {
 	LOGR("CImageData::Load: %s", fileName);
+
+	// .ktx2 files go through the KTX2/UASTC transcode path; all else unchanged.
+	if (strcasecmp(IMG_FileExtension(fileName), ".ktx2") == 0)
+	{
+		return this->LoadKTX2(fileName);
+	}
+
 	if (dealloc)
 		DeallocImage();
 
@@ -3082,6 +3175,209 @@ bool CImageData::Load(const char *fileName, bool dealloc)
 	 */
 	
 	return false;
+}
+
+// =====================================================================
+// KTX2 / UASTC compressed-image decode path (design note §0, §9).
+//
+// Two outcomes, decided by gRenderBackend->GetPreferredCompressedFormat():
+//
+//  * BC7 / ASTC_4x4 -> transcode EVERY mip level to that GPU block format,
+//    fill compressedMips[], set type=IMG_TYPE_GPU_COMPRESSED / isCompressed.
+//
+//  * IMG_GPU_UNCOMPRESSED (or no render backend) -> transcode MIP 0 ONLY to
+//    cTFRGBA32, populate resultData as a normal IMG_TYPE_RGBA image
+//    (isCompressed=false). It then flows through the existing RGBA path
+//    unchanged. Mips are dropped in this fallback (legacy path is single-level).
+// =====================================================================
+bool CImageData::LoadKTX2(const char *fileName)
+{
+	LOGR("CImageData::LoadKTX2: %s", fileName);
+	DeallocImage();
+
+	// --- pick target GPU format from the render backend capability API ---
+	// EImageGpuFormat / gRenderBackend reached via VID_Main.h (-> CRenderBackend.h
+	// -> EImageGpuFormat.h). Do NOT #include EImageGpuFormat.h directly: it lives
+	// under Core/Render/ and is not on the Core/ include path (design note §8.2).
+	EImageGpuFormat gpuFormat = IMG_GPU_UNCOMPRESSED;
+	if (gRenderBackend != NULL)
+		gpuFormat = gRenderBackend->GetPreferredCompressedFormat();
+
+	const bool wantCompressed = (gpuFormat == IMG_GPU_BC7 || gpuFormat == IMG_GPU_ASTC_4x4);
+
+	basist::transcoder_texture_format tf;
+	if (gpuFormat == IMG_GPU_ASTC_4x4)
+		tf = basist::transcoder_texture_format::cTFASTC_4x4_RGBA;
+	else if (gpuFormat == IMG_GPU_BC7)
+		tf = basist::transcoder_texture_format::cTFBC7_RGBA;
+	else
+		tf = basist::transcoder_texture_format::cTFRGBA32;  // uncompressed fallback
+
+	// --- read whole file into memory ---
+	FILE *fp = fopen(fileName, "rb");
+	if (!fp)
+	{
+		LOGError("CImageData::LoadKTX2: '%s' not found", fileName);
+		this->type = IMG_TYPE_UNKNOWN;
+		return false;
+	}
+	fseek(fp, 0, SEEK_END);
+	long fileSize = ftell(fp);
+	fseek(fp, 0, SEEK_SET);
+	if (fileSize <= 0)
+	{
+		LOGError("CImageData::LoadKTX2: '%s' empty or unreadable", fileName);
+		fclose(fp);
+		this->type = IMG_TYPE_UNKNOWN;
+		return false;
+	}
+	u8 *fileBytes = new u8[fileSize];
+	size_t rd = fread(fileBytes, 1, fileSize, fp);
+	fclose(fp);
+	if ((long)rd != fileSize)
+	{
+		LOGError("CImageData::LoadKTX2: short read on '%s'", fileName);
+		delete [] fileBytes;
+		this->type = IMG_TYPE_UNKNOWN;
+		return false;
+	}
+
+	// --- transcoder must be initialised once before any transcode (idempotent) ---
+	basist::basisu_transcoder_init();
+
+	basist::ktx2_transcoder transcoder;
+	if (!transcoder.init(fileBytes, (uint32_t)fileSize))
+	{
+		LOGError("CImageData::LoadKTX2: ktx2_transcoder::init failed for '%s'", fileName);
+		delete [] fileBytes;
+		this->type = IMG_TYPE_UNKNOWN;
+		return false;
+	}
+	if (!transcoder.start_transcoding())
+	{
+		LOGError("CImageData::LoadKTX2: start_transcoding failed for '%s'", fileName);
+		delete [] fileBytes;
+		this->type = IMG_TYPE_UNKNOWN;
+		return false;
+	}
+
+	uint32_t levels = transcoder.get_levels();
+	if (levels == 0)
+	{
+		LOGError("CImageData::LoadKTX2: '%s' has 0 mip levels", fileName);
+		delete [] fileBytes;
+		this->type = IMG_TYPE_UNKNOWN;
+		return false;
+	}
+
+	if (!wantCompressed)
+	{
+		// ----- uncompressed fallback: transcode mip 0 only to RGBA32 -----
+		basist::ktx2_image_level_info li;
+		if (!transcoder.get_image_level_info(li, 0, 0, 0))
+		{
+			LOGError("CImageData::LoadKTX2: get_image_level_info(0) failed for '%s'", fileName);
+			delete [] fileBytes;
+			this->type = IMG_TYPE_UNKNOWN;
+			return false;
+		}
+
+		int logicalW = (int)li.m_orig_width;
+		int logicalH = (int)li.m_orig_height;
+		u8 *rgba = new u8[(size_t)logicalW * logicalH * 4];
+
+		// cTFRGBA32: output buffer size and row pitch are expressed in PIXELS.
+		// Transcode directly at the logical dimensions so resultData is a plain
+		// tightly-packed RGBA8 image, identical to the stbi_load layout.
+		if (!transcoder.transcode_image_level(0, 0, 0,
+											  rgba, (uint32_t)(logicalW * logicalH),
+											  tf, 0, (uint32_t)logicalW, (uint32_t)logicalH))
+		{
+			LOGError("CImageData::LoadKTX2: RGBA32 transcode of mip 0 failed for '%s'", fileName);
+			delete [] rgba;
+			delete [] fileBytes;
+			this->type = IMG_TYPE_UNKNOWN;
+			return false;
+		}
+
+		delete [] fileBytes;
+
+		this->width = logicalW;
+		this->height = logicalH;
+		this->type = IMG_TYPE_RGBA;
+		this->resultData = rgba;
+		this->isCompressed = false;
+		this->compressedGpuFormat = 0;
+		this->compressedMipCount = 0;
+		this->compressedMips = NULL;
+		LOGR("CImageData::LoadKTX2: '%s' decoded to RGBA32 fallback %dx%d", fileName, logicalW, logicalH);
+		return true;
+	}
+
+	// ----- compressed path: transcode every mip level to GPU blocks -----
+	this->width  = (int)transcoder.get_width();
+	this->height = (int)transcoder.get_height();
+	LOGR("CImageData::LoadKTX2: %s  %dx%d  %d mip levels  gpuFormat=%d",
+		 fileName, this->width, this->height, levels, (int)gpuFormat);
+
+	this->compressedMips = new SCompressedMip[levels];
+	this->compressedMipCount = 0;
+
+	// BC7 and ASTC 4x4 are both 16 bytes per 4x4 block (design note §8.6).
+	const uint32_t bytesPerBlock = 16;
+
+	bool ok = true;
+	for (uint32_t level = 0; level < levels; level++)
+	{
+		basist::ktx2_image_level_info li;
+		if (!transcoder.get_image_level_info(li, level, 0, 0))
+		{
+			LOGError("CImageData::LoadKTX2: get_image_level_info failed level=%d", level);
+			ok = false;
+			break;
+		}
+
+		uint32_t totalBlocks = li.m_total_blocks;
+		uint32_t outSize = totalBlocks * bytesPerBlock;
+		u8 *blocks = new u8[outSize];
+
+		if (!transcoder.transcode_image_level(level, 0, 0, blocks, totalBlocks, tf))
+		{
+			LOGError("CImageData::LoadKTX2: transcode_image_level failed level=%d", level);
+			delete [] blocks;
+			ok = false;
+			break;
+		}
+
+		// GOTCHA §8.1: store BOTH logical (orig) and physical (block-padded) sizes.
+		this->compressedMips[level].origWidth  = (int)li.m_orig_width;
+		this->compressedMips[level].origHeight = (int)li.m_orig_height;
+		this->compressedMips[level].physWidth  = (int)li.m_width;
+		this->compressedMips[level].physHeight = (int)li.m_height;
+		this->compressedMips[level].blockData = blocks;
+		this->compressedMips[level].blockDataSize = outSize;
+		this->compressedMipCount++;
+
+		LOGR("  mip %d: orig %dx%d  phys %dx%d  blocks=%dx%d  payload=%d bytes",
+			 level, li.m_orig_width, li.m_orig_height, li.m_width, li.m_height,
+			 li.m_num_blocks_x, li.m_num_blocks_y, outSize);
+	}
+
+	delete [] fileBytes;
+
+	if (!ok)
+	{
+		DeallocCompressed();
+		this->type = IMG_TYPE_UNKNOWN;
+		return false;
+	}
+
+	this->type = IMG_TYPE_GPU_COMPRESSED;
+	this->isCompressed = true;
+	this->compressedGpuFormat = (u8)gpuFormat;
+	LOGR("CImageData::LoadKTX2: '%s' transcoded OK, %d mips, gpuFormat=%d",
+		 fileName, this->compressedMipCount, (int)gpuFormat);
+	return true;
 }
 
 void CImageData::RawSave(const char *fileName)

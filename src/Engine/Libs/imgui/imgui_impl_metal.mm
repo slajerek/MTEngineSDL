@@ -747,6 +747,13 @@ static void ImGui_ImplMetal_InvalidateDeviceObjectsForPlatformWindows()
     "\n"
     "fragment half4 fragment_main(VertexOut in [[stage_in]],\n"
     "                             texture2d<half, access::sample> texture [[texture(0)]]) {\n"
+    // ===== MTEngine dependency: KTX2 mipmapped textures =====
+    // The `mip_filter::linear` term below enables trilinear sampling of
+    // GPU-compressed mip chains (KTX2/UASTC -> BC7/ASTC). It is the stock
+    // upstream ImGui sampler and harmless to ImGui's own (non-mipped) UI/font
+    // textures. DO NOT DROP `mip_filter::linear` when upgrading ImGui —
+    // re-apply it after any imgui_impl_metal.mm update if upstream changes it.
+    // =======================================================
     "    constexpr sampler linearSampler(coord::normalized, min_filter::linear, mag_filter::linear, mip_filter::linear);\n"
     "    half4 texColor = texture.sample(linearSampler, in.texCoords);\n"
     "    return half4(in.color) * texColor;\n"

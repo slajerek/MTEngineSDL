@@ -17,7 +17,6 @@
  ********************************************************************/
 
 #include <stdio.h>
-//#include <ogg/ogg.h>
 #include "Ogg/ogg.h"
 #include "tremor-ivorbiscodec.h"
 #include "tremor-codec_internal.h"
@@ -68,15 +67,11 @@ static int _vorbis_synthesis1(vorbis_block *vb,ogg_packet *op,int decodep){
   
   /* more setup */
   vb->granulepos=op->granulepos;
-  vb->sequence=op->packetno-3; /* first block is third packet */
+  vb->sequence=op->packetno; /* first block is third packet */
   vb->eofflag=op->e_o_s;
 
   if(decodep){
     /* alloc pcm passback storage */
-	// marcin skoczylas
-	if (vb->W < 0)
-		return (0);
-
     vb->pcmend=ci->blocksizes[vb->W];
     vb->pcm=(ogg_int32_t **)_vorbis_block_alloc(vb,sizeof(*vb->pcm)*vi->channels);
     for(i=0;i<vi->channels;i++)
@@ -129,7 +124,7 @@ long vorbis_packet_blocksize(vorbis_info *vi,ogg_packet *op){
     /* read our mode and pre/post windowsize */
     mode=oggpack_read(&opb,modebits);
   }
-  if(mode==-1)return(OV_EBADPACKET);
+  if(mode==-1 || !ci->mode_param[mode])return(OV_EBADPACKET);
   return(ci->blocksizes[ci->mode_param[mode]->blockflag]);
 }
 

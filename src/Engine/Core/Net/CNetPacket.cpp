@@ -60,6 +60,14 @@ const char *CNetPacketCallback::NetGetPacketNameFromType(u8 protocolType, u16 pa
 		{
 			return "AUTHORIZED";
 		}
+		else if (packetType == NET_PACKET_TYPE_AUTHORIZE_CHALLENGE)
+		{
+			return "AUTHORIZE_CHALLENGE";
+		}
+		else if (packetType == NET_PACKET_TYPE_AUTHORIZE_RESPONSE)
+		{
+			return "AUTHORIZE_RESPONSE";
+		}
 	}
 	return NULL;
 }
@@ -197,4 +205,3 @@ void LOGCCFROM(std::string clientName, u8 protocolType, u16 packetType, const ch
     LOGCC("%s <FROM< %2.2x/%4.4x: %s", clientName, protocolType, packetType, buffer);
 #endif
 }
-

@@ -14,7 +14,8 @@ void GUI_Init()
 void GUI_Render()
 {
 	//	LOGD("GUI_Render");
-	ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport());
+	guiMain->RenderDockSpacesOverViewports();
+	guiMain->RunAutoLayoutIfRequested();
 	guiMain->RenderImGui();
 	
 	MT_Render();

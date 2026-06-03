@@ -11,7 +11,7 @@ CSlrResourceBase::CSlrResourceBase()
 	this->resourceId = 0;
 	this->resourceLoadingSize = 0;
 	this->resourceIdleSize = 0;
-	this->resourceActivatedTime = 0;
+	this->resourceActivatedTime.store(0);
 	this->resourceHashCode = 0;
 	this->resourceBindSize = 0;
 	this->resourcePriority = RESOURCE_PRIORITY_NORMAL;
@@ -105,10 +105,12 @@ const char *CSlrResourceBase::ResourceGetTypeName()
 
 const char *CSlrResourceBase::ResourceGetStateName()
 {
-	switch(resourceState)
+		switch(resourceState)
 	{
 		case RESOURCE_STATE_DEALLOCATED:
 			return "DEALLOCATED";
+		case RESOURCE_STATE_ERROR:
+			return "ERROR";
 		case RESOURCE_STATE_PRELOADING:
 			return "PRELOADED";
 		case RESOURCE_STATE_PRELOADING_LOADED:
@@ -117,9 +119,10 @@ const char *CSlrResourceBase::ResourceGetStateName()
 			return "...LOADING...";
 		case RESOURCE_STATE_LOADED:
 			return "LOADED";
+		case RESOURCE_STATE_EVICTING:
+			return "EVICTING";
 		default:
 			return "UNKNOWN";
 	}
 }
-
 

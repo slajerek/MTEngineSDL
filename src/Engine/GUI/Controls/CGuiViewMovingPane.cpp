@@ -36,6 +36,29 @@ CGuiViewMovingPane::CGuiViewMovingPane(const char *name, float posX, float posY,
 	AddLayoutParameter(new CLayoutParameterFloat("MovingPanePosY", true, &mapPosY));
 }
 
+CGuiViewMovingPane::CGuiViewMovingPane(const char *name, float posX, float posY, float posZ, float sizeX, float sizeY, float paneWidth, float paneHeight, const char *titleI18nKey, const char *stableId)
+: CGuiView(name, posX, posY, posZ, sizeX, sizeY, titleI18nKey, stableId)
+{
+	this->paneWidth = paneWidth;
+	this->paneHeight = paneHeight;
+
+	isForcedMovingMap = false;
+
+	SetMovingPaneStyle(MovingPaneStyle_RightClickAndSpacebar);
+	mouseInvert = false;
+
+	cursorInside = false;
+	zoomCursorX = zoomCursorY = 0.5f;
+
+	minZoom = 1.0f;
+	maxZoom = 60.0f;
+	ClearZoom();
+
+	AddLayoutParameter(new CLayoutParameterFloat("MovingPaneZoom", true, &currentZoom));
+	AddLayoutParameter(new CLayoutParameterFloat("MovingPanePosX", true, &mapPosX));
+	AddLayoutParameter(new CLayoutParameterFloat("MovingPanePosY", true, &mapPosY));
+}
+
 void CGuiViewMovingPane::SetMovingPaneStyle(MovingPaneStyle movingPaneStyle)
 {
 	this->movingPaneStyle = movingPaneStyle;

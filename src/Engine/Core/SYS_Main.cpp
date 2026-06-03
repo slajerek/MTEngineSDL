@@ -39,6 +39,53 @@ unsigned long SYS_GetCurrentTimeInMillis()
 	return VID_GetTickCount();
 }
 
+int SYS_GetPortOffset()
+{
+	static bool cached = false;
+	static int portOffset = 0;
+	if (cached)
+		return portOffset;
+
+	cached = true;
+	const char *env = getenv("LH_PORT_OFFSET");
+	if (!env || env[0] == 0x00)
+	{
+		portOffset = 0;
+		return portOffset;
+	}
+
+	char *end = NULL;
+	long v = strtol(env, &end, 10);
+	if (end == env)
+	{
+		portOffset = 0;
+		return portOffset;
+	}
+
+	// Sanity clamp.
+	if (v < -60000 || v > 60000)
+		v = 0;
+
+	portOffset = (int)v;
+	return portOffset;
+}
+
+int SYS_ApplyPortOffset(int port)
+{
+	if (port <= 0)
+		return port;
+
+	int offset = SYS_GetPortOffset();
+	if (offset == 0)
+		return port;
+
+	int out = port + offset;
+	if (out <= 0 || out > 65535)
+		return port;
+
+	return out;
+}
+
 void SYS_NotImplemented()
 {
 	SYS_FatalExit("TODO: NOT IMPLEMENTED");
@@ -378,6 +425,7 @@ u32 SYS_GetBareKey(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool i
 		case 60: keyCode = ','; break;
 		case 62: keyCode = '.'; break;
 		case 63: keyCode = '/'; break;
+		case '~': keyCode = '`'; break;
 	}
 	
 	return keyCode;
@@ -750,4 +798,29 @@ const char *SYS_GetPlatformArchitectureString() { //Get current architecture, de
 	#else
 	return "UNKNOWN";
 	#endif
+}
+
+const char *SYS_GetCompilerNameString()
+{
+#if defined(__clang__)
+	#define MT_STRINGIFY2(x) #x
+	#define MT_STRINGIFY(x) MT_STRINGIFY2(x)
+	return "Clang " MT_STRINGIFY(__clang_major__) "." MT_STRINGIFY(__clang_minor__) "." MT_STRINGIFY(__clang_patchlevel__);
+	#undef MT_STRINGIFY
+	#undef MT_STRINGIFY2
+#elif defined(__GNUC__)
+	return "GCC " __VERSION__;
+#elif defined(_MSC_VER)
+	#if _MSC_VER >= 1940
+	return "MSVC 17.x";
+	#elif _MSC_VER >= 1930
+	return "MSVC 17.0";
+	#elif _MSC_VER >= 1920
+	return "MSVC 16.x";
+	#else
+	return "MSVC";
+	#endif
+#else
+	return "Unknown compiler";
+#endif
 }

@@ -12,6 +12,15 @@ CGuiViewTableWithFilterAndButtons::CGuiViewTableWithFilterAndButtons(const char 
 	tableRowSelectedByArrowKey = false;
 }
 
+CGuiViewTableWithFilterAndButtons::CGuiViewTableWithFilterAndButtons(const char *name, float posX, float posY, float sizeX, float sizeY, const char *titleI18nKey, const char *stableId)
+: CGuiView(name, posX, posY, -1, sizeX, sizeY, titleI18nKey, stableId)
+{
+	tableSelectedRow = -1;
+	previousNumberOfItems = 0;
+	tableFilterBuf[0] = 0;
+	tableRowSelectedByArrowKey = false;
+}
+
 void CGuiViewTableWithFilterAndButtons::RenderImGui()
 {
 	PreRenderImGui();
@@ -56,7 +65,7 @@ void CGuiViewTableWithFilterAndButtons::RenderImGuiTableView()
 	style.ItemSpacing.y = 0.0f;
 	style.WindowPadding = ImVec2(0, 0);
 
-	if (BeginTable("##List", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_Resizable | ImGuiTableFlags_Sortable))
+	if (BeginTable("##List", TableGetColumnCount(), ImGuiTableFlags_Borders | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_Resizable | ImGuiTableFlags_Sortable))
 	{
 		TableSetupColumns();
 
@@ -92,7 +101,10 @@ void CGuiViewTableWithFilterAndButtons::RenderImGuiTableView()
 
 				ImGui::PushID(item->GetID()); // Unique ID per row
 				bool row_selected = (tableSelectedRow == item->GetID());
-				if (Selectable(buf, row_selected, ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap, ImVec2(0, 0)))
+				float rowHeight = TableGetRowHeight();
+				if (rowHeight > 0.0f)
+					ImGui::AlignTextToFramePadding();
+				if (Selectable(buf, row_selected, ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap, ImVec2(0, rowHeight)))
 				{
 					tableSelectedRow = item->GetID();
 
@@ -105,6 +117,8 @@ void CGuiViewTableWithFilterAndButtons::RenderImGuiTableView()
 					ImGui::SetScrollHereY(0.5f);
 					tableRowSelectedByArrowKey = false;
 				}
+
+				TableRenderMiddleColumns(item);
 
 				TableNextColumn();
 				TableContinuePrintRow(item);
@@ -211,6 +225,16 @@ void CGuiViewTableWithFilterAndButtons::TableSortItems(const ImGuiTableSortSpecs
 	LOGWarning("CGuiViewTableWithFilterAndButtons::SortItems: should be overridden (not implemented)");
 }
 
+int CGuiViewTableWithFilterAndButtons::TableGetColumnCount()
+{
+	return 2;
+}
+
+float CGuiViewTableWithFilterAndButtons::TableGetRowHeight()
+{
+	return 0.0f;  // 0 = Selectable sizes to text height (default)
+}
+
 void CGuiViewTableWithFilterAndButtons::TableSetupColumns()
 {
 }
@@ -220,7 +244,13 @@ void CGuiViewTableWithFilterAndButtons::TableGetFirstColumnText(CGuiViewTableIte
 {
 }
 
-// print columns #1+
+// render columns between column #0 (selectable) and the last column (TableContinuePrintRow).
+// Override and call TableNextColumn() once per middle column when TableGetColumnCount() > 2.
+void CGuiViewTableWithFilterAndButtons::TableRenderMiddleColumns(CGuiViewTableItem *item)
+{
+}
+
+// print last column
 void CGuiViewTableWithFilterAndButtons::TableContinuePrintRow(CGuiViewTableItem *item)
 {
 }

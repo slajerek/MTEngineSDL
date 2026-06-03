@@ -6,6 +6,19 @@
 #ifndef _SYS_DEFS_H_
 #define _SYS_DEFS_H_
 
+// Windows: prevent min/max macros from breaking std::min/std::max
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifdef min
+#undef min
+#endif
+#ifdef max
+#undef max
+#endif
+#endif
+
 #define APPLICATION_BUNDLE_NAME "MTEngineSDL"
 
 #define MAX_STRING_LENGTH 8192
@@ -103,6 +116,19 @@ typedef short                       int16;
 typedef unsigned short              uint16;
 typedef int                         int32;
 typedef unsigned int                uint32;
+
+// Some macOS system headers (Security.framework) use these macros as typedef
+// guards for uint8/uint16/uint32. Define them alongside the engine typedefs so
+// we don't hit typedef redefinition errors when those headers are included.
+#ifndef _UINT8
+#define _UINT8
+#endif
+#ifndef _UINT16
+#define _UINT16
+#endif
+#ifndef _UINT32
+#define _UINT32
+#endif
 
 /*
 #ifndef LINUX_ALEK

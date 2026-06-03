@@ -20,6 +20,41 @@
 #include "CSlrFile.h"
 #include "CSlrImageTexture.h"
 
+#include <atomic>
+
+class CAtomicTexturePtr
+{
+public:
+	CAtomicTexturePtr()
+	{
+		value.store(NULL, std::memory_order_relaxed);
+	}
+
+	void *load(std::memory_order order = std::memory_order_seq_cst) const
+	{
+		return value.load(order);
+	}
+
+	void store(void *ptr, std::memory_order order = std::memory_order_seq_cst)
+	{
+		value.store(ptr, order);
+	}
+
+	operator void *() const
+	{
+		return value.load(std::memory_order_seq_cst);
+	}
+
+	CAtomicTexturePtr &operator=(void *ptr)
+	{
+		value.store(ptr, std::memory_order_seq_cst);
+		return *this;
+	}
+
+private:
+	std::atomic<void *> value;
+};
+
 class CSlrImage : public CSlrImageTexture
 {
 public:
@@ -52,6 +87,12 @@ public:
 	void LoadImage(CImageData *imageData, u8 resourcePriority, bool flipImageVertically);
 	void LoadImageForRebinding(CImageData *origImageData, u8 resourcePriority);
 	void RefreshImageParameters(CImageData *imageData, u8 resourcePriority, bool flipImageVertically);
+
+	// KTX2 compressed-image support. Shared metadata helper — sets ALL ~14
+	// LoadImage member fields for a GPU-compressed image so no compressed
+	// branch ever early-returns with half-initialised metadata.
+	void SetCompressedImageMetadata(CImageData *compressedImageData, u8 resourcePriority);
+
 	void PreloadImage(CSlrFile *imgFile);
 	void LoadImage(CSlrFile *imgFile);
 
@@ -75,7 +116,9 @@ public:
 	bool isFromAtlas;
 	CSlrImage *imgAtlas;
 
-	void  *texturePtr;
+	CAtomicTexturePtr texturePtr;
+	u64 cacheKey;
+	bool cacheLinearScaling;
 
 	float rasterHeight;
 	float rasterWidth;
@@ -88,6 +131,7 @@ public:
 	float downScale;
 
 	void DrawLine(float x1, float y1, float x2, float y2);
+	void *TexturePtr();
 
 	CImageData *GetImageData(float *imageScale, u32 *width, u32 *height);
 
@@ -97,6 +141,12 @@ public:
 	u32 loadImgHeight;
 
 	bool shouldDeallocLoadImageData;
+
+	// KTX2 compressed-image support. For an RGBA image these stay false/0 and
+	// are never read; the render backend uses them to take the compressed
+	// upload path (Task 4.5c).
+	bool isCompressed;
+	int compressedMipCount;
 	
 	float gfxScale;
 
@@ -107,6 +157,7 @@ public:
 	virtual bool ResourcePreload(const char *fileName, bool fromResources);
 	virtual u32 ResourceGetLoadingSize();
 	virtual u32 ResourceGetIdleSize();
+	bool DelayedLoadImageNoFail(const char *fileName, bool fromResources);
 
 
 };

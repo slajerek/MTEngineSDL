@@ -1,0 +1,9 @@
+[submodule "other/lib/llama.cpp"]
+	path = other/lib/llama.cpp
+	url = https://github.com/ggml-org/llama.cpp
+[submodule "other/lib/mbedtls"]
+	path = other/lib/mbedtls
+	url = https://github.com/Mbed-TLS/mbedtls.git
+[submodule "other/lib/ftxui"]
+	path = other/lib/ftxui
+	url = https://github.com/ArthurSonzogni/FTXUI.git

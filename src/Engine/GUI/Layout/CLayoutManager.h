@@ -11,6 +11,8 @@ class CByteBuffer;
 
 #define C64D_LAYOUTS_FILE_NAME 				"layouts.dat"
 
+extern CSlrString *settingsPathToLayoutsFile;
+
 class CLayoutData
 {
 public:
@@ -22,9 +24,13 @@ public:
 	bool doNotUpdateViewsPositions;	// shall we always save views position on layout change, or not (i.e. always restore original positions)
 	CByteBuffer *serializedLayoutBuffer;
 	CSlrKeyboardShortcut *keyShortcut;
-	
+
 	bool isFullScreenLayout;
 	CLayoutData *parentLayout;
+
+	char *predefinedId;      // NULL = user-created; non-NULL = stable ID for app-defined workspaces
+	char *translationKey;    // i18n key for display name; NULL = use layoutName
+	bool IsPredefined() const { return predefinedId != NULL; }
 };
 
 class CLayoutManager : public CSlrKeyboardShortcutCallback
@@ -53,11 +59,16 @@ public:
 	
 	
 	CLayoutData *GetLayoutByName(const char *name);
-	
+
+	CLayoutData *AddPredefinedLayout(const char *predefinedId, const char *translationKey);
+	void RemovePredefinedLayout(const char *predefinedId);
+	CLayoutData *GetPredefinedLayoutById(const char *predefinedId);
+
 	CGuiMain *guiMain;
-	
+
 	std::list<CLayoutData *> layouts;
 	std::map<u64, CLayoutData *> layoutsByHash;
+	std::map<u64, CLayoutData *> predefinedLayoutsById;
 	
 	CLayoutData *currentLayout;
 	

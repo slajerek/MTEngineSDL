@@ -581,7 +581,7 @@ void SYS_DialogOpenFile(CSystemFileDialogCallback *callback, std::list<CSlrStrin
 	LOGD("SYS_DialogOpenFile");
 
 	OPENFILENAME ofn;
-    char szFileName[MAX_PATH] = "";
+	char szFileName[65536] = "";
 
 	// temporary remove always on top window flag
 	SYS_windowAlwaysOnTopBeforeFileDialog = VID_IsMainWindowAlwaysOnTop();
@@ -673,8 +673,8 @@ void SYS_DialogOpenFile(CSystemFileDialogCallback *callback, std::list<CSlrStrin
 		LOGD(">> defaultFolder is NULL");
 	}
 
-    ofn.nMaxFile = MAX_PATH;
-    ofn.Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY;
+	ofn.nMaxFile = sizeof(szFileName);
+	ofn.Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY | OFN_ALLOWMULTISELECT;
     
     // workaround
     GUI_KeyUpAllModifiers();
@@ -690,8 +690,36 @@ void SYS_DialogOpenFile(CSystemFileDialogCallback *callback, std::list<CSlrStrin
 
 		LOGD("szFileName='%s'", szFileName);
 		SYS_ReleaseCharBuf(buf);
-		CSlrString *outPath = new CSlrString(szFileName);
-		callback->SystemDialogFileOpenSelected(outPath);
+
+		std::vector<CSlrString *> selectedPaths;
+		char *base = szFileName;
+		char *next = base + strlen(base) + 1;
+
+		if (*next == '\0')
+		{
+			selectedPaths.push_back(new CSlrString(base));
+		}
+		else
+		{
+			std::string folder = base;
+			while (*next != '\0')
+			{
+				std::string fullPath = folder;
+				fullPath += "\\";
+				fullPath += next;
+				selectedPaths.push_back(new CSlrString(fullPath.c_str()));
+				next += strlen(next) + 1;
+			}
+		}
+
+		if (selectedPaths.empty())
+			callback->SystemDialogFileOpenCancelled();
+		else
+			callback->SystemDialogFilesOpenSelected(&selectedPaths);
+
+		for (CSlrString *path : selectedPaths)
+			delete path;
+
 		if (initialFolder != NULL)
 			delete initialFolder;
 	}
@@ -705,6 +733,11 @@ void SYS_DialogOpenFile(CSystemFileDialogCallback *callback, std::list<CSlrStrin
 		SYS_ReleaseCharBuf(buf);
 		callback->SystemDialogFileOpenCancelled();
 	}
+}
+
+void SYS_DialogOpenFiles(CSystemFileDialogCallback *callback, std::list<CSlrString *> *extensions, CSlrString *defaultFolder, CSlrString *windowTitle)
+{
+	SYS_DialogOpenFile(callback, extensions, defaultFolder, windowTitle);
 }
 
 void SYS_DialogSaveFile(CSystemFileDialogCallback *callback, std::list<CSlrString *> *extensions, CSlrString *defaultFileName, CSlrString *defaultFolder, CSlrString *windowTitle)
@@ -1106,30 +1139,6 @@ char* SYS_GetFileExtension(const char* fileName)
 char* SYS_GetPathToDocuments()
 {
 	return gCPathToDocuments;
-}
-
-void CSystemFileDialogCallback::SystemDialogFileOpenSelected(CSlrString* path)
-{
-}
-
-void CSystemFileDialogCallback::SystemDialogFileOpenCancelled()
-{
-}
-
-void CSystemFileDialogCallback::SystemDialogFileSaveSelected(CSlrString* path)
-{
-}
-
-void CSystemFileDialogCallback::SystemDialogFileSaveCancelled()
-{
-}
-
-void CSystemFileDialogCallback::SystemDialogPickFolderSelected(CSlrString* path)
-{
-}
-
-void CSystemFileDialogCallback::SystemDialogPickFolderCancelled()
-{
 }
 
 #ifndef WIN32

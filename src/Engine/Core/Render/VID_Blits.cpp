@@ -178,7 +178,7 @@ void Blit(CSlrImage *image, float destX, float destY, float z, float sizeX, floa
 	ImVec2 pMax(destX + sizeX,	destY + sizeY);
 	
 	ImDrawList *drawList = ImGui::GetWindowDrawList();
-	drawList->AddImage(image->texturePtr, pMin, pMax, uv0, uv1,
+	drawList->AddImage(image->TexturePtr(), pMin, pMax, uv0, uv1,
 					   ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 1.0f, 1.0f, 1.0f)));
 
 	
@@ -527,7 +527,7 @@ void BlitAlphaColor(CSlrImage *image, float destX, float destY, float z, float s
 	ImVec2 pMax(destX + sizeX,	destY + sizeY);
 	
 	ImDrawList *drawList = ImGui::GetWindowDrawList();
-	drawList->AddImage(image->texturePtr, pMin, pMax, uv0, uv1,
+	drawList->AddImage(image->TexturePtr(), pMin, pMax, uv0, uv1,
 					   ImGui::ColorConvertFloat4ToU32(ImVec4(colorR, colorG, colorB, alpha)));
 	
 #ifdef LOG_BLITS
@@ -592,7 +592,7 @@ void Blit(CSlrImage *image, float destX, float destY, float z, float size,
 	ImVec2 pMax(destX + sizeX,	destY + sizeY);
 	
 	ImDrawList *drawList = ImGui::GetWindowDrawList();
-	drawList->AddImage(image->texturePtr, pMin, pMax, uv0, uv1,
+	drawList->AddImage(image->TexturePtr(), pMin, pMax, uv0, uv1,
 					   ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 1.0f, 1.0f, 1.0f)));
 
 }
@@ -611,7 +611,7 @@ void BlitAlpha(CSlrImage *image, float destX, float destY, float z, float size,
 	ImVec2 pMax(destX + sizeX,	destY + sizeY);
 	
 	ImDrawList *drawList = ImGui::GetWindowDrawList();
-	drawList->AddImage(image->texturePtr, pMin, pMax, uv0, uv1,
+	drawList->AddImage(image->TexturePtr(), pMin, pMax, uv0, uv1,
 					   ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 1.0f, 1.0f, alpha)));
 }
 
@@ -677,7 +677,7 @@ void Blit(CSlrImage *image, float destX, float destY, float z, float sizeX, floa
 	ImVec2 pMax(destX + sizeX,	destY + sizeY);
 	
 	ImDrawList *drawList = ImGui::GetWindowDrawList();
-	drawList->AddImage(image->texturePtr, pMin, pMax, uv0, uv1,
+	drawList->AddImage(image->TexturePtr(), pMin, pMax, uv0, uv1,
 					   ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 1.0f, 1.0f, 1.0f)));
 }
 
@@ -697,7 +697,7 @@ void BlitFlipVertical(CSlrImage *image, float destX, float destY, float z, float
 	ImVec2 pMax(destX + sizeX,	destY + sizeY);
 	
 	ImDrawList *drawList = ImGui::GetWindowDrawList();
-	drawList->AddImage(image->texturePtr, pMin, pMax, uv0, uv1,
+	drawList->AddImage(image->TexturePtr(), pMin, pMax, uv0, uv1,
 					   ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 1.0f, 1.0f, 1.0f)));
 }
 
@@ -718,7 +718,7 @@ void BlitInImGuiWindow(CSlrImage *image, float destX, float destY, float z, floa
 //	ImVec2 pMax(destX + sizeX,	destY + sizeY);
 	
 	ImDrawList *drawList = ImGui::GetWindowDrawList();
-	drawList->AddImage(image->texturePtr, pMin, pMax, uv0, uv1,
+	drawList->AddImage(image->TexturePtr(), pMin, pMax, uv0, uv1,
 					   ImGui::ColorConvertFloat4ToU32(ImVec4(colorR, colorG, colorB, alpha)));
 	
 }
@@ -739,7 +739,7 @@ void BlitInImGuiWindow(CSlrImage *image, float destX, float destY, float z, floa
 //	ImVec2 pMax(destX + sizeX,	destY + sizeY);
 	
 	ImDrawList *drawList = ImGui::GetWindowDrawList();
-	drawList->AddImage(image->texturePtr, pMin, pMax, uv0, uv1,
+	drawList->AddImage(image->TexturePtr(), pMin, pMax, uv0, uv1,
 					   ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 1.0f, 1.0f, 1.0f)));
 	
 }
@@ -811,7 +811,7 @@ void BlitAlpha(CSlrImage *image, float destX, float destY, float z, float sizeX,
 		ImVec2 pMax(destX + sizeX,	destY + sizeY);
 		
 		ImDrawList *drawList = ImGui::GetWindowDrawList();
-		drawList->AddImage(image->texturePtr, pMin, pMax, uv0, uv1,
+		drawList->AddImage(image->TexturePtr(), pMin, pMax, uv0, uv1,
 						   ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 1.0f, 1.0f, alpha)));
 }
 

@@ -8,6 +8,7 @@ class CGuiViewImageWithLayer : public CGuiViewMovingPaneImage
 {
 public:
 	CGuiViewImageWithLayer(const char *name, float posX, float posY, float sizeX, float sizeY);
+	CGuiViewImageWithLayer(const char *name, float posX, float posY, float sizeX, float sizeY, const char *titleI18nKey, const char *stableId);
 	~CGuiViewImageWithLayer();
 	
 	virtual void UpdateLayer(CImageData *imageDataLayer);

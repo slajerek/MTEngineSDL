@@ -58,7 +58,7 @@ void CSlrImageTexture::Render(float posZ)
 			this->ResourceGetPath(), STRBOOL(isBound), STRBOOL(resourceIsActive));
 #endif
 
-	this->resourceActivatedTime = gCurrentFrameTime;
+	this->resourceActivatedTime.store(gCurrentFrameTime, std::memory_order_relaxed);
 	Blit((CSlrImage*)this, -widthD2, -heightD2, posZ, width, height);
 }
 
@@ -74,7 +74,7 @@ void CSlrImageTexture::Render(float posZ, float alpha)
 			this->ResourceGetPath(), STRBOOL(isBound), STRBOOL(resourceIsActive));
 #endif
 
-	this->resourceActivatedTime = gCurrentFrameTime;
+	this->resourceActivatedTime.store(gCurrentFrameTime, std::memory_order_relaxed);
 	BlitAlpha((CSlrImage*)this, -widthD2, -heightD2, posZ, width, height, alpha);
 }
 
@@ -90,7 +90,7 @@ void CSlrImageTexture::RenderMixColor(float posZ, float alpha, float mixColorR, 
 			   this->ResourceGetPath(), STRBOOL(isBound), STRBOOL(resourceIsActive));
 #endif
 	
-	this->resourceActivatedTime = gCurrentFrameTime;
+	this->resourceActivatedTime.store(gCurrentFrameTime, std::memory_order_relaxed);
 	BlitMixColor((CSlrImage*)this, -widthD2, -heightD2, posZ, width, height, alpha, mixColorR, mixColorG, mixColorB);
 }
 
@@ -106,7 +106,7 @@ void CSlrImageTexture::Render(float destX, float destY, float z, float sizeX, fl
 			this->ResourceGetPath(), STRBOOL(isBound), STRBOOL(resourceIsActive));
 #endif
 
-	this->resourceActivatedTime = gCurrentFrameTime;
+	this->resourceActivatedTime.store(gCurrentFrameTime, std::memory_order_relaxed);
 	Blit((CSlrImage*)this, destX, destY, z, sizeX, sizeY);
 }
 
@@ -124,7 +124,7 @@ void CSlrImageTexture::Render(float destX, float destY, float z, float size,
 			this->ResourceGetPath(), STRBOOL(isBound), STRBOOL(resourceIsActive));
 #endif
 
-	this->resourceActivatedTime = gCurrentFrameTime;
+	this->resourceActivatedTime.store(gCurrentFrameTime, std::memory_order_relaxed);
 	Blit((CSlrImage*)this, destX, destY, z, size, texStartX, texStartY, texEndX, texEndY);
 }
 
@@ -142,7 +142,7 @@ void CSlrImageTexture::RenderAlpha(float destX, float destY, float z, float alph
 			this->ResourceGetPath(), STRBOOL(isBound), STRBOOL(resourceIsActive));
 #endif
 
-	this->resourceActivatedTime = gCurrentFrameTime;
+	this->resourceActivatedTime.store(gCurrentFrameTime, std::memory_order_relaxed);
 	BlitAlpha((CSlrImage*)this, destX, destY, z, alpha);
 }
 
@@ -159,7 +159,7 @@ void CSlrImageTexture::RenderAlpha(float destX, float destY, float z, float size
 			this->ResourceGetPath(), STRBOOL(isBound), STRBOOL(resourceIsActive));
 #endif
 
-	this->resourceActivatedTime = gCurrentFrameTime;
+	this->resourceActivatedTime.store(gCurrentFrameTime, std::memory_order_relaxed);
 	BlitAlpha((CSlrImage*)this, destX, destY, z, sizeX, sizeY, alpha);
 }
 
@@ -176,7 +176,7 @@ void CSlrImageTexture::RenderAlphaMixColor(float destX, float destY, float z, fl
 			   this->ResourceGetPath(), STRBOOL(isBound), STRBOOL(resourceIsActive));
 #endif
 	
-	this->resourceActivatedTime = gCurrentFrameTime;
+	this->resourceActivatedTime.store(gCurrentFrameTime, std::memory_order_relaxed);
 	
 	BlitMixColor((CSlrImage*)this, destX, destY, z, sizeX, sizeY, alpha, mixColorR, mixColorG, mixColorB );
 }
@@ -195,7 +195,7 @@ void CSlrImageTexture::RenderAlpha(float destX, float destY, float z, float size
 			this->ResourceGetPath(), STRBOOL(isBound), STRBOOL(resourceIsActive));
 #endif
 
-	this->resourceActivatedTime = gCurrentFrameTime;
+	this->resourceActivatedTime.store(gCurrentFrameTime, std::memory_order_relaxed);
 	BlitAlpha((CSlrImage*)this, destX, destY, z, size,
 			  texStartX, texStartY,
 			  texEndX, texEndY, alpha);
@@ -217,7 +217,7 @@ void CSlrImageTexture::RenderAlpha(float destX, float destY, float z,
 			this->ResourceGetPath(), STRBOOL(isBound), STRBOOL(resourceIsActive));
 #endif
 
-	this->resourceActivatedTime = gCurrentFrameTime;
+	this->resourceActivatedTime.store(gCurrentFrameTime, std::memory_order_relaxed);
 	BlitAlpha((CSlrImage*)this, destX, destY, z, sizeX, sizeY,
 			  texStartX, texStartY,
 			  texEndX, texEndY, alpha);
@@ -238,7 +238,7 @@ void CSlrImageTexture::Render(float destX, float destY, float z,
 			   this->ResourceGetPath(), STRBOOL(isBound), STRBOOL(resourceIsActive));
 #endif
 	
-	this->resourceActivatedTime = gCurrentFrameTime;
+	this->resourceActivatedTime.store(gCurrentFrameTime, std::memory_order_relaxed);
 	Blit((CSlrImage*)this, destX, destY, z, sizeX, sizeY,
 			  texStartX, texStartY,
 			  texEndX, texEndY);
@@ -260,7 +260,7 @@ void CSlrImageTexture::RenderAlpha_aaaa(float destX, float destY, float z, float
 			this->ResourceGetPath(), STRBOOL(isBound), STRBOOL(resourceIsActive));
 #endif
 
-	this->resourceActivatedTime = gCurrentFrameTime;
+	this->resourceActivatedTime.store(gCurrentFrameTime, std::memory_order_relaxed);
 	BlitAlpha_aaaa((CSlrImage*)this, destX, destY, z, sizeX, sizeY,
 				   texStartX, texStartY,
 				   texEndX, texEndY,
@@ -282,7 +282,7 @@ void CSlrImageTexture::RenderAlphaColor(float destX, float destY, float z, float
 			this->ResourceGetPath(), STRBOOL(isBound), STRBOOL(resourceIsActive));
 #endif
 
-	this->resourceActivatedTime = gCurrentFrameTime;
+	this->resourceActivatedTime.store(gCurrentFrameTime, std::memory_order_relaxed);
 	BlitAlphaColor((CSlrImage*)this, destX, destY, z, sizeX, sizeY,
 				   texStartX, texStartY,
 				   texEndX, texEndY,
@@ -301,7 +301,7 @@ void CSlrImageTexture::RenderPolygonAlpha(float alpha, float *verts, float *texs
 			this->ResourceGetPath(), STRBOOL(isBound), STRBOOL(resourceIsActive));
 #endif
 
-	this->resourceActivatedTime = gCurrentFrameTime;
+	this->resourceActivatedTime.store(gCurrentFrameTime, std::memory_order_relaxed);
 	BlitPolygonAlpha((CSlrImage*)this, alpha, verts, texs, norms, numVertices);
 }
 
@@ -347,10 +347,23 @@ u32 CSlrImageTexture::ResourceActivate(bool async)
 
 	u64 memBefore = SYS_GetUsedMemory();
 	//LOGD("CSlrImageTexture         memBefore: %lld", memBefore);
-	this->DelayedLoadImage(ResourceGetPath(), resourceIsFromAppResources);
+	CSlrImage *image = (CSlrImage *)this;
+	bool loaded = true;
+	if (image->cacheKey != 0)
+		loaded = image->DelayedLoadImageNoFail(ResourceGetPath(), resourceIsFromAppResources);
+	else
+		this->DelayedLoadImage(ResourceGetPath(), resourceIsFromAppResources);
+
+	if (!loaded)
+	{
+		this->resourceIsActive = false;
+		this->resourceState = RESOURCE_STATE_ERROR;
+		return 0;
+	}
 	if (async)
 	{
 		VID_PostImageBinding((CSlrImage*)this, NULL);
+		this->resourceState = RESOURCE_STATE_LOADING;
 	}
 	else
 	{
@@ -387,7 +400,6 @@ u32 CSlrImageTexture::ResourceActivate(bool async)
 	}
 
 	this->resourceIsActive = true;
-	this->resourceState = RESOURCE_STATE_LOADED;
 
 	return this->resourceIdleSize;
 }
@@ -444,4 +456,3 @@ const char *CSlrImageTexture::ResourceGetTypeName()
 {
 	return "texture";
 }
-

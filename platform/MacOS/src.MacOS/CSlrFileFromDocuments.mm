@@ -3,6 +3,17 @@
 #include "SYS_FileSystem.h"
 #include "SYS_Funct.h"
 
+static bool MT_IsAbsolutePath(const char *fileName)
+{
+	if (fileName == NULL || fileName[0] == 0)
+		return false;
+	if (fileName[0] == '/' || fileName[0] == '\\')
+		return true;
+	if (((fileName[0] >= 'A' && fileName[0] <= 'Z') || (fileName[0] >= 'a' && fileName[0] <= 'z')) && fileName[1] == ':')
+		return true;
+	return false;
+}
+
 CSlrFileFromDocuments::CSlrFileFromDocuments(const char *fileName)
 {
 	this->fp = NULL;
@@ -47,7 +58,10 @@ void CSlrFileFromDocuments::Open(const char *fileName)
 {
 	LOGR("CSlrFileFromDocuments: opening %s", fileName);
 	strcpy(this->fileName, fileName);
-	sprintf(this->osFileName, "%s%s", gCPathToDocuments, fileName);
+	if (this->isAbsolutePath || MT_IsAbsolutePath(fileName))
+		sprintf(this->osFileName, "%s", fileName);
+	else
+		sprintf(this->osFileName, "%s%s", gCPathToDocuments, fileName);
 
 	this->fileSize = 0;
 	this->Reopen();
@@ -57,7 +71,10 @@ void CSlrFileFromDocuments::OpenForWrite(const char *fileName)
 {
 	LOGR("CSlrFileFromDocuments: opening %s for write", fileName);
 	strcpy(this->fileName, fileName);
-	sprintf(this->osFileName, "%s%s", gCPathToDocuments, fileName);
+	if (this->isAbsolutePath || MT_IsAbsolutePath(fileName))
+		sprintf(this->osFileName, "%s", fileName);
+	else
+		sprintf(this->osFileName, "%s%s", gCPathToDocuments, fileName);
 	
 	this->fileSize = 0;
 	this->ReopenForWrite();
@@ -174,4 +191,3 @@ CSlrFileFromDocuments::~CSlrFileFromDocuments()
 {
 	this->Close();
 }
-

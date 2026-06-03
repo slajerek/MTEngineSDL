@@ -452,6 +452,7 @@ void SYS_DialogOpenFile(CSystemFileDialogCallback *callback, std::list<CSlrStrin
 {
 	LOGD("SYS_DialogOpenFile");
 	
+	
 //	// temporary remove always on top window flag
 	SYS_windowAlwaysOnTopBeforeFileDialog = VID_IsMainWindowAlwaysOnTop();
 	VID_SetMainWindowAlwaysOnTopTemporary(false);
@@ -511,7 +512,7 @@ void SYS_DialogOpenFile(CSystemFileDialogCallback *callback, std::list<CSlrStrin
 		// Configure your panel the way you want it
 		[panel setCanChooseFiles:YES];
 		[panel setCanChooseDirectories:NO];
-		[panel setAllowsMultipleSelection:NO];
+		[panel setAllowsMultipleSelection:YES];
 		
 		if (extensionsArray != nil)
 		{
@@ -543,13 +544,21 @@ void SYS_DialogOpenFile(CSystemFileDialogCallback *callback, std::list<CSlrStrin
 
 			if (result == NSModalResponseOK)
 			{
+				std::vector<CSlrString *> selectedPaths;
 				for (NSURL *fileURL in [panel URLs])
 				{
 					NSString *strPath = [fileURL path];
 					CSlrString *outPath = FUN_ConvertNSStringToCSlrString(strPath);
-					callback->SystemDialogFileOpenSelected(outPath);
-					delete outPath;
+					selectedPaths.push_back(outPath);
 				}
+
+				if (selectedPaths.empty())
+					callback->SystemDialogFileOpenCancelled();
+				else
+					callback->SystemDialogFilesOpenSelected(&selectedPaths);
+
+				for (CSlrString *path : selectedPaths)
+					delete path;
 			}
 			else
 			{
@@ -569,6 +578,12 @@ void SYS_DialogOpenFile(CSystemFileDialogCallback *callback, std::list<CSlrStrin
 		[NSApp activateIgnoringOtherApps:YES];
 		
 	});
+}
+
+void SYS_DialogOpenFiles(CSystemFileDialogCallback *callback, std::list<CSlrString *> *extensions,
+						 CSlrString *defaultFolder, CSlrString *windowTitle)
+{
+	SYS_DialogOpenFile(callback, extensions, defaultFolder, windowTitle);
 }
 
 

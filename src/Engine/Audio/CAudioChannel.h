@@ -44,6 +44,12 @@ public:
 	
 	virtual void SetWaveformData(CWaveformData *waveformData);
 	CWaveformData *waveformData;
+
+	// Ring buffer for visualization (VU meters, waveforms)
+	static const int PEEK_BUFFER_SIZE = 2048;
+	float peekBuffer[PEEK_BUFFER_SIZE];
+	int peekWritePos;
+	int PeekRecentSamples(float *outSamples, int numSamples) const;
 };
 
 #endif

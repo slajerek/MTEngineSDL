@@ -282,7 +282,7 @@ void CGuiButton::InitWithText(char *text)
 
 void CGuiButton::SetText(const char *text)
 {
-	LOGD("CGuiButton::SetText: text=%s", text);
+//	LOGD("CGuiButton::SetText: text=%s", text);
 	
 	if (textUTF != NULL)
 	{

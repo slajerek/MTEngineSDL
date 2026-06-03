@@ -24,6 +24,17 @@ void SYS_InitApplicationGuiLogger()
 CGuiViewDebugLog::CGuiViewDebugLog(const char *name, float posX, float posY, float posZ, float sizeX, float sizeY)
 : CGuiView(name, posX, posY, posZ, sizeX, sizeY)
 {	
+	visible = false;
+#if defined(USE_DEBUG_LOG_TO_VIEW)
+	AutoScroll = true;
+	Clear();
+#endif
+}
+
+CGuiViewDebugLog::CGuiViewDebugLog(const char *name, float posX, float posY, float posZ, float sizeX, float sizeY, const char *titleI18nKey, const char *stableId)
+: CGuiView(name, posX, posY, posZ, sizeX, sizeY, titleI18nKey, stableId)
+{	
+	visible = false;
 #if defined(USE_DEBUG_LOG_TO_VIEW)
 	AutoScroll = true;
 	Clear();

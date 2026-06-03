@@ -16,6 +16,7 @@ class CGuiViewSearch : public CGuiView
 {
 public:
 	CGuiViewSearch(const char *name, float posX, float posY, float posZ, float sizeX, float sizeY, CGuiViewSearchCallback *callback);
+	CGuiViewSearch(const char *name, float posX, float posY, float posZ, float sizeX, float sizeY, CGuiViewSearchCallback *callback, const char *titleI18nKey, const char *stableId);
 	virtual ~CGuiViewSearch();
 
 	virtual void RenderImGui();

@@ -40,6 +40,7 @@ unsigned long VID_GetTickCount();
 extern u64 gCurrentFrameTime;
 extern bool gViewportsEnableInitAtStartup;
 extern bool gHeadlessMode;
+extern bool gServiceMode;	// skip VID/GUI/SND init entirely (pure headless service)
 
 enum ImGuiStyleType : int
 {
@@ -101,6 +102,12 @@ void VID_SetVSyncScreenRefresh(bool isVSyncRefresh);
 void VID_RaiseMainWindow();
 
 CRenderBackend *VID_GetRenderBackend();
+
+// Render backend selection (macOS only — both Metal and OpenGL4 are built there)
+const char *VID_GetPreferredRenderBackend();          // reads config; returns "opengl" if unset
+void        VID_SetPreferredRenderBackend(const char *name); // writes config; validates "metal"/"opengl"
+const char *VID_GetCurrentRenderBackendName();        // name of the running backend ("Metal"/"OpenGL4")
+bool        VID_IsRenderBackendSwitchable();          // true on macOS, false elsewhere
 
 void VID_GetStartupMainWindowPosition(int *x, int *y, int *width, int *height, bool *maximized);
 void VID_StoreMainWindowPosition();

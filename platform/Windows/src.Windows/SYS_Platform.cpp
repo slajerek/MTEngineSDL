@@ -18,75 +18,22 @@ INT64 W32QpcPerSecond;
 
 void SYS_PlatformInit()
 {
-	timeBeginPeriod(8);
-	
-	/*
-	// precision timer code from: https://github.com/blat-blatnik/Snippets/blob/main/precise_sleep.c
-	W32Timer = CreateWaitableTimerExW(NULL, NULL, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS);
-	TIMECAPS caps;
-	timeGetDevCaps(&caps, sizeof caps);
-	timeBeginPeriod(caps.wPeriodMin);
-	W32SchedulerPeriodMs = (int)caps.wPeriodMin;
+	timeBeginPeriod(1);
+
 	LARGE_INTEGER qpf;
 	QueryPerformanceFrequency(&qpf);
 	W32QpcPerSecond = qpf.QuadPart;
-	*/
 }
 
 void SYS_PlatformShutdown()
 {
-	timeEndPeriod(8);
+	timeEndPeriod(1);
 	SYS_DetachWindowsConsole();
 }
 
 void SYS_PlatformSleep(unsigned long milliseconds)
 {
 	Sleep(milliseconds);
-	return;
-
-	// code from: https://github.com/blat-blatnik/Snippets/blob/main/precise_sleep.c
-	// (does not work)
-	/*
-	double seconds = (double)milliseconds / 1000.0;
-
-	LARGE_INTEGER qpc;
-	QueryPerformanceCounter(&qpc);
-	INT64 targetQpc = (INT64)(qpc.QuadPart + seconds * W32QpcPerSecond);
-
-	if (W32Timer) // Try using a high resolution timer first.
-	{
-		const double TOLERANCE = 0.001'02;
-		INT64 maxTicks = (INT64)W32SchedulerPeriodMs * 9'500;
-		for (;;) // Break sleep up into parts that are lower than scheduler period.
-		{
-			double remainingSeconds = (targetQpc - qpc.QuadPart) / (double)W32QpcPerSecond;
-			INT64 sleepTicks = (INT64)((remainingSeconds - TOLERANCE) * 10'000'000);
-			if (sleepTicks <= 0)
-				break;
-
-			LARGE_INTEGER due;
-			due.QuadPart = -(sleepTicks > maxTicks ? maxTicks : sleepTicks);
-			SetWaitableTimerEx(W32Timer, &due, 0, NULL, NULL, NULL, 0);
-			WaitForSingleObject(W32Timer, INFINITE);
-			QueryPerformanceCounter(&qpc);
-		}
-	}
-	else // Fallback to Sleep.
-	{
-		const double TOLERANCE = 0.000'02;
-		double sleepMs = (seconds - TOLERANCE) * 1000 - W32SchedulerPeriodMs; // Sleep for 1 scheduler period less than requested.
-		int sleepSlices = (int)(sleepMs / W32SchedulerPeriodMs);
-		if (sleepSlices > 0)
-			Sleep((DWORD)sleepSlices * W32SchedulerPeriodMs);
-		QueryPerformanceCounter(&qpc);
-	}
-
-	while (qpc.QuadPart < targetQpc) // Spin for any remaining time.
-	{
-		YieldProcessor();
-		QueryPerformanceCounter(&qpc);
-	}
-	*/
 }
 
 
@@ -199,18 +146,9 @@ void VID_StoreMainWindowPosition()
 	SDL_GetWindowPosition(sdlMainWindow, &x, &y);
 	SDL_GetWindowSize(sdlMainWindow, &width, &height);
 
-	// does not work on Isildur's Windows
-	// int hb = GetSystemMetrics(SM_CYCAPTION);
-	int hb = 0;
-	y -= hb;
-
-	width = SDL_GetWindowSurface(sdlMainWindow)->w;
-	height = SDL_GetWindowSurface(sdlMainWindow)->h + hb;
-
 	bool maximized = (SDL_GetWindowFlags(sdlMainWindow) & SDL_WINDOW_MAXIMIZED);
-	//LOGD("VID_StoreMainWindowPosition: maximized=%s", STRBOOL(maximized));
+	//LOGD("VID_StoreMainWindowPosition: maximized=%s x=%d y=%d w=%d h=%d", STRBOOL(maximized), x, y, width, height);
 
-	//
 	if (!maximized)
 	{
 		gApplicationDefaultConfig->SetInt("MainWindowX", &x);
@@ -229,10 +167,6 @@ void VID_RestoreMainWindowPosition()
 
 void VID_GetStartupMainWindowPosition(int* x, int* y, int* width, int* height, bool *maximized)
 {
-	DWORD windowLeft, windowRight, windowTop, windowBottom;
-	int windowWidth;
-	int windowHeight;
-
 	if (!gApplicationDefaultConfig->E_x_i_s_t_s("MainWindowX"))
 	{
 		// default values
@@ -240,82 +174,44 @@ void VID_GetStartupMainWindowPosition(int* x, int* y, int* width, int* height, b
 		return;
 	}
 
-	int storedLeft, storedTop, storedWidth, storedHeight;
-
-	//
 	int defaultX, defaultY, defaultWidth, defaultHeight;
 	bool defaultMaximized;
 	MT_GetDefaultWindowPositionAndSize(&defaultX, &defaultY, &defaultWidth, &defaultHeight, &defaultMaximized);
 
 	gApplicationDefaultConfig->GetBool("MainWindowMaximized", maximized, defaultMaximized);
-	gApplicationDefaultConfig->GetInt("MainWindowX", &storedLeft, defaultX);
-	gApplicationDefaultConfig->GetInt("MainWindowY", &storedTop, defaultY);
+
+	int storedX, storedY, storedWidth, storedHeight;
+	gApplicationDefaultConfig->GetInt("MainWindowX", &storedX, defaultX);
+	gApplicationDefaultConfig->GetInt("MainWindowY", &storedY, defaultY);
 	gApplicationDefaultConfig->GetInt("MainWindowWidth", &storedWidth, defaultWidth);
 	gApplicationDefaultConfig->GetInt("MainWindowHeight", &storedHeight, defaultHeight);
 
-	windowLeft = storedLeft;
-	windowTop = storedTop;
-
-	///
-	windowRight = windowLeft + storedWidth;
-	windowBottom = windowTop + storedHeight;
-
-	// the following correction is needed when the taskbar is
-	// at the left or top and it is not "auto-hidden"
-	RECT workArea;
-	SystemParametersInfo(SPI_GETWORKAREA, 0, &workArea, 0);
-	windowLeft += workArea.left;
-	windowTop += workArea.top;
- 
-	// make sure the window is not completely out of sight
+	// stored coordinates are absolute screen coordinates from SDL_GetWindowPosition,
+	// validate they are within visible virtual screen bounds
 	int minX = GetSystemMetrics(SM_XVIRTUALSCREEN);
 	int minY = GetSystemMetrics(SM_YVIRTUALSCREEN);
-	int maxX = GetSystemMetrics(SM_CXVIRTUALSCREEN) - GetSystemMetrics(SM_CXICON);
-	int maxY = GetSystemMetrics(SM_CYVIRTUALSCREEN) - GetSystemMetrics(SM_CYICON);
-	if (windowLeft < minX
-		|| windowTop < minY)
+	int maxX = minX + GetSystemMetrics(SM_CXVIRTUALSCREEN) - GetSystemMetrics(SM_CXICON);
+	int maxY = minY + GetSystemMetrics(SM_CYVIRTUALSCREEN) - GetSystemMetrics(SM_CYICON);
+
+	if (storedX < minX || storedX > maxX
+		|| storedY < minY || storedY > maxY)
 	{
-		LOGError("Main window outside visible area: left=%d minX=%d top=%d minY=%d", windowLeft, minX, windowTop, minY);
+		LOGError("Main window outside visible area: x=%d y=%d (bounds: %d,%d - %d,%d)", storedX, storedY, minX, minY, maxX, maxY);
+		MT_GetDefaultWindowPositionAndSize(x, y, width, height, maximized);
 		return;
 	}
 
-	if (windowLeft > maxX
-		|| windowTop > maxY)
-	{
-		LOGError("Main window outside visible area: left=%d maxX=%d top=%d maxY=%d", windowLeft, maxX, windowTop, maxY);
-		return;
-	}
+	if (storedWidth < 3)
+		storedWidth = defaultWidth;
+	if (storedHeight < 3)
+		storedHeight = defaultHeight;
 
-	// restore the window's width and height
-	windowWidth = windowRight - windowLeft;
-	windowHeight = windowBottom - windowTop;
+	*x = storedX;
+	*y = storedY;
+	*width = storedWidth;
+	*height = storedHeight;
 
-	if (windowWidth > maxX)
-	{
-		windowWidth = SCREEN_WIDTH;
-	}
-
-	if (windowHeight > maxY)
-	{
-		windowHeight = SCREEN_HEIGHT;
-	}
-	
-	if (windowWidth < 3)
-	{
-		windowWidth = 20;
-	}
-
-	if (windowHeight < 3)
-	{
-		windowHeight = 20;
-	}
-
-	*x = windowLeft;
-	*y = windowTop;
-	*width = windowWidth;
-	*height = windowHeight;
-
-	//LOGD("x=%d y=%d width=%d height=%d", *x, *y, *width, *height);
+	//LOGD("VID_GetStartupMainWindowPosition: x=%d y=%d width=%d height=%d maximized=%s", *x, *y, *width, *height, STRBOOL(*maximized));
 }
 
 /* note, it seems this below gives virus false positives on windows defender

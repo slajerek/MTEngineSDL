@@ -416,15 +416,40 @@ void SYS_DialogOpenFile(CSystemFileDialogCallback *callback, std::list<CSlrStrin
 
 	LOGD("SYS_DialogOpenFile: filtersStr=%s", filtersStr);
 
-	nfdchar_t *outPathStr = NULL;
-	nfdresult_t result = NFD_OpenDialog( filtersStr, defaultFolderStr, &outPathStr );	
+	nfdpathset_t outPaths;
+	memset(&outPaths, 0, sizeof(outPaths));
+	nfdresult_t result = NFD_OpenDialogMultiple(filtersStr, defaultFolderStr, &outPaths);
 
 	if (result == NFD_OKAY)
 	{
 		VID_SetMainWindowAlwaysOnTopTemporary(SYS_windowAlwaysOnTopBeforeFileDialog);
 
-		CSlrString *outPath = new CSlrString(outPathStr);
-		callback->SystemDialogFileOpenSelected(outPath);
+		size_t count = NFD_PathSet_GetCount(&outPaths);
+		std::vector<CSlrString *> selectedPaths;
+		selectedPaths.reserve(count);
+
+		for (size_t i = 0; i < count; i++)
+		{
+			nfdchar_t *outPathStr = NFD_PathSet_GetPath(&outPaths, i);
+			if (outPathStr)
+			{
+				selectedPaths.push_back(new CSlrString(outPathStr));
+			}
+		}
+
+		if (selectedPaths.empty())
+		{
+			callback->SystemDialogFileOpenCancelled();
+		}
+		else
+		{
+			callback->SystemDialogFilesOpenSelected(&selectedPaths);
+		}
+
+		for (CSlrString *path : selectedPaths)
+			delete path;
+
+		NFD_PathSet_Free(&outPaths);
 	}
 	else if (result == NFD_CANCEL)
 	{
@@ -439,6 +464,11 @@ void SYS_DialogOpenFile(CSystemFileDialogCallback *callback, std::list<CSlrStrin
 
 	delete [] defaultFolderStr;
 	SYS_ReleaseCharBuf(filtersStr);
+}
+
+void SYS_DialogOpenFiles(CSystemFileDialogCallback *callback, std::list<CSlrString *> *extensions, CSlrString *defaultFolder, CSlrString *windowTitle)
+{
+	SYS_DialogOpenFile(callback, extensions, defaultFolder, windowTitle);
 }
 
 void SYS_DialogSaveFile(CSystemFileDialogCallback *callback, std::list<CSlrString *> *extensions, CSlrString *defaultFileName, CSlrString *defaultFolder, CSlrString *windowTitle)

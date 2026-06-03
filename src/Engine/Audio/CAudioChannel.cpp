@@ -2,6 +2,7 @@
 #include "SYS_Main.h"
 #include "CSlrString.h"
 #include "SYS_DefaultConfig.h"
+#include <cstring>
 
 // Note, this may evntually cause a bug. Check is not performed for performance purposes as we assume the OS buffer size will not change
 #define SKIP_BUFFER_SIZE_CHECK
@@ -20,13 +21,22 @@ CAudioChannel::CAudioChannel(const char *name)
 	this->isMuted = false;
 	this->volume = 1.0f;
 	this->waveformData = NULL;
-		
+
+	memset(peekBuffer, 0, sizeof(peekBuffer));
+	peekWritePos = 0;
+
 	this->CreateChannelBuffer(DEFAULT_BUFFER_NUM_SAMPLES);
 	GetDefaultValuesFromAppConfig();
 }
 
 CAudioChannel::~CAudioChannel()
 {
+	if (this->channelBuffer)
+	{
+		delete [] this->channelBuffer;
+		this->channelBuffer = NULL;
+	}
+
 	STRFREE(name);
 }
 
@@ -107,51 +117,63 @@ void CAudioChannel::MixIn(int *mixBuffer, u32 numSamples, int numAudioChannels)
 #endif
 	
 	this->FillBuffer(channelBuffer, numSamples);
-	
-	if (isMuted)
+
+	if (!isMuted)
 	{
-		return;
-	}
-	
-	i16 *inPtr = (i16*)channelBuffer;
-	i16 *outPtr = (i16*)mixBuffer;
-	
-	if (volume == 1.0f)
-	{
-		for (u32 i = 0; i < numSamples; i++)
+		i16 *inPtr = (i16*)channelBuffer;
+		i16 *outPtr = (i16*)mixBuffer;
+
+		if (volume == 1.0f)
 		{
-	//		mixBuffer[i] = channelBuffer[i];
-			
+			for (u32 i = 0; i < numSamples; i++)
+			{
+		//		mixBuffer[i] = channelBuffer[i];
+
 #if defined(DIVIDE_VOLUME_BY_NUM_CHANNELS)
-			int sL = (int)(*inPtr++)/numAudioChannels + (int)(*outPtr);
-			int sR = (int)(*inPtr++)/numAudioChannels + (int)(*(outPtr+1));
+				int sL = (int)(*inPtr++)/numAudioChannels + (int)(*outPtr);
+				int sR = (int)(*inPtr++)/numAudioChannels + (int)(*(outPtr+1));
 #else
-			int sL = (int)*inPtr++ + (int)(*outPtr);
-			int sR = (int)*inPtr++ + (int)(*(outPtr+1));
+				int sL = (int)*inPtr++ + (int)(*outPtr);
+				int sR = (int)*inPtr++ + (int)(*(outPtr+1));
 #endif
-			*outPtr = sL; outPtr++;
-			*outPtr = sR; outPtr++;
+				*outPtr = sL; outPtr++;
+				*outPtr = sR; outPtr++;
+			}
+		}
+		else
+		{
+			for (u32 i = 0; i < numSamples; i++)
+			{
+		//		mixBuffer[i] = channelBuffer[i];
+
+#if defined(DIVIDE_VOLUME_BY_NUM_CHANNELS)
+				i16 mL = (i16)(float)(*inPtr++)/(float)numAudioChannels * volume;
+				i16 mR = (i16)(float)(*inPtr++)/(float)numAudioChannels * volume;
+#else
+				i16 mL = (i16)(float)*inPtr++ * volume;
+				i16 mR = (i16)(float)*inPtr++ * volume;
+#endif
+
+				int sL = (int)mL + (int)(*outPtr);
+				int sR = (int)mR + (int)(*(outPtr+1));
+
+				*outPtr = sL; outPtr++;
+				*outPtr = sR; outPtr++;
+			}
 		}
 	}
-	else
+
+	// Capture mono mix into peek buffer for visualization
 	{
+		i16 *capturePtr = (i16*)channelBuffer;
 		for (u32 i = 0; i < numSamples; i++)
 		{
-	//		mixBuffer[i] = channelBuffer[i];
-						
-#if defined(DIVIDE_VOLUME_BY_NUM_CHANNELS)
-			i16 mL = (i16)(float)(*inPtr++)/(float)numAudioChannels * volume;
-			i16 mR = (i16)(float)(*inPtr++)/(float)numAudioChannels * volume;
-#else
-			i16 mL = (i16)(float)*inPtr++ * volume;
-			i16 mR = (i16)(float)*inPtr++ * volume;
-#endif
-			
-			int sL = (int)mL + (int)(*outPtr);
-			int sR = (int)mR + (int)(*(outPtr+1));
-						
-			*outPtr = sL; outPtr++;
-			*outPtr = sR; outPtr++;
+			float sL = (float)(*capturePtr++) / 32768.0f;
+			float sR = (float)(*capturePtr++) / 32768.0f;
+			float mono = (sL + sR) * 0.5f;
+			if (isMuted) mono = 0.0f;
+			peekBuffer[peekWritePos] = mono * volume;
+			peekWritePos = (peekWritePos + 1) % PEEK_BUFFER_SIZE;
 		}
 	}
 }
@@ -159,6 +181,23 @@ void CAudioChannel::MixIn(int *mixBuffer, u32 numSamples, int numAudioChannels)
 void CAudioChannel::MixInFloat(float *mixBufferL, float *mixBufferR, u32 numSamples)
 {
 	SYS_FatalExit("abstract CAudioChannel::MixInFloat");
+}
+
+int CAudioChannel::PeekRecentSamples(float *outSamples, int numSamples) const
+{
+	if (numSamples > PEEK_BUFFER_SIZE)
+		numSamples = PEEK_BUFFER_SIZE;
+
+	int startPos = peekWritePos - numSamples;
+	if (startPos < 0)
+		startPos += PEEK_BUFFER_SIZE;
+
+	for (int i = 0; i < numSamples; i++)
+	{
+		outSamples[i] = peekBuffer[(startPos + i) % PEEK_BUFFER_SIZE];
+	}
+
+	return numSamples;
 }
 
 void CAudioChannel::SetWaveformData(CWaveformData *waveformData)

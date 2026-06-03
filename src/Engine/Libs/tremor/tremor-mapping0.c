@@ -19,7 +19,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
-//#include <ogg/ogg.h>
 #include "Ogg/ogg.h"
 #include "tremor-ivorbiscodec.h"
 #include "tremor-mdct.h"

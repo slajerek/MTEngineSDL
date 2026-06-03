@@ -11,6 +11,9 @@
 #include "NET_Main.h"
 #include "NET_Includes.h"
 #include "CNetPacket.h"
+#include "NET_AuthPw2.h"
+
+#include <array>
 
 CNetClient::CNetClient(const char *serverConnectAddress, int serverConnectPort, u64 serverId, std::string clientLoginName, std::vector<u8> passwordHash)
 {
@@ -31,7 +34,8 @@ void CNetClient::Init(CNetClientCallback *clientCallback, CNetPacketCallback *pa
 	this->AddClientCallback(clientCallback);
 	this->AddPacketCallback(packetCallback);
 
-	strcpy(this->serverAddress, serverConnectAddress);
+	strncpy(this->serverAddress, serverConnectAddress, sizeof(this->serverAddress) - 1);
+	this->serverAddress[sizeof(this->serverAddress) - 1] = '\0';
 	this->serverPort = serverConnectPort;
 
 	this->serverId = serverId;
@@ -129,7 +133,8 @@ void CNetClient::ThreadRun(void *data)
 
 		// connect
 		enet_address_set_host (&address, serverAddress);
-		address.port = serverPort;
+		int actualPort = SYS_ApplyPortOffset((int)serverPort);
+		address.port = actualPort;
 
 		// Initiate the connection, allocating the two channels 0 and 1.
 		peer = enet_host_connect (client, &address, 2, 0);
@@ -141,11 +146,11 @@ void CNetClient::ThreadRun(void *data)
 		}
 
 		// Wait up to 5 seconds for the connection attempt to succeed.
-		LOGCFROM("Connecting to %s:%d", serverAddress, serverPort);
+		LOGCFROM("Connecting to %s:%d (base %d)", serverAddress, actualPort, serverPort);
 		if (enet_host_service(client, & event, 5000) > 0 &&
 			event.type == ENET_EVENT_TYPE_CONNECT)
 		{
-			LOGCFROM("Connection to %s:%d succeeded", serverAddress, serverPort);
+			LOGCFROM("Connection to %s:%d (base %d) succeeded", serverAddress, actualPort, serverPort);
 			this->status = NET_CLIENT_STATUS_CONNECTED;
 		}
 		else
@@ -154,7 +159,7 @@ void CNetClient::ThreadRun(void *data)
 			// received. Reset the peer in the event the 5 seconds
 			// had run out without any significant event.
 			enet_peer_reset (peer);
-			LOGError("Connection to %s:%d failed", serverAddress, serverPort);
+			LOGError("Connection to %s:%d (base %d) failed", serverAddress, actualPort, serverPort);
 			this->status = NET_CLIENT_STATUS_RECONNECT;
 			continue;
 		}
@@ -171,8 +176,18 @@ void CNetClient::ThreadRun(void *data)
 		byteBufferReliableOut->PutU32(NET_PROTOCOL_VERSION);
 		byteBufferReliableOut->PutU64(serverId);
 		byteBufferReliableOut->PutStdString(clientLoginName);
-		byteBufferReliableOut->PutU16(passwordHash.size());
-		byteBufferReliableOut->PutBytes(passwordHash.data(), passwordHash.size());
+
+		// Auth data: for PW2 challenge-response we only send the 4-byte magic.
+		u16 authLen = (u16)passwordHash.size();
+		u8 *authBytes = passwordHash.data();
+		if (NET_AuthPw2_IsClientAuthData(passwordHash))
+		{
+			authLen = 4;
+			authBytes = passwordHash.data();
+		}
+		byteBufferReliableOut->PutU16(authLen);
+		if (authLen > 0)
+			byteBufferReliableOut->PutBytes(authBytes, authLen);
 
 		this->SendReliableBufferAsync(byteBufferReliableOut);
 		
@@ -195,6 +210,66 @@ void CNetClient::ThreadRun(void *data)
 					{
 						isAuthorized = byteBufferIn->GetBool();
 					}
+					else if (packetType == NET_PACKET_TYPE_AUTHORIZE_CHALLENGE)
+					{
+						u16 challengeLen = byteBufferIn->getU16();
+						u8 *challengeBytes = byteBufferIn->getBytes(challengeLen);
+						std::vector<u8> challenge(challengeBytes, challengeBytes + challengeLen);
+
+						// Snapshot auth data under lock (can be updated from UI thread).
+						std::vector<u8> clientAuthData;
+						std::string loginNameCopy;
+						this->LockMutex();
+						clientAuthData = passwordHash;
+						loginNameCopy = clientLoginName;
+						this->UnlockMutex();
+
+						if (!NET_AuthPw2_IsClientAuthData(clientAuthData))
+						{
+							LOGError("CNetClient: received authorize challenge but client has no PW2 auth data");
+							this->SetStatusDisconnectAndReconnect();
+						}
+						else
+						{
+							u8 hashVer = 0;
+							u32 iters = 0;
+							std::vector<u8> salt;
+							std::vector<u8> nonce;
+							if (!NET_AuthPw2_ParseChallenge(challenge, hashVer, iters, salt, nonce))
+							{
+								LOGError("CNetClient: invalid PW2 authorize challenge payload");
+								this->SetStatusDisconnectAndReconnect();
+							}
+							else
+							{
+								const u8 *proofPtr = NET_AuthPw2_GetPasswordProofPtr(clientAuthData);
+								std::vector<u8> proof(proofPtr, proofPtr + 32);
+								std::vector<u8> key;
+								if (!NET_AuthPw2_DeriveKeyFromProof(hashVer, proof, salt, iters, key))
+								{
+									LOGError("CNetClient: failed to derive PW2 key");
+									this->SetStatusDisconnectAndReconnect();
+								}
+								else
+								{
+									auto hmac = NET_AuthPw2_ComputeHmacFromKey(key, nonce);
+									std::vector<u8> responsePayload = NET_AuthPw2_BuildResponse(hmac);
+
+									// Send authorize response.
+									this->LockMutex();
+									byteBufferReliableOut->Reset();
+									byteBufferReliableOut->PutByte(NET_PACKET_TYPE_AUTHORIZE_RESPONSE);
+									byteBufferReliableOut->PutU32(NET_PROTOCOL_VERSION);
+									byteBufferReliableOut->PutU64(serverId);
+									byteBufferReliableOut->PutStdString(loginNameCopy);
+									byteBufferReliableOut->PutU16((u16)responsePayload.size());
+									byteBufferReliableOut->PutBytes(responsePayload.data(), (u32)responsePayload.size());
+									this->SendReliableBufferAsync(byteBufferReliableOut);
+									this->UnlockMutex();
+								}
+							}
+						}
+					}
 
 					// Clean up the packet now that we're done using it
 					enet_packet_destroy (event.packet);
@@ -207,7 +282,12 @@ void CNetClient::ThreadRun(void *data)
 						break;
 					}
 
-					if (isAuthorized)
+					if (packetType == NET_PACKET_TYPE_AUTHORIZE_CHALLENGE)
+					{
+						// Challenge handled (or failed) above; stay in CONNECTED state.
+						break;
+					}
+					else if (isAuthorized)
 					{
 						LOGCFROM("AUTHORIZED, go online");
 						this->status = NET_CLIENT_STATUS_ONLINE;
@@ -219,11 +299,14 @@ void CNetClient::ThreadRun(void *data)
 						byteBufferNotReliableOut->Reset();
 						this->UnlockMutex();
 
-						for (std::list<CNetClientCallback *>::iterator it = this->clientCallbacks.begin();
-							it != this->clientCallbacks.end(); it++)
 						{
-							CNetClientCallback *callback = (*it);
-							callback->NetClientCallbackConnected(this);
+							this->LockMutex();
+							std::list<CNetClientCallback *> callbacksCopy = this->clientCallbacks;
+							this->UnlockMutex();
+							for (auto *callback : callbacksCopy)
+							{
+								callback->NetClientCallbackConnected(this);
+							}
 						}
 
 						break;
@@ -233,11 +316,14 @@ void CNetClient::ThreadRun(void *data)
 						LOGError("CONNECTED: not authorized");
 						this->Disconnect();
 						
-						for (std::list<CNetClientCallback *>::iterator it = this->clientCallbacks.begin();
-							it != this->clientCallbacks.end(); it++)
 						{
-							CNetClientCallback *callback = (*it);
-							callback->NetClientCallbackNotAuthorized(this);
+							this->LockMutex();
+							std::list<CNetClientCallback *> callbacksCopy = this->clientCallbacks;
+							this->UnlockMutex();
+							for (auto *callback : callbacksCopy)
+							{
+								callback->NetClientCallbackNotAuthorized(this);
+							}
 						}
 
 						break;
@@ -341,11 +427,14 @@ void CNetClient::NetLogic()
 		this->receivedPackets.pop_front();
 		this->UnlockMutex();
 		
-		for (std::list<CNetClientCallback *>::iterator it = this->clientCallbacks.begin();
-			it != this->clientCallbacks.end(); it++)
 		{
-			CNetClientCallback *callback = (*it);
-			callback->NetClientProcessPacket(packet);
+			this->LockMutex();
+			std::list<CNetClientCallback *> callbacksCopy = this->clientCallbacks;
+			this->UnlockMutex();
+			for (auto *callback : callbacksCopy)
+			{
+				callback->NetClientProcessPacket(packet);
+			}
 		}
 
 		delete packet;
@@ -371,11 +460,12 @@ void CNetClient::NetLogic()
 	this->UnlockMutex();
 	
 	// net logic
-	for (std::list<CNetClientCallback *>::iterator it = this->clientCallbacks.begin();
-		 it != this->clientCallbacks.end(); it++)
 	{
-		CNetClientCallback *callback = (*it);
-		callback->NetClientLogic(this);
+		std::list<CNetClientCallback *> callbacksCopy = this->clientCallbacks;
+		for (auto *callback : callbacksCopy)
+		{
+			callback->NetClientLogic(this);
+		}
 	}
 
 }
@@ -413,8 +503,8 @@ void CNetClient::IssuePacket(bool isReliable, CNetPacket *packet)
 		byteBufferNotReliableOut->PutU16(packet->packetType);
 		packet->Serialize(byteBufferNotReliableOut);
 	}
-	LOGD("byteBufferReliableOut len=%d", byteBufferReliableOut->length);
-	LOGD("byteBufferNotReliableOut len=%d", byteBufferNotReliableOut->length);
+//	LOGD("byteBufferReliableOut len=%d", byteBufferReliableOut->length);
+//	LOGD("byteBufferNotReliableOut len=%d", byteBufferNotReliableOut->length);
 	this->UnlockMutex();
 }
 
@@ -517,13 +607,17 @@ void CNetClient::AddClientCallback(CNetClientCallback *clientCallback)
 	if (clientCallback != NULL)
 	{
 		LOGCC("CNetClient::AddClientCallback");
+		this->LockMutex();
 		this->clientCallbacks.push_back(clientCallback);
+		this->UnlockMutex();
 	}
 }
 
 void CNetClient::RemoveClientCallback(CNetClientCallback *clientCallback)
 {
+	this->LockMutex();
 	this->clientCallbacks.remove(clientCallback);
+	this->UnlockMutex();
 }
 
 void CNetClient::AddPacketCallback(CNetPacketCallback *packetCallback)
@@ -545,10 +639,11 @@ void CNetClient::SetStatusDisconnectAndReconnect()
 	LOGCFROM("CNetClient::SetStatusDisconnectAndReconnect");
 	if (this->status == NET_CLIENT_STATUS_ONLINE)
 	{
-		for (std::list<CNetClientCallback *>::iterator it = this->clientCallbacks.begin();
-			it != this->clientCallbacks.end(); it++)
+		this->LockMutex();
+		std::list<CNetClientCallback *> callbacksCopy = this->clientCallbacks;
+		this->UnlockMutex();
+		for (auto *callback : callbacksCopy)
 		{
-			CNetClientCallback *callback = (*it);
 			callback->NetClientCallbackDisconnected(this);
 		}
 	}
@@ -560,10 +655,11 @@ void CNetClient::Disconnect()
 	LOGCFROM("CNetClient::Disconnect");
 	if (this->status == NET_CLIENT_STATUS_ONLINE)
 	{
-		for (std::list<CNetClientCallback *>::iterator it = this->clientCallbacks.begin();
-			it != this->clientCallbacks.end(); it++)
+		this->LockMutex();
+		std::list<CNetClientCallback *> callbacksCopy = this->clientCallbacks;
+		this->UnlockMutex();
+		for (auto *callback : callbacksCopy)
 		{
-			CNetClientCallback *callback = (*it);
 			callback->NetClientCallbackDisconnected(this);
 		}
 	}
@@ -630,4 +726,3 @@ void CNetClientCallback::NetClientProcessPacket(CNetPacket *packet)
 void CNetClientCallback::NetClientLogic(CNetClient *netClient)
 {
 }
-

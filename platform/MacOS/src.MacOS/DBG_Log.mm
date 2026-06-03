@@ -28,6 +28,8 @@
 
 #import <Foundation/Foundation.h>
 
+#include "MT_API.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
@@ -98,11 +100,14 @@ void LOG_Init(void)
 
     if (logDir == nil)
     {
-        logDir = [NSSearchPathForDirectoriesInDomains(NSDesktopDirectory, NSUserDomainMask, YES) objectAtIndex:0];
+//        logDir = [NSSearchPathForDirectoriesInDomains(NSDesktopDirectory, NSUserDomainMask, YES) objectAtIndex:0];
+		
+		logDir = [NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES) objectAtIndex:0];
     }
 
-    NSString *path = [NSString stringWithFormat:@"%@/MTEngineSDL-%02d%02d%02d-%02d%02d.txt",
-                      logDir,
+    NSString *appName = [NSString stringWithUTF8String:MT_GetSettingsFolderName()];
+    NSString *path = [NSString stringWithFormat:@"%@/%@-%02d%02d%02d-%02d%02d.txt",
+                      logDir, appName,
                       (timeinfo->tm_year-100), (timeinfo->tm_mon+1), timeinfo->tm_mday, timeinfo->tm_hour, timeinfo->tm_min];
 
     NSLog(@"logger file path=%@", path);

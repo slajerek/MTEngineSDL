@@ -190,22 +190,25 @@ void CRecentlyOpenedFiles::RenderImGuiMenu(const char *menuItemLabel)
 		{
 			CRecentFile *file = *it;
 			// TODO: replace below with const char *menuLabelText = guiMain->isAltPressed ? file->filePath : file->fileName;
+			char *cstr = file->filePath->GetUTF8();
 			if (guiMain->isAltPressed)
 			{
-				char *cstr = file->filePath->GetUTF8();
 				if (ImGui::MenuItem(cstr, "", false, file->isAvailable))
 				{
 					fileSelected = file;
 				}
-				STRFREE(cstr);
 			}
 			else
 			{
-				if (ImGui::MenuItem(file->fileName, "", false, file->isAvailable))
+				// Use full path as hidden ImGui ID to avoid duplicate IDs for files with the same name in different folders
+				char labelBuf[4096];
+				snprintf(labelBuf, sizeof(labelBuf), "%s##%s", file->fileName, cstr);
+				if (ImGui::MenuItem(labelBuf, "", false, file->isAvailable))
 				{
 					fileSelected = file;
 				}
 			}
+			STRFREE(cstr);
 		}
 		
 		if (menuItemLabel != NULL)

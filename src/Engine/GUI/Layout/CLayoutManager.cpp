@@ -4,6 +4,9 @@
 #include "CGuiMain.h"
 #include "CSlrKeyboardShortcuts.h"
 #include "VID_Main.h"
+#include "SYS_CommandLine.h"
+
+CSlrString *settingsPathToLayoutsFile = NULL;
 
 CLayoutData::CLayoutData()
 {
@@ -13,6 +16,8 @@ CLayoutData::CLayoutData()
 	this->keyShortcut = NULL;
 	this->isFullScreenLayout = false;
 	this->parentLayout = NULL;
+	this->predefinedId = NULL;
+	this->translationKey = NULL;
 }
 
 CLayoutData::CLayoutData(const char *layoutName, CByteBuffer *serializedLayout, bool doNotUpdateViewsPosition, CSlrKeyboardShortcut *keyShortcut)
@@ -27,6 +32,8 @@ CLayoutData::CLayoutData(const char *layoutName, CByteBuffer *serializedLayout, 
 	}
 	this->isFullScreenLayout = false;
 	this->parentLayout = NULL;
+	this->predefinedId = NULL;
+	this->translationKey = NULL;
 }
 
 CLayoutData::~CLayoutData()
@@ -44,12 +51,30 @@ CLayoutData::~CLayoutData()
 	
 	if (parentLayout)
 		delete parentLayout;
+	if (predefinedId)
+		STRFREE(predefinedId);
+	if (translationKey)
+		STRFREE(translationKey);
 }
 
 CLayoutManager::CLayoutManager(CGuiMain *guiMain)
 {
 	this->guiMain = guiMain;
 	this->currentLayout = NULL;
+
+	// Parse --layouts-file command line option if not already set by the app
+	if (settingsPathToLayoutsFile == NULL)
+	{
+		for (int i = 0; i < (int)sysCommandLineArguments.size() - 1; i++)
+		{
+			const char *arg = sysCommandLineArguments[i];
+			if (!strcmp(arg, "--layouts-file") || !strcmp(arg, "-layouts-file") || !strcmp(arg, "layouts-file"))
+			{
+				settingsPathToLayoutsFile = new CSlrString(sysCommandLineArguments[i + 1]);
+				break;
+			}
+		}
+	}
 }
 
 void CLayoutManager::AddLayout(CLayoutData *layoutData)
@@ -65,9 +90,15 @@ void CLayoutManager::AddLayout(CLayoutData *layoutData)
 	}
 	
 	layouts.push_back(layoutData);
-	
+
 	u64 hash = GetHashCode64(layoutData->layoutName);
 	layoutsByHash[hash] = layoutData;
+
+	if (layoutData->predefinedId)
+	{
+		u64 idHash = GetHashCode64(layoutData->predefinedId);
+		predefinedLayoutsById[idHash] = layoutData;
+	}
 	
 	if (layoutData->keyShortcut)
 	{
@@ -78,21 +109,55 @@ void CLayoutManager::AddLayout(CLayoutData *layoutData)
 
 void CLayoutManager::RemoveAndDeleteLayout(CLayoutData *layoutData)
 {
-	if (currentLayout == layoutData)
+	bool wasCurrent = (currentLayout == layoutData);
+	if (wasCurrent)
 	{
 		currentLayout = NULL;
 	}
-	
+
 	layouts.remove(layoutData);
 
 	u64 hash = GetHashCode64(layoutData->layoutName);
 	layoutsByHash.erase(hash);
-	
+
+	if (layoutData->predefinedId)
+	{
+		u64 idHash = GetHashCode64(layoutData->predefinedId);
+		predefinedLayoutsById.erase(idHash);
+	}
+
 	delete layoutData;
+
+	// Fix #4/#5: ensure currentLayout is never left NULL
+	if (wasCurrent)
+	{
+		if (layouts.empty())
+		{
+			// Fix #5: always keep at least one workspace
+			CLayoutData *defaultLayout = new CLayoutData();
+			defaultLayout->layoutName = STRALLOC("Default");
+			defaultLayout->doNotUpdateViewsPositions = false;
+			AddLayout(defaultLayout);
+			currentLayout = defaultLayout;
+			SerializeLayoutAsync(defaultLayout);
+		}
+		else
+		{
+			// Fix #4: pick next available layout
+			currentLayout = layouts.front();
+		}
+	}
 }
 
 void CLayoutManager::DeleteAllLayouts()
 {
+	// Clear references to layouts that are about to be deleted.
+	// Note: DeleteAllLayouts() is used by DeserializeLayouts(); layoutsByHash must be cleared
+	// otherwise AddLayout() may find freed layouts and attempt to delete them again.
+	currentLayout = NULL;
+	layoutsByHash.clear();
+	predefinedLayoutsById.clear();
+
 	while(!layouts.empty())
 	{
 		CLayoutData *layoutData = layouts.front();
@@ -115,6 +180,17 @@ void CLayoutManager::SerializeLayout(CLayoutData *layoutData, CByteBuffer *byteB
 	{
 		byteBuffer->PutBool(false);
 	}
+
+	// v3: predefinedId
+	if (layoutData->predefinedId)
+	{
+		byteBuffer->PutBool(true);
+		byteBuffer->PutString(layoutData->predefinedId);
+	}
+	else
+	{
+		byteBuffer->PutBool(false);
+	}
 }
 
 void CLayoutManager::SerializeLayouts(CByteBuffer *byteBuffer)
@@ -126,10 +202,14 @@ void CLayoutManager::SerializeLayouts(CByteBuffer *byteBuffer)
 		SerializeLayout(layoutData, byteBuffer);
 	}
 	
-	// TODO: bug: after returning from full screen the current layoutName is NULL
+	// Fix #2: never write empty currentLayoutName — fall back to first layout
 	if (currentLayout && currentLayout->layoutName)
 	{
 		byteBuffer->PutString(currentLayout->layoutName);
+	}
+	else if (!layouts.empty() && layouts.front()->layoutName)
+	{
+		byteBuffer->PutString(layouts.front()->layoutName);
 	}
 	else
 	{
@@ -154,6 +234,18 @@ CLayoutData *CLayoutManager::DeserializeLayout(CByteBuffer *byteBuffer, u16 vers
 	}
 	
 	CLayoutData *layoutData = new CLayoutData(layoutName, serializedLayout, isStatic, keyShortcut);
+
+	// v3: predefinedId
+	if (version >= 0x0003)
+	{
+		bool hasPredefinedId = byteBuffer->GetBool();
+		if (hasPredefinedId)
+		{
+			char *predefinedId = byteBuffer->GetString();
+			layoutData->predefinedId = STRALLOC(predefinedId);
+		}
+	}
+
 	return layoutData;
 }
 
@@ -172,11 +264,17 @@ void CLayoutManager::DeserializeLayouts(CByteBuffer *byteBuffer, u16 version)
 	LOGD("currentLayoutName=%s", currentLayoutName);
 
 	CLayoutData *layoutData = GetLayoutByName(currentLayoutName);
+
+	// Fix #1: fall back to first layout when saved name is not found (e.g. empty or deleted)
+	if (layoutData == NULL && !layouts.empty())
+	{
+		LOGD("CLayoutManager::DeserializeLayouts: currentLayoutName '%s' not found, falling back to first layout", currentLayoutName);
+		layoutData = layouts.front();
+	}
+
 	if (layoutData != NULL)
 	{
 		SetLayoutAsync(layoutData, false);
-//		CUiThreadTaskSetLayout *task = new CUiThreadTaskSetLayout(layoutData, false);
-//		guiMain->AddUiThreadTask(task);
 	}
 }
 
@@ -190,7 +288,72 @@ CLayoutData *CLayoutManager::GetLayoutByName(const char *name)
 	return it->second;
 }
 
-#define LAYOUTS_FILE_VERSION 0x0002
+CLayoutData *CLayoutManager::GetPredefinedLayoutById(const char *predefinedId)
+{
+	u64 hash = GetHashCode64(predefinedId);
+	std::map<u64, CLayoutData *>::iterator it = predefinedLayoutsById.find(hash);
+	if (it == predefinedLayoutsById.end())
+		return NULL;
+	return it->second;
+}
+
+CLayoutData *CLayoutManager::AddPredefinedLayout(const char *predefinedId, const char *translationKey)
+{
+	LOGD("CLayoutManager::AddPredefinedLayout: id=%s translationKey=%s", predefinedId, translationKey);
+
+	// Check if this predefined layout already exists (e.g. restored from layouts.dat)
+	CLayoutData *existing = GetPredefinedLayoutById(predefinedId);
+	if (existing)
+	{
+		LOGD("CLayoutManager::AddPredefinedLayout: found existing layout for id=%s", predefinedId);
+		// Update translationKey (it's app-provided, not serialized)
+		if (existing->translationKey)
+			STRFREE(existing->translationKey);
+		existing->translationKey = STRALLOC(translationKey);
+		// Do NOT change position — preserve order from file
+		return existing;
+	}
+
+	// Create new predefined layout with empty buffer.
+	// First use will capture the view state via SwitchToPredefinedWorkspace.
+	CLayoutData *layoutData = new CLayoutData();
+	layoutData->predefinedId = STRALLOC(predefinedId);
+	layoutData->translationKey = STRALLOC(translationKey);
+	layoutData->layoutName = STRALLOC(predefinedId); // use predefinedId as layoutName
+	layoutData->doNotUpdateViewsPositions = false;
+
+	// Insert after the last predefined layout, before first user workspace.
+	// This keeps registration order (Factions → Items → ... → ServerAdmin).
+	auto insertPos = layouts.end();
+	for (auto it = layouts.begin(); it != layouts.end(); ++it)
+	{
+		if (!(*it)->IsPredefined())
+		{
+			insertPos = it;
+			break;
+		}
+	}
+	layouts.insert(insertPos, layoutData);
+
+	u64 nameHash = GetHashCode64(layoutData->layoutName);
+	layoutsByHash[nameHash] = layoutData;
+
+	u64 idHash = GetHashCode64(predefinedId);
+	predefinedLayoutsById[idHash] = layoutData;
+
+	return layoutData;
+}
+
+void CLayoutManager::RemovePredefinedLayout(const char *predefinedId)
+{
+	CLayoutData *layoutData = GetPredefinedLayoutById(predefinedId);
+	if (layoutData)
+	{
+		RemoveAndDeleteLayout(layoutData);
+	}
+}
+
+#define LAYOUTS_FILE_VERSION 0x0003
 
 void CLayoutManager::StoreLayouts()
 {
@@ -205,11 +368,16 @@ void CLayoutManager::StoreLayouts()
 
 	SerializeLayouts(byteBuffer);
 	
-	LOGG("LAYOUTS_FILE_NAME is set to=%s", C64D_LAYOUTS_FILE_NAME);
-	CSlrString *fileName = new CSlrString(C64D_LAYOUTS_FILE_NAME);
-//	fileName->DebugPrint("fileName=");
-	byteBuffer->storeToSettings(fileName);
-	delete fileName;
+	if (settingsPathToLayoutsFile != NULL)
+	{
+		byteBuffer->storeToFile(settingsPathToLayoutsFile);
+	}
+	else
+	{
+		CSlrString *fileName = new CSlrString(C64D_LAYOUTS_FILE_NAME);
+		byteBuffer->storeToSettings(fileName);
+		delete fileName;
+	}
 	
 	delete byteBuffer;
 }
@@ -219,9 +387,17 @@ void CLayoutManager::LoadLayouts()
 	LOGD("CLayoutManager::LoadLayouts");
 	CByteBuffer *byteBuffer = new CByteBuffer();
 
-	CSlrString *fileName = new CSlrString(C64D_LAYOUTS_FILE_NAME);
-	bool available = byteBuffer->loadFromSettings(fileName);
-	delete fileName;
+	bool available;
+	if (settingsPathToLayoutsFile != NULL)
+	{
+		available = byteBuffer->readFromFile(settingsPathToLayoutsFile);
+	}
+	else
+	{
+		CSlrString *fileName = new CSlrString(C64D_LAYOUTS_FILE_NAME);
+		available = byteBuffer->loadFromSettings(fileName);
+		delete fileName;
+	}
 	
 	if (available)
 	{
@@ -247,9 +423,9 @@ void CLayoutManager::LoadLayouts()
 		else
 		{
 			u16 version = byteBuffer->GetU16();
-			if (version != LAYOUTS_FILE_VERSION)
+			if (version > LAYOUTS_FILE_VERSION)
 			{
-				LOGError("CLayoutManager::LoadLayouts: version %04x not supported", version);
+				LOGError("CLayoutManager::LoadLayouts: version %04x not supported (max %04x)", version, LAYOUTS_FILE_VERSION);
 			}
 			else
 			{
@@ -312,9 +488,9 @@ CLayoutData *CLayoutManager::LoadLayout(CSlrString *filePath)
 		else
 		{
 			u16 version = byteBuffer->GetU16();
-			if (version != LAYOUTS_FILE_VERSION)
+			if (version > LAYOUTS_FILE_VERSION)
 			{
-				LOGError("CLayoutManager::LoadLayout: version %04x not supported", version);
+				LOGError("CLayoutManager::LoadLayout: version %04x not supported (max %04x)", version, LAYOUTS_FILE_VERSION);
 			}
 			else
 			{

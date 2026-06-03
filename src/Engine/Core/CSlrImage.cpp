@@ -291,6 +291,21 @@ void CSlrImage::DelayedLoadImage(const char *fileName, bool fromResources)
 {
 	ResourceSetPath(fileName, fromResources);
 
+	if (DelayedLoadImageNoFail(fileName, fromResources) == false)
+	{
+		this->resourceState = RESOURCE_STATE_ERROR;
+		this->resourceIsActive = false;
+	}
+}
+
+bool CSlrImage::DelayedLoadImageNoFail(const char *fileName, bool fromResources)
+{
+	if (SYS_FileExists(fileName))
+	{
+		this->LoadImage(fileName, "");
+		return true;
+	}
+
 	if (fromResources)
 	{
 		CSlrFile *file = RES_GetFileFromDeploy(fileName, DEPLOY_FILE_TYPE_GFX);
@@ -298,7 +313,7 @@ void CSlrImage::DelayedLoadImage(const char *fileName, bool fromResources)
 		{
 			this->LoadImage(file);
 			delete file;
-			return;
+			return true;
 		}
 	}
 
@@ -314,7 +329,13 @@ void CSlrImage::DelayedLoadImage(const char *fileName, bool fromResources)
 		sprintf(buf, "%s%s", gPathToDocuments, fileName);
 	}
 
+	if (!SYS_FileExists(buf))
+	{
+		return false;
+	}
+
 	this->LoadImage(buf, "png");
+	return true;
 }
 
 void CSlrImage::PreloadImage(const char *fileName, bool fromResources)
@@ -431,14 +452,116 @@ void CSlrImage::LoadImage(CImageData *imageData, u8 resourcePriority)
 	this->LoadImage(imageData, RESOURCE_PRIORITY_STATIC, false);
 }
 
+// KTX2 compressed-image support — shared metadata helper. Sets every member
+// the RGBA LoadImage path would set, with the compressed-path values:
+//   loadImgWidth/Height    = compressed mip-0 size (KTX2 texture dimensions)
+//   rasterWidth/Height     = SAME as loadImg* — block-compressed textures need
+//                            NO power-of-two padding; the GPU texture is
+//                            exactly the KTX2 dimensions
+//   origRasterWidth/Height = same as rasterWidth/Height
+//   width/height           = loadImg dimensions
+//   defaultTexStartX/Y     = 0.0
+//   defaultTexEndX/Y       = 1.0 — no padding => clean full-texture UVs
+//   widthD2/heightD2       = width/2, height/2
+//   widthM2/heightM2       = width*2, height*2
+//   resourcePriority       = passed in
+//   resourceLoadingSize    = sum of all mip blockDataSize (transcoded payload;
+//                            no transient 2x RGBA staging buffer)
+//   resourceIdleSize       = same — the compressed payload stays resident
+//   resourceIsActive       = false
+//   resourceState          = RESOURCE_STATE_PRELOADING
+// All three compressed branches (LoadImage / LoadImageForRebinding /
+// RefreshImageParameters) call exactly this helper and then return.
+void CSlrImage::SetCompressedImageMetadata(CImageData *compressedImageData, u8 resourcePriority)
+{
+	this->isCompressed = true;
+	this->compressedMipCount = compressedImageData->compressedMipCount;
+
+	this->loadImgWidth = compressedImageData->width;
+	this->loadImgHeight = compressedImageData->height;
+
+	// block-compressed textures do NOT need power-of-two padding
+	this->rasterWidth = (float)this->loadImgWidth;
+	this->rasterHeight = (float)this->loadImgHeight;
+	this->origRasterWidth = this->rasterWidth;
+	this->origRasterHeight = this->rasterHeight;
+
+	this->width = this->loadImgWidth;
+	this->height = this->loadImgHeight;
+
+	this->defaultTexStartX = 0.0f;
+	this->defaultTexEndX = 1.0f;
+	this->defaultTexStartY = 0.0f;
+	this->defaultTexEndY = 1.0f;
+
+	this->widthD2 = this->width / 2.0;
+	this->heightD2 = this->height / 2.0;
+	this->widthM2 = this->width * 2.0;
+	this->heightM2 = this->height * 2.0;
+
+	u32 totalPayload = 0;
+	for (int i = 0; i < compressedImageData->compressedMipCount; i++)
+	{
+		totalPayload += compressedImageData->compressedMips[i].blockDataSize;
+	}
+
+	this->resourcePriority = resourcePriority;
+	this->resourceLoadingSize = totalPayload;
+	this->resourceIdleSize = totalPayload;
+
+	this->resourceIsActive = false;
+	this->resourceState = RESOURCE_STATE_PRELOADING;
+}
+
 void CSlrImage::LoadImage(CImageData *origImageData, u8 resourcePriority, bool flipImageVertically)
 {
+	// KTX2 compressed (.ktx2) branch. The CImageData passed here is, in the
+	// common CSlrImage(fileName) ctor case, a temp object that the ctor will
+	// `delete` immediately after this returns — so the compressed mip buffers
+	// (potentially >1 MB) must be MOVED out into a CSlrImage-owned CImageData
+	// rather than copied or left to be freed by that delete.
+	if (origImageData->isCompressed)
+	{
+		// free any previously-owned load data, mirroring the RGBA reload path
+		if (this->shouldDeallocLoadImageData && this->loadImageData != NULL)
+		{
+			delete this->loadImageData;
+			this->loadImageData = NULL;
+		}
+
+		// allocate a fresh CSlrImage-owned compressed CImageData and STEAL the
+		// mip array out of the source: copy the pointers across, then null
+		// them on the source so its destructor frees only an empty husk.
+		CImageData *owned = new CImageData();
+		owned->type = IMG_TYPE_GPU_COMPRESSED;
+		owned->isCompressed = true;
+		owned->width = origImageData->width;
+		owned->height = origImageData->height;
+		owned->compressedGpuFormat = origImageData->compressedGpuFormat;
+		owned->compressedMipCount = origImageData->compressedMipCount;
+		owned->compressedMips = origImageData->compressedMips;	// steal pointer
+
+		// source no longer owns the mips — its delete / DeallocCompressed()
+		// now sees compressedMips == NULL and is a no-op. (When the source is
+		// a caller-owned CImageData* it is left valid-but-empty by design.)
+		origImageData->compressedMips = NULL;
+		origImageData->compressedMipCount = 0;
+		origImageData->isCompressed = false;
+
+		// reuse the existing FreeLoadImage()/Deallocate() lifecycle unchanged
+		this->loadImageData = owned;
+		this->shouldDeallocLoadImageData = true;
+
+		this->SetCompressedImageMetadata(owned, resourcePriority);
+		return;
+	}
+
 	if(origImageData->getImageType() != IMG_TYPE_RGBA)
 	{
 		SYS_FatalExit("Image type is %2.2x (should be %2.2x)",
 				origImageData->getImageType(), IMG_TYPE_RGBA);
 	}
-	
+
 	this->loadImgWidth = origImageData->width;
 	this->loadImgHeight = origImageData->height;
 	this->rasterWidth = NextPow2(loadImgWidth);
@@ -532,12 +655,29 @@ void CSlrImage::LoadImage(CImageData *origImageData, u8 resourcePriority, bool f
 
 void CSlrImage::LoadImageForRebinding(CImageData *origImageData, u8 resourcePriority)
 {
+	// KTX2 compressed (.ktx2) branch. As in the RGBA rebinding path the caller
+	// retains ownership of origImageData (shouldDeallocLoadImageData = false);
+	// the compressed mips are borrowed, not stolen.
+	if (origImageData->isCompressed)
+	{
+		if (shouldDeallocLoadImageData && this->loadImageData != NULL)
+			delete this->loadImageData;
+
+		this->shouldDeallocLoadImageData = false;
+		this->loadImageData = origImageData;
+
+		this->SetCompressedImageMetadata(origImageData, resourcePriority);
+
+		this->resourceType = RESOURCE_TYPE_IMAGE_DYNAMIC;
+		return;
+	}
+
 	if(origImageData->getImageType() != IMG_TYPE_RGBA)
 	{
 		SYS_FatalExit("Image type is %2.2x (should be %2.2x)",
 					  origImageData->getImageType(), IMG_TYPE_RGBA);
 	}
-	
+
 	if (shouldDeallocLoadImageData && this->loadImageData != NULL)
 		delete this->loadImageData;
 	
@@ -579,6 +719,15 @@ void CSlrImage::LoadImageForRebinding(CImageData *origImageData, u8 resourcePrio
 
 void CSlrImage::RefreshImageParameters(CImageData *origImageData, u8 resourcePriority, bool flipImageVertically)
 {
+	// KTX2 compressed (.ktx2) branch. Re-derive the ~14 metadata fields from
+	// the already-owned compressed loadImageData; no RGBA loadImageData is
+	// allocated for a compressed image.
+	if (origImageData->isCompressed)
+	{
+		this->SetCompressedImageMetadata(origImageData, resourcePriority);
+		return;
+	}
+
 	if(origImageData->getImageType() != IMG_TYPE_RGBA)
 	{
 		SYS_FatalExit("Image type is %2.2x (should be %2.2x)",
@@ -869,10 +1018,15 @@ void CSlrImage::PostReBind()
 
 void CSlrImage::InitImageLoad(bool linearScaling)
 {
+	this->isCompressed = false;
+	this->compressedMipCount = 0;
 	this->isFromAtlas = false;
 	this->isBound = false;
 	this->imgAtlas = NULL;
 	this->linearScaling = linearScaling;
+	this->texturePtr.store(NULL, std::memory_order_relaxed);
+	this->cacheKey = 0;
+	this->cacheLinearScaling = linearScaling;
 }
 
 void CSlrImage::BindImage()
@@ -905,6 +1059,11 @@ void CSlrImage::BindImage()
 
 	resourceIsActive = true;
 	resourceState = RESOURCE_STATE_LOADED;
+	resourceActivatedTime.store(gCurrentFrameTime, std::memory_order_relaxed);
+	if (cacheKey != 0)
+	{
+		RES_CacheTouch(this);
+	}
 
 }
 
@@ -956,6 +1115,7 @@ void CSlrImage::Deallocate()
 	this->FreeLoadImage();
 
 	gRenderBackend->DeleteTexture(this);
+	this->texturePtr.store(NULL, std::memory_order_release);
 
 	this->isBound = false;
 
@@ -1056,3 +1216,17 @@ u32 CSlrImage::ResourceGetIdleSize()
 	return this->resourceIdleSize;
 }
 
+void *CSlrImage::TexturePtr()
+{
+	void *ptr = texturePtr.load(std::memory_order_acquire);
+	if (cacheKey != 0 && ptr == NULL && resourceState == RESOURCE_STATE_DEALLOCATED && resourcePath != NULL)
+	{
+		RES_CacheGetImage(resourcePath, cacheLinearScaling);
+		ptr = texturePtr.load(std::memory_order_acquire);
+	}
+	if (cacheKey != 0 && ptr != NULL)
+	{
+		resourceActivatedTime.store(gCurrentFrameTime, std::memory_order_relaxed);
+	}
+	return ptr;
+}

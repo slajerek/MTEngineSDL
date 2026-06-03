@@ -12,6 +12,7 @@
 #include "SYS_Defs.h"
 #include "DBG_Log.h"
 #include "SYS_Funct.h"
+#include "SYS_SecureRandom.h"
 
 unsigned long SYS_GetCurrentTimeInMillis();
 
@@ -51,6 +52,11 @@ void SYS_ReleaseCharBuf(char *buf);
 
 u32 SYS_GetBareKey(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper);
 u32 SYS_GetShiftedKey(u32 keyCode, bool isShift, bool isAlt, bool isControl, bool isSuper);
+
+// Port offset helper (used by CLI test runs to avoid colliding with a desktop instance).
+// Controlled via environment variable `LH_PORT_OFFSET` (e.g. "10000").
+int SYS_GetPortOffset();
+int SYS_ApplyPortOffset(int port);
 
 char *SYS_GetCurrentDateTimeString();
 
@@ -125,5 +131,6 @@ void LOG_PrintHexArray(u8 *data, int size);
 
 const char *SYS_GetPlatformNameString();
 const char *SYS_GetPlatformArchitectureString();
+const char *SYS_GetCompilerNameString();
 
 #endif // __SYS_MAIN_H__

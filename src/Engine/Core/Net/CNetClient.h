@@ -8,8 +8,11 @@
 #ifndef _CNETCLIENT_H_
 #define _CNETCLIENT_H_
 
-#include "enet.h"
 #include "SYS_Defs.h"
+#ifdef _WIN32
+#include <winsock2.h>
+#endif
+#include "enet.h"
 #include "SYS_Threading.h"
 #include <list>
 #include <vector>

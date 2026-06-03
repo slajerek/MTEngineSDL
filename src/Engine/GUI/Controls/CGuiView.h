@@ -15,6 +15,8 @@
 #include "SYS_Main.h"
 #include "GUI_Main.h"
 
+#include <string>
+
 class CLayoutParameter;
 
 class CGuiView : public CGuiElement
@@ -22,7 +24,14 @@ class CGuiView : public CGuiElement
 public:
 	CGuiView(const char *name, float posX, float posY, float sizeX, float sizeY);
 	CGuiView(const char *name, float posX, float posY, float posZ, float sizeX, float sizeY);
+	// Optional i18n title configuration (backwards-compatible)
+	CGuiView(const char *name, float posX, float posY, float sizeX, float sizeY, const char *titleI18nKey, const char *stableId);
+	CGuiView(const char *name, float posX, float posY, float posZ, float sizeX, float sizeY, const char *titleI18nKey, const char *stableId);
 	CGuiView(float posX, float posY, float posZ, float sizeX, float sizeY);
+
+	// Translation hook for ImGui window titles (engine stays i18n-agnostic)
+	static void SetImGuiTitleTranslateFunc(const char *(*fn)(const char *key));
+	void ConfigureImGuiTitleI18n(const char *titleI18nKey, const char *stableId = nullptr);
 	
 	void CalcAspectRatio(float aspectRatio, ImVec2 viewportSize, ImVec2 *adjustedPos, ImVec2 *adjustedSize);
 	
@@ -53,6 +62,10 @@ public:
 	virtual void RenderImGui();
 	virtual void PreRenderImGui();
 	virtual void PostRenderImGui();
+	// Builds the visible ImGui window label (without the ###stableId).
+	// Default behavior: translated label if possible, otherwise legacy `name`.
+	virtual void BuildImGuiWindowLabel(std::string &outLabel) const;
+	virtual const char *GetImGuiBeginName() const;
 
 	virtual void Render();
 	virtual void Render(float posX, float posY);
@@ -171,14 +184,34 @@ public:
 	virtual void InitImGuiView(const char *name);
 	
 	ImGuiWindow *imGuiWindow;
+
+	// Optional i18n-backed window title: Begin name is
+	// "<label>###<stableId>" where label is translated if available.
+	// Using ### keeps the internal ImGui window ID stable even when the label changes.
+	std::string imGuiTitleI18nKey;
+	std::string imGuiStableId;
+	mutable std::string imGuiBeginNameCache;
+	static const char *(*sTranslateImGuiTitle)(const char *key);
 	
 	bool imGuiForceThisFrameNewPosition;
 	float thisFrameNewPosX, thisFrameNewPosY;
 	virtual void SetNewImGuiWindowPosition(float newPosX, float newPosY);
+
+	// Absolute-position variant (used for multi-viewport / multi-screen layouts)
+	bool imGuiForceThisFrameNewPositionAbsolute;
+	float thisFrameNewAbsPosX, thisFrameNewAbsPosY;
+	ImGuiID thisFrameNewAbsViewportId;
+	virtual void SetNewImGuiWindowPositionAbsolute(float newAbsPosX, float newAbsPosY, ImGuiID viewportId);
 	
 	bool imGuiForceThisFrameNewSize;
 	float thisFrameNewSizeX, thisFrameNewSizeY;
 	virtual void SetNewImGuiWindowSize(float newSizeX, float newSizeY);
+
+	// Dock request (next frame)
+	bool imGuiForceThisFrameDockId;
+	ImGuiID thisFrameDockId;
+	ImGuiID thisFrameDockViewportId;
+	virtual void DockToImGuiDockspace(ImGuiID dockId, ImGuiID viewportId);
 
 	bool imGuiWindowSkipFocusCheck;
 	bool imGuiNoWindowPadding;
@@ -262,4 +295,3 @@ private:
 
 #endif
 //_GUI_VIEW_
-

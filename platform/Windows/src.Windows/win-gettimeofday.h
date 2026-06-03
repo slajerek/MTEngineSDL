@@ -1,6 +1,10 @@
 #ifndef _WIN_GETTIMEOFDAY_
 #define _WIN_GETTIMEOFDAY_
 
+#ifdef _WIN32
+#include <winsock2.h>
+#endif
+
 struct timezone 
 {
   int  tz_minuteswest; /* minutes W of Greenwich */

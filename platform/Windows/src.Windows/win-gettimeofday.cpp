@@ -1,5 +1,6 @@
 #include <time.h>
-#include <windows.h> 
+#include <winsock2.h>
+#include <windows.h>
 #include "win-gettimeofday.h"
 
 #if defined(_MSC_VER) || defined(_MSC_EXTENSIONS)

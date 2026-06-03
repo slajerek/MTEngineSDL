@@ -22,6 +22,11 @@ class CByteBuffer;
 #define NET_PACKET_TYPE_AUTHORIZE		1
 #define NET_PACKET_TYPE_AUTHORIZED		2
 
+// Challenge-response extension for NET_PACKET_TYPE_AUTHORIZE.
+// Sent/received while client is in NET_CLIENT_STATE_CONNECTED (pre-ONLINE).
+#define NET_PACKET_TYPE_AUTHORIZE_CHALLENGE	3
+#define NET_PACKET_TYPE_AUTHORIZE_RESPONSE	4
+
 class CNetPacket
 {
 public:

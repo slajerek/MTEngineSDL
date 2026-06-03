@@ -8,8 +8,11 @@
 #ifndef _CNETSERVER_H_
 #define _CNETSERVER_H_
 
-#include "enet.h"
 #include "SYS_Defs.h"
+#ifdef _WIN32
+#include <winsock2.h>
+#endif
+#include "enet.h"
 #include "SYS_Threading.h"
 #include <list>
 #include <vector>
@@ -22,6 +25,7 @@ class CNetClientData;
 class CByteBuffer;
 
 #define NET_MAX_CLIENTS	32
+#define NET_AUTH_CHALLENGE_TIMEOUT_MS 30000
 
 #define NET_SERVER_STATUS_OFFLINE	0
 #define NET_SERVER_STATUS_DISCONNECTED	1
@@ -32,6 +36,9 @@ class CByteBuffer;
 #define NET_SERVER_CALLBACK_AUTHORIZE_NOT_AVAILABLE 0
 #define NET_SERVER_CALLBACK_AUTHORIZE_WRONG_PASSWORD 1
 #define NET_SERVER_CALLBACK_AUTHORIZE_CORRECT 2
+// Server requests a challenge-response round-trip.
+// CNetServer will send NET_PACKET_TYPE_AUTHORIZE_CHALLENGE and wait for NET_PACKET_TYPE_AUTHORIZE_RESPONSE.
+#define NET_SERVER_CALLBACK_AUTHORIZE_CHALLENGE 3
 
 class CNetServer;
 
@@ -75,6 +82,7 @@ public:
 
 	void ParseDataBuffer(CNetClientData *netClientData, CByteBuffer *byteBuffer);
 	bool ParseAuthorize(CNetClientData *netClientData, CByteBuffer *byteBuffer);
+	bool ParseAuthorizeResponse(CNetClientData *netClientData, CByteBuffer *byteBuffer);
 
 	void Disconnect(CNetClientData *netClientData);
 	void Disconnected(CNetClientData *netClientData);
@@ -92,6 +100,7 @@ public:
 	void SendNotReliableBufferAsync(CNetClientData *clientData, CByteBuffer *byteBuffer);
 
 	void AddServerCallback(CNetServerCallback *serverCallback);
+	void RemoveServerCallback(CNetServerCallback *serverCallback);
 	void AddPacketCallback(CNetPacketCallback *packetCallback);
 	
 	void IssuePacket(CNetClientData *clientData, CNetPacket *packet);
@@ -111,4 +120,3 @@ public:
 
 #endif
 //_CNETSERVER_H_
-

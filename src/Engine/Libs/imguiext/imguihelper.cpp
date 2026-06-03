@@ -111,10 +111,11 @@ void TextColored(int fntIndex, const ImVec4 &col, const char *fmt,...)  {
 void TextV(int fntIndex, const char *fmt, va_list args) {
     if (ImGui::GetCurrentWindow()->SkipItems) return;
 
-    ImGuiContext& g = *GImGui;
-    const char* text_end = g.TempBuffer + ImFormatStringV(g.TempBuffer, IM_ARRAYSIZE(g.TempBuffer), fmt, args);
+    const char* text_buf;
+    const char* text_end;
+    ImFormatStringToTempBufferV(&text_buf, &text_end, fmt, args);
     ImGui::PushFont(fntIndex);
-    TextUnformatted(g.TempBuffer, text_end);
+    TextUnformatted(text_buf, text_end);
     ImGui::PopFont();
 }
 void Text(int fntIndex, const char *fmt,...)    {
@@ -126,7 +127,7 @@ void Text(int fntIndex, const char *fmt,...)    {
 
 bool GetTexCoordsFromGlyph(unsigned short glyph, ImVec2 &uv0, ImVec2 &uv1) {
     if (!GImGui->Font) return false;
-    const ImFontGlyph* g = GImGui->Font->FindGlyph(glyph);
+    const ImFontGlyph* g = ImGui::GetFontBaked()->FindGlyph(glyph);
     if (g)  {
         uv0.x = g->U0; uv0.y = g->V0;
         uv1.x = g->U1; uv1.y = g->V1;
@@ -135,7 +136,7 @@ bool GetTexCoordsFromGlyph(unsigned short glyph, ImVec2 &uv0, ImVec2 &uv1) {
     return false;
 }
 float CalcMainMenuHeight()  {
-    if (GImGui->FontBaseSize>0) return GImGui->FontBaseSize + GImGui->Style.FramePadding.y * 2.0f;
+    if (ImGui::GetStyle().FontSizeBase>0) return ImGui::GetStyle().FontSizeBase + ImGui::GetStyle().FramePadding.y * 2.0f;
     else {
         ImGuiIO& io = ImGui::GetIO();
         ImGuiStyle& style = ImGui::GetStyle();
@@ -144,7 +145,7 @@ float CalcMainMenuHeight()  {
             if (io.Fonts->Fonts.size()>0) font = io.Fonts->Fonts[0];
             else return (14)+style.FramePadding.y * 2.0f;
         }
-        return (io.FontGlobalScale * font->Scale * font->FontSize) + style.FramePadding.y * 2.0f;
+        return (io.FontGlobalScale * font->Scale * font->LegacySize) + style.FramePadding.y * 2.0f;
     }
 }
 #endif //NO_IMGUIHELPER_FONT_METHODS
@@ -548,15 +549,15 @@ ImVec2 CalcVerticalTextSize(const char* text, const char* text_end, bool hide_te
     const ImVec2 rv = ImGui::CalcTextSize(text,text_end,hide_text_after_double_hash,wrap_width);
     return ImVec2(rv.y,rv.x);
 }
-void RenderTextVertical(const ImFont* font,ImDrawList* draw_list, float size, ImVec2 pos, ImU32 col, const ImVec4& clip_rect, const char* text_begin, const char* text_end, float wrap_width, bool cpu_fine_clip, bool rotateCCW) {
+void RenderTextVertical(ImFont* font,ImDrawList* draw_list, float size, ImVec2 pos, ImU32 col, const ImVec4& clip_rect, const char* text_begin, const char* text_end, float wrap_width, bool cpu_fine_clip, bool rotateCCW) {
     if (!text_end) text_end = text_begin + strlen(text_begin);
 
-    const float scale = size / font->FontSize;
-    const float line_height = font->FontSize * scale;
+    const float scale = size / font->LegacySize;
+    const float line_height = font->LegacySize * scale;
 
     // Align to be pixel perfect
-    pos.x = (float)(int)pos.x;// + (rotateCCW ? (font->FontSize-font->DisplayOffset.y) : 0);  // Not sure it's correct
-    pos.y = (float)(int)pos.y + font->ConfigData->GlyphOffset.x;
+    pos.x = (float)(int)pos.x;// + (rotateCCW ? (font->LegacySize-font->DisplayOffset.y) : 0);  // Not sure it's correct
+    pos.y = (float)(int)pos.y;
 
 
     float x = pos.x;
@@ -645,7 +646,7 @@ void RenderTextVertical(const ImFont* font,ImDrawList* draw_list, float size, Im
         }
 
         float char_width = 0.0f;
-        if (const ImFontGlyph* glyph = font->FindGlyph((unsigned short)c))
+        if (const ImFontGlyph* glyph = font->GetFontBaked(size)->FindGlyph((unsigned short)c))
         {
             char_width = glyph->AdvanceX * scale;
             //fprintf(stderr,"%c [%1.4f]\n",(unsigned char) glyph->Codepoint,char_width);
@@ -655,8 +656,8 @@ void RenderTextVertical(const ImFont* font,ImDrawList* draw_list, float size, Im
             {
                 // We don't do a second finer clipping test on the Y axis as we've already skipped anything before clip_rect.y and exit once we pass clip_rect.w
                 if (!rotateCCW)  {
-                    x1 = x + (font->FontSize-glyph->Y1) * scale;
-                    x2 = x + (font->FontSize-glyph->Y0) * scale;
+                    x1 = x + (font->LegacySize-glyph->Y1) * scale;
+                    x2 = x + (font->LegacySize-glyph->Y0) * scale;
                     y1 = y + glyph->X0 * scale;
                     y2 = y + glyph->X1 * scale;
                 }
@@ -747,7 +748,7 @@ void RenderTextVertical(const ImFont* font,ImDrawList* draw_list, float size, Im
     draw_list->_IdxWritePtr = idx_write;
     draw_list->_VtxCurrentIdx = (unsigned int)draw_list->VtxBuffer.Size;
 }
-void AddTextVertical(ImDrawList* drawList,const ImFont* font, float font_size, const ImVec2& pos, ImU32 col, const char* text_begin, const char* text_end, float wrap_width, const ImVec4* cpu_fine_clip_rect,bool rotateCCW)    {
+void AddTextVertical(ImDrawList* drawList,ImFont* font, float font_size, const ImVec2& pos, ImU32 col, const char* text_begin, const char* text_end, float wrap_width, const ImVec4* cpu_fine_clip_rect,bool rotateCCW)    {
     if ((col & IM_COL32_A_MASK) == 0)
         return;
 

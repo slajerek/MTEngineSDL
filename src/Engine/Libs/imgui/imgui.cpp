@@ -18083,7 +18083,14 @@ void ImGui::DockContextBuildAddWindowsToNodes(ImGuiContext* ctx, ImGuiID root_id
             continue;
 
         ImGuiDockNode* node = DockContextFindNodeByID(ctx, window->DockId);
-        IM_ASSERT(node != NULL);   // This should have been called after DockContextBuildNodesFromSettings()
+        if (node == NULL)
+        {
+            // Node no longer exists — INI has a stale DockId (e.g. from a layout rebuild that
+            // was saved with a now-deleted node ID). Clear the reference so the window floats
+            // instead of crashing. It will re-dock on the next frame if a matching node appears.
+            window->DockId = 0;
+            continue;
+        }
         if (root_id == 0 || DockNodeGetRootNode(node)->ID == root_id)
             DockNodeAddWindow(node, window, true);
     }
@@ -19053,8 +19060,12 @@ static void ImGui::DockNodeUpdate(ImGuiDockNode* node)
     node->RefViewportId = 0; // Clear when we have a host window
 
     // Update focused node (the one whose title bar is highlight) within a node tree
-    if (node->IsSplitNode())
-        IM_ASSERT(node->TabBar == NULL);
+    if (node->IsSplitNode() && node->TabBar != NULL)
+    {
+        // Split node should not have a TabBar — this can happen when loading stale
+        // workspace layouts from a previous version. Clean up gracefully instead of asserting.
+        DockNodeRemoveTabBar(node);
+    }
     if (node->IsRootNode())
         if (ImGuiWindow* p_window = g.NavWindow ? g.NavWindow->RootWindow : NULL)
             while (p_window != NULL && p_window->DockNode != NULL)

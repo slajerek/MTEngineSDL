@@ -30,6 +30,9 @@
 #if !IMGUI_TEST_ENGINE_IS_GAME_CONSOLE
 #include <signal.h>     // signal()
 #endif
+#if !IMGUI_TEST_ENGINE_IS_GAME_CONSOLE
+#include <execinfo.h>   // backtrace(), backtrace_symbols_fd()
+#endif
 #include <unistd.h>     // sleep()
 #endif
 
@@ -2105,9 +2108,27 @@ static LONG WINAPI ImGuiTestEngine_CrashHandlerWin32(LPEXCEPTION_POINTERS)
 #else
 static void ImGuiTestEngine_CrashHandlerUnix(int signal)
 {
-    IM_UNUSED(signal);
+    // Prevent recursive crash handling:
+    // - We install handlers for SIGSEGV and SIGABRT.
+    // - When SIGSEGV fires, old implementation called abort(), which raises SIGABRT.
+    // - SIGABRT was also handled, resulting in infinite recursion until stack overflow.
+    static bool handling = false;
+    if (handling)
+        _exit(128 + signal);
+    handling = true;
+
+    // Try to print a backtrace to stderr (best-effort; not guaranteed async-signal-safe).
+#if !IMGUI_TEST_ENGINE_IS_GAME_CONSOLE
+    {
+        void* callstack[128];
+        int frames = backtrace(callstack, (int)(sizeof(callstack) / sizeof(callstack[0])));
+        if (frames > 0)
+            backtrace_symbols_fd(callstack, frames, STDERR_FILENO);
+    }
+#endif
+
     ImGuiTestEngine_CrashHandler();
-    abort();
+    _exit(128 + signal);
 }
 #endif
 

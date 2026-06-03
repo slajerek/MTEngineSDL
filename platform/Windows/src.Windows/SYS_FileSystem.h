@@ -93,6 +93,7 @@ FILE *SYS_OpenFile(const char *path, const char *mode);
 #include "CSystemFileDialogCallback.h"
 
 void SYS_DialogOpenFile(CSystemFileDialogCallback *callback, std::list<CSlrString *> *extensions, CSlrString *defaultFolder, CSlrString *windowTitle);
+void SYS_DialogOpenFiles(CSystemFileDialogCallback *callback, std::list<CSlrString *> *extensions, CSlrString *defaultFolder, CSlrString *windowTitle);
 void SYS_DialogSaveFile(CSystemFileDialogCallback *callback, std::list<CSlrString *> *extensions, CSlrString *defaultFileName, CSlrString *defaultFolder, CSlrString *windowTitle);
 void SYS_DialogPickFolder(CSystemFileDialogCallback* callback, CSlrString* defaultFolder);
 

@@ -24,6 +24,8 @@ public:
 	virtual void ReBindTexture(CSlrImage *image);
 	virtual void DeleteTexture(CSlrImage *image);
 
+	virtual EImageGpuFormat GetPreferredCompressedFormat() override;
+
 	virtual ~CRenderBackendMetal();
 };
 

@@ -4,6 +4,7 @@
 #include "SYS_Defs.h"
 #include <SDL.h>
 #include "imgui.h"
+#include "EImageGpuFormat.h"
 
 class CSlrImage;
 
@@ -27,7 +28,12 @@ public:
 	virtual void UpdateTextureLinearScaling(CSlrImage *image);
 	virtual void ReBindTexture(CSlrImage *image);
 	virtual void DeleteTexture(CSlrImage *image);
-	
+
+	// Compressed texture format this backend/device can upload, or
+	// IMG_GPU_UNCOMPRESSED if none. Default: none (safe for any backend
+	// that does not override this).
+	virtual EImageGpuFormat GetPreferredCompressedFormat() { return IMG_GPU_UNCOMPRESSED; }
+
 	virtual ~CRenderBackend();
 	
 	const char *name;

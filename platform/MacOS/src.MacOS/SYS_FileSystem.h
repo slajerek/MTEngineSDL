@@ -104,6 +104,8 @@ FILE *SYS_OpenFile(const char *path, const char *mode);
 
 void SYS_DialogOpenFile(CSystemFileDialogCallback *callback, std::list<CSlrString *> *extensions,
 						CSlrString *defaultFolder, CSlrString *windowTitle);
+void SYS_DialogOpenFiles(CSystemFileDialogCallback *callback, std::list<CSlrString *> *extensions,
+						 CSlrString *defaultFolder, CSlrString *windowTitle);
 void SYS_DialogSaveFile(CSystemFileDialogCallback *callback, std::list<CSlrString *> *extensions,
 						CSlrString *defaultFileName, CSlrString *defaultFolder, CSlrString *windowTitle);
 

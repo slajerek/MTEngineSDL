@@ -16,7 +16,7 @@
 #include <string>
 #include <type_traits>
 
-#define GLOBAL_DEBUG_OFF
+//#define GLOBAL_DEBUG_OFF
 
 #define DBGLVL_ALL_OFF	0x0000
 #define DBGLVL_ALL_ON	0xFFFF
@@ -200,4 +200,4 @@ void DBG_LogTime();
 // GLOBAL_DEBUG_OFF
 
 
-#endif __DBG_LOGF_H__
+#endif 

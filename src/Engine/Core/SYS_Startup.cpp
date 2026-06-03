@@ -13,8 +13,11 @@
 #include "CLayoutManager.h"
 
 #include "SYS_Platform.h"
+#include "SYS_CommandLine.h"
 #include "MT_VERSION.h"
 #include "MT_API.h"
+
+#include <cstring>
 
 
 //https://github.com/thennequin/ImWindow/tree/master/ImWindowGLFW
@@ -37,6 +40,7 @@
 #include "GAM_GamePads.h"
 
 void SYS_Shutdown();
+extern volatile bool mtQuitApplication;
 
 // THIS IS THE ENTRY POINT, ENJOY :)
 void SYS_MTEngineStartup()
@@ -55,6 +59,34 @@ void SYS_MTEngineStartup()
 
 	MT_PreInit();
 
+	// Early headless/service detection: scan argv before SDL_Init so we can
+	// skip heavy subsystems for pure services (auth, node-agent, registry, etc.)
+	// and set SDL hints for headless mode.
+	for (int i = 1; i < SYS_GetArgc(); i++)
+	{
+		const char *arg = SYS_GetArgv()[i];
+		if (strcmp(arg, "--headless") == 0 || strcmp(arg, "--mcp-headless") == 0)
+		{
+			gHeadlessMode = true;
+		}
+		else if (strcmp(arg, "--auth-server") == 0
+				 || strcmp(arg, "--node-agent") == 0
+				 || strcmp(arg, "--registry-server") == 0
+				 || strcmp(arg, "--admin-dashboard") == 0
+				 || strcmp(arg, "--registry-admin") == 0
+				 || strcmp(arg, "--registry-admin-cmd") == 0)
+		{
+			gServiceMode = true;
+			gHeadlessMode = true;
+		}
+	}
+
+	if (gHeadlessMode)
+	{
+		LOGM("Headless mode detected (early), setting SDL background app hint");
+		SDL_SetHint(SDL_HINT_MAC_BACKGROUND_APP, "1");
+	}
+
 	SDL_version compiled;
 	SDL_version linked;
 
@@ -64,69 +96,118 @@ void SYS_MTEngineStartup()
 		   compiled.major, compiled.minor, compiled.patch,
 		   linked.major, linked.minor, linked.patch);
 	LOGM("             ImGui version %s (%d)", IMGUI_VERSION, IMGUI_VERSION_NUM);
-	
-	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER | SDL_INIT_HAPTIC) != 0)
+
+	if (gServiceMode)
 	{
-		LOGError("SDL_Init error: %s", SDL_GetError());
-		return;
+		// Service mode: skip window, OpenGL, audio, gamepads
+		// Still init SDL (timer only), resource manager, ImGui context (minimal),
+		// and networking — some service code references these globals.
+		if (SDL_Init(SDL_INIT_TIMER) != 0)
+		{
+			LOGError("SDL_Init error: %s", SDL_GetError());
+			return;
+		}
+
+		RES_Init(2048);
+
+		// Create minimal ImGui context (no window/renderer) — some service
+		// code may reference ImGui::GetCurrentContext() or ImGui::GetIO()
+		IMGUI_CHECKVERSION();
+		ImGui::CreateContext();
+		ImGui::GetIO().IniFilename = NULL;
+
+		NET_Initialize();
+
+		MT_PostInit();
+
+		// Service mode main loop — MT_PostInit starts the service in a thread,
+		// this loop keeps the process alive until SYS_Shutdown() is called
+		while (mtQuitApplication == false)
+		{
+			SYS_Sleep(10);
+		}
 	}
-	
-	// this is the order of startup:
-	
-	RES_Init(2048);
+	else
+	{
+		// Normal mode: full initialization with rendering, audio, GUI
+		if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER | SDL_INIT_HAPTIC) != 0)
+		{
+			LOGError("SDL_Init error: %s", SDL_GetError());
+			return;
+		}
 
-	VID_Init();
-	
-	IM_ASSERT(ImGui::GetCurrentContext() != NULL && "Dear ImGui context failed to create");
+		RES_Init(2048);
 
-	SND_Init();
-	
-	// init the application gui
-	GUI_Init();
-	
-	// init Enet
-	NET_Initialize();
-	
-	// init gamepads
-	GAM_InitGamePads();
+		VID_Init();
 
-	// update default OS menus (e.g. remove items in macOS)
-	PLATFORM_UpdateMenus();
-	
-	MT_PostInit();
-	
-	// start sound
-	SND_Start();
+		IM_ASSERT(ImGui::GetCurrentContext() != NULL && "Dear ImGui context failed to create");
 
-	VID_PostInit();
-	
-	// First rendered frame is here and whole Render Loop
-	VID_RenderLoop();
+		SND_Init();
+
+		GUI_Init();
+
+		NET_Initialize();
+
+		GAM_InitGamePads();
+
+		PLATFORM_UpdateMenus();
+
+		MT_PostInit();
+
+		SND_Start();
+
+		VID_PostInit();
+
+		// First rendered frame is here and whole Render Loop
+		VID_RenderLoop();
+	}
+
+	if (!gServiceMode && !gHeadlessMode)
+	{
+		// Fix #5b: ensure at least one workspace exists before saving
+		if (guiMain->layoutManager->layouts.empty())
+		{
+			CLayoutData *defaultLayout = new CLayoutData();
+			defaultLayout->layoutName = STRALLOC("Default");
+			defaultLayout->doNotUpdateViewsPositions = false;
+			guiMain->layoutManager->AddLayout(defaultLayout);
+			guiMain->layoutManager->currentLayout = defaultLayout;
+		}
+
+		// Fix #3: if currentLayout is NULL but layouts exist, pick first one
+		if (!guiMain->layoutManager->currentLayout && !guiMain->layoutManager->layouts.empty())
+		{
+			guiMain->layoutManager->currentLayout = guiMain->layoutManager->layouts.front();
+		}
+
+		if (guiMain->layoutManager->currentLayout)
+		{
+			// Save ImGui ini settings BEFORE MT_Shutdown() so that any test engine
+			// settings handlers are still alive when SaveIniSettingsToDisk runs.
+			ImGuiContext& g = *GImGui;
+			ImGui::SaveIniSettingsToDisk(g.IO.IniFilename);
+
+			// Fix #3: only serialize view state when not in fullscreen
+			// (we don't want to capture fullscreen state as the normal layout),
+			// but always call StoreLayouts() to persist a valid currentLayoutName
+			if (guiMain->IsViewFullScreen() == false &&
+				guiMain->layoutManager->currentLayout->doNotUpdateViewsPositions == false)
+			{
+				// serialize current layout to workspaces
+				guiMain->layoutManager->currentLayout->serializedLayoutBuffer->Clear();
+
+				// note, we can just serialize layout now because the frame has been rendered, normally we would need to call async serialize
+				guiMain->SerializeLayout(guiMain->layoutManager->currentLayout);
+			}
+
+			// always save layouts to persist valid currentLayoutName
+			guiMain->layoutManager->StoreLayouts();
+		}
+	}
 
 	// shutdown
-//	MT_Shutdown();
+	MT_Shutdown();
 
-	ImGuiContext& g = *GImGui;
-	if (!gHeadlessMode &&
-		guiMain->IsViewFullScreen() == false &&
-		guiMain->layoutManager->currentLayout)
-	{
-		// store ImGui layout
-		ImGui::SaveIniSettingsToDisk(g.IO.IniFilename);
-
-		if (guiMain->layoutManager->currentLayout->doNotUpdateViewsPositions == false)
-		{
-			// serialize current layout to workspaces
-			guiMain->layoutManager->currentLayout->serializedLayoutBuffer->Clear();
-			
-			// note, we can just serialize layout now because the frame has been rendered, normally we would need to call async serialize
-			guiMain->SerializeLayout(guiMain->layoutManager->currentLayout);
-		}
-		
-		// save all layouts
-		guiMain->layoutManager->StoreLayouts();
-	}
-	
 	SYS_ApplicationShutdown();
 	SYS_PlatformShutdown();
 	
@@ -149,5 +230,13 @@ void SYS_MTEngineStartup()
 void SYS_Shutdown()
 {
 	LOGM("SYS_Shutdown");
-	VID_StopEventsLoop();
+	if (gServiceMode)
+	{
+		// Service mode: no VID event loop, just signal the sleep loop to exit
+		mtQuitApplication = true;
+	}
+	else
+	{
+		VID_StopEventsLoop();
+	}
 }

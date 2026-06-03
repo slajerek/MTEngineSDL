@@ -32,9 +32,11 @@ public:
 	void GetInt(const char *name, int *value, int defaultValue);
 
 	void SetFloat(const char *name, float *value);
+	void SetFloatSkipConfigSave(const char *name, float *value);
 	void GetFloat(const char *name, float *value, float defaultValue);
 
 	void SetDouble(const char *name, double *value);
+	void SetDoubleSkipConfigSave(const char *name, double *value);
 	void GetDouble(const char *name, double *value, double defaultValue);
 
 	void SetString(const char *name, const char *value);

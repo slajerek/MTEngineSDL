@@ -23,9 +23,14 @@ public:
 	virtual void ReBindTexture(CSlrImage *image);
 	virtual void DeleteTexture(CSlrImage *image);
 
+	virtual EImageGpuFormat GetPreferredCompressedFormat() override;
+
 	void SetupGlSlVersion();
 	const char *glslVersionString;
 	const char *GetGlSlVersion();
+
+	// Cached result of GL extension scan; -1 means not yet probed.
+	int cachedCompressedFormat;
 	
 	virtual ~CRenderBackendOpenGL4();
 	

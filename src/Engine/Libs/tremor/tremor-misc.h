@@ -51,19 +51,14 @@ union magic {
 };
 #endif 
 
-// checkme
-#if !defined(ANDROID)
-
-	#if BYTE_ORDER==BIG_ENDIAN
-	union magic {
-		struct {
-			ogg_int32_t hi;
-			ogg_int32_t lo;
-		} halves;
-		ogg_int64_t whole;
-	};
-#endif
-
+#if BYTE_ORDER==BIG_ENDIAN
+union magic {
+  struct {
+    ogg_int32_t hi;
+    ogg_int32_t lo;
+  } halves;
+  ogg_int64_t whole;
+};
 #endif
 
 STIN ogg_int32_t MULT32(ogg_int32_t x, ogg_int32_t y) {

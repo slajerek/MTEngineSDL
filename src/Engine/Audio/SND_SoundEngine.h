@@ -32,6 +32,7 @@ public:
 	int deviceOutIndex;
 
 	SDL_AudioDeviceID currentAudioDevice;
+	bool isUsingAudioDeviceApi;
 
 	void DebugPrintAudioDevices();
 	

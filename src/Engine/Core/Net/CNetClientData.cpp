@@ -18,6 +18,7 @@ CNetClientData::CNetClientData(CNetServer *server, ENetPeer *peer, u32 peerId)
 	this->voidData = NULL;
 	this->peer = peer;
 	this->peerId = peerId;
+	this->clientId = -1;
 	this->totalNumReceived = 0;
 	this->byteBufferReliableOut = new CByteBuffer();
 	this->byteBufferNotReliableOut = new CByteBuffer();

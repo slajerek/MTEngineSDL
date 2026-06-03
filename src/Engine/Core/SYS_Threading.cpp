@@ -159,15 +159,15 @@ CSlrMutex::~CSlrMutex()
 void CSlrMutex::Lock()
 {
 #if defined(MT_DEBUG_MUTEX)
-	u64 timeout = SYS_GetCurrentTimeInMillis() + 5000;
+	u64 timeout = SYS_GetCurrentTimeInMillis() + 3000;
 	
 	while (SDL_TryLockMutex(mutex) == SDL_MUTEX_TIMEDOUT)
 	{
 		u64 now = SYS_GetCurrentTimeInMillis();
 		if (now >= timeout)
 		{
-			LOGError("Mutex lock timeout, name=%s", this->name);
-			return;
+			LOGError("CSlrMutex::Lock: Mutex lock timeout, name=%s", this->name);
+			timeout = now + 3000;
 		}
 		
 		SYS_Sleep(5);
@@ -215,4 +215,3 @@ unsigned long SYS_GetProcessId()
 	return getpid();
 #endif
 }
-

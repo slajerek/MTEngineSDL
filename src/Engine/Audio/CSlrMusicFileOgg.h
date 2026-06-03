@@ -37,6 +37,7 @@ public:
 	CSlrFile *oggFileHandle;
 	OggVorbis_File *oggVorbisData;
 
+	virtual void FillBuffer(int *mixBuffer, u32 numSamples);
 	virtual void Mix(int *mixBuffer, u32 numSamples);
 	virtual void MixFloat(float *mixBufferL, float *mixBufferR, u32 numSamples);
 	virtual void MixIn(int *mixBuffer, u32 numSamples);
@@ -61,10 +62,15 @@ public:
 	virtual u32 ResourceGetSize();
 
 private:
+	bool Init(CSlrFile *file, bool seekable, bool takeOwnership);
+
 	int *oggAudioBuffer; //= NULL;
 	int *oggMixBuffer;// = NULL;
 	int oggAudioBufferPos;// = 0;
 	int oggAudioBufferLen;// = 0;
+
+	bool ownsOggFileHandle;
+	bool oggVorbisDataInitialized;
 
 	CSlrMutex *oggFileMutex;
 

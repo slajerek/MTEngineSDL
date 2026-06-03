@@ -1,8 +1,8 @@
 #ifndef _VID_Fonts_h_
 #define _VID_Fonts_h_
 
-extern const char *gDefaultFontPath;
-extern float gDefaultFontSize;
-extern int gDefaultFontOversampling;
+// VID_Fonts.h is deprecated. Use CGuiFontManager.h instead.
+// This header is kept for backward compatibility.
+#include "CGuiFontManager.h"
 
 #endif

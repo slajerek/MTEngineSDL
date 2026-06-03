@@ -9,6 +9,7 @@ class CGuiViewMovingPaneImage : public CGuiViewMovingPane
 {
 public:
 	CGuiViewMovingPaneImage(const char *name, float posX, float posY, float posZ, float sizeX, float sizeY);
+	CGuiViewMovingPaneImage(const char *name, float posX, float posY, float posZ, float sizeX, float sizeY, const char *titleI18nKey, const char *stableId);
 	virtual ~CGuiViewMovingPaneImage();
 	
 	virtual void RenderImGui();

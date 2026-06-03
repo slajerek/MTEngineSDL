@@ -4,6 +4,7 @@
 #include "SYS_Startup.h"
 #include "SYS_CommandLine.h"
 #include "SYS_Platform.h"
+#include "SYS_MiniDump.h"
 #include "MT_VERSION.h"
 #if !defined(GLOBAL_DEBUG_OFF)
 #include "CGuiViewDebugLog.h"
@@ -11,6 +12,7 @@
 
 int main(int argc, char* argv[])
 {
+	SYS_InstallCrashHandler();
 	LOG_Init();
 #if !defined(GLOBAL_DEBUG_OFF)
 	guiViewDebugLog = new CGuiViewDebugLog("Debug Log", 50, 50, -1, 200, 200);

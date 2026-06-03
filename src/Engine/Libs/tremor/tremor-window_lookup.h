@@ -16,7 +16,6 @@
  ********************************************************************/
 
 
-//#include <ogg/os_types.h>
 #include "Ogg/tremor-os_types.h"
 
 static const LOOKUP_T vwin64[32] = {

@@ -12,6 +12,8 @@
 #include "NET_Main.h"
 #include "enet.h"
 #include <list>
+#include <vector>
+#include <string>
 
 class CNetServer;
 class CNetPacket;
@@ -31,6 +33,8 @@ public:
 	u32 peerId;
 	u32 totalNumReceived;
 
+	int clientId;  // generic numeric identity, set during authentication. -1 = unknown
+
 	std::string clientName;
 	void SetClientName(std::string userName);
 
@@ -47,6 +51,13 @@ public:
 	void *voidData;
 	void SetVoidData(void *voidData);
 
+	// Pre-online authorize challenge state (for challenge-response auth).
+	bool authorizePending = false;
+	u64 authorizePendingServerId = 0;
+	std::string authorizePendingUserName;
+	std::vector<u8> authorizePendingChallenge;
+	u64 authorizePendingIssuedAtMillis = 0;
+
 	u8 state;
 
 	bool Receive(u32 frameNum);
@@ -57,4 +68,3 @@ public:
 
 
 #endif
-

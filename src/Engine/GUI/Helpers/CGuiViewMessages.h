@@ -12,6 +12,8 @@ class CGuiViewMessages : public CGuiView
 public:
 	CGuiViewMessages(const char *name, float posX, float posY, float sizeX, float sizeY);
 	CGuiViewMessages(const char *name, float posX, float posY, float posZ, float sizeX, float sizeY);
+	CGuiViewMessages(const char *name, float posX, float posY, float sizeX, float sizeY, const char *titleI18nKey, const char *stableId);
+	CGuiViewMessages(const char *name, float posX, float posY, float posZ, float sizeX, float sizeY, const char *titleI18nKey, const char *stableId);
 	virtual ~CGuiViewMessages();
 	
 	virtual void Render();

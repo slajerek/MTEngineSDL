@@ -26,6 +26,24 @@ CGuiViewMovingPaneImage::CGuiViewMovingPaneImage(const char *name, float posX, f
 	// derived constructor should load image and call InitImage()
 }
 
+CGuiViewMovingPaneImage::CGuiViewMovingPaneImage(const char *name, float posX, float posY, float posZ, float sizeX, float sizeY, const char *titleI18nKey, const char *stableId)
+: CGuiViewMovingPane(name, posX, posY, posZ, sizeX, sizeY, 1, 1, titleI18nKey, stableId)
+{
+	this->font = NULL;
+	this->fontScale = 0.11f;
+
+	shouldDeallocImage = false;
+
+	rasterWidth = 0;
+	rasterHeight = 0;
+
+	imageData = NULL;
+	image = NULL;
+	shader = NULL;
+
+	imageChanged = false;
+}
+
 bool CGuiViewMovingPaneImage::IsInside(float x, float y)
 {
 	return IsInsideWindowInnerRect(x, y);
@@ -44,9 +62,9 @@ void CGuiViewMovingPaneImage::InitPane()
 void CGuiViewMovingPaneImage::InitImage()
 {
 	imageData = NULL;
-	
+
 	RefreshEmulatorScreenImageData();
-	
+
 	if (imageData == NULL)
 		return;
 
@@ -59,6 +77,15 @@ void CGuiViewMovingPaneImage::InitImage()
 	renderTextureEndX = ((float)paneWidth / (float)rasterWidth);
 	renderTextureStartY = 0.0f;
 	renderTextureEndY = ((float)paneHeight / (float)rasterHeight);
+
+	// Symmetric with SetImage / SetImageData (line 170, 210): lock the
+	// host window's aspect ratio to the image pane so it can't be
+	// free-stretched. Without this, subclasses that use InitImage() —
+	// the same path RefreshEmulatorScreenImageData runs through —
+	// would render undistorted on open but distort under any user
+	// resize.
+	if (paneHeight > 0)
+		SetKeepAspectRatio(true, (float)paneWidth / (float)paneHeight);
 }
 
 void CGuiViewMovingPaneImage::RefreshEmulatorScreenImageData()

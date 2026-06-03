@@ -9,6 +9,7 @@ class CGuiViewTableWithFilterAndButtons : public CGuiView
 {
 public:
 	CGuiViewTableWithFilterAndButtons(const char *name, float posX, float posY, float sizeX, float sizeY);
+	CGuiViewTableWithFilterAndButtons(const char *name, float posX, float posY, float sizeX, float sizeY, const char *titleI18nKey, const char *stableId);
 
 	virtual ~CGuiViewTableWithFilterAndButtons();
 
@@ -28,8 +29,11 @@ public:
 
 	virtual void TableAddFilteredItems(const char *filterBuf);
 	virtual void TableSortItems(const ImGuiTableSortSpecs* sort_specs, std::vector<CGuiViewTableItem *>& visible_items);
+	virtual int  TableGetColumnCount();
+	virtual float TableGetRowHeight();  // 0 = default (text height); override when middle columns use taller widgets
 	virtual void TableSetupColumns();
 	virtual void TableGetFirstColumnText(CGuiViewTableItem *item, char *buf);
+	virtual void TableRenderMiddleColumns(CGuiViewTableItem *item);
 	virtual void TableContinuePrintRow(CGuiViewTableItem *item);
 	virtual void TableSelectedItem(CGuiViewTableItem *item);
 	virtual void TableRenderButtons();

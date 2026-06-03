@@ -10,11 +10,30 @@ CAudioChannelBusInt::CAudioChannelBusInt(const char *name, u16 numChannels)
 	this->isActive = false;
 	this->bypass = false;
 	this->destroyMe = false;
+
+	oggAudioChannelsPool = new CSlrMusicFileOgg *[numChannels];
+	oggAudioFilesPool = new CSlrFileMemory *[numChannels];
+
+	char *buf = SYS_GetCharBuf();
+	for (u16 i = 0; i < numChannels; i++)
+	{
+		sprintf(buf, "%s-%d", name, i);
+		oggAudioChannelsPool[i] = new CSlrMusicFileOgg(buf);
+		oggAudioFilesPool[i] = new CSlrFileMemory();
+	}
+	SYS_ReleaseCharBuf(buf);
 }
 
 CAudioChannelBusInt::~CAudioChannelBusInt()
 {
+	for (u16 i = 0; i < numChannels; i++)
+	{
+		delete oggAudioChannelsPool[i];
+		delete oggAudioFilesPool[i];
+	}
 
+	delete [] oggAudioChannelsPool;
+	delete [] oggAudioFilesPool;
 }
 
 void CAudioChannelBusInt::Mix(int *mixBuffer, u32 numSamples)

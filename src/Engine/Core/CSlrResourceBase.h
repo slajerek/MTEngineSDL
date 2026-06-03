@@ -3,6 +3,8 @@
 
 #include "SYS_Defs.h"
 
+#include <atomic>
+
 // can not be removed from memory, highest priority
 #define RESOURCE_PRIORITY_STATIC	0
 
@@ -16,6 +18,7 @@
 #define RESOURCE_STATE_PRELOADING_LOADED		3
 #define RESOURCE_STATE_LOADING		4
 #define RESOURCE_STATE_LOADED		5
+#define RESOURCE_STATE_EVICTING	6
 
 #define RESOURCE_TYPE_UNKNOWN	0
 #define RESOURCE_TYPE_IMAGE		1
@@ -48,7 +51,7 @@ public:
 	u32 resourceIdleSize;
 	
 	// last time active (image displayed, etc)
-	u64 resourceActivatedTime;
+	std::atomic<u64> resourceActivatedTime;
 
 	// real memory used reported by os
 	u32 resourceBindSize;

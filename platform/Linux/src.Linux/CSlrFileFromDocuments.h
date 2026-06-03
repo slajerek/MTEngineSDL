@@ -8,9 +8,11 @@ class CSlrFileFromDocuments : public CSlrFile
 {
 public:
 	char osFileName[768];
+	bool isAbsolutePath;
 
 	CSlrFileFromDocuments(const char *fileName);
 	CSlrFileFromDocuments(const char *fileName, u8 fileMode);
+	CSlrFileFromDocuments(const char *fileName, u8 fileMode, bool isAbsolutePath);
 
 	void Open(const char *fileName);
 	virtual void OpenForWrite(const char *fileName);
@@ -35,4 +37,3 @@ private:
 
 #endif
 //_CFILEFROMDOCUMENTS_H_
-

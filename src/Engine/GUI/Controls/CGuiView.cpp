@@ -15,6 +15,8 @@
 #include "CLayoutParameter.h"
 #include "CByteBuffer.h"
 
+const char *(*CGuiView::sTranslateImGuiTitle)(const char *key) = nullptr;
+
 CGuiView::CGuiView(const char *name, float posX, float posY, float sizeX, float sizeY)
 	: CGuiElement(posX, posY, -1, sizeX, sizeY)
 {
@@ -27,6 +29,20 @@ CGuiView::CGuiView(const char *name, float posX, float posY, float posZ, float s
 	this->Init(name, posX, posY, posZ, sizeX, sizeY);
 }
 
+CGuiView::CGuiView(const char *name, float posX, float posY, float sizeX, float sizeY, const char *titleI18nKey, const char *stableId)
+	: CGuiElement(posX, posY, -1, sizeX, sizeY)
+{
+	this->Init(name, posX, posY, 0, sizeX, sizeY);
+	this->ConfigureImGuiTitleI18n(titleI18nKey, stableId);
+}
+
+CGuiView::CGuiView(const char *name, float posX, float posY, float posZ, float sizeX, float sizeY, const char *titleI18nKey, const char *stableId)
+	: CGuiElement(posX, posY, posZ, sizeX, sizeY)
+{
+	this->Init(name, posX, posY, posZ, sizeX, sizeY);
+	this->ConfigureImGuiTitleI18n(titleI18nKey, stableId);
+}
+
 CGuiView::CGuiView(float posX, float posY, float posZ, float sizeX, float sizeY)
 	: CGuiElement(posX, posY, posZ, sizeX, sizeY)
 {
@@ -37,6 +53,9 @@ CGuiView::CGuiView(float posX, float posY, float posZ, float sizeX, float sizeY)
 void CGuiView::Init(const char *name, float posX, float posY, float posZ, float sizeX, float sizeY)
 {
 	this->name = name;
+	imGuiTitleI18nKey.clear();
+	imGuiStableId.clear();
+	imGuiBeginNameCache.clear();
 	this->previousZ = posZ;
 	this->previousFrontZ = posZ;
 		
@@ -57,8 +76,14 @@ void CGuiView::Init(const char *name, float posX, float posY, float posZ, float 
 	
 	imGuiForceThisFrameNewPosition = false;
 	imGuiForceThisFrameNewSize = false;
+	imGuiForceThisFrameNewPositionAbsolute = false;
+	imGuiForceThisFrameDockId = false;
 	thisFrameNewPosX = -1; thisFrameNewPosY = -1;
 	thisFrameNewSizeX = -1; thisFrameNewSizeY = -1;
+	thisFrameNewAbsPosX = -1; thisFrameNewAbsPosY = -1;
+	thisFrameNewAbsViewportId = 0;
+	thisFrameDockId = 0;
+	thisFrameDockViewportId = 0;
 
 	previousPosX = -1;
 	previousPosY = -1;
@@ -85,6 +110,86 @@ void CGuiView::Init(const char *name, float posX, float posY, float posZ, float 
 	
 	// this is to determine if layout parameters were rendered this frame, if yes then we'll skip render
 	previousRenderedFrameWithLayoutParameters = 0;
+}
+
+void CGuiView::SetImGuiTitleTranslateFunc(const char *(*fn)(const char *key))
+{
+	sTranslateImGuiTitle = fn;
+}
+
+void CGuiView::ConfigureImGuiTitleI18n(const char *titleI18nKey, const char *stableId)
+{
+	if (titleI18nKey && titleI18nKey[0] != 0)
+		this->imGuiTitleI18nKey = titleI18nKey;
+	else
+		this->imGuiTitleI18nKey.clear();
+
+	if (stableId && stableId[0] != 0)
+		this->imGuiStableId = stableId;
+	else
+		this->imGuiStableId.clear();
+
+	this->imGuiBeginNameCache.clear();
+}
+
+void CGuiView::BuildImGuiWindowLabel(std::string &outLabel) const
+{
+	if (!this->name)
+	{
+		outLabel.clear();
+		return;
+	}
+
+	// Default label is legacy name.
+	outLabel.assign(this->name);
+
+	if (this->imGuiTitleI18nKey.empty())
+		return;
+
+	const char *key = this->imGuiTitleI18nKey.c_str();
+	if (!sTranslateImGuiTitle)
+		return;
+
+	const char *translated = sTranslateImGuiTitle(key);
+	if (!translated)
+		return;
+
+	// Treat "translation equals key" as "missing" (common i18n behavior)
+	if (strcmp(translated, key) == 0)
+		return;
+
+	outLabel.assign(translated);
+}
+
+const char *CGuiView::GetImGuiBeginName() const
+{
+	if (!this->name)
+		return "";
+
+	if (this->imGuiTitleI18nKey.empty())
+		return this->name;
+
+	const char *key = this->imGuiTitleI18nKey.c_str();
+	std::string label;
+	BuildImGuiWindowLabel(label);
+
+	const char *stableId = nullptr;
+	if (!this->imGuiStableId.empty())
+	{
+		stableId = this->imGuiStableId.c_str();
+	}
+	else
+	{
+		stableId = this->name;
+	}
+
+	if (!stableId || stableId[0] == 0)
+		stableId = key;
+
+	this->imGuiBeginNameCache.assign(label);
+	this->imGuiBeginNameCache.append("###");
+	this->imGuiBeginNameCache.append(stableId);
+	return this->imGuiBeginNameCache.c_str();
 }
 
 bool CGuiView::IsInsideWindow(float x, float y)
@@ -277,12 +382,27 @@ void CGuiView::SetNewImGuiWindowPosition(float newPosX, float newPosY)
 	this->imGuiForceThisFrameNewPosition = true;
 }
 
+void CGuiView::SetNewImGuiWindowPositionAbsolute(float newAbsPosX, float newAbsPosY, ImGuiID viewportId)
+{
+	this->thisFrameNewAbsPosX = newAbsPosX;
+	this->thisFrameNewAbsPosY = newAbsPosY;
+	this->thisFrameNewAbsViewportId = viewportId;
+	this->imGuiForceThisFrameNewPositionAbsolute = true;
+}
+
 void CGuiView::SetNewImGuiWindowSize(float newSizeX, float newSizeY)
 {
 	LOGD("CGuiView::SetNewImGuiWindowSize: %f %f", newSizeX, newSizeY);
 	this->thisFrameNewSizeX = newSizeX;
 	this->thisFrameNewSizeY = newSizeY;
 	this->imGuiForceThisFrameNewSize = true;
+}
+
+void CGuiView::DockToImGuiDockspace(ImGuiID dockId, ImGuiID viewportId)
+{
+	this->thisFrameDockId = dockId;
+	this->thisFrameDockViewportId = viewportId;
+	this->imGuiForceThisFrameDockId = true;
 }
 
 void CGuiView::CenterImGuiWindowPosition()
@@ -1441,7 +1561,15 @@ void CGuiView::PreRenderImGui()
 	else
 	{
 		// not fullscreen, setup parameters of this window
-		if (imGuiForceThisFrameNewPosition)
+		if (imGuiForceThisFrameNewPositionAbsolute)
+		{
+			// force new absolute position (optionally in a specific viewport)
+			if (thisFrameNewAbsViewportId != 0)
+				ImGui::SetNextWindowViewport(thisFrameNewAbsViewportId);
+			ImGui::SetNextWindowPos(ImVec2(thisFrameNewAbsPosX, thisFrameNewAbsPosY), ImGuiCond_Always);
+			imGuiForceThisFrameNewPositionAbsolute = false;
+		}
+		else if (imGuiForceThisFrameNewPosition)
 		{
 			// force new position
 			ImGui::SetNextWindowPos(ImGui::GetMainViewport()->Pos + ImVec2(this->thisFrameNewPosX, this->thisFrameNewPosY), ImGuiCond_Always);
@@ -1488,6 +1616,14 @@ void CGuiView::PreRenderImGui()
 		}
 	}
 
+	if (imGuiForceThisFrameDockId)
+	{
+		if (thisFrameDockViewportId != 0)
+			ImGui::SetNextWindowViewport(thisFrameDockViewportId);
+		ImGui::SetNextWindowDockID(thisFrameDockId, ImGuiCond_Always);
+		imGuiForceThisFrameDockId = false;
+	}
+
 	if (imGuiNoWindowPadding)
 	{
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0,0));
@@ -1495,12 +1631,12 @@ void CGuiView::PreRenderImGui()
 
 	if (imGuiNoScrollbar)
 	{
-		ImGui::Begin(this->name, &(this->visible), ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse
-					 | (isFullScreen ? ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoResize : 0));
+		ImGui::Begin(this->GetImGuiBeginName(), &(this->visible), ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse
+					 | (isFullScreen ? (ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoResize) : 0));
 	}
 	else
 	{
-		ImGui::Begin(this->name, &(this->visible), (isFullScreen ? ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoResize : 0));
+		ImGui::Begin(this->GetImGuiBeginName(), &(this->visible), (isFullScreen ? (ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoResize) : 0));
 	}
 
 	ImGuiWindow* window = ImGui::GetCurrentWindow();
@@ -1565,10 +1701,66 @@ void CGuiView::PreRenderImGui()
 	if (imGuiWindowSkipFocusCheck == false)
 	{
 		LOGG("check focus %s", this->name);
-		if (ImGui::IsWindowFocused())
+		// Docked views need special handling. ImGui's strict
+		// IsWindowFocused() (NavWindow == cur_window) doesn't ask
+		// whether the docked view is actually VISIBLE — an inactive tab
+		// in a dock node can stay g.NavWindow indefinitely after a
+		// neighbouring tab is selected. If we honour that, focusedView
+		// ends up pointing at a window the user is not looking at, and
+		// every key goes to the wrong handler (note keys typed in the
+		// pattern grid silently land in the instrument editor, hex
+		// digits land in the pattern, etc.).
+		//
+		// Policy for a docked view:
+		//   - claim focus ONLY when we are the currently visible tab
+		//     (DockTabIsVisible), AND ImGui's nav focus is either on
+		//     us, somewhere under our subtree, or on the dock HOST
+		//     window that owns our tab bar (the state Shift+drop
+		//     leaves behind).
+		//   - never claim focus when the user has hidden us behind a
+		//     sibling tab, no matter what NavWindow says.
+		//
+		// Non-docked views keep the original strict check, so this
+		// change can't bleed focus into floating windows that share
+		// state with popups or transient child windows.
+		bool isDocked = (imGuiWindow != NULL && imGuiWindow->DockIsActive);
+		if (!isDocked)
 		{
-			LOGG("..ImGui::IsWindowFocused %s", this->name);
-			guiMain->SetInternalViewFocus(this);
+			if (ImGui::IsWindowFocused())
+			{
+				LOGG("..ImGui::IsWindowFocused %s", this->name);
+				guiMain->SetInternalViewFocus(this);
+			}
+		}
+		else if (imGuiWindow->DockTabIsVisible)
+		{
+			bool claim = false;
+			ImGuiWindow *nav = GImGui->NavWindow;
+			ImGuiDockNode *node = imGuiWindow->DockNode;
+			ImGuiWindow *host = node ? node->HostWindow : NULL;
+			if (ImGui::IsWindowFocused())
+			{
+				claim = true;
+			}
+			else if (host != NULL && nav == host)
+			{
+				// Shift+drop / tab-button click leaves NavWindow on the
+				// dock host. The visible tab is the right focus target.
+				claim = true;
+			}
+			else if (nav != NULL && host != NULL && nav->RootWindowDockTree == host)
+			{
+				// NavWindow is some other window in the same dock tree
+				// (a sibling inactive tab whose Begin still got called,
+				// or one of our own BeginChild descendants). Either way
+				// the visible tab is the user-facing target.
+				claim = true;
+			}
+			if (claim)
+			{
+				LOGG("..ImGui::IsWindowFocused (docked-visible-tab) %s", this->name);
+				guiMain->SetInternalViewFocus(this);
+			}
 		}
 	}
 }
@@ -1963,5 +2155,3 @@ void CGuiView::Serialize(CByteBuffer *byteBuffer)
 void CGuiView::Deserialize(CByteBuffer *byteBuffer)
 {
 }
-
-

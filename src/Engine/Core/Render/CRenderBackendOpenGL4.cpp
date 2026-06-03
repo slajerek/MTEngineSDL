@@ -2,13 +2,26 @@
 #include "SYS_Main.h"
 #include "VID_Main.h"
 #include "CSlrImage.h"
+#include "CImageData.h"
 #include "imgui_impl_sdl2.h"
 #include "imgui_impl_opengl3.h"
 #include <GL/gl3w.h>
 #include <vector>
 
+// Compressed-texture internal formats. These enum tokens come from the
+// GL_ARB_texture_compression_bptc and GL_KHR_texture_compression_astc_ldr
+// extensions and may be absent from the GL headers in this tree. Define them
+// to their standard values when missing (design note §8.5).
+#ifndef GL_COMPRESSED_RGBA_BPTC_UNORM
+#define GL_COMPRESSED_RGBA_BPTC_UNORM 0x8E8C
+#endif
+#ifndef GL_COMPRESSED_RGBA_ASTC_4x4_KHR
+#define GL_COMPRESSED_RGBA_ASTC_4x4_KHR 0x93B0
+#endif
+
 CRenderBackendOpenGL4::CRenderBackendOpenGL4()
 : CRenderBackend("OpenGL4")
+, cachedCompressedFormat(-1)
 {
 }
 
@@ -171,11 +184,100 @@ void CRenderBackendOpenGL4::Shutdown()
 	ImGui_ImplOpenGL3_Shutdown();
 }
 
+// Compressed (KTX2/UASTC-transcoded) + mipmapped upload path. Fully separate
+// from the RGBA path below; an RGBA image never reaches this function.
+static void OpenGL4CreateCompressedTexture(CSlrImage *image)
+{
+	CImageData *cd = image->loadImageData;
+	if (cd == NULL || cd->compressedMips == NULL || cd->compressedMipCount <= 0)
+	{
+		LOGError("CRenderBackendOpenGL4::CreateTexture: no compressed mip data");
+		return;
+	}
+
+	// EImageGpuFormat -> GL internal format.
+	GLenum internalFormat;
+	switch (cd->compressedGpuFormat)
+	{
+		case IMG_GPU_ASTC_4x4:
+			internalFormat = GL_COMPRESSED_RGBA_ASTC_4x4_KHR;
+			break;
+		case IMG_GPU_BC7:
+		default:
+			internalFormat = GL_COMPRESSED_RGBA_BPTC_UNORM;
+			break;
+	}
+
+	const int mipCount = cd->compressedMipCount;
+
+	GLuint textureId;
+	glGenTextures(1, &textureId);
+	ASSERT_OPENGL();
+	glBindTexture(GL_TEXTURE_2D, textureId);
+	ASSERT_OPENGL();
+
+	// Min-filter: mip-aware only when the texture actually has a mip chain;
+	// single-level compressed images keep today's non-mip filter.
+	if (mipCount > 1)
+	{
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+						image->linearScaling ? GL_LINEAR_MIPMAP_LINEAR : GL_NEAREST_MIPMAP_LINEAR);
+		ASSERT_OPENGL();
+	}
+	else
+	{
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		ASSERT_OPENGL();
+	}
+	// Mag-filter never samples mips; identical to the RGBA path.
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER,
+					image->linearScaling ? GL_LINEAR : GL_NEAREST);
+	ASSERT_OPENGL();
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	ASSERT_OPENGL();
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	ASSERT_OPENGL();
+
+	// Bound the sampled mip range to what the KTX2 file actually provides.
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, mipCount - 1);
+	ASSERT_OPENGL();
+
+	glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+	ASSERT_OPENGL();
+
+	// Upload every mip level. Logical mip dims (width>>level, clamped >=1) drive
+	// the texture extent; the transcoded payload size is the block byte count.
+	// Do NOT call glGenerateMipmap — the mips come from the KTX2 file.
+	for (int level = 0; level < mipCount; level++)
+	{
+		const SCompressedMip &mip = cd->compressedMips[level];
+
+		GLsizei mipW = (GLsizei)(cd->width  >> level);
+		if (mipW < 1) mipW = 1;
+		GLsizei mipH = (GLsizei)(cd->height >> level);
+		if (mipH < 1) mipH = 1;
+
+		glCompressedTexImage2D(GL_TEXTURE_2D, level, internalFormat,
+							   mipW, mipH, 0,
+							   (GLsizei)mip.blockDataSize, mip.blockData);
+		ASSERT_OPENGL();
+	}
+
+	image->texturePtr.store((void*)(intptr_t)textureId, std::memory_order_release);
+}
+
 void CRenderBackendOpenGL4::CreateTexture(CSlrImage *image)
 {
+	if (image->isCompressed)
+	{
+		OpenGL4CreateCompressedTexture(image);
+		return;
+	}
+
 	u8 *data = image->loadImageData->getRGBAResultData();
 //	LOGD("CRenderBackendOpenGL4::CreateTexture: width=%d height=%d image=%x image->loadImageData=%x", image->rasterWidth, image->rasterHeight, image, image->loadImageData, data);
-	
+
 	GLuint textureId;
 	glGenTextures(1, &textureId);
 	ASSERT_OPENGL();
@@ -210,7 +312,7 @@ void CRenderBackendOpenGL4::CreateTexture(CSlrImage *image)
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image->rasterWidth, image->rasterHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, image->loadImageData->getRGBAResultData());
 	ASSERT_OPENGL();
 
-	image->texturePtr = (void*)(intptr_t)textureId;
+	image->texturePtr.store((void*)(intptr_t)textureId, std::memory_order_release);
 }
 
 void CRenderBackendOpenGL4::UpdateTextureLinearScaling(CSlrImage *image)
@@ -222,7 +324,7 @@ void CRenderBackendOpenGL4::UpdateTextureLinearScaling(CSlrImage *image)
 		return;
 	}
 	
-	glBindTexture(GL_TEXTURE_2D, (GLuint)(intptr_t)image->texturePtr);
+	glBindTexture(GL_TEXTURE_2D, (GLuint)(intptr_t)image->texturePtr.load(std::memory_order_acquire));
 	if (image->linearScaling)
 	{
 		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
@@ -254,11 +356,20 @@ void CRenderBackendOpenGL4::ReBindTexture(CSlrImage *image)
 		CreateTexture(image);
 		return;
 	}
-	
+
+	// Compressed mip chains are not partially re-uploaded in place; delete the
+	// old texture object and recreate it from the compressed mip data.
+	if (image->isCompressed)
+	{
+		DeleteTexture(image);
+		CreateTexture(image);
+		return;
+	}
+
 	u8 *data = image->loadImageData->getRGBAResultData();
 //	LOGD("CRenderBackendOpenGL4::ReBindTexture: width=%d height=%d image=%x image->loadImageData=%x", image->rasterWidth, image->rasterHeight, image, image->loadImageData, data);
 	
-	glBindTexture(GL_TEXTURE_2D, (GLuint)(intptr_t)image->texturePtr);
+	glBindTexture(GL_TEXTURE_2D, (GLuint)(intptr_t)image->texturePtr.load(std::memory_order_acquire));
 	ASSERT_OPENGL();
 
 	if (image->linearScaling)
@@ -305,9 +416,46 @@ void CRenderBackendOpenGL4::DeleteTexture(CSlrImage *image)
 		return;
 	}
 	
-	GLuint textureId = (intptr_t)image->texturePtr;
+	GLuint textureId = (intptr_t)image->texturePtr.load(std::memory_order_acquire);
 	glDeleteTextures(1, &textureId);
 	ASSERT_OPENGL();
+	image->texturePtr.store(NULL, std::memory_order_release);
+}
+
+EImageGpuFormat CRenderBackendOpenGL4::GetPreferredCompressedFormat()
+{
+	// Return cached result after the first probe.
+	if (cachedCompressedFormat != -1)
+	{
+		return (EImageGpuFormat)cachedCompressedFormat;
+	}
+
+	bool hasBptc  = false;
+	bool hasAstc  = false;
+
+	GLint numExtensions = 0;
+	glGetIntegerv(GL_NUM_EXTENSIONS, &numExtensions);
+	for (GLint i = 0; i < numExtensions; ++i)
+	{
+		const char *ext = (const char *)glGetStringi(GL_EXTENSIONS, (GLuint)i);
+		if (ext == nullptr)
+			continue;
+		if (strcmp(ext, "GL_ARB_texture_compression_bptc") == 0)
+			hasBptc = true;
+		else if (strcmp(ext, "GL_KHR_texture_compression_astc_ldr") == 0)
+			hasAstc = true;
+	}
+
+	EImageGpuFormat result;
+	if (hasBptc)
+		result = IMG_GPU_BC7;
+	else if (hasAstc)
+		result = IMG_GPU_ASTC_4x4;
+	else
+		result = IMG_GPU_UNCOMPRESSED;
+
+	cachedCompressedFormat = (int)result;
+	return result;
 }
 
 CRenderBackendOpenGL4::~CRenderBackendOpenGL4()
