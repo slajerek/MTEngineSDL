@@ -6,7 +6,7 @@ struct ImFont;
 // Replaces VID_Fonts globals and adds optional markdown font variants.
 //
 // Markdown fonts (Inter Regular/Bold/Italic/BoldItalic + JetBrains Mono) are
-// embedded as compressed C arrays in Embedded/Fonts/ and loaded on demand.
+// embedded as compressed C arrays in src/Embedded/Fonts/ and loaded on demand.
 // Call LoadMarkdownFonts() before ImGui font atlas build if you want markdown
 // rendering with proper typography. Apps that don't need it pay zero cost.
 //
