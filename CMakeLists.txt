@@ -51,7 +51,10 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED On)
 set(CMAKE_CXX_EXTENSIONS Off)
 
-set(CMAKE_CXX_FLAGS "$(CMAKE_CXX_FLAGS) -fpermissive")
+# -Wno-narrowing: vendored code has benign narrowing conversions in braced-init lists;
+# clang treats these as hard errors and -Werror/strict GCC promotes them. Suppress
+# globally so the build is portable across toolchains.
+set(CMAKE_CXX_FLAGS "$(CMAKE_CXX_FLAGS) -fpermissive -Wno-narrowing")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-implicit-function-declaration")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wint-conversion")
 
