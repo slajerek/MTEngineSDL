@@ -3,7 +3,9 @@
 #include "CTest.h"
 #include "SYS_Main.h"
 #include "SYS_Funct.h"
+#include "SYS_CommandLine.h"
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <thread>
 #if !defined(_WIN32)
@@ -27,6 +29,16 @@ static void RestoreDefaultSignalHandlers()
 #endif
 }
 
+static void ExitCliTestProcess(int status)
+{
+	RestoreDefaultSignalHandlers();
+	LOGM("CTestSuite: exiting CLI test process with status=%d", status);
+	LOG_Shutdown();
+	// CLI suites run inside MT_Render(); returning would continue into the
+	// current frame's SDL present path before MTEngine observes SYS_Shutdown().
+	std::_Exit(status);
+}
+
 bool CTestSuite::isCLIModeActive = false;
 
 CTestSuite::CTestSuite()
@@ -34,6 +46,7 @@ CTestSuite::CTestSuite()
 	currentTestIndex = -1;
 	isRunning = false;
 	exitOnCompletion = false;
+	stopOnFirstFailure = false;
 }
 
 CTestSuite::~CTestSuite()
@@ -47,6 +60,23 @@ void CTestSuite::RunFromCLI(CTestSuite *suite, const char *testName)
 
 	suite->exitOnCompletion = true;
 	suite->resultsFilePath = "tests/results/last_run.txt";
+
+	// Default: run every test and report all failures in one pass. Opt back into
+	// fast-fail with --stop-on-first-failure. --all-plugin-tests asks the
+	// subclass to also include its optional/removable tests.
+	bool includeOptional = false;
+	for (size_t i = 0; i < sysCommandLineArguments.size(); i++)
+	{
+		if (strcmp(sysCommandLineArguments[i], "--stop-on-first-failure") == 0)
+			suite->stopOnFirstFailure = true;
+		else if (strcmp(sysCommandLineArguments[i], "--all-plugin-tests") == 0)
+			includeOptional = true;
+	}
+	// Running a specific test by name may target any compiled test, including an
+	// optional one — so make all registrars available in that case.
+	if (testName != NULL)
+		includeOptional = true;
+	suite->SetIncludeOptionalTests(includeOptional);
 
 	// Register all tests from the subclass
 	suite->RegisterTests();
@@ -70,7 +100,6 @@ void CTestSuite::RunFromCLI(CTestSuite *suite, const char *testName)
 
 			// Log available test names — re-register to list them
 			CTestSuite *temp = suite;
-			// Tests were already cleared by the move, re-register to show names
 			temp->RegisterTests();
 			LOGI("Available tests:");
 			for (auto &t : temp->tests)
@@ -90,14 +119,42 @@ void CTestSuite::RunFromCLI(CTestSuite *suite, const char *testName)
 			}
 
 			CTestRunner::isTestPending = false;
-			RestoreDefaultSignalHandlers();
-			SYS_Shutdown();
-			delete suite;
+			ExitCliTestProcess(1);
 			return;
 		}
 	}
 
 	suite->Run();
+}
+
+void CTestSuite::ListTestsFromCLI(CTestSuite *suite)
+{
+	// --all-plugin-tests asks the subclass to also list its optional tests.
+	for (size_t i = 0; i < sysCommandLineArguments.size(); i++)
+		if (strcmp(sysCommandLineArguments[i], "--all-plugin-tests") == 0)
+			suite->SetIncludeOptionalTests(true);
+
+	suite->RegisterTests();
+
+	const char *outPath = "tests/results/test_list.txt";
+	FILE *f = fopen(outPath, "w");
+	for (auto &t : suite->tests)
+	{
+		// Prefix on stdout so the orchestrator can parse past log noise; the
+		// file holds "<category>\t<name>" so the runner can group core vs
+		// plugin tests. (The orchestrator reads the first tab-separated field
+		// as category and the name as the rest.)
+		printf("CTESTSUITE_TEST: [%s] %s\n", t->category, t->GetName());
+		if (f != NULL)
+			fprintf(f, "%s\t%s\n", t->category, t->GetName());
+	}
+	if (f != NULL)
+		fclose(f);
+	fflush(stdout);
+
+	LOGM("CTestSuite: listed %d tests to %s", (int)suite->tests.size(), outPath);
+	LOG_Shutdown();
+	std::_Exit(0);
 }
 
 void CTestSuite::Run()
@@ -113,6 +170,12 @@ void CTestSuite::Run()
 
 void CTestSuite::StartTimeoutWatchdog()
 {
+	if (!useTimeoutWatchdogThread)
+	{
+		LOGS("CTestSuite: Timeout watchdog disabled (single-threaded completion)");
+		return;
+	}
+
 	std::thread watchdog([this]() {
 		LOGS("CTestSuite: Timeout watchdog started (per-test=%ds, suite=%ds)", defaultTestTimeoutSeconds, suiteTimeoutSeconds);
 		while (isRunning)
@@ -188,11 +251,11 @@ void CTestSuite::RunNextTest()
 			int passed = 0;
 			for (auto &r : results)
 			{
-				if (r.success) passed++;
+				if (r.success)
+					passed++;
 			}
 			LOGM("SUITE RESULTS: %d/%d passed", passed, (int)results.size());
-			RestoreDefaultSignalHandlers();
-			SYS_Shutdown();
+			ExitCliTestProcess((passed == (int)results.size() && !results.empty()) ? 0 : 1);
 		}
 		return;
 	}
@@ -214,9 +277,9 @@ void CTestSuite::OnTestCompleted(CTest *test, bool success, const char *summary)
 
 	results.push_back({test->GetName(), success, summary});
 
-	if (!success)
+	if (!success && stopOnFirstFailure)
 	{
-		LOGS("CTestSuite: Test failed, stopping suite");
+		LOGS("CTestSuite: Test failed, stopping suite (--stop-on-first-failure)");
 		CTestRunner::isTestPending = false;
 		isRunning = false;
 
@@ -227,16 +290,22 @@ void CTestSuite::OnTestCompleted(CTest *test, bool success, const char *summary)
 			int passed = 0;
 			for (auto &r : results)
 			{
-				if (r.success) passed++;
+				if (r.success)
+					passed++;
 			}
 			LOGM("SUITE RESULTS: %d/%d passed", passed, (int)results.size());
-			RestoreDefaultSignalHandlers();
-			SYS_Shutdown();
+			ExitCliTestProcess(1);
 		}
 		return;
 	}
 
-	// Run next test
+	if (!success)
+	{
+		// Continue-on-failure (default): keep running so one pass surfaces every
+		// failure instead of hiding the tests after the first failing one.
+		LOGS("CTestSuite: [%s] FAILED - continuing to next test", test->GetName());
+	}
+
 	RunNextTest();
 }
 
@@ -253,7 +322,8 @@ void CTestSuite::WriteResults()
 	for (auto &r : results)
 	{
 		fprintf(f, "[%s] %s: %s\n", r.testName.c_str(), r.success ? "PASS" : "FAIL", r.summary.c_str());
-		if (r.success) passed++;
+		if (r.success)
+			passed++;
 	}
 	fprintf(f, "---\n");
 	fprintf(f, "RESULT: %d/%d passed\n", passed, (int)results.size());
