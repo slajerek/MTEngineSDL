@@ -163,6 +163,9 @@
     <Filter Include="Source Files\src\Engine\GUI\AudioMixer">
       <UniqueIdentifier>{d4717988-4718-413d-bd7e-db53d0fd65fc}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\src\Engine\GUI\Fonts">
+      <UniqueIdentifier>{a3f21d84-5b2e-4c9a-8f1e-7d6c3e8b9042}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Source Files\src\Engine\Libs\ENet">
       <UniqueIdentifier>{f8118afd-95f8-4711-8ec7-d87b00d4ca54}</UniqueIdentifier>
     </Filter>
@@ -181,11 +184,32 @@
     <Filter Include="Source Files\src\Engine\Libs\httplib">
       <UniqueIdentifier>{4a46abed-15eb-4b15-867d-8baab0acf23e}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\src\Engine\Libs\basis_universal">
+      <UniqueIdentifier>{ba515100-0000-0000-0000-000000000001}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Libs\basis_universal\transcoder">
+      <UniqueIdentifier>{ba515100-0000-0000-0000-000000000002}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Libs\basis_universal\zstd">
+      <UniqueIdentifier>{ba515100-0000-0000-0000-000000000003}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Source Files\src\Engine\Libs\sgSHA256">
       <UniqueIdentifier>{8c94d282-b456-4a73-94c2-ac6f57a3655a}</UniqueIdentifier>
     </Filter>
     <Filter Include="Source Files\src\Engine\Tools">
       <UniqueIdentifier>{fe172705-1946-43d2-978f-8f869bd776f9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Tests">
+      <UniqueIdentifier>{a1b2c3d4-e5f6-7890-abcd-ef1234567890}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Tools\NetGame">
+      <UniqueIdentifier>{b2c3d4e5-f6a7-8901-bcde-f12345678901}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Sci">
+      <UniqueIdentifier>{c3d4e5f6-a7b8-9012-cdef-123456789012}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Sci\Llama">
+      <UniqueIdentifier>{d4e5f6a7-b8c9-0123-def0-234567890123}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -214,6 +238,18 @@
       <Filter>Source Files\src\Engine\Audio</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\Audio\CSlrMusicSwitcher.cpp">
+      <Filter>Source Files\src\Engine\Audio</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Audio\CSlrMusicPlaylistController.cpp">
+      <Filter>Source Files\src\Engine\Audio</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Audio\CPlaylistPlaybackManager.cpp">
+      <Filter>Source Files\src\Engine\Audio</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Audio\CSlrMusicPlaylistPersistence.cpp">
+      <Filter>Source Files\src\Engine\Audio</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Audio\CSlrMusicCueTransitionPlanner.cpp">
       <Filter>Source Files\src\Engine\Audio</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\Audio\SND_Main.cpp">
@@ -576,6 +612,9 @@
     <ClCompile Include="..\..\..\src\Engine\Libs\mtrand\mtrand.cpp">
       <Filter>Source Files\src\Engine\Libs\mtrand</Filter>
     </ClCompile>
+    <ClCompile Include="..\src.Windows\CCameraWindows.cpp">
+      <Filter>Source Files\src.Windows</Filter>
+    </ClCompile>
     <ClCompile Include="..\src.Windows\CLogByteBuffer.cpp">
       <Filter>Source Files\src.Windows</Filter>
     </ClCompile>
@@ -744,10 +783,22 @@
     <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewConsole.cpp">
       <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewLlamaChat.cpp">
+      <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\CViewLlamaTaskQueue.cpp">
+      <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewLlamaModelLoader.cpp">
+      <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewDummy.cpp">
       <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewDummySimple.cpp">
+      <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewMusicPlaylist.cpp">
       <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewTableItem.cpp">
@@ -864,6 +915,9 @@
     <ClCompile Include="..\..\..\src\Engine\Core\CConfigStorage.cpp">
       <Filter>Source Files\src\Engine\Core</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\CCameraCapture.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\Core\CImageData.cpp">
       <Filter>Source Files\src\Engine\Core</Filter>
     </ClCompile>
@@ -908,6 +962,30 @@
     </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\Core\CSlrKeyboardShortcuts.cpp">
       <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Sci\Llama\CLlamaPromptAgent.cpp">
+      <Filter>Source Files\src\Engine\Sci\Llama</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Sci\Llama\CLlamaTaskQueue.cpp">
+      <Filter>Source Files\src\Engine\Sci\Llama</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Sci\Llama\CLlamaService.cpp">
+      <Filter>Source Files\src\Engine\Sci\Llama</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Sci\Llama\CLlamaModelManager.cpp">
+      <Filter>Source Files\src\Engine\Sci\Llama</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Sci\Llama\CLlamaModelDownloader.cpp">
+      <Filter>Source Files\src\Engine\Sci\Llama</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Sci\Llama\LLamaBackend_Stub.cpp">
+      <Filter>Source Files\src\Engine\Sci\Llama</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Sci\Llama\LLamaBackend_LlamaCpp.cpp">
+      <Filter>Source Files\src\Engine\Sci\Llama</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Sci\Llama\LLamaBackend_WinCudaPlugin.cpp">
+      <Filter>Source Files\src\Engine\Sci\Llama</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\Core\CSlrResourceBase.cpp">
       <Filter>Source Files\src\Engine\Core</Filter>
@@ -1089,11 +1167,17 @@
     <ClCompile Include="..\..\..\src\Engine\GUI\Waveform\CWaveformData.cpp">
       <Filter>Source Files\src\Engine\GUI\Waveform</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Waveform\CMusicWaveformCache.cpp">
+      <Filter>Source Files\src\Engine\GUI\Waveform</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\Core\VID_Fonts.cpp">
       <Filter>Source Files\src\Engine\Core</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\GUI\AudioMixer\CViewAudioMixer.cpp">
       <Filter>Source Files\src\Engine\GUI\AudioMixer</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Fonts\CGuiFontManager.cpp">
+      <Filter>Source Files\src\Engine\GUI\Fonts</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewDebugLog.cpp">
       <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
@@ -1102,6 +1186,9 @@
       <Filter>Source Files\src\Engine\Libs\imguiext</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewSearch.cpp">
+      <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\CViewCamera.cpp">
       <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiViewMovingPaneImage.cpp">
@@ -1209,6 +1296,15 @@
     <ClCompile Include="..\..\..\src\Engine\Libs\sgSHA256\sgSHA256.cpp">
       <Filter>Source Files\src\Engine\Libs\sgSHA256</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\httplib\httplib_vendor.cpp">
+      <Filter>Source Files\src\Engine\Libs\httplib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\basis_universal\transcoder\basisu_transcoder.cpp">
+      <Filter>Source Files\src\Engine\Libs\basis_universal\transcoder</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\basis_universal\zstd\zstd.c">
+      <Filter>Source Files\src\Engine\Libs\basis_universal\zstd</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\Tools\CInterruptibleSleep.cpp">
       <Filter>Source Files\src\Engine\Tools</Filter>
     </ClCompile>
@@ -1217,6 +1313,114 @@
     </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\Tools\CTaskScheduler.cpp">
       <Filter>Source Files\src\Engine\Tools</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tests\CImGuiTestEngine.cpp">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTest.cpp">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestI18nEngine.cpp">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestRunner.cpp">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestSuite.cpp">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tools\CProcessSpawner.cpp">
+      <Filter>Source Files\src\Engine\Tools</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tools\NetGame\CNetGameUserProfile.cpp">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tools\NetGame\CNetGamePackets.cpp">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tools\NetGame\CChatHistory.cpp">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tools\NetGame\CNetGameServer.cpp">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tools\NetGame\CServerGame.cpp">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tools\NetGame\CLobbyLink.cpp">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tools\NetGame\CLobbyServiceServer.cpp">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tools\NetGame\CGameServerRegistry.cpp">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tools\NetGame\CRegistryServer.cpp">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tools\NetGame\CRegistryClient.cpp">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tools\NetGame\CNetLobbyServer.cpp">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tools\NetGame\CNetGameClient.cpp">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tools\NetGame\CViewGameClient.cpp">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tools\NetGame\CViewGameServer.cpp">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tools\NetGame\CGameServerProcessBase.cpp">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tools\NetGame\CNetLobbyClient.cpp">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tools\NetGame\CTurnBasedGameServer.cpp">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tools\NetGame\CAuthServiceProcess.cpp">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tools\NetGame\CAuthServiceServer.cpp">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tools\NetGame\CNetGameDataProvider.cpp">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tools\NetGame\CNetGameDataProviderLocalFiles.cpp">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tools\NetGame\CServerGamesManagerBase.cpp">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tools\NetGame\CViewServerAdmin.cpp">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tools\NetGame\CAssetServer.cpp">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tools\NetGame\CAssetServerProcess.cpp">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tools\NetGame\CClusterConfig.cpp">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tools\NetGame\CDownloadTracker.cpp">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tools\NetGame\CFileDownloader.cpp">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tools\NetGame\CNodeAgent.cpp">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tools\NetGame\CSnapshotStorage.cpp">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1311,6 +1515,18 @@
       <Filter>Source Files\src\Engine\Audio</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\Audio\CSlrMusicSwitcher.h">
+      <Filter>Source Files\src\Engine\Audio</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Audio\CSlrMusicPlaylistController.h">
+      <Filter>Source Files\src\Engine\Audio</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Audio\CPlaylistPlaybackManager.h">
+      <Filter>Source Files\src\Engine\Audio</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Audio\CSlrMusicPlaylistPersistence.h">
+      <Filter>Source Files\src\Engine\Audio</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Audio\CSlrMusicCueTransitionPlanner.h">
       <Filter>Source Files\src\Engine\Audio</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\Audio\SND_Main.h">
@@ -1628,10 +1844,22 @@
     <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewConsole.h">
       <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewLlamaChat.h">
+      <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\CViewLlamaTaskQueue.h">
+      <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewLlamaModelLoader.h">
+      <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewDummy.h">
       <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewDummySimple.h">
+      <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewMusicPlaylist.h">
       <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewTableItem.h">
@@ -1832,6 +2060,9 @@
     <ClInclude Include="..\..\..\src\Engine\Core\CGlobalLogicCallback.h">
       <Filter>Source Files\src\Engine\Core</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\CGlobalLayoutCallback.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\Core\CGlobalOSWindowChangedCallback.h">
       <Filter>Source Files\src\Engine\Core</Filter>
     </ClInclude>
@@ -1882,6 +2113,30 @@
     </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\Core\CSlrKeyboardShortcuts.h">
       <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Sci\Llama\CLlamaPromptAgent.h">
+      <Filter>Source Files\src\Engine\Sci\Llama</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Sci\Llama\CLlamaTaskQueue.h">
+      <Filter>Source Files\src\Engine\Sci\Llama</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Sci\Llama\CLlamaService.h">
+      <Filter>Source Files\src\Engine\Sci\Llama</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Sci\Llama\CLlamaModelManager.h">
+      <Filter>Source Files\src\Engine\Sci\Llama</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Sci\Llama\CLlamaModelDownloader.h">
+      <Filter>Source Files\src\Engine\Sci\Llama</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Sci\Llama\LLamaBackend_Stub.h">
+      <Filter>Source Files\src\Engine\Sci\Llama</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Sci\Llama\LLamaBackend_LlamaCpp.h">
+      <Filter>Source Files\src\Engine\Sci\Llama</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Sci\Llama\LLamaBackend_WinCudaPlugin.h">
+      <Filter>Source Files\src\Engine\Sci\Llama</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\Core\CSlrResourceBase.h">
       <Filter>Source Files\src\Engine\Core</Filter>
@@ -2087,11 +2342,17 @@
     <ClInclude Include="..\..\..\src\Engine\GUI\Waveform\CWaveformData.h">
       <Filter>Source Files\src\Engine\GUI\Waveform</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Waveform\CMusicWaveformCache.h">
+      <Filter>Source Files\src\Engine\GUI\Waveform</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\Core\VID_Fonts.h">
       <Filter>Source Files\src\Engine\Core</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\GUI\AudioMixer\CViewAudioMixer.h">
       <Filter>Source Files\src\Engine\GUI\AudioMixer</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Fonts\CGuiFontManager.h">
+      <Filter>Source Files\src\Engine\GUI\Fonts</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewDebugLog.h">
       <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
@@ -2248,6 +2509,123 @@
     </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\Tools\CTaskScheduler.h">
       <Filter>Source Files\src\Engine\Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tests\CImGuiTestEngine.h">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTest.h">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestI18nEngine.h">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestRunner.h">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestSuite.h">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tests\ITestCallback.h">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tools\CProcessSpawner.h">
+      <Filter>Source Files\src\Engine\Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tools\NetGame\CNetGameUserProfile.h">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tools\NetGame\CNetGamePackets.h">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tools\NetGame\CChatHistory.h">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tools\NetGame\CNetGameServer.h">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tools\NetGame\CServerGame.h">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tools\NetGame\CLobbyLink.h">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tools\NetGame\CLobbyServiceServer.h">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tools\NetGame\CGameServerRegistry.h">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tools\NetGame\CRegistryServer.h">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tools\NetGame\CRegistryClient.h">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tools\NetGame\CNetLobbyClientCallback.h">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tools\NetGame\CNetLobbyServer.h">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tools\NetGame\CNetGameClient.h">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tools\NetGame\CViewGameClient.h">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tools\NetGame\CViewGameServer.h">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tools\NetGame\CGameServerProcessBase.h">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tools\NetGame\CNetLobbyClient.h">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tools\NetGame\CTurnBasedGameServer.h">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tools\NetGame\CAuthServiceProcess.h">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tools\NetGame\CAuthServiceServer.h">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tools\NetGame\CNetGameDataProvider.h">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tools\NetGame\CNetGameDataProviderLocalFiles.h">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tools\NetGame\CServerGamesManagerBase.h">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tools\NetGame\CViewServerAdmin.h">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tools\NetGame\CAssetServer.h">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tools\NetGame\CAssetServerProcess.h">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tools\NetGame\CClusterConfig.h">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tools\NetGame\CDownloadTracker.h">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tools\NetGame\CFileDownloader.h">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tools\NetGame\CNodeAgent.h">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tools\NetGame\CSnapshotStorage.h">
+      <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\ILogSink.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
