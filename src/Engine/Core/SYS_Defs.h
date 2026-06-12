@@ -46,6 +46,7 @@ extern "C"
 {
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>	// fixed-width int types (uint8_t, uint64_t, ...): newer GCC (13+) no longer pulls these in transitively
 #include <stdarg.h>
 #ifndef WIN32
 #include <stddef.h>
