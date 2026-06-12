@@ -28,7 +28,14 @@ New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 $cmakeToolset = if ($Compiler -eq 'Clang') { @('-T', 'ClangCL') } else { @() }
 
 Write-Host "Configuring llama.cpp (CPU) in $buildDir"
-cmake -S $llamaSrc -B $buildDir -G "Visual Studio 17 2022" -A $Platform @cmakeToolset `
+# Auto-detect the default Visual Studio CMake generator for the installed VS
+# (handles 'Visual Studio 17 2022', 'Visual Studio 18 2026', ... without hardcoding).
+$genMatch = cmake --help | Select-String -Pattern '^\*\s+(Visual Studio \d+ \d+)'
+if (-not $genMatch) { throw "Could not detect the default Visual Studio CMake generator from 'cmake --help'." }
+$generator = $genMatch.Matches[0].Groups[1].Value
+Write-Host "Using CMake generator: $generator"
+
+cmake -S $llamaSrc -B $buildDir -G $generator -A $Platform @cmakeToolset `
     -DBUILD_SHARED_LIBS=OFF `
     -DLLAMA_BUILD_COMMON=OFF `
     -DLLAMA_BUILD_TESTS=OFF `
