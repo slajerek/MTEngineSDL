@@ -34,6 +34,7 @@ core
 !src/Engine/Core/*
 !src/Engine/Core/**/*
 !other/lib/SDL2-2.0.10-static/src/core/
+!other/lib/SDL-release-2.32.10-static/src/core/
 /Release/
 other/lib/SDL2-2.0.10-static/VisualC/Win32/
 other/lib/SDL2-2.0.10-static/VisualC/x64/
