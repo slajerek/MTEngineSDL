@@ -32,8 +32,10 @@
 
 #if defined(_MSC_VER) && (_MSC_VER >= 1400)
 /* As of Clang 11, '_m_prefetchw' is conflicting with the winnt.h's version,
-   so we define the needed '_m_prefetch' here as a pseudo-header, until the issue is fixed. */
-#ifdef __clang__
+   so we define the needed '_m_prefetch' here as a pseudo-header, until the issue is fixed.
+   Since Clang 21, '_m_prefetch' is itself a compiler builtin, so only apply this
+   workaround when the builtin isn't available (matches upstream SDL2's fix). */
+#if defined(__clang__) && !_SDL_HAS_BUILTIN(_m_prefetch)
 #ifndef __PRFCHWINTRIN_H
 #define __PRFCHWINTRIN_H
 static __inline__ void __attribute__((__always_inline__, __nodebug__))

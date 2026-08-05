@@ -3727,6 +3727,7 @@
 				C0DEFACE0000000000000B01 /* Build llama_cpp */,
 				C0DEFACE0000000000000B02 /* Build mbedtls */,
 				C0DEFACE0000000000000B03 /* Build ftxui */,
+				C0DEFACE0000000000000B04 /* Build SDL2 */,
 				410CAEED2397A470009DA199 /* Sources */,
 				410CAEEE2397A470009DA199 /* Frameworks */,
 				410CAEEF2397A470009DA199 /* Headers */,
@@ -3836,6 +3837,27 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/bash;
 			shellScript = "\"$PROJECT_DIR/build-ftxui.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+		C0DEFACE0000000000000B04 /* Build SDL2 */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Build SDL2";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(PROJECT_DIR)/libs/libSDL2.a",
+				"$(PROJECT_DIR)/libs/libSDL2.stamp",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "\"$PROJECT_DIR/build-sdl2.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
 /* End PBXShellScriptBuildPhase section */
