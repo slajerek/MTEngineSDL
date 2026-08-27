@@ -68,6 +68,7 @@ void CGuiView::Init(const char *name, float posX, float posY, float posZ, float 
 	imGuiWindowSkipFocusCheck = false;
 	imGuiNoWindowPadding = false;
 	imGuiNoScrollbar = false;
+	imGuiExtraWindowFlags = 0;
 	imGuiSkipKeyPressWhenIoWantsTextInput = true;
 	imGuiWindowKeepAspectRatio = false;
 	imGuiWindowAspectRatio = 1.0f;
@@ -392,7 +393,7 @@ void CGuiView::SetNewImGuiWindowPositionAbsolute(float newAbsPosX, float newAbsP
 
 void CGuiView::SetNewImGuiWindowSize(float newSizeX, float newSizeY)
 {
-	LOGD("CGuiView::SetNewImGuiWindowSize: %f %f", newSizeX, newSizeY);
+//	LOGD("CGuiView::SetNewImGuiWindowSize: %f %f", newSizeX, newSizeY);
 	this->thisFrameNewSizeX = newSizeX;
 	this->thisFrameNewSizeY = newSizeY;
 	this->imGuiForceThisFrameNewSize = true;
@@ -1631,12 +1632,16 @@ void CGuiView::PreRenderImGui()
 
 	if (imGuiNoScrollbar)
 	{
-		ImGui::Begin(this->GetImGuiBeginName(), &(this->visible), ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse
+		ImGui::Begin(this->GetImGuiBeginName(), &(this->visible),
+					 ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse
+					 | imGuiExtraWindowFlags
 					 | (isFullScreen ? (ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoResize) : 0));
 	}
 	else
 	{
-		ImGui::Begin(this->GetImGuiBeginName(), &(this->visible), (isFullScreen ? (ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoResize) : 0));
+		ImGui::Begin(this->GetImGuiBeginName(), &(this->visible),
+					 imGuiExtraWindowFlags
+					 | (isFullScreen ? (ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoResize) : 0));
 	}
 
 	ImGuiWindow* window = ImGui::GetCurrentWindow();

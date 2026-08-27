@@ -1,7 +1,7 @@
 #ifndef _SYS_THREADING_H_
 #define _SYS_THREADING_H_
 
-//#include <SDL.h>
+//#include <SDL3/SDL.h>
 struct SDL_Thread;
 typedef struct SDL_Thread SDL_Thread;
 
@@ -13,8 +13,8 @@ typedef struct SDL_Thread SDL_Thread;
 #endif
 
 #if defined(USE_SDL_MUTEX)
-struct SDL_mutex;
-typedef struct SDL_mutex SDL_mutex;
+struct SDL_Mutex;
+typedef struct SDL_Mutex SDL_Mutex;
 #else
 #include <mutex>
 #endif
@@ -33,7 +33,7 @@ public:
 	
 	
 #if defined(USE_SDL_MUTEX)
-	SDL_mutex *mutex;
+	SDL_Mutex *mutex;
 #else
 	std::recursive_mutex mutex;
 #endif

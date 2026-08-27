@@ -16,6 +16,8 @@
 #include "CLogByteBuffer.h"
 #include "SYS_Threading.h"
 #include "SYS_Main.h"
+#include "SYS_FileSystem.h"
+#include <cstring>
 
 #if !defined(GLOBAL_DEBUG_OFF)
 
@@ -186,17 +188,45 @@ void LOG_Init(void)
 
 	DWORD processId = GetCurrentProcessId();
 
-	sprintf(logBuf, "./log/MTEngine-%04d%02d%02d-%02d%02d%02d-%d.txt", tmeCurrent.wYear, tmeCurrent.wMonth, tmeCurrent.wDay,
-		tmeCurrent.wHour, tmeCurrent.wMinute, tmeCurrent.wSecond, processId);
+	// --log-dir <path>: read from the CRT's own __argc/__argv rather than
+	// SYS_GetArgv(), because LOG_Init() runs before
+	// SYS_SetCommandLineArguments() in every platform's main() (Windows
+	// included). macOS's DBG_Log.mm reads NSProcessInfo directly for the
+	// identical reason; __argc/__argv are populated by CRT startup before
+	// main() runs, so they are always safe to read here regardless of that
+	// ordering. Previously this platform had no --log-dir support at all, so
+	// every log landed in .\log\ (or, when that didn't exist, the process's
+	// current directory) no matter what the caller asked for.
+	const char *logDirArg = NULL;
+	for (int i = 1; i < __argc - 1; i++)
+	{
+		if (strcmp(__argv[i], "--log-dir") == 0)
+		{
+			logDirArg = __argv[i + 1];
+			break;
+		}
+	}
 
-	fpLog = fopen(logBuf, "wb");
+	if (logDirArg != NULL)
+	{
+		CreateDirectoryA(logDirArg, NULL);
+		sprintf(logBuf, "%s\\MTEngine-%04d%02d%02d-%02d%02d%02d-%d.txt", logDirArg, tmeCurrent.wYear, tmeCurrent.wMonth, tmeCurrent.wDay,
+			tmeCurrent.wHour, tmeCurrent.wMinute, tmeCurrent.wSecond, processId);
+	}
+	else
+	{
+		sprintf(logBuf, "./log/MTEngine-%04d%02d%02d-%02d%02d%02d-%d.txt", tmeCurrent.wYear, tmeCurrent.wMonth, tmeCurrent.wDay,
+			tmeCurrent.wHour, tmeCurrent.wMinute, tmeCurrent.wSecond, processId);
+	}
+
+	fpLog = SYS_OpenFile(logBuf, "wb");
 
 	if (fpLog == NULL)
 	{
 		sprintf(logBuf, "MTEngine-%04d%02d%02d-%02d%02d%02d-%d.txt", tmeCurrent.wYear, tmeCurrent.wMonth, tmeCurrent.wDay,
 			tmeCurrent.wHour, tmeCurrent.wMinute, tmeCurrent.wSecond, processId);
 
-		fpLog = fopen(logBuf, "wb");
+		fpLog = SYS_OpenFile(logBuf, "wb");
 	}
 #endif
 

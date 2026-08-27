@@ -16,6 +16,7 @@ void GUI_Render()
 	//	LOGD("GUI_Render");
 	guiMain->RenderDockSpacesOverViewports();
 	guiMain->RunAutoLayoutIfRequested();
+	guiMain->RenderNativeMenuBarFrame();
 	guiMain->RenderImGui();
 	
 	MT_Render();

@@ -163,6 +163,54 @@ void BlitSize(CSlrImage *what, float destX, float destY, float z, float size)
 //    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 }
 
+namespace
+{
+	// Selects the right texture filter around ONE image draw, on backends where
+	// the filter is a per-draw binding rather than per-texture state.
+	//
+	// OpenGL sets min/mag with glTexParameteri on the texture itself
+	// (CRenderBackendOpenGL4::UpdateTextureLinearScaling), so nothing happens
+	// here and no callback splits the draw list. Metal's sampler is bound on the
+	// encoder and shared by every draw in the pass, so an image with
+	// linearScaling == false has to ask for point magnification around its own
+	// draw -- otherwise it inherits whatever the previous draw left bound, which
+	// is the linear default. That was the whole bug: c64d's memory map and
+	// bitmap fonts rendered blurred on Metal and sharp on OpenGL, with nothing
+	// wrong with either texture.
+	//
+	// Only NON-default images are bracketed. A linear image queues nothing,
+	// because linear is what the state already is -- so the common case costs
+	// exactly zero callbacks and only point-filtered images pay two.
+	class ScopedImageSampler
+	{
+	public:
+		explicit ScopedImageSampler(CSlrImage *image) : backend(NULL)
+		{
+			CRenderBackend *b = VID_GetRenderBackend();
+			if (b == NULL || image == NULL || !b->ImageNeedsSamplerOverride(image))
+				return;
+			backend = b;
+			backend->QueueSamplerForImage(image);
+		}
+
+		// RESTORE unconditionally on the way out. Draw callbacks are executed in
+		// submission order at render time, so leaving the point sampler bound
+		// would silently apply it to every later draw in the frame -- including
+		// ImGui's own text, which would then be the bug in the other direction.
+		~ScopedImageSampler()
+		{
+			if (backend != NULL)
+				backend->QueueDefaultSampler();
+		}
+
+	private:
+		ScopedImageSampler(const ScopedImageSampler &);
+		ScopedImageSampler &operator=(const ScopedImageSampler &);
+
+		CRenderBackend *backend;
+	};
+}
+
 void Blit(CSlrImage *image, float destX, float destY, float z, float sizeX, float sizeY)
 {
 	//LOGD("Blit: x=%f y=%f sx=%f sy=%f", destX, destY, sizeX, sizeY);
@@ -177,6 +225,7 @@ void Blit(CSlrImage *image, float destX, float destY, float z, float sizeX, floa
 	ImVec2 pMin(destX,			destY);
 	ImVec2 pMax(destX + sizeX,	destY + sizeY);
 	
+	ScopedImageSampler samplerScope(image);
 	ImDrawList *drawList = ImGui::GetWindowDrawList();
 	drawList->AddImage(image->TexturePtr(), pMin, pMax, uv0, uv1,
 					   ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 1.0f, 1.0f, 1.0f)));
@@ -526,6 +575,7 @@ void BlitAlphaColor(CSlrImage *image, float destX, float destY, float z, float s
 	ImVec2 pMin(destX,			destY);
 	ImVec2 pMax(destX + sizeX,	destY + sizeY);
 	
+	ScopedImageSampler samplerScope(image);
 	ImDrawList *drawList = ImGui::GetWindowDrawList();
 	drawList->AddImage(image->TexturePtr(), pMin, pMax, uv0, uv1,
 					   ImGui::ColorConvertFloat4ToU32(ImVec4(colorR, colorG, colorB, alpha)));
@@ -591,6 +641,7 @@ void Blit(CSlrImage *image, float destX, float destY, float z, float size,
 	ImVec2 pMin(destX,			destY);
 	ImVec2 pMax(destX + sizeX,	destY + sizeY);
 	
+	ScopedImageSampler samplerScope(image);
 	ImDrawList *drawList = ImGui::GetWindowDrawList();
 	drawList->AddImage(image->TexturePtr(), pMin, pMax, uv0, uv1,
 					   ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 1.0f, 1.0f, 1.0f)));
@@ -610,6 +661,7 @@ void BlitAlpha(CSlrImage *image, float destX, float destY, float z, float size,
 	ImVec2 pMin(destX,			destY);
 	ImVec2 pMax(destX + sizeX,	destY + sizeY);
 	
+	ScopedImageSampler samplerScope(image);
 	ImDrawList *drawList = ImGui::GetWindowDrawList();
 	drawList->AddImage(image->TexturePtr(), pMin, pMax, uv0, uv1,
 					   ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 1.0f, 1.0f, alpha)));
@@ -676,9 +728,48 @@ void Blit(CSlrImage *image, float destX, float destY, float z, float sizeX, floa
 	ImVec2 pMin(destX,			destY);
 	ImVec2 pMax(destX + sizeX,	destY + sizeY);
 	
+	ScopedImageSampler samplerScope(image);
 	ImDrawList *drawList = ImGui::GetWindowDrawList();
 	drawList->AddImage(image->TexturePtr(), pMin, pMax, uv0, uv1,
 					   ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 1.0f, 1.0f, 1.0f)));
+}
+
+void BlitQuarterTurns(CSlrImage *image, float destX, float destY, float z,
+					  float sizeX, float sizeY,
+					  float texStartX, float texStartY, float texEndX, float texEndY,
+					  int quarterTurns)
+{
+	int q = ((quarterTurns % 4) + 4) % 4;
+	if (q == 0)
+	{
+		// Unrotated path stays on the plain axis-aligned AddImage above, so
+		// every existing host renders through exactly the same code as before.
+		Blit(image, destX, destY, z, sizeX, sizeY, texStartX, texStartY, texEndX, texEndY);
+		return;
+	}
+
+	// The incoming UVs are display-space coordinates inside the image's own
+	// texel rect. Rotating them absolutely around [0,1] would sample POT
+	// padding on images uploaded via CSlrImage::LoadImage, so the rotation is
+	// done inside defaultTex* and mapped back into it.
+	const float sx0 = image->defaultTexStartX, sx1 = image->defaultTexEndX;
+	const float sy0 = image->defaultTexStartY, sy1 = image->defaultTexEndY;
+
+	ImVec2 p1(destX,		 destY);
+	ImVec2 p2(destX + sizeX, destY);
+	ImVec2 p3(destX + sizeX, destY + sizeY);
+	ImVec2 p4(destX,		 destY + sizeY);
+
+	ImVec2 uv1, uv2, uv3, uv4;
+	VID_RotateQuarterUVInRect(q, texStartX, texStartY, sx0, sy0, sx1, sy1, uv1.x, uv1.y);
+	VID_RotateQuarterUVInRect(q, texEndX,   texStartY, sx0, sy0, sx1, sy1, uv2.x, uv2.y);
+	VID_RotateQuarterUVInRect(q, texEndX,   texEndY,   sx0, sy0, sx1, sy1, uv3.x, uv3.y);
+	VID_RotateQuarterUVInRect(q, texStartX, texEndY,   sx0, sy0, sx1, sy1, uv4.x, uv4.y);
+
+	ScopedImageSampler samplerScope(image);
+	ImDrawList *drawList = ImGui::GetWindowDrawList();
+	drawList->AddImageQuad(image->TexturePtr(), p1, p2, p3, p4, uv1, uv2, uv3, uv4,
+						   ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 1.0f, 1.0f, 1.0f)));
 }
 
 void BlitFlipVertical(CSlrImage *image, float destX, float destY, float z, float sizeX, float sizeY,
@@ -696,6 +787,7 @@ void BlitFlipVertical(CSlrImage *image, float destX, float destY, float z, float
 	ImVec2 pMin(destX,			destY);
 	ImVec2 pMax(destX + sizeX,	destY + sizeY);
 	
+	ScopedImageSampler samplerScope(image);
 	ImDrawList *drawList = ImGui::GetWindowDrawList();
 	drawList->AddImage(image->TexturePtr(), pMin, pMax, uv0, uv1,
 					   ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 1.0f, 1.0f, 1.0f)));
@@ -717,6 +809,7 @@ void BlitInImGuiWindow(CSlrImage *image, float destX, float destY, float z, floa
 //	ImVec2 pMin(destX,			destY);
 //	ImVec2 pMax(destX + sizeX,	destY + sizeY);
 	
+	ScopedImageSampler samplerScope(image);
 	ImDrawList *drawList = ImGui::GetWindowDrawList();
 	drawList->AddImage(image->TexturePtr(), pMin, pMax, uv0, uv1,
 					   ImGui::ColorConvertFloat4ToU32(ImVec4(colorR, colorG, colorB, alpha)));
@@ -738,6 +831,7 @@ void BlitInImGuiWindow(CSlrImage *image, float destX, float destY, float z, floa
 //	ImVec2 pMin(destX,			destY);
 //	ImVec2 pMax(destX + sizeX,	destY + sizeY);
 	
+	ScopedImageSampler samplerScope(image);
 	ImDrawList *drawList = ImGui::GetWindowDrawList();
 	drawList->AddImage(image->TexturePtr(), pMin, pMax, uv0, uv1,
 					   ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 1.0f, 1.0f, 1.0f)));
@@ -810,6 +904,7 @@ void BlitAlpha(CSlrImage *image, float destX, float destY, float z, float sizeX,
 		ImVec2 pMin(destX,			destY);
 		ImVec2 pMax(destX + sizeX,	destY + sizeY);
 		
+		ScopedImageSampler samplerScope(image);
 		ImDrawList *drawList = ImGui::GetWindowDrawList();
 		drawList->AddImage(image->TexturePtr(), pMin, pMax, uv0, uv1,
 						   ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 1.0f, 1.0f, alpha)));

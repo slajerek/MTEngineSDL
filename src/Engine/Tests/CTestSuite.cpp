@@ -47,6 +47,7 @@ CTestSuite::CTestSuite()
 	isRunning = false;
 	exitOnCompletion = false;
 	stopOnFirstFailure = false;
+	requireFixtures = (getenv("PC_REQUIRE_FIXTURES") != NULL);
 }
 
 CTestSuite::~CTestSuite()
@@ -69,6 +70,8 @@ void CTestSuite::RunFromCLI(CTestSuite *suite, const char *testName)
 	{
 		if (strcmp(sysCommandLineArguments[i], "--stop-on-first-failure") == 0)
 			suite->stopOnFirstFailure = true;
+		if (strcmp(sysCommandLineArguments[i], "--require-fixtures") == 0)
+			suite->requireFixtures = true;
 		else if (strcmp(sysCommandLineArguments[i], "--all-plugin-tests") == 0)
 			includeOptional = true;
 	}
@@ -236,34 +239,92 @@ void CTestSuite::RunNextTest()
 	if (!isRunning)
 		return;
 
-	currentTestIndex++;
-
-	if (currentTestIndex >= (int)tests.size())
+	// Re-entrant call: we are inside test->Run() below, because the test called
+	// TestCompleted() synchronously (the common case -- and the ONLY case for a
+	// test that aborts early on a failed assertion). Starting test N+1 here would
+	// run the rest of the suite nested inside test N's stack frame, so every RAII
+	// guard test N still holds (scoped temp dirs, saved/restored global settings,
+	// live browsers and decode pools) would only unwind after the last test had
+	// finished -- leaking test N's mutated global state into all of them. Hand the
+	// advance back to the dispatch loop instead; it runs once Run() has returned
+	// and the guards have fired.
+	if (dispatchingTest)
 	{
-		LOGS("CTestSuite: All tests completed");
-		CTestRunner::isTestPending = false;
-		isRunning = false;
-
-		if (exitOnCompletion)
-		{
-			WriteResults();
-
-			int passed = 0;
-			for (auto &r : results)
-			{
-				if (r.success)
-					passed++;
-			}
-			LOGM("SUITE RESULTS: %d/%d passed", passed, (int)results.size());
-			ExitCliTestProcess((passed == (int)results.size() && !results.empty()) ? 0 : 1);
-		}
+		advanceRequested = true;
 		return;
 	}
 
-	CTest *test = tests[currentTestIndex].get();
-	LOGS("CTestSuite: Running test %d/%d: %s", currentTestIndex + 1, (int)tests.size(), test->GetName());
-	test->startTime = time(NULL);
-	test->Run(this);
+	do
+	{
+		advanceRequested = false;
+		currentTestIndex++;
+
+		if (currentTestIndex >= (int)tests.size())
+		{
+			LOGS("CTestSuite: All tests completed");
+			CTestRunner::isTestPending = false;
+			isRunning = false;
+
+			if (exitOnCompletion)
+			{
+				WriteResults();
+
+				int passed = 0, skipped = 0, gaps = 0;
+				for (auto &r : results)
+				{
+					if (!r.requiredGap.empty())
+					{
+						gaps++;
+						LOGM("REQUIRED COVERAGE MISSING: [%s] %s",
+							 r.testName.c_str(), r.requiredGap.c_str());
+					}
+					if (r.skipped)
+						skipped++;
+					else if (r.success)
+						passed++;
+				}
+				if (gaps > 0)
+					LOGM("SUITE: %d test(s) reported REQUIRED coverage gaps%s", gaps,
+						 requireFixtures ? " -- FAILING the run (--require-fixtures)"
+										 : " -- re-run with --require-fixtures to make these fail");
+				// Skips are reported SEPARATELY and are not counted as passes.
+				// The exit code still treats them as non-failures -- a missing
+				// fixture must not turn a machine red -- but the number no
+				// longer claims coverage that did not happen.
+				if (skipped > 0)
+					LOGM("SUITE RESULTS: %d/%d passed, %d SKIPPED (did not run)",
+						 passed, (int)results.size() - skipped, skipped);
+				else
+					LOGM("SUITE RESULTS: %d/%d passed", passed, (int)results.size());
+				// Exit on FAILURES, not on "passed == total". Skips are not
+				// failures -- a machine without a RAW fixture or a GT2 plugin
+				// must not go red -- but they are no longer counted as passes
+				// either, so the old equality would now fail every run that
+				// skips anything.
+				const bool anyFailed = (passed + skipped) != (int)results.size();
+				// Under --require-fixtures a recorded gap is a failure, and so is
+				// any skip: that mode exists for the runs that claim DoD
+				// compliance, where "the fixture was absent" is exactly the
+				// thing being checked.
+				const bool strictViolation = requireFixtures && (gaps > 0 || skipped > 0);
+				ExitCliTestProcess((!anyFailed && !strictViolation && !results.empty()) ? 0 : 1);
+			}
+			return;
+		}
+
+		CTest *test = tests[currentTestIndex].get();
+		LOGS("CTestSuite: Running test %d/%d: %s", currentTestIndex + 1, (int)tests.size(), test->GetName());
+		test->startTime = time(NULL);
+
+		dispatchingTest = true;
+		test->Run(this);
+		dispatchingTest = false;
+
+		// advanceRequested is set only by the re-entrant branch above, i.e. the
+		// test completed synchronously. A test that completes later (async) leaves
+		// it false: the loop exits and its own OnTestCompleted -- arriving on an
+		// empty dispatch stack -- drives the chain onward exactly as before.
+	} while (advanceRequested && isRunning);
 }
 
 void CTestSuite::OnTestStepCompleted(CTest *test, int stepId, bool success, const char *message)
@@ -275,7 +336,7 @@ void CTestSuite::OnTestCompleted(CTest *test, bool success, const char *summary)
 {
 	LOGS("CTestSuite: [%s] Completed %s: %s", test->GetName(), success ? "OK" : "FAILED", summary);
 
-	results.push_back({test->GetName(), success, summary});
+	results.push_back({test->GetName(), success, test->WasSkipped(), test->GetRequiredGap(), summary});
 
 	if (!success && stopOnFirstFailure)
 	{
@@ -287,13 +348,19 @@ void CTestSuite::OnTestCompleted(CTest *test, bool success, const char *summary)
 		{
 			WriteResults();
 
-			int passed = 0;
+			int passed = 0, skipped = 0;
 			for (auto &r : results)
 			{
-				if (r.success)
+				if (r.skipped)
+					skipped++;
+				else if (r.success)
 					passed++;
 			}
-			LOGM("SUITE RESULTS: %d/%d passed", passed, (int)results.size());
+			if (skipped > 0)
+				LOGM("SUITE RESULTS: %d/%d passed, %d SKIPPED (did not run)",
+					 passed, (int)results.size() - skipped, skipped);
+			else
+				LOGM("SUITE RESULTS: %d/%d passed", passed, (int)results.size());
 			ExitCliTestProcess(1);
 		}
 		return;
@@ -321,12 +388,20 @@ void CTestSuite::WriteResults()
 	int passed = 0;
 	for (auto &r : results)
 	{
-		fprintf(f, "[%s] %s: %s\n", r.testName.c_str(), r.success ? "PASS" : "FAIL", r.summary.c_str());
-		if (r.success)
+		fprintf(f, "[%s] %s: %s\n", r.testName.c_str(),
+		        r.skipped ? "SKIP" : (r.success ? "PASS" : "FAIL"), r.summary.c_str());
+		if (r.success && !r.skipped)
 			passed++;
 	}
 	fprintf(f, "---\n");
-	fprintf(f, "RESULT: %d/%d passed\n", passed, (int)results.size());
+	int skippedCount = 0;
+	for (auto &r : results)
+		if (r.skipped) skippedCount++;
+	if (skippedCount > 0)
+		fprintf(f, "RESULT: %d/%d passed, %d SKIPPED (did not run)\n",
+		        passed, (int)results.size() - skippedCount, skippedCount);
+	else
+		fprintf(f, "RESULT: %d/%d passed\n", passed, (int)results.size());
 	fclose(f);
 
 	LOGM("CTestSuite: Results written to %s", resultsFilePath.c_str());

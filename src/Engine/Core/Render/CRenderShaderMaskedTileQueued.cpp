@@ -3,32 +3,30 @@
 CRenderShaderMaskedTileQueued::CRenderShaderMaskedTileQueued(CRenderBackendOpenGL4 *renderBackend)
 : CRenderShaderMaskedTile(renderBackend)
 {
-	readIndex = 0;
 }
 
 void CRenderShaderMaskedTileQueued::BeginBatch()
 {
-	boundsQueue.clear();
-	readIndex = 0;
+	boundsQueue.Clear();
 }
 
 void CRenderShaderMaskedTileQueued::PushTileBounds(GLuint maskTexId, float px, float py, float sx, float sy)
 {
-	boundsQueue.push_back({maskTexId, px, py, sx, sy});
+	boundsQueue.Push((void *)(uintptr_t)maskTexId, px, py, sx, sy);
 }
 
 void CRenderShaderMaskedTileQueued::SetShaderVars()
 {
 	// Pop next entry from queue if available, otherwise fall back to parent
 	// behavior (reads member variables set via SetMaskTexture/SetTileBounds)
-	if (readIndex < (int)boundsQueue.size())
+	const CMaskedTileBounds *b = boundsQueue.Pop();
+	if (b != NULL)
 	{
-		auto& b = boundsQueue[readIndex++];
-		maskTextureId = b.maskTexId;
-		tilePosX = b.px;
-		tilePosY = b.py;
-		tileSizeX = b.sx;
-		tileSizeY = b.sy;
+		maskTextureId = (GLuint)(uintptr_t)b->maskTexture;
+		tilePosX = b->px;
+		tilePosY = b->py;
+		tileSizeX = b->sx;
+		tileSizeY = b->sy;
 	}
 
 	CRenderShaderMaskedTile::SetShaderVars();

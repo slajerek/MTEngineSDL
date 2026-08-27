@@ -5,7 +5,15 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 MBEDTLS_SRC_DIR="$ROOT_DIR/other/lib/mbedtls"
-OUT_LIB_DIR="$ROOT_DIR/platform/Linux/libs"
+# OUTSIDE the checkout, and keyed by the resolved capability set -- see
+# mt_caps_lib_dir in ../caps-lib.sh and resolve.deps_dir for why this is a
+# correctness change and not tidiness. One flat platform/Linux/libs served all
+# four apps, and a capability being off writes a STUB over the real archive.
+if ! declare -f mt_caps_lib_dir >/dev/null 2>&1; then
+  # shellcheck source=../caps-lib.sh
+  . "$ROOT_DIR/platform/caps-lib.sh"
+fi
+OUT_LIB_DIR="$(mt_caps_lib_dir)"
 OUT_LIB="$OUT_LIB_DIR/libmbedtls_bundle.a"
 STAMP_FILE="$OUT_LIB_DIR/libmbedtls_bundle.stamp"
 

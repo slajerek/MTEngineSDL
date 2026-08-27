@@ -1,12 +1,46 @@
 #include "SYS_MiniDump.h"
 #include "DBG_Log.h"
+#include "SYS_WindowsPathUtils.h"
+#include "VID_Main.h"
 #include <time.h>
+#include <string>
 
 // http://www.debuginfo.com/examples/effmdmpexamples.html
 
 #pragma comment(lib, "dbghelp.lib")
 
 // ─── helpers ────────────────────────────────────────────────────────────────
+
+static std::wstring CrashPathToWide(const char *path)
+{
+	std::string normalized = SYS_WindowsNormalizeLongPathUtf8(path ? path : "");
+	int count = MultiByteToWideChar(CP_UTF8, 0, normalized.c_str(), -1, NULL, 0);
+	if (count <= 0)
+		return std::wstring();
+
+	std::wstring wide(count, L'\0');
+	MultiByteToWideChar(CP_UTF8, 0, normalized.c_str(), -1, wide.data(), count);
+	if (!wide.empty() && wide.back() == L'\0')
+		wide.pop_back();
+	return wide;
+}
+
+static FILE *CrashOpenFile(const char *path, const wchar_t *mode)
+{
+	std::wstring widePath = CrashPathToWide(path);
+	if (widePath.empty())
+		return NULL;
+	return _wfopen(widePath.c_str(), mode);
+}
+
+static HANDLE CrashCreateDumpFile(const char *dumpPath)
+{
+	std::wstring widePath = CrashPathToWide(dumpPath);
+	if (widePath.empty())
+		return INVALID_HANDLE_VALUE;
+	return CreateFileW(widePath.c_str(), GENERIC_READ | GENERIC_WRITE,
+	                   0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+}
 
 static const char* ExceptionCodeToString(DWORD code)
 {
@@ -182,8 +216,7 @@ static void DumpCallStack(FILE* fp, EXCEPTION_POINTERS* pep)
 
 static void WriteDumpFile(const char* dumpPath, EXCEPTION_POINTERS* pep, MINIDUMP_TYPE mdt)
 {
-	HANDLE hFile = CreateFileA(dumpPath, GENERIC_READ | GENERIC_WRITE,
-	                           0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+	HANDLE hFile = CrashCreateDumpFile(dumpPath);
 	if (hFile == NULL || hFile == INVALID_HANDLE_VALUE)
 		return;
 
@@ -232,7 +265,7 @@ static LONG WINAPI SYS_CrashExceptionFilter(EXCEPTION_POINTERS* pep)
 	         t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond, (unsigned long)pid);
 
 	// Open crash log file
-	FILE* fp = fopen(crashLogPath, "w");
+	FILE* fp = CrashOpenFile(crashLogPath, L"w");
 
 	DWORD exCode = pep->ExceptionRecord->ExceptionCode;
 	void* exAddr = pep->ExceptionRecord->ExceptionAddress;
@@ -261,8 +294,7 @@ static LONG WINAPI SYS_CrashExceptionFilter(EXCEPTION_POINTERS* pep)
 	                                     MiniDumpWithThreadInfo |
 	                                     MiniDumpWithUnloadedModules);
 
-	HANDLE hFile = CreateFileA(dumpPath, GENERIC_READ | GENERIC_WRITE,
-	                           0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+	HANDLE hFile = CrashCreateDumpFile(dumpPath);
 	BOOL dumpOk = FALSE;
 	if (hFile != NULL && hFile != INVALID_HANDLE_VALUE)
 	{
@@ -299,7 +331,11 @@ static LONG WINAPI SYS_CrashExceptionFilter(EXCEPTION_POINTERS* pep)
 	         crashLogPath,
 	         dumpOk ? dumpPath : "(failed to create)");
 
-	MessageBoxA(NULL, msg, "MTEngine Crash", MB_OK | MB_ICONERROR);
+	// A modal MessageBox blocks forever with no one to click it in headless
+	// test/CI runs -- the crash report is already on disk by this point,
+	// which is what headless callers actually need.
+	if (!gHeadlessMode)
+		MessageBoxA(NULL, msg, "MTEngine Crash", MB_OK | MB_ICONERROR);
 
 	return EXCEPTION_EXECUTE_HANDLER;
 }

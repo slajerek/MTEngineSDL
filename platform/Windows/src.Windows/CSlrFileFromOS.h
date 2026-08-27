@@ -3,11 +3,12 @@
 
 #include "SYS_Defs.h"
 #include "CSlrFile.h"
+#include <string>
 
 class CSlrFileFromOS : public CSlrFile
 {
 public:
-	char osFilePath[768];
+	std::string osFilePath;
 	
 	CSlrFileFromOS(CSlrString *str);
 	CSlrFileFromOS(const char *filePath);
@@ -36,4 +37,3 @@ private:
 
 #endif
 //_CFILEFROMOS_H_
-

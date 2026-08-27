@@ -110,6 +110,9 @@ typedef unsigned int                u32;
 typedef unsigned long long          u64;
 typedef long long                   i64;
 
+// Signed-sample alias used by the video source interface (IVideoSource.h)
+typedef short                       s16;
+
 
 typedef signed char                 int8;
 typedef unsigned char               uint8;

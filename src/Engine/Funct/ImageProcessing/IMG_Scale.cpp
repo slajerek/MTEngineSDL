@@ -2,6 +2,8 @@
 #include "resampler.h"
 #include "DBG_Log.h"
 #include "SYS_Funct.h"
+#include <atomic>
+#include <memory>
 #include <vector>
 
 #if defined(WIN32)
@@ -34,6 +36,12 @@ CImageData *IMG_Scale(CImageData *imgIn, float scaleX, float scaleY, bool isShee
 }
 
 CImageData *IMG_Scale(CImageData *imgIn, int destWidth, int destHeight)
+{
+	return IMG_Scale(imgIn, destWidth, destHeight, IMG_ScaleOptions{});
+}
+
+CImageData *IMG_Scale(CImageData *imgIn, int destWidth, int destHeight,
+                      const IMG_ScaleOptions &opts)
 {
 	if (imgIn->getImageType() != IMG_TYPE_RGBA)
 	{
@@ -70,7 +78,7 @@ CImageData *IMG_Scale(CImageData *imgIn, int destWidth, int destHeight)
 	}
 
 	// Partial gamma correction looks better on mips. Set to 1.0 to disable gamma correction.
-	const float source_gamma = 1.75f;
+	const float source_gamma = opts.gamma;
 
 	// Filter scale - values < 1.0 cause aliasing, but create sharper looking mips.
 	const float filter_scale = 1.0f;//.75f;
@@ -96,15 +104,41 @@ CImageData *IMG_Scale(CImageData *imgIn, int destWidth, int destHeight)
 		linear_to_srgb[i] = (unsigned char)k;
 	}
 
-	Resampler* resamplers[max_components];
+	// unique_ptr so every exit path (success, cancel, out-of-memory error)
+	// frees all n Resampler objects automatically -- pre-existing leak fix
+	// (High 1, round 4): the raw-pointer version freed none of them on the
+	// success return, leaking n(=4) Resampler objects (~196 KB Scan_Buf
+	// each) per call.
+	std::unique_ptr<Resampler> resamplers[max_components];
 	std::vector<float> samples[max_components];
 
-	resamplers[0] = new Resampler(src_width, src_height, dst_width, dst_height,
-								  Resampler::BOUNDARY_CLAMP, 0.0f, 1.0f, pFilter, NULL, NULL, filter_scale, filter_scale);
+	// status() is CHECKED, on every one of them.
+	//
+	// Resampler's constructor cannot throw or return a failure: it reports an
+	// allocation failure by setting m_status and returning with its members
+	// still NULL (m_Pdst_buf, the contributor pool, m_Psrc_y_count,
+	// m_Psrc_y_flag, m_Pscan_buf). Skipping the check turns that into a NULL
+	// dereference on the very next put_line(), which indexes m_Psrc_y_count
+	// without a guard -- a segfault where this function's own contract is
+	// simply "return NULL on failure". The condition is real here: several
+	// workers scale large images concurrently while full-size decodes are
+	// resident, which is exactly what status() exists to report.
+	resamplers[0].reset(new Resampler(src_width, src_height, dst_width, dst_height,
+								  Resampler::BOUNDARY_CLAMP, 0.0f, 1.0f, pFilter, NULL, NULL, filter_scale, filter_scale));
+	if (resamplers[0]->status() != Resampler::STATUS_OKAY)
+	{
+		LOGError("IMG_Scale: resampler 0 failed to initialise (status %d)", (int)resamplers[0]->status());
+		return NULL;
+	}
 	samples[0].resize(src_width);
 	for (int i = 1; i < n; i++)
 	{
-		resamplers[i] = new Resampler(src_width, src_height, dst_width, dst_height, Resampler::BOUNDARY_CLAMP, 0.0f, 1.0f, pFilter, resamplers[0]->get_clist_x(), resamplers[0]->get_clist_y(), filter_scale, filter_scale);
+		resamplers[i].reset(new Resampler(src_width, src_height, dst_width, dst_height, Resampler::BOUNDARY_CLAMP, 0.0f, 1.0f, pFilter, resamplers[0]->get_clist_x(), resamplers[0]->get_clist_y(), filter_scale, filter_scale));
+		if (resamplers[i]->status() != Resampler::STATUS_OKAY)
+		{
+			LOGError("IMG_Scale: resampler %d failed to initialise (status %d)", i, (int)resamplers[i]->status());
+			return NULL;
+		}
 		samples[i].resize(src_width);
 	}
 
@@ -139,6 +173,7 @@ CImageData *IMG_Scale(CImageData *imgIn, int destWidth, int destHeight)
 			if (!resamplers[c]->put_line(&samples[c][0]))
 			{
 				LOGError("Out of memory!");
+				delete imgDest;
 				return NULL;
 			}
 		}
@@ -146,6 +181,20 @@ CImageData *IMG_Scale(CImageData *imgIn, int destWidth, int destHeight)
 		u8 r, g, b, a;
 		for ( ; ; )
 		{
+			// Cooperative cancel (finding 3): polled once per OUTPUT ROW via a
+			// real atomic load -- IMG_Scale runs synchronously on the executor
+			// thread while Cancel() is set from another thread, so a plain/
+			// volatile read would never observe the flip. startedFlag (test-only,
+			// null in production) is set true on the first output row so a test
+			// can deterministically wait for the scale to begin before cancelling.
+			if (opts.startedFlag)
+				opts.startedFlag->store(true);
+			if (opts.cancelFlag && opts.cancelFlag->load(std::memory_order_relaxed))
+			{
+				delete imgDest;
+				return NULL;
+			}
+
 			int c;
 			for (c = 0; c < n; c++)
 			{
@@ -155,9 +204,16 @@ CImageData *IMG_Scale(CImageData *imgIn, int destWidth, int destHeight)
 
 				const bool alpha_channel = (c == 3) || ((n == 2) && (c == 1));
 
+				// BAIL OUT, do not merely log it. The next line indexes
+				// dst_image at dst_y * dst_pitch, so continuing past this point
+				// is a heap overflow -- the log line named the right condition
+				// and then wrote out of bounds anyway.
 				if (dst_y >= dst_height)
 				{
-					LOGError("assertion: (dst_y=%d >= dst_height=%d)", dst_y, dst_height);
+					LOGError("IMG_Scale: dst_y=%d >= dst_height=%d -- channels desynchronised, aborting",
+							 dst_y, dst_height);
+					delete imgDest;
+					return NULL;
 				}
 
 				unsigned char* pDst = &dst_image[dst_y * dst_pitch + c];

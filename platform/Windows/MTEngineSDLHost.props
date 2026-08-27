@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Importable by any MTEngineSDL Windows host app. Add
+
+       <Import Project="$(MTEngineSDLDir)platform\Windows\MTEngineSDLHost.props" />
+
+     near the top of the host .vcxproj, after MTEngineSDLDir is defined.
+     Import it from .exe (Application) projects only: a static library has no
+     manifest of its own.
+
+     What it does: embeds MTEngineSDL.manifest, whose activeCodePage=UTF-8
+     makes the narrow CRT/Win32 path APIs speak UTF-8 for the whole process.
+     Without it, any file whose path is outside the machine's ANSI code page
+     (Polish and other Latin-Extended names, CJK, emoji, macOS NFD accents)
+     can be listed but not opened. See the manifest for the full story.
+
+     The manifest is merged with, not substituted for, the manifest the linker
+     generates from AdditionalManifestDependencies (Common-Controls and
+     friends), so a host keeps everything it already declared. A host that
+     needs to add its own settings (DPI awareness, longPathAware, requested
+     execution level) can set MTEngineSDLManifest to point at its own copy, or
+     simply list a second <Manifest Include="..."/>: mt.exe merges all of
+     them. -->
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <MTEngineSDLManifest Condition="'$(MTEngineSDLManifest)' == ''">$(MSBuildThisFileDirectory)MTEngineSDL.manifest</MTEngineSDLManifest>
+  </PropertyGroup>
+  <ItemGroup>
+    <Manifest Include="$(MTEngineSDLManifest)" Condition="Exists('$(MTEngineSDLManifest)')" />
+  </ItemGroup>
+</Project>

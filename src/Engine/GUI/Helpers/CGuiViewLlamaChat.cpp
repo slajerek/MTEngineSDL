@@ -11,6 +11,7 @@
 #include "DBG_Log.h"
 
 #include <algorithm>
+#include <cstdlib>
 #include <ctime>
 #include <fstream>
 #include <sstream>
@@ -29,7 +30,7 @@ struct LlamaChatMarkdown : public imgui_md
 	{
 		if (!gGuiFontManager.markdownFontsLoaded)
 			return nullptr; // fall back to current ImGui font
-		if (m_is_code || m_hlevel == 0 && !m_is_em && !m_is_strong)
+		if (m_is_code || (m_hlevel == 0 && !m_is_em && !m_is_strong))
 			return m_is_code ? gGuiFontManager.fontMono : gGuiFontManager.fontRegular;
 		if (m_is_strong && m_is_em) return gGuiFontManager.fontBoldItalic;
 		if (m_is_strong)            return gGuiFontManager.fontBold;
@@ -193,7 +194,7 @@ void CGuiViewLlamaChat::RenderImGui()
 	float maxHeight = ImGui::GetFrameHeight() * 6.0f; // Max ~6 lines
 	float textHeight = textSize.y + ImGui::GetStyle().FramePadding.y * 2.0f;
 	// If text ends with newline, ImGui::CalcTextSize doesn't add a new line height for the empty next line
-	int len = strlen(inputBuf);
+	size_t len = strlen(inputBuf);
 	if (len > 0 && inputBuf[len-1] == '\n') textHeight += ImGui::GetTextLineHeight();
 
 	float inputH = std::max(minHeight, std::min(textHeight, maxHeight));
@@ -667,22 +668,22 @@ void CGuiViewLlamaChat::NewContext()
 void CGuiViewLlamaChat::SystemDialogFileSaveSelected(CSlrString *path)
 {
 	if (!path) return;
-	char *c = path->GetStdASCII();
+	char *c = path->GetUTF8();
 	if (c)
 	{
 		if (saveDialogMode == SaveDialogMode::TokenDump)
 			SaveTokenDump(c);
 		else
 			SaveChat(c);
-		delete [] c;
+		free(c);
 	}
 }
 
 void CGuiViewLlamaChat::SystemDialogFileOpenSelected(CSlrString *path)
 {
 	if (!path) return;
-	char *c = path->GetStdASCII();
-	if (c) { LoadChat(c); delete [] c; }
+	char *c = path->GetUTF8();
+	if (c) { LoadChat(c); free(c); }
 }
 
 void CGuiViewLlamaChat::SaveChat(const std::string &path)

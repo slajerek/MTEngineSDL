@@ -48,11 +48,9 @@ Copyright (C) 2009 Apple Inc. All Rights Reserved.
 */
 
 #ifdef WIN32
-#define int32_t int
-#define int16_t short int
 #define uint unsigned int
+#include <stdint.h>
 #define M_PI MATH_PI
-#define int64_t long int
 #endif
 
 #if !defined __SPECTRUM_ANALYSIS_H__

@@ -122,6 +122,81 @@ void CTestI18nEngine::Run(ITestCallback *callback)
 	ASSERT_TRUE(mgr->GetPluralCategory(12, "pl") == I18N_PLURAL_MANY, "PL plural: 12 -> many");
 	ASSERT_TRUE(mgr->GetPluralCategory(22, "pl") == I18N_PLURAL_FEW, "PL plural: 22 -> few");
 
+	// --- Test 4b: Built-in CLDR rules for the common app languages ---
+	// Invoked directly, so the test does not depend on any host registering these
+	// locales. Operand order is (n, i, v, w, f, t).
+	{
+		EI18nPluralRuleFn frCard = CI18nManager::GetBuiltinCardinalRule("fr");
+		ASSERT_TRUE(frCard != nullptr, "Builtin cardinal rule exists for fr");
+		ASSERT_TRUE(CI18nManager::GetBuiltinCardinalRule("fr-FR") != nullptr,
+					"Builtin cardinal rule resolves for fr-FR");
+		ASSERT_TRUE(frCard(0.0, 0, 0, 0, 0, 0) == I18N_PLURAL_ONE, "FR cardinal: 0 -> one");
+		ASSERT_TRUE(frCard(1.0, 1, 0, 0, 0, 0) == I18N_PLURAL_ONE, "FR cardinal: 1 -> one");
+		ASSERT_TRUE(frCard(2.0, 2, 0, 0, 0, 0) == I18N_PLURAL_OTHER, "FR cardinal: 2 -> other");
+		ASSERT_TRUE(frCard(1000000.0, 1000000, 0, 0, 0, 0) == I18N_PLURAL_MANY,
+					"FR cardinal: 1000000 -> many");
+		ASSERT_TRUE(frCard(1000001.0, 1000001, 0, 0, 0, 0) == I18N_PLURAL_OTHER,
+					"FR cardinal: 1000001 -> other");
+
+		EI18nPluralRuleFn frOrd = CI18nManager::GetBuiltinOrdinalRule("fr");
+		ASSERT_TRUE(frOrd != nullptr, "Builtin ordinal rule exists for fr");
+		ASSERT_TRUE(frOrd(1.0, 1, 0, 0, 0, 0) == I18N_PLURAL_ONE, "FR ordinal: 1 -> one");
+		ASSERT_TRUE(frOrd(2.0, 2, 0, 0, 0, 0) == I18N_PLURAL_OTHER, "FR ordinal: 2 -> other");
+
+		EI18nPluralRuleFn esCard = CI18nManager::GetBuiltinCardinalRule("es");
+		ASSERT_TRUE(esCard != nullptr, "Builtin cardinal rule exists for es");
+		ASSERT_TRUE(CI18nManager::GetBuiltinCardinalRule("es-ES") != nullptr,
+					"Builtin cardinal rule resolves for es-ES");
+		ASSERT_TRUE(esCard(0.0, 0, 0, 0, 0, 0) == I18N_PLURAL_OTHER, "ES cardinal: 0 -> other");
+		ASSERT_TRUE(esCard(1.0, 1, 0, 0, 0, 0) == I18N_PLURAL_ONE, "ES cardinal: 1 -> one");
+		ASSERT_TRUE(esCard(2.0, 2, 0, 0, 0, 0) == I18N_PLURAL_OTHER, "ES cardinal: 2 -> other");
+		ASSERT_TRUE(esCard(1000000.0, 1000000, 0, 0, 0, 0) == I18N_PLURAL_MANY,
+					"ES cardinal: 1000000 -> many");
+
+		EI18nPluralRuleFn ptBRCard = CI18nManager::GetBuiltinCardinalRule("pt-BR");
+		ASSERT_TRUE(ptBRCard != nullptr, "Builtin cardinal rule exists for pt-BR");
+		ASSERT_TRUE(CI18nManager::GetBuiltinCardinalRule("pt") != nullptr,
+					"Builtin cardinal rule resolves for generic pt");
+		ASSERT_TRUE(ptBRCard(0.0, 0, 0, 0, 0, 0) == I18N_PLURAL_ONE, "PT-BR cardinal: 0 -> one");
+		ASSERT_TRUE(ptBRCard(1.0, 1, 0, 0, 0, 0) == I18N_PLURAL_ONE, "PT-BR cardinal: 1 -> one");
+		ASSERT_TRUE(ptBRCard(2.0, 2, 0, 0, 0, 0) == I18N_PLURAL_OTHER, "PT-BR cardinal: 2 -> other");
+		ASSERT_TRUE(ptBRCard(1000000.0, 1000000, 0, 0, 0, 0) == I18N_PLURAL_MANY,
+					"PT-BR cardinal: 1000000 -> many");
+
+		EI18nPluralRuleFn nlCard = CI18nManager::GetBuiltinCardinalRule("nl");
+		ASSERT_TRUE(nlCard != nullptr, "Builtin cardinal rule exists for nl");
+		ASSERT_TRUE(CI18nManager::GetBuiltinCardinalRule("nl-NL") != nullptr,
+					"Builtin cardinal rule resolves for nl-NL");
+		ASSERT_TRUE(nlCard(1.0, 1, 0, 0, 0, 0) == I18N_PLURAL_ONE, "NL cardinal: 1 -> one");
+		ASSERT_TRUE(nlCard(1.0, 1, 1, 0, 0, 0) == I18N_PLURAL_OTHER, "NL cardinal: 1.0 -> other");
+		ASSERT_TRUE(nlCard(2.0, 2, 0, 0, 0, 0) == I18N_PLURAL_OTHER, "NL cardinal: 2 -> other");
+
+		EI18nPluralRuleFn csCard = CI18nManager::GetBuiltinCardinalRule("cs");
+		ASSERT_TRUE(csCard != nullptr, "Builtin cardinal rule exists for cs");
+		ASSERT_TRUE(csCard(1.0, 1, 0, 0, 0, 0) == I18N_PLURAL_ONE, "CS cardinal: 1 -> one");
+		ASSERT_TRUE(csCard(2.0, 2, 0, 0, 0, 0) == I18N_PLURAL_FEW, "CS cardinal: 2 -> few");
+		ASSERT_TRUE(csCard(4.0, 4, 0, 0, 0, 0) == I18N_PLURAL_FEW, "CS cardinal: 4 -> few");
+		ASSERT_TRUE(csCard(5.0, 5, 0, 0, 0, 0) == I18N_PLURAL_OTHER, "CS cardinal: 5 -> other");
+		ASSERT_TRUE(csCard(1.5, 1, 1, 1, 5, 5) == I18N_PLURAL_MANY, "CS cardinal: 1.5 -> many");
+
+		EI18nPluralRuleFn trCard = CI18nManager::GetBuiltinCardinalRule("tr");
+		ASSERT_TRUE(trCard != nullptr, "Builtin cardinal rule exists for tr");
+		ASSERT_TRUE(CI18nManager::GetBuiltinCardinalRule("tr-TR") != nullptr,
+					"Builtin cardinal rule resolves for tr-TR");
+		ASSERT_TRUE(trCard(1.0, 1, 0, 0, 0, 0) == I18N_PLURAL_ONE, "TR cardinal: 1 -> one");
+		ASSERT_TRUE(trCard(2.0, 2, 0, 0, 0, 0) == I18N_PLURAL_OTHER, "TR cardinal: 2 -> other");
+
+		// Only en/it/fr have ordinal rules; the rest are "other" for all counts.
+		ASSERT_TRUE(CI18nManager::GetBuiltinOrdinalRule("es") == nullptr, "ES has no dedicated ordinal rule");
+		ASSERT_TRUE(CI18nManager::GetBuiltinOrdinalRule("pt-BR") == nullptr, "PT-BR has no dedicated ordinal rule");
+		ASSERT_TRUE(CI18nManager::GetBuiltinOrdinalRule("nl") == nullptr, "NL has no dedicated ordinal rule");
+		ASSERT_TRUE(CI18nManager::GetBuiltinOrdinalRule("cs") == nullptr, "CS has no dedicated ordinal rule");
+		ASSERT_TRUE(CI18nManager::GetBuiltinOrdinalRule("tr") == nullptr, "TR has no dedicated ordinal rule");
+
+		ASSERT_TRUE(CI18nManager::GetBuiltinCardinalRule("xx") == nullptr,
+					"Builtin cardinal rule absent for unknown language");
+	}
+
 	// --- Test 5: PluralCategoryName ---
 	ASSERT_EQ(string(CI18nManager::PluralCategoryName(I18N_PLURAL_ZERO)), string("zero"), "PluralCategoryName zero");
 	ASSERT_EQ(string(CI18nManager::PluralCategoryName(I18N_PLURAL_ONE)), string("one"), "PluralCategoryName one");

@@ -5,11 +5,54 @@ set -euo pipefail
 # FTXUI has 3 components: screen, dom, component — merged into one archive.
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
+# FIRST, before this script defines anything of its own. A script phase inherits
+# ~600 Xcode build settings, and this script's own BUILD_DIR is one of the names
+# in that namespace -- so the strip has to happen while those values are still
+# purely inherited. (Measured the other way round: called after the assignments,
+# it deleted the script's BUILD_DIR and the build died on an unbound variable.)
+# shellcheck source=../caps-lib.sh
+. "$ROOT_DIR/platform/caps-lib.sh"
+mt_caps_strip_host_build_env
 FTXUI_SRC_DIR="$ROOT_DIR/other/lib/ftxui"
-OUT_LIB_DIR="$ROOT_DIR/platform/MacOS/libs"
+# OUTSIDE the checkout -- see mt_caps_lib_dir in ../caps-lib.sh for why this
+# is a correctness change and not tidiness.
+if ! declare -f mt_caps_lib_dir >/dev/null 2>&1; then
+  . "$ROOT_DIR/platform/caps-lib.sh"
+fi
+OUT_LIB_DIR="$(mt_caps_lib_dir)"
 OUT_LIB="$OUT_LIB_DIR/libftxui.a"
 
 mkdir -p "$OUT_LIB_DIR"
+
+# ---------------------------------------------------------------------------
+# Capability gate.
+#
+# The flag arrives as a build setting (an Xcode script phase sees settings as
+# environment variables) or as an exported variable from the wrapper. Default 1,
+# so a standalone engine build with no manifest behaves exactly as before.
+#
+# It emits a STUB ARCHIVE rather than skipping, following the precedent
+# build-mbedtls.sh already set: a PBXBuildFile cannot be conditioned on a build
+# setting, so simply not producing the archive fails the LINK on a missing .a,
+# in four different app-side linking idioms. A stub carries no library symbols,
+# so the `nm` proof still distinguishes on from off.
+#
+# It comes BEFORE the submodule check on purpose. With the capability off the
+# submodule is not fetched at all -- that is the point -- so a missing-submodule
+# error here would turn the saving into a build failure.
+# ---------------------------------------------------------------------------
+source "$ROOT_DIR/platform/caps-lib.sh"
+
+if [[ "${MT_ENABLE_FTXUI:-1}" == "0" ]]; then
+  STUB_STAMP="disabled:$(shasum -a 256 "${BASH_SOURCE[0]}" 2>/dev/null | cut -d ' ' -f 1)"
+  if [[ -f "$OUT_LIB" && -f "$OUT_LIB_DIR/libftxui.stamp" && "$(cat "$OUT_LIB_DIR/libftxui.stamp" 2>/dev/null)" == "$STUB_STAMP" ]]; then
+    exit 0
+  fi
+  mt_caps_stub_archive "$OUT_LIB" "ftxui"
+  echo -n "$STUB_STAMP" > "$OUT_LIB_DIR/libftxui.stamp"
+  exit 0
+fi
 
 if [[ ! -d "$FTXUI_SRC_DIR" ]]; then
   echo "ERROR: ftxui submodule not found at $FTXUI_SRC_DIR" >&2

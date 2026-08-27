@@ -2,6 +2,7 @@
 #include "SYS_Main.h"
 #include "RES_ResourceManager.h"
 #include "CGuiMain.h"
+#include "MT_UiScale.h"
 #include "CDataAdapter.h"
 #include "CSlrString.h"
 #include "SYS_KeyCodes.h"
@@ -23,7 +24,7 @@ CGuiViewToolBox::CGuiViewToolBox(float posX, float posY, float posZ,
 	this->callback = callback;
 
 	font = guiMain->fntEngineDefault;
-	fontScale = 1.5;
+	fontScale = MT_UiScaled(1.5f);
 	fontHeight = font->GetCharHeight('@', fontScale) + 2;
 	
 	this->iconGapX = iconGapX;

@@ -3,7 +3,7 @@
 #include "VID_Main.h"
 #include "CSlrImage.h"
 #include "CImageData.h"
-#include "imgui_impl_sdl2.h"
+#include "imgui_impl_sdl3.h"
 #include "imgui_impl_opengl3.h"
 #include <GL/gl3w.h>
 #include <vector>
@@ -36,10 +36,24 @@ SDL_Window *CRenderBackendOpenGL4::CreateSDLWindow(const char *title, int x, int
 	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
 	SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
 
-	int windowFlags = (SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_HIDDEN);
+	SDL_WindowFlags windowFlags = (SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_HIDDEN);
 //	if (maximized)
 //		windowFlags |= SDL_WINDOW_MAXIMIZED;
-	mainWindow = SDL_CreateWindow(title, x, y, w, h, (SDL_WindowFlags)windowFlags);
+
+	// SDL3 dropped x/y from SDL_CreateWindow -- position is set afterwards.
+	// The window is created HIDDEN (see the flags), so setting the position
+	// before it is shown is exactly equivalent to the old behaviour and there
+	// is no visible jump.
+	//
+	// SDL_WINDOW_HIGH_PIXEL_DENSITY is SDL2's SDL_WINDOW_ALLOW_HIGHDPI, renamed.
+	// It is still OPT-IN: dropping it here would quietly ship a non-Retina
+	// backbuffer, and the symptom would look like a UI-scale bug rather than a
+	// missing flag.
+	mainWindow = SDL_CreateWindow(title, w, h, windowFlags);
+	if (mainWindow != NULL)
+	{
+		SDL_SetWindowPosition(mainWindow, x, y);
+	}
 	return mainWindow;
 }
 
@@ -77,17 +91,28 @@ void CRenderBackendOpenGL4::CreateRenderContext()
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	ASSERT_OPENGL();
 
-	SDL_GL_SwapWindow(mainWindow);
-	ASSERT_OPENGL();
+	// HEADLESS: never present. SDL_GL_SwapWindow goes through
+	// Cocoa_GL_SwapWindow, which waits on the window server for the display to
+	// take the frame. With no display attached, or the display asleep, that wait
+	// does not return -- a headless run then blocks forever instead of failing,
+	// which is worse than a crash because CI and overnight runs hang silently.
+	// Nothing is on screen in headless mode, so there is nothing to present.
+	if (!gHeadlessMode)
+	{
+		SDL_GL_SwapWindow(mainWindow);
+		ASSERT_OPENGL();
+	}
 
-	SDL_GL_SetSwapInterval(1); // Enable vsync
+	// vsync throttles the render loop -- but it is also what makes the swap wait
+	// on the display. A headless run has no display to sync to, so request 0.
+	SDL_GL_SetSwapInterval(gHeadlessMode ? 0 : 1);
 	ASSERT_OPENGL();
 
 }
 
 void CRenderBackendOpenGL4::InitRenderPipeline()
 {
-	ImGui_ImplSDL2_InitForOpenGL(mainWindow, glContext);
+	ImGui_ImplSDL3_InitForOpenGL(mainWindow, glContext);
 	ImGui_ImplOpenGL3_Init(glslVersionString);
 }
 
@@ -175,8 +200,17 @@ void CRenderBackendOpenGL4::PresentFrameBuffer(ImVec4 clearColor)
 		SDL_GL_MakeCurrent(backup_current_window, backup_current_context);
 	}
 
+
 //	LOGD("CRenderBackendOpenGL4::PresentFrameBuffer: SDL_GL_SwapWindow");
-	SDL_GL_SwapWindow(mainWindow);
+	// HEADLESS: skip the present, not the draw. Everything above -- the clear,
+	// ImGui_ImplOpenGL3_RenderDrawData, the platform windows -- has already run,
+	// so the back buffer holds the finished frame and imgui_test_engine's
+	// screen-capture readback still sees it. Only the blocking hand-off to the
+	// window server is skipped. See the comment in InitBackend.
+	if (!gHeadlessMode)
+	{
+		SDL_GL_SwapWindow(mainWindow);
+	}
 }
 
 void CRenderBackendOpenGL4::Shutdown()
@@ -275,8 +309,19 @@ void CRenderBackendOpenGL4::CreateTexture(CSlrImage *image)
 		return;
 	}
 
-	u8 *data = image->loadImageData->getRGBAResultData();
-//	LOGD("CRenderBackendOpenGL4::CreateTexture: width=%d height=%d image=%x image->loadImageData=%x", image->rasterWidth, image->rasterHeight, image, image->loadImageData, data);
+	// getResultDataForUpload, not getRGBAResultData: the latter fatal-exits on
+	// any type but RGBA8, and a float image is a legitimate upload (S-5).
+	u8 *data = image->loadImageData->getResultDataForUpload();
+	if (data == NULL)
+	{
+		LOGError("CRenderBackendOpenGL4::CreateTexture: image type %2.2x is not uploadable",
+				 image->loadImageData->getImageType());
+		// No texture exists, so no format is bound. Leaving boundFormat at a
+		// stale value would have the next ReBindTexture compare against a
+		// format the (absent) texture never had.
+		image->boundFormat = RENDER_TEXTURE_RGBA8;
+		return;
+	}
 
 	GLuint textureId;
 	glGenTextures(1, &textureId);
@@ -307,10 +352,36 @@ void CRenderBackendOpenGL4::CreateTexture(CSlrImage *image)
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	ASSERT_OPENGL();
 
+	// Use the actual buffer dimensions. LoadImageForRebinding passes through the
+	// raw decoded buffer (original pixel size, not POT-padded); LoadImage/PreloadImage
+	// allocates a padded CImageData so loadImageData->width == rasterWidth there.
+	// OpenGL 4 supports NPOT textures natively.
+	int texW = (int)image->loadImageData->width;
+	int texH = (int)image->loadImageData->height;
 	glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
 	ASSERT_OPENGL();
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image->rasterWidth, image->rasterHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, image->loadImageData->getRGBAResultData());
+
+	// The RESIDENT format decides the internal format and the source type.
+	// GL_RGBA16F + GL_HALF_FLOAT needs GL 3.0+, which the 4.1 core context
+	// already guarantees, so there is no capability branch to make here --
+	// SupportsTextureFormat() is what answers that question, once.
+	u8 *pixels = image->loadImageData->getResultDataForUpload();
+	if (pixels == NULL)
+	{
+		LOGError("CRenderBackendOpenGL4::CreateTexture: image type %2.2x is not uploadable",
+				 image->loadImageData->getImageType());
+		return;
+	}
+	if (image->residentFormat == RENDER_TEXTURE_RGBA16F)
+	{
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, texW, texH, 0, GL_RGBA, GL_HALF_FLOAT, pixels);
+	}
+	else
+	{
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, texW, texH, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+	}
 	ASSERT_OPENGL();
+	image->boundFormat = image->residentFormat;
 
 	image->texturePtr.store((void*)(intptr_t)textureId, std::memory_order_release);
 }
@@ -366,7 +437,17 @@ void CRenderBackendOpenGL4::ReBindTexture(CSlrImage *image)
 		return;
 	}
 
-	u8 *data = image->loadImageData->getRGBAResultData();
+	// Same reasoning for a RESIDENT FORMAT change (S-5): glTexSubImage2D
+	// reuses the existing storage, so RGBA8 <-> RGBA16F cannot be written in
+	// place -- 8-byte pixels into a 4-byte allocation is an overrun, not a
+	// wrong colour.
+	if (image->residentFormat != image->boundFormat)
+	{
+		DeleteTexture(image);
+		CreateTexture(image);
+		return;
+	}
+
 //	LOGD("CRenderBackendOpenGL4::ReBindTexture: width=%d height=%d image=%x image->loadImageData=%x", image->rasterWidth, image->rasterHeight, image, image->loadImageData, data);
 	
 	glBindTexture(GL_TEXTURE_2D, (GLuint)(intptr_t)image->texturePtr.load(std::memory_order_acquire));
@@ -397,12 +478,28 @@ void CRenderBackendOpenGL4::ReBindTexture(CSlrImage *image)
 
 //	glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
 //	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image->rasterWidth, image->rasterHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, image->loadImageData->getRGBAResultData());
-	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, image->loadImageData->width, image->loadImageData->height, GL_RGBA, GL_UNSIGNED_BYTE, image->loadImageData->getRGBAResultData());
+	// glTexSubImage2D does NOT reallocate storage, so a format CHANGE cannot be
+	// written -- it has to be recreated, or 8-byte pixels go into a 4-byte
+	// allocation. (ReBindImageData and RefreshImageParameters are exactly this
+	// shape, and c64d calls both.)
+	u8 *pixels = image->loadImageData->getResultDataForUpload();
+	if (pixels == NULL)
+	{
+		LOGError("CRenderBackendOpenGL4::ReBindTexture: image type %2.2x is not uploadable",
+				 image->loadImageData->getImageType());
+		return;
+	}
+	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, image->loadImageData->width, image->loadImageData->height,
+					GL_RGBA,
+					image->boundFormat == RENDER_TEXTURE_RGBA16F ? GL_HALF_FLOAT : GL_UNSIGNED_BYTE,
+					pixels);
 	ASSERT_OPENGL();
 }
 
 void CRenderBackendOpenGL4::DeleteTexture(CSlrImage *image)
 {
+	// The texture is gone, so nothing is bound in any format.
+	if (image) image->boundFormat = RENDER_TEXTURE_RGBA8;
 //	LOGD("CRenderBackendOpenGL4::DeleteTexture: %x", image);
 	if (!image)
 	{
@@ -438,7 +535,7 @@ EImageGpuFormat CRenderBackendOpenGL4::GetPreferredCompressedFormat()
 	for (GLint i = 0; i < numExtensions; ++i)
 	{
 		const char *ext = (const char *)glGetStringi(GL_EXTENSIONS, (GLuint)i);
-		if (ext == nullptr)
+		if (ext == nullptr)	
 			continue;
 		if (strcmp(ext, "GL_ARB_texture_compression_bptc") == 0)
 			hasBptc = true;
@@ -460,7 +557,7 @@ EImageGpuFormat CRenderBackendOpenGL4::GetPreferredCompressedFormat()
 
 CRenderBackendOpenGL4::~CRenderBackendOpenGL4()
 {
-	SDL_GL_DeleteContext(glContext);
+	SDL_GL_DestroyContext(glContext);
 }
 
 CRenderBackendOpenGL4 *CRenderBackendOpenGL4::GetRenderBackendOpenGL4()
@@ -517,4 +614,323 @@ bool CRenderBackendOpenGL4::CheckOpenGLError()
 		return true;
 	}
 	return false;
+}
+
+// ===========================================================================
+// S-4: backend-neutral seams, OpenGL implementations.
+// ===========================================================================
+
+#include "CMaskedTileShader.h"
+#include "CRenderShaderFlatColorOpenGL4.h"
+#include "CRenderShaderMaskedTile.h"
+#include "CRenderShaderMaskedTileQueued.h"
+
+// Adapts the existing GL masked-tile shaders to the backend-neutral interface.
+//
+// An ADAPTER rather than making CRenderShaderMaskedTile inherit the interface
+// directly: it already derives from CRenderShaderOpenGL4, which declares
+// CompileShaders()/UseShaderProgram()/ResetState() of its own, so adding a
+// second base with the same pure-virtual signatures would force a forwarding
+// override for each anyway. Doing it here keeps the GL shader classes untouched
+// and confines the void*<->GLuint conversion to one place.
+class CMaskedTileShaderGL : public CMaskedTileShader
+{
+public:
+	CMaskedTileShaderGL(CRenderShaderMaskedTile *shader, CRenderShaderMaskedTileQueued *queued)
+	: shader(shader), queued(queued) {}
+
+	virtual ~CMaskedTileShaderGL() { delete shader; }
+
+	virtual void CompileShaders() override    { shader->CompileShaders(); }
+	virtual void UseShaderProgram() override  { shader->UseShaderProgram(); }
+	virtual void ResetState() override        { shader->ResetState(); }
+	virtual bool IsUsable() const override    { return shader->isCompiled; }
+
+	virtual void SetMaskTexture(void *maskTexture) override
+	{
+		shader->SetMaskTexture((GLuint)(uintptr_t)maskTexture);
+	}
+
+	virtual void SetTileBounds(float px, float py, float sx, float sy) override
+	{
+		shader->SetTileBounds(px, py, sx, sy);
+	}
+
+	virtual void BeginBatch() override
+	{
+		if (queued) queued->BeginBatch();
+	}
+
+	virtual void PushTileBounds(void *maskTexture, float px, float py, float sx, float sy) override
+	{
+		if (queued) queued->PushTileBounds((GLuint)(uintptr_t)maskTexture, px, py, sx, sy);
+	}
+
+private:
+	CRenderShaderMaskedTile *shader;
+	CRenderShaderMaskedTileQueued *queued;   // same object as `shader` when queued, else NULL
+};
+
+CMaskedTileShader *CRenderBackendOpenGL4::CreateMaskedTileShader(bool queued)
+{
+	if (queued)
+	{
+		CRenderShaderMaskedTileQueued *q = new CRenderShaderMaskedTileQueued(this);
+		return new CMaskedTileShaderGL(q, q);
+	}
+	return new CMaskedTileShaderGL(new CRenderShaderMaskedTile(this), NULL);
+}
+
+CRenderShader *CRenderBackendOpenGL4::CreateFlatColorShader(float r, float g, float b, float a)
+{
+	return new CRenderShaderFlatColorOpenGL4(this, r, g, b, a);
+}
+
+// --- per-draw texture filtering -------------------------------------------
+//
+// This backend sets min/mag per TEXTURE (CreateTexture and
+// UpdateTextureLinearScaling call glTexParameteri on the texture itself), which
+// used to be the whole story. It no longer is.
+//
+// imgui_impl_opengl3 now binds a SAMPLER OBJECT in SetupRenderState whenever
+// glBindSampler is available -- desktop GL 3.3+, i.e. always here -- and a bound
+// sampler object OVERRIDES every glTexParameter setting on the texture. The
+// backend's own changelog calls this out as breaking. So since the ImGui
+// upgrade, every glTexParameteri in this file has been silently dead: point-
+// magnified images sampled linear, and mipmapped compressed textures lost their
+// mips, because ImGui's linear sampler is GL_LINEAR min -- not
+// GL_LINEAR_MIPMAP_LINEAR.
+//
+// The fix is to UNBIND ImGui's sampler around the draw, which restores exactly
+// the per-texture semantics this engine has always intended -- rather than
+// binding ImGui's own nearest sampler, which is NEAREST on min as well as mag
+// and would both change minification and disable mips.
+static GLuint gSavedImGuiSampler = 0;
+
+static void GLDrawCallbackUseTextureOwnFilter(const ImDrawList *, const ImDrawCmd *)
+{
+	ImGui_ImplOpenGL3_RenderState *renderState = ImGui_ImplOpenGL3_GetRenderState();
+	if (renderState == NULL || !renderState->UseBindSampler)
+		return;   // no sampler object in play; the texture's own state already wins
+
+	gSavedImGuiSampler = (GLuint)renderState->CurrentSampler;
+	renderState->CurrentSampler = 0;
+	glBindSampler(0, 0);
+
+	// UseTexParameterFilter is deliberately left FALSE. Setting it would make
+	// ImGui start writing glTexParameter itself on every draw, clobbering the
+	// very per-texture filter this exists to expose.
+}
+
+static void GLDrawCallbackRestoreImGuiSampler(const ImDrawList *, const ImDrawCmd *)
+{
+	ImGui_ImplOpenGL3_RenderState *renderState = ImGui_ImplOpenGL3_GetRenderState();
+	if (renderState == NULL || !renderState->UseBindSampler)
+		return;
+
+	renderState->CurrentSampler = gSavedImGuiSampler;
+	glBindSampler(0, gSavedImGuiSampler);
+}
+
+bool CRenderBackendOpenGL4::ReadTexturePixels(void *texture, int w, int h, unsigned int *outRGBA)
+{
+	if (texture == NULL || outRGBA == NULL || w <= 0 || h <= 0)
+		return false;
+
+	// glGetTexImage returns the texture in its OWN row order, and this engine
+	// uploads and renders render targets top-down (CVideoYUVShader inverts its
+	// quad precisely so row 0 is the visual top), so no flip here.
+	glBindTexture(GL_TEXTURE_2D, (GLuint)(uintptr_t)texture);
+	glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, outRGBA);
+	glBindTexture(GL_TEXTURE_2D, 0);
+	return true;
+}
+
+bool CRenderBackendOpenGL4::ReadTexturePixelsFloat(void *texture, int w, int h, float *outRGBA)
+{
+	if (texture == NULL || outRGBA == NULL || w <= 0 || h <= 0)
+		return false;
+
+	// GL_FLOAT rather than GL_HALF_FLOAT: the caller's buffer is float, and
+	// glGetTexImage converts from the texture's own RGBA16F storage on the way
+	// out. Reading an RGBA16F texture as GL_UNSIGNED_BYTE (what the integer
+	// sibling above does) would clamp away exactly the above-1.0 values a
+	// caller asking for float wants to see -- which is why this is a separate
+	// entry point rather than a flag on that one.
+	//
+	// Same row-order rationale as ReadTexturePixels: no flip.
+	glBindTexture(GL_TEXTURE_2D, (GLuint)(uintptr_t)texture);
+	glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, outRGBA);
+	glBindTexture(GL_TEXTURE_2D, 0);
+	return true;
+}
+
+bool CRenderBackendOpenGL4::ImageNeedsSamplerOverride(CSlrImage *image)
+{
+	if (image == NULL)
+		return false;
+
+	// Point magnification, or mipmapped minification -- ImGui's bound sampler
+	// destroys both. compressedMipCount > 1 is the KTX2/BC7/ASTC atlas path,
+	// whose whole point is the mip chain.
+	return !image->linearScaling || image->compressedMipCount > 1;
+}
+
+void CRenderBackendOpenGL4::QueueSamplerForImage(CSlrImage *image)
+{
+	ImGui::GetWindowDrawList()->AddCallback(GLDrawCallbackUseTextureOwnFilter, NULL);
+}
+
+void CRenderBackendOpenGL4::QueueDefaultSampler()
+{
+	ImGui::GetWindowDrawList()->AddCallback(GLDrawCallbackRestoreImGuiSampler, NULL);
+}
+
+bool CRenderBackendOpenGL4::ReadFramebufferPixels(int x, int y, int w, int h, unsigned int *outRGBA)
+{
+	if (w <= 0 || h <= 0 || outRGBA == NULL)
+		return false;
+
+	// The caller's x/y are TOP-DOWN framebuffer coords; GL's origin is
+	// BOTTOM-left, so both the read origin and the row order are converted here.
+	// The conversion belongs on this side of the seam because it is a GL
+	// convention -- Metal textures are already top-down and must NOT be flipped,
+	// and doing it on both sides yields a mirrored capture that a "not all zero"
+	// assertion happily accepts.
+	int fbW = 0, fbH = 0;
+	SDL_GetWindowSizeInPixels(mainWindow, &fbW, &fbH);
+	int glY = fbH - y - h;
+	if (glY < 0) glY = 0;
+
+	std::vector<unsigned int> buf((size_t)w * (size_t)h, 0u);
+	glPixelStorei(GL_PACK_ALIGNMENT, 1);
+	glReadPixels(x, glY, w, h, GL_RGBA, GL_UNSIGNED_BYTE, buf.data());
+
+	for (int row = 0; row < h; row++)
+	{
+		const unsigned int *src = &buf[(size_t)(h - 1 - row) * (size_t)w];
+		memcpy(&outRGBA[(size_t)row * (size_t)w], src, (size_t)w * sizeof(unsigned int));
+	}
+	return true;
+}
+
+// --- video plane textures -------------------------------------------------
+
+void *CRenderBackendOpenGL4::CreatePlaneTexture(int width, int height, int channels, int bytesPerChannel)
+{
+	GLuint tex = 0;
+	glGenTextures(1, &tex);
+	if (tex == 0)
+		return NULL;
+
+	glBindTexture(GL_TEXTURE_2D, tex);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+	GLint internalFormat = GL_R8;
+	GLenum format = GL_RED;
+	GLenum type = GL_UNSIGNED_BYTE;
+	if (channels == 2)
+	{
+		internalFormat = (bytesPerChannel == 2) ? GL_RG16 : GL_RG8;
+		format = GL_RG;
+	}
+	else
+	{
+		internalFormat = (bytesPerChannel == 2) ? GL_R16 : GL_R8;
+		format = GL_RED;
+	}
+	if (bytesPerChannel == 2)
+		type = GL_UNSIGNED_SHORT;
+
+	glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, format, type, NULL);
+	glBindTexture(GL_TEXTURE_2D, 0);
+	return (void *)(uintptr_t)tex;
+}
+
+void CRenderBackendOpenGL4::UpdatePlaneTexture(void *tex, const void *data, int width, int height, int stride)
+{
+	if (tex == NULL || data == NULL)
+		return;
+
+	GLuint id = (GLuint)(uintptr_t)tex;
+	GLint internalFormat = 0;
+	glBindTexture(GL_TEXTURE_2D, id);
+	glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &internalFormat);
+
+	GLenum format = (internalFormat == GL_RG8 || internalFormat == GL_RG16) ? GL_RG : GL_RED;
+	GLenum type = (internalFormat == GL_R16 || internalFormat == GL_RG16) ? GL_UNSIGNED_SHORT : GL_UNSIGNED_BYTE;
+	int bytesPerPixel = ((format == GL_RG) ? 2 : 1) * ((type == GL_UNSIGNED_SHORT) ? 2 : 1);
+
+	// Source rows may be padded; GL_UNPACK_ROW_LENGTH is in PIXELS, not bytes.
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+	glPixelStorei(GL_UNPACK_ROW_LENGTH, (stride > 0) ? (stride / bytesPerPixel) : 0);
+	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, format, type, data);
+	// Restore both defaults. Callers used to do this themselves; now that the
+	// upload lives behind the seam, leaving global GL state modified would be an
+	// action at a distance for whatever draws next.
+	glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+	glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+void CRenderBackendOpenGL4::DeletePlaneTexture(void *tex)
+{
+	if (tex == NULL)
+		return;
+	GLuint id = (GLuint)(uintptr_t)tex;
+	glDeleteTextures(1, &id);
+}
+
+// --- CM-E display LUT (3D) ------------------------------------------------
+
+void *CRenderBackendOpenGL4::CreateLutTexture3D(int edge)
+{
+	GLuint tex = 0;
+	glGenTextures(1, &tex);
+	if (tex == 0)
+		return NULL;
+
+	glBindTexture(GL_TEXTURE_3D, tex);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+	glTexImage3D(GL_TEXTURE_3D, 0, GL_RGBA16, edge, edge, edge, 0, GL_RGBA, GL_UNSIGNED_SHORT, NULL);
+	glBindTexture(GL_TEXTURE_3D, 0);
+	return (void *)(uintptr_t)tex;
+}
+
+void CRenderBackendOpenGL4::UpdateLutTexture3D(void *tex, const void *data, int edge)
+{
+	if (tex == NULL || data == NULL)
+		return;
+	glBindTexture(GL_TEXTURE_3D, (GLuint)(uintptr_t)tex);
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+	glTexSubImage3D(GL_TEXTURE_3D, 0, 0, 0, 0, edge, edge, edge, GL_RGBA, GL_UNSIGNED_SHORT, data);
+	glBindTexture(GL_TEXTURE_3D, 0);
+}
+
+void CRenderBackendOpenGL4::DeleteLutTexture3D(void *tex)
+{
+	if (tex == NULL)
+		return;
+	GLuint id = (GLuint)(uintptr_t)tex;
+	glDeleteTextures(1, &id);
+}
+
+#include "../../Video/CGLRenderTarget.h"
+#include "../../Video/CVideoYUVShader.h"
+
+CRenderTarget *CRenderBackendOpenGL4::CreateRenderTarget()
+{
+	return new CGLRenderTarget();
+}
+
+CVideoYUVConverter *CRenderBackendOpenGL4::CreateVideoYUVConverter()
+{
+	return new CVideoYUVShader();
 }

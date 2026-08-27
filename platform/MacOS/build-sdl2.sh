@@ -7,8 +7,24 @@ set -euo pipefail
 # which broke the libtool step here ("could not find 'libSDL2.a'").
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
+# FIRST, before this script defines anything of its own. A script phase inherits
+# ~600 Xcode build settings, and this script's own BUILD_DIR is one of the names
+# in that namespace -- so the strip has to happen while those values are still
+# purely inherited. (Measured the other way round: called after the assignments,
+# it deleted the script's BUILD_DIR and the build died on an unbound variable.)
+# shellcheck source=../caps-lib.sh
+. "$ROOT_DIR/platform/caps-lib.sh"
+mt_caps_strip_host_build_env
 SDL2_SRC_DIR="$ROOT_DIR/other/lib/SDL-release-2.32.10-static"
-OUT_LIB_DIR="$ROOT_DIR/platform/MacOS/libs"
+# OUTSIDE the checkout -- see mt_caps_lib_dir in ../caps-lib.sh. This script is
+# dormant (SDL3 superseded it and nothing invokes it any more), but it stays
+# consistent with its five live siblings so reviving it cannot reintroduce a
+# write inside the repository.
+if ! declare -f mt_caps_lib_dir >/dev/null 2>&1; then
+  . "$ROOT_DIR/platform/caps-lib.sh"
+fi
+OUT_LIB_DIR="$(mt_caps_lib_dir)"
 OUT_LIB="$OUT_LIB_DIR/libSDL2.a"
 STAMP_FILE="$OUT_LIB_DIR/libSDL2.stamp"
 

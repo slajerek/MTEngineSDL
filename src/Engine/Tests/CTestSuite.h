@@ -14,6 +14,8 @@ struct CTestSuiteResult
 {
 	string testName;
 	bool success;
+	bool skipped = false;   // completed via CTest::TestSkipped(): did NOT run
+	string requiredGap;     // non-empty: a MANDATORY part did not run
 	string summary;
 };
 
@@ -74,11 +76,26 @@ private:
 	vector<CTestSuiteResult> results;
 	int currentTestIndex;
 	bool isRunning;
+	// Re-entrancy guard for the test chain. A test that finishes synchronously
+	// calls TestCompleted() from INSIDE its own Run(); if OnTestCompleted then
+	// started the next test directly, every following test would execute nested
+	// on the completing test's stack -- with all of its still-live scope guards
+	// (temp-dir cleanup, global-settings restore, open browsers) unwound only
+	// AFTER the whole suite had run. RunNextTest() therefore never starts a test
+	// re-entrantly: it records the request and the dispatch loop picks it up once
+	// Run() has returned and the test's destructors have fired.
+	bool dispatchingTest = false;
+	bool advanceRequested = false;
 	bool exitOnCompletion;
 	// When false (default), the suite runs every test and reports all failures
 	// in one pass; a failing test no longer hides the tests after it. Set true
 	// (CLI: --stop-on-first-failure) for fast-fail behaviour.
 	bool stopOnFirstFailure;
+
+	// --require-fixtures / PC_REQUIRE_FIXTURES=1: treat every recorded required
+	// gap and required skip as a FAILURE. Off by default so a developer without
+	// the fixture set stays green; on for the runs that claim DoD compliance.
+	bool requireFixtures;
 	string resultsFilePath;
 	time_t suiteStartTime = 0;
 };

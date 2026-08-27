@@ -3,17 +3,67 @@
 
 #ifdef _WIN32
 #include <windows.h>
+#include <unordered_map>
+#include <mutex>
 #else
 #include <unistd.h>
 #include <signal.h>
 #include <sys/wait.h>
 #include <spawn.h>
 #include <errno.h>
+#include <cstring>
 extern char **environ;
 #endif
 
 #ifdef __APPLE__
 #include <mach-o/dyld.h>
+#endif
+
+#ifdef _WIN32
+// Windows has no zombie/reap concept: once a process exits and its last HANDLE
+// is closed, the OS may fully discard the process object and recycle the PID
+// for something unrelated. Re-deriving a HANDLE later via OpenProcess(pid) is
+// therefore unreliable for short-lived processes — by the time TryWait/IsRunning
+// runs, the PID can already point at a different process, or at nothing at all
+// (OpenProcess fails, and callers silently lose the real exit code).
+// Cache the HANDLE from CreateProcess and reuse it for the lifetime tracking
+// calls below; only OpenProcess() as a fallback for PIDs we didn't spawn.
+static std::mutex sProcessHandlesMutex;
+static std::unordered_map<pid_t, HANDLE> sProcessHandles;
+
+static void CacheProcessHandle(pid_t pid, HANDLE h)
+{
+	std::lock_guard<std::mutex> lock(sProcessHandlesMutex);
+	sProcessHandles[pid] = h;
+}
+
+// Returns a HANDLE usable by the caller (caller must NOT close a cached handle;
+// pass ownsHandle=true only for the OpenProcess() fallback, which the caller owns).
+static HANDLE AcquireProcessHandle(pid_t pid, DWORD desiredAccess, bool *ownsHandle)
+{
+	{
+		std::lock_guard<std::mutex> lock(sProcessHandlesMutex);
+		auto it = sProcessHandles.find(pid);
+		if (it != sProcessHandles.end())
+		{
+			*ownsHandle = false;
+			return it->second;
+		}
+	}
+	*ownsHandle = true;
+	return OpenProcess(desiredAccess, FALSE, pid);
+}
+
+static void ReleaseProcessHandle(pid_t pid)
+{
+	std::lock_guard<std::mutex> lock(sProcessHandlesMutex);
+	auto it = sProcessHandles.find(pid);
+	if (it != sProcessHandles.end())
+	{
+		CloseHandle(it->second);
+		sProcessHandles.erase(it);
+	}
+}
 #endif
 
 pid_t CProcessSpawner::Spawn(const vector<string> &args)
@@ -48,7 +98,7 @@ pid_t CProcessSpawner::Spawn(const vector<string> &args)
 	}
 
 	CloseHandle(pi.hThread);
-	CloseHandle(pi.hProcess);
+	CacheProcessHandle((pid_t)pi.dwProcessId, pi.hProcess);
 	return (pid_t)pi.dwProcessId;
 #else
 	// Unix: posix_spawn (safer than fork in multi-threaded programs)
@@ -143,7 +193,7 @@ pid_t CProcessSpawner::SpawnWithEnv(const vector<string> &args, const vector<str
 	}
 
 	CloseHandle(pi.hThread);
-	CloseHandle(pi.hProcess);
+	CacheProcessHandle((pid_t)pi.dwProcessId, pi.hProcess);
 	return (pid_t)pi.dwProcessId;
 #else
 	// Unix: build custom environ array
@@ -197,13 +247,15 @@ bool CProcessSpawner::IsRunning(pid_t pid)
 		return false;
 
 #ifdef _WIN32
-	HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, pid);
+	bool ownsHandle = false;
+	HANDLE hProcess = AcquireProcessHandle(pid, PROCESS_QUERY_INFORMATION, &ownsHandle);
 	if (!hProcess)
 		return false;
 
 	DWORD exitCode;
 	bool running = (GetExitCodeProcess(hProcess, &exitCode) && exitCode == STILL_ACTIVE);
-	CloseHandle(hProcess);
+	if (ownsHandle)
+		CloseHandle(hProcess);
 	return running;
 #else
 	// Send signal 0 to check if the process exists
@@ -223,12 +275,14 @@ bool CProcessSpawner::Kill(pid_t pid)
 		return false;
 
 #ifdef _WIN32
-	HANDLE hProcess = OpenProcess(PROCESS_TERMINATE, FALSE, pid);
+	bool ownsHandle = false;
+	HANDLE hProcess = AcquireProcessHandle(pid, PROCESS_TERMINATE, &ownsHandle);
 	if (!hProcess)
 		return false;
 
 	bool result = TerminateProcess(hProcess, 1);
-	CloseHandle(hProcess);
+	if (ownsHandle)
+		CloseHandle(hProcess);
 	return result;
 #else
 	int result = ::kill(pid, SIGTERM);
@@ -248,12 +302,14 @@ bool CProcessSpawner::ForceKill(pid_t pid)
 		return false;
 
 #ifdef _WIN32
-	HANDLE hProcess = OpenProcess(PROCESS_TERMINATE, FALSE, pid);
+	bool ownsHandle = false;
+	HANDLE hProcess = AcquireProcessHandle(pid, PROCESS_TERMINATE, &ownsHandle);
 	if (!hProcess)
 		return false;
 
 	bool result = TerminateProcess(hProcess, 1);
-	CloseHandle(hProcess);
+	if (ownsHandle)
+		CloseHandle(hProcess);
 	return result;
 #else
 	int result = ::kill(pid, SIGKILL);
@@ -273,7 +329,8 @@ bool CProcessSpawner::TryWait(pid_t pid, int *exitCode)
 		return true;
 
 #ifdef _WIN32
-	HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | SYNCHRONIZE, FALSE, pid);
+	bool ownsHandle = false;
+	HANDLE hProcess = AcquireProcessHandle(pid, PROCESS_QUERY_INFORMATION | SYNCHRONIZE, &ownsHandle);
 	if (!hProcess)
 		return true; // process doesn't exist
 
@@ -286,10 +343,14 @@ bool CProcessSpawner::TryWait(pid_t pid, int *exitCode)
 			GetExitCodeProcess(hProcess, &code);
 			*exitCode = (int)code;
 		}
-		CloseHandle(hProcess);
+		if (ownsHandle)
+			CloseHandle(hProcess);
+		else
+			ReleaseProcessHandle(pid);
 		return true;
 	}
-	CloseHandle(hProcess);
+	if (ownsHandle)
+		CloseHandle(hProcess);
 	return false;
 #else
 	int status;

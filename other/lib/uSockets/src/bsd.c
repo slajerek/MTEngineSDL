@@ -251,7 +251,7 @@ void *bsd_create_udp_packet_buffer() {
         b->iov[n].iov_len = LIBUS_UDP_MAX_SIZE;
 
         b->msgvec[n].msg_hdr = (struct msghdr) {
-            .msg_name       = &b->addr,
+            .msg_name       = &b->addr[n],
             .msg_namelen    = sizeof (struct sockaddr_storage),
 
             .msg_iov        = &b->iov[n],
@@ -599,7 +599,7 @@ LIBUS_SOCKET_DESCRIPTOR bsd_create_udp_socket(const char *host, int port) {
     }
 
     LIBUS_SOCKET_DESCRIPTOR listenFd = LIBUS_SOCKET_ERROR;
-    struct addrinfo* listenAddr = NULL;
+    struct addrinfo *listenAddr = NULL;
     for (struct addrinfo *a = result; a && listenFd == LIBUS_SOCKET_ERROR; a = a->ai_next) {
         if (a->ai_family == AF_INET6) {
             listenFd = bsd_create_socket(a->ai_family, a->ai_socktype, a->ai_protocol);

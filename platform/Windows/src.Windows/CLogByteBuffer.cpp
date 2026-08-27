@@ -1,6 +1,7 @@
 #include "SYS_Main.h"
 #include "CLogByteBuffer.h"
 #include "SYS_Defs.h"
+#include "SYS_FileSystem.h"
 
 ELogBadPacket::ELogBadPacket()
 {
@@ -475,7 +476,7 @@ char *CLogByteBuffer::BytesToHexString(byte *in, int begin, int size, char *sepa
 
 bool CLogByteBuffer::storeToFile(char *fileName)
 {
-	FILE *fp = fopen(fileName, "wb");
+	FILE *fp = SYS_OpenFile(fileName, "wb");
 	if (fp == NULL)
 	{
 		return false;
@@ -496,7 +497,7 @@ bool CLogByteBuffer::storeToFile(char *fileName)
 
 bool CLogByteBuffer::readFromFile(char *fileName)
 {
-	FILE *fp = fopen(fileName, "rb");
+	FILE *fp = SYS_OpenFile(fileName, "rb");
 	if (fp == NULL)
 	{
 		return false;
@@ -515,5 +516,3 @@ bool CLogByteBuffer::readFromFile(char *fileName)
 
 	return true;
 }
-
-

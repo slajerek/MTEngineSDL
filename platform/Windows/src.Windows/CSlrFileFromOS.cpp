@@ -2,6 +2,19 @@
 #include "SYS_Main.h"
 #include "SYS_FileSystem.h"
 #include "SYS_Funct.h"
+#include "SYS_WindowsPathUtils.h"
+#include <cstdlib>
+#include <cstring>
+
+static void MT_CopyFileNameForDebug(char *dst, const char *src)
+{
+	if (!dst)
+		return;
+	if (!src)
+		src = "";
+	strncpy(dst, src, 511);
+	dst[511] = 0;
+}
 
 CSlrFileFromOS::CSlrFileFromOS(CSlrString *str)
 {
@@ -23,7 +36,7 @@ CSlrFileFromOS::CSlrFileFromOS(CSlrString* filePath, u8 fileMode)
 	this->fp = NULL;
 	this->isFromResources = false;
 
-	char* cFilePath = filePath->GetStdASCII();
+	char* cFilePath = filePath->GetUTF8();
 
 	if (fileMode == SLR_FILE_MODE_READ)
 	{
@@ -35,7 +48,7 @@ CSlrFileFromOS::CSlrFileFromOS(CSlrString* filePath, u8 fileMode)
 	}
 	else SYS_FatalExit("unknown file mode %d", fileMode);
 
-	delete cFilePath;
+	free(cFilePath);
 }
 
 CSlrFileFromOS::CSlrFileFromOS(const char *filePath, u8 fileMode)
@@ -59,10 +72,9 @@ void CSlrFileFromOS::Open(const char *filePath)
 
 	LOGD("...filePath='%s'", filePath);
 
-	strcpy(this->fileName, filePath);
+	MT_CopyFileNameForDebug(this->fileName, filePath);
 	SYS_FixFileNameSlashes(this->fileName);
-	strcpy(this->osFilePath, filePath);
-	SYS_FixFileNameSlashes(this->osFilePath);
+	this->osFilePath = SYS_WindowsPathBackslashes(filePath ? filePath : "");
 
 	this->fileSize = 0;
 	this->Reopen();
@@ -71,8 +83,8 @@ void CSlrFileFromOS::Open(const char *filePath)
 void CSlrFileFromOS::OpenForWrite(const char *filePath)
 {
 	LOGR("CSlrFileFromOS: opening %s for write", filePath);
-	strcpy(this->fileName, filePath);
-	strcpy(this->osFilePath, filePath);
+	MT_CopyFileNameForDebug(this->fileName, filePath);
+	this->osFilePath = SYS_WindowsPathBackslashes(filePath ? filePath : "");
 	
 	this->fileSize = 0;
 	this->ReopenForWrite();
@@ -80,18 +92,18 @@ void CSlrFileFromOS::OpenForWrite(const char *filePath)
 
 void CSlrFileFromOS::ReopenForWrite()
 {
-	SYS_FixFileNameSlashes(this->osFilePath);
-	LOGR("CSlrFileFromOS: opening %s size=%d", this->osFilePath, this->fileSize);
+	this->osFilePath = SYS_WindowsPathBackslashes(this->osFilePath);
+	LOGR("CSlrFileFromOS: opening %s size=%d", this->osFilePath.c_str(), this->fileSize);
 	
 	if (this->fp != NULL)
 		fclose(fp);
 	
 	this->filePos = 0;
-	this->fp = fopen(this->osFilePath, "wb");
+	this->fp = SYS_OpenFile(this->osFilePath.c_str(), "wb");
 	
 	if (this->fp == NULL)
 	{
-		LOGError("CSlrFileFromOS: failed to open %s for write", this->osFilePath);
+		LOGError("CSlrFileFromOS: failed to open %s for write", this->osFilePath.c_str());
 		this->fileMode = SLR_FILE_MODE_ERROR;
 		return;
 	}
@@ -100,23 +112,23 @@ void CSlrFileFromOS::ReopenForWrite()
 	
 	this->fileMode = SLR_FILE_MODE_WRITE;
 	
-	LOGR("CSlrFileFromOS: %s opened, size=%d", osFilePath, this->fileSize);
+	LOGR("CSlrFileFromOS: %s opened, size=%d", osFilePath.c_str(), this->fileSize);
 }
 
 void CSlrFileFromOS::Reopen()
 {
-	SYS_FixFileNameSlashes(this->osFilePath);
-	LOGR("CSlrFileFromOS: opening %s size=%d", this->osFilePath, this->fileSize);
+	this->osFilePath = SYS_WindowsPathBackslashes(this->osFilePath);
+	LOGR("CSlrFileFromOS: opening %s size=%d", this->osFilePath.c_str(), this->fileSize);
 
 	if (this->fp != NULL)
 		fclose(fp);
 
 	this->filePos = 0;
-	this->fp = fopen(this->osFilePath, "rb");
+	this->fp = SYS_OpenFile(this->osFilePath.c_str(), "rb");
 
 	if (this->fp == NULL)
 	{
-		LOGError("CSlrFileFromOS: failed to open %s", this->osFilePath);
+		LOGError("CSlrFileFromOS: failed to open %s", this->osFilePath.c_str());
 		this->fileMode = SLR_FILE_MODE_ERROR;
 		return;
 	}
@@ -127,7 +139,7 @@ void CSlrFileFromOS::Reopen()
 	
 	this->fileMode = SLR_FILE_MODE_READ;
 
-	LOGR("CSlrFileFromOS: %s opened, size=%d", osFilePath, this->fileSize);
+	LOGR("CSlrFileFromOS: %s opened, size=%d", osFilePath.c_str(), this->fileSize);
 }
 
 bool CSlrFileFromOS::Exists()
@@ -201,4 +213,3 @@ CSlrFileFromOS::~CSlrFileFromOS()
 {
 	this->Close();
 }
-

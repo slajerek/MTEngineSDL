@@ -79,7 +79,23 @@ void CRenderShaderMaskedTile::SetShaderVars()
 	// Get DPI scale for the current display (works after window moves between screens)
 	float dpiScale = 1.0f;
 #ifdef __APPLE__
-	dpiScale = MACOS_GetBackingScaleFactor(SDL_GetWindowDisplayIndex(VID_GetMainSDLWindow()));
+	// SDL3: this used to be MACOS_GetBackingScaleFactor(SDL_GetWindowDisplayIndex(w)),
+	// and the rename scripts turned the inner call into SDL_GetDisplayForWindow --
+	// which compiles and is WRONG. MACOS_GetBackingScaleFactor indexes
+	// [NSScreen screens]; SDL3 display IDs are OPAQUE HANDLES, not indices
+	// (they typically start at 1), so on a single-screen Mac this asked for
+	// screen 1 of 1, fell off the end, and silently returned 1.0f -- i.e. no
+	// Retina scaling, exactly where the shader needs it.
+	//
+	// SDL_GetWindowPixelDensity is the direct equivalent of NSScreen's
+	// backingScaleFactor ("a ratio of pixel size to window size"), it follows
+	// the window across screens by itself, and it needs no platform helper.
+	//
+	// The __APPLE__ guard STAYS. This API works everywhere, but non-Apple
+	// platforms have always taken the 1.0f default here, and switching them to
+	// a real density is a behaviour change with its own testing -- not
+	// something to slip into an SDL port.
+	dpiScale = SDL_GetWindowPixelDensity(VID_GetMainSDLWindow());
 #endif
 
 	// Bind mask texture to unit 1

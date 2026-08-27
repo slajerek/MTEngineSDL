@@ -1,15 +1,17 @@
 # Hello and welcome to the MTEngineSDL!
 
 This is an application host framework for starting custom apps created using
-SDL2, ImGui and OpenGL.
+SDL3, ImGui and OpenGL.
 
 # How to compile
 
-Engine compiles SDL2 with ImGui and app as static binary.
+Engine compiles SDL3 with ImGui and app as static binary. SDL3 is built from
+the vendored source tree in `other/lib/SDL-release-3.4.14-static/` by the
+platform build scripts -- no system or package-manager SDL is used or needed.
 You need to compile the MTEngineSDL first.
 
 MTEngineSDL: https://github.com/slajerek/MTEngineSDL
-SDL2: https://github.com/libsdl-org/SDL
+SDL3: https://github.com/libsdl-org/SDL
 ImGui: https://github.com/imgui
 
 Verbose log can be switched on by commenting out `#define GLOBAL_DEBUG_OFF`
@@ -27,7 +29,8 @@ The precompled library is put in `~/develop/MTEngineSDL/MacOS/libs` folder.
 Check VS2019 project in `./platform/Windows`. This should work when put into
 `C:\develop\MTEngineSDL`
 
-Static SDL2 libraries are in `./platform/Windows/libs` folder.
+Static SDL3 libraries are in `./platform/Windows/libs` folder (x64 and ARM64,
+Debug and Release -- 32-bit Windows was dropped in 2026-08).
 
 Windows version uses LogConsole.exe app to display verbose log when compiled
 without `GLOBAL_DEBUG_OFF` in `DBG_Log.h`
@@ -44,7 +47,8 @@ cmake ./../
 make
 ```
 
-Remember to have SDL2 library installed.
+No SDL package needs to be installed: SDL3 is built from the vendored source
+tree by `platform/Linux/build-sdl3.sh`, which `build-linux.sh` runs for you.
 
 
 # Thanks
@@ -72,7 +76,7 @@ Donations will help me in development, thanks!
 MTEngineSDL source code is licensed under MIT license.
 
 This product uses 1-Writer font: http://home-2002.code-cop.org/c64/font_01.html
-UI assets licenses are provided by the ImGui, SDL2 and all referenced licenses.
+UI assets licenses are provided by the ImGui, SDL3 and all referenced licenses.
 
 
 CIAO!

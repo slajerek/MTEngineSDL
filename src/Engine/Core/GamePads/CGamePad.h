@@ -8,7 +8,7 @@ public:
 	~CGamePad();
 	
 	bool isActive;
-	SDL_GameController *sdlGamePad;
+	SDL_Gamepad *sdlGamePad;
 	SDL_Haptic *sdlGamePadHaptic;
 	SDL_JoystickID sdlJoystickId;
 	int index;
@@ -23,7 +23,7 @@ public:
 	virtual bool GamePadAxisMotionToButtonEvent(u8 axis, int value);
 
 private:
-	bool axisToButtonState[SDL_CONTROLLER_BUTTON_MAX];
+	bool axisToButtonState[SDL_GAMEPAD_BUTTON_COUNT];
 };
 
 #endif

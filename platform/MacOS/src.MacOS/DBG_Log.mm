@@ -222,7 +222,7 @@ int _LOGGER(unsigned int level, const char *fileName, unsigned int lineNum, cons
         gettimeofday(&tv, &tz);
         tm = localtime(&tv.tv_sec);
 
-        unsigned int ms = (unsigned int)tv.tv_usec/(unsigned int)10000;
+        unsigned int ms = (unsigned int)tv.tv_usec/(unsigned int)1000;
 
 		sprintf(buffer, "%02d:%02d:%02d,%03d ",
 				tm->tm_hour, tm->tm_min, tm->tm_sec, ms);
@@ -368,7 +368,7 @@ int _LOGGER(unsigned int level, const char *fileName, unsigned int lineNum, cons
         gettimeofday(&tv, &tz);
         tm = localtime(&tv.tv_sec);
 
-        unsigned int ms = (unsigned int)tv.tv_usec/(unsigned int)10000;
+        unsigned int ms = (unsigned int)tv.tv_usec/(unsigned int)1000;
 
         fprintf(stderr, "%02d:%02d:%02d,%03d ",
                 tm->tm_hour, tm->tm_min, tm->tm_sec, ms);

@@ -1,11 +1,12 @@
 #include "VID_Main.h"
 #include "CGuiViewUiDebug.h"
 #include "CGuiMain.h"
+#include "MT_UiScale.h"
 #include "SYS_KeyCodes.h"
 #include "SYS_Platform.h"
 #include "MT_API.h"
 #include "MT_VERSION.h"
-#include <SDL.h>
+#include <SDL3/SDL.h>
 
 CGuiViewUiDebug::CGuiViewUiDebug(float posX, float posY, float posZ, float sizeX, float sizeY)
 : CGuiView(posX, posY, posZ, sizeX, sizeY)
@@ -51,7 +52,7 @@ void CGuiViewUiDebug::RenderImGui()
 	
 	float px = posX;
 	float py = posY;
-	float fontSize = 11.0f;
+	float fontSize = MT_UiScaled(11.0f);
 	
 	char *buf = SYS_GetCharBuf();
 	sprintf(buf, "MTEngineSDL version %s", MT_VERSION_STRING);
@@ -62,13 +63,13 @@ void CGuiViewUiDebug::RenderImGui()
 	guiMain->fntConsole->BlitText(buf, px, py, 0, fontSize, 1.0);
 	py += fontSize;
 
-	SDL_version compiled;
-	SDL_version linked;
-	SDL_VERSION(&compiled);
-	SDL_GetVersion(&linked);
+	// SDL3 dropped the SDL_version struct: SDL_VERSION is a packed int constant
+	// and SDL_GetVersion() returns one, unpacked with SDL_VERSIONNUM_*.
+	const int sdlCompiled = SDL_VERSION;
+	const int sdlLinked = SDL_GetVersion();
 	sprintf(buf, "SDL compiled %d.%d.%d, linked with %d.%d.%d",
-		   compiled.major, compiled.minor, compiled.patch,
-		   linked.major, linked.minor, linked.patch);
+		   SDL_VERSIONNUM_MAJOR(sdlCompiled), SDL_VERSIONNUM_MINOR(sdlCompiled), SDL_VERSIONNUM_MICRO(sdlCompiled),
+		   SDL_VERSIONNUM_MAJOR(sdlLinked), SDL_VERSIONNUM_MINOR(sdlLinked), SDL_VERSIONNUM_MICRO(sdlLinked));
 	guiMain->fntConsole->BlitText(buf, px, py, 0, fontSize, 1.0);
 	py += fontSize;
 
@@ -144,32 +145,36 @@ void CGuiViewUiDebug::RenderImGui()
 	py += fontSize;
 	
 	//
-	int numDisplays = SDL_GetNumVideoDisplays();
+	// SDL3: displays are IDENTIFIED, not indexed. SDL_GetNumVideoDisplays is
+	// gone; SDL_GetDisplays() returns an array of SDL_DisplayID to SDL_free.
+	int numDisplays = 0;
+	SDL_DisplayID *displayIds = SDL_GetDisplays(&numDisplays);
 	sprintf(buf, "Video Displays: %d", numDisplays);
 	guiMain->fntConsole->BlitText(buf, px, py, 0, fontSize);
 	py += fontSize;
 
-	for (int n = 0; n < numDisplays; n++)
+	for (int n = 0; n < numDisplays && displayIds != NULL; n++)
 	{
+		SDL_DisplayID displayId = displayIds[n];
+
 		SDL_Rect r1;
-		SDL_GetDisplayBounds(n, &r1);
+		SDL_GetDisplayBounds(displayId, &r1);
 
 		SDL_Rect r2;
-		SDL_GetDisplayUsableBounds(n, &r2);
+		SDL_GetDisplayUsableBounds(displayId, &r2);
 
-		float ddpi, hdpi, vdpi;
-		SDL_GetDisplayDPI(n, &ddpi, &hdpi, &vdpi);
-		
-		float dpiScale = 0.0f;
-#if defined(__APPLE__)
-		dpiScale = MACOS_GetBackingScaleFactor(n);
-#elif defined(SDL_HAS_PER_MONITOR_DPI)
-		float dpi = 0.0f;
-		if (!SDL_GetDisplayDPI(n, &dpi, NULL, NULL))
-			dpiScale = dpi / 96.0f;
-#endif
+		// SDL_GetDisplayDPI is REMOVED, with no direct replacement, and the
+		// removal was deliberate: the ddpi/hdpi/vdpi it reported were unreliable
+		// across platforms and drivers. SDL3 offers CONTENT SCALE instead --
+		// the factor the desktop wants content drawn at -- which is the number
+		// this display actually wanted anyway.
+		//
+		// So the three DPI figures are gone from this debug view rather than
+		// being faked from the scale. Inventing "96 * scale" would print a
+		// plausible number that is not a measurement.
+		float contentScale = SDL_GetDisplayContentScale(displayId);
 
-		sprintf(buf, "Display #%d", n);
+		sprintf(buf, "Display #%d (id=%u)", n, (unsigned int)displayId);
 		guiMain->fntConsole->BlitText(buf, px, py, 0, fontSize);
 		py += fontSize;
 		
@@ -178,10 +183,27 @@ void CGuiViewUiDebug::RenderImGui()
 		guiMain->fntConsole->BlitText(buf, px, py, 0, fontSize);
 		py += fontSize;
 
-		sprintf(buf, "  ddpi=%5.2f hdpi=%5.2f vdpi=%5.2f scale=%5.2f", ddpi, hdpi, vdpi, dpiScale);
+		// The old MACOS_GetBackingScaleFactor(n) call is gone from this loop on
+		// purpose. It indexes [NSScreen screens] with OUR loop counter, and
+		// nothing guarantees SDL enumerates displays in NSScreen's order -- so
+		// on a multi-monitor Mac it could print one screen's scale next to
+		// another screen's bounds. A debug view that quietly mislabels which
+		// monitor it is describing is worse than one number short.
+		//
+		// Pixel density is a WINDOW property in SDL3, not a display one, so it
+		// is reported once below rather than per display.
+		sprintf(buf, "  contentScale=%5.2f", contentScale);
 		guiMain->fntConsole->BlitText(buf, px, py, 0, fontSize);
 		py += fontSize;
 	}
+	if (displayIds != NULL)
+		SDL_free(displayIds);
+
+	sprintf(buf, "Window pixel density: %5.2f   display scale: %5.2f",
+			SDL_GetWindowPixelDensity(VID_GetMainSDLWindow()),
+			SDL_GetWindowDisplayScale(VID_GetMainSDLWindow()));
+	guiMain->fntConsole->BlitText(buf, px, py, 0, fontSize);
+	py += fontSize;
 	
 	
 	// blit cursor position

@@ -142,3 +142,18 @@ static inline std::string SYS_Crc32ToHex(uint32_t crc)
 	snprintf(hex, sizeof(hex), "%08x", crc);
 	return std::string(hex);
 }
+
+// SHA-256 of a file on disk, lowercase hex. Empty + ok=false on error.
+static inline std::string SYS_Sha256File(const std::string &filePath, bool *ok = nullptr)
+{
+	FILE *f = fopen(filePath.c_str(), "rb");
+	if (!f) { if (ok) *ok = false; return std::string(); }
+	sgSHA256 sha;
+	uint8_t buf[8192];
+	size_t n;
+	while ((n = fread(buf, 1, sizeof(buf), f)) > 0)
+		sha.update(buf, n);
+	fclose(f);
+	if (ok) *ok = true;
+	return sgSHA256::toString(sha.digest());
+}

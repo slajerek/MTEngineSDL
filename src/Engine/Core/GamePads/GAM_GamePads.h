@@ -1,7 +1,7 @@
 #ifndef _GAM_GamePads_H_
 #define _GAM_GamePads_H_
 
-#include <SDL.h>
+#include <SDL3/SDL.h>
 #include "CGamePad.h"
 #include "CGamePadAxisMotionToButton.h"
 

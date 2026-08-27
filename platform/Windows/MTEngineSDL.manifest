@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <!--
+    Shared application manifest for MTEngineSDL host apps. Import
+    MTEngineSDLHost.props from your .vcxproj and the linker embeds this.
+
+    activeCodePage=UTF-8 makes GetACP() return 65001 for the whole process,
+    which is what every *narrow* Win32/CRT entry point uses to turn a char*
+    path into the wide name the filesystem actually stores: fopen, fopen_s,
+    std::ifstream, std::filesystem's std::string constructors, CreateFileA,
+    FindFirstFileA, and argv.
+
+    MTEngineSDL's convention is that a path in a char* or std::string is
+    UTF-8 (native on macOS and Linux). Without this setting those UTF-8 bytes
+    get decoded as CP1252 / CP1250 / CP932, so any file under a folder or with
+    a name outside the machine's ANSI code page fails to open: Polish or other
+    Latin-Extended names, CJK, emoji, macOS NFD normalized accents on files
+    that came from another OS. The wide APIs list such a file happily and the
+    narrow open then reports "no such file", which reads as data corruption or
+    a missing file rather than an encoding bug.
+
+    It cannot be fixed call site by call site alone: the affected calls are
+    spread across the engine and its vendored third party libraries. The
+    engine's own media loading path is ALSO hardened in code (see
+    src/Engine/Core/SYS_FileUtf8.h) so it works even without this manifest,
+    but the manifest is what fixes everything else at once.
+
+    Requires Windows 10 1903 (build 18362) or newer. Older Windows ignores the
+    setting and behaves exactly as before.
+  -->
+  <application xmlns="urn:schemas-microsoft-com:asm.v3">
+    <windowsSettings>
+      <activeCodePage xmlns="http://schemas.microsoft.com/SMI/2019/WindowsSettings">UTF-8</activeCodePage>
+    </windowsSettings>
+  </application>
+</assembly>

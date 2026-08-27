@@ -3,6 +3,21 @@
 Compressed C arrays for embedding font data into the binary.
 Used by `CGuiFontManager` for markdown rendering in ImGui.
 
+## Using these fonts from a HOST
+
+`MTEmbeddedFonts.h` declares every blob below `extern`, and `CGuiFontManager.cpp`
+includes it **before** the textual `font_*.cpp` includes. That ordering is
+load-bearing: the generated definitions are `const` at namespace scope, which in
+C++ means *internal* linkage (`binary_to_compressed_c -nostatic` removes the
+keyword but not the linkage), so without a prior `extern` declaration no other
+translation unit can reference them — `nm` shows `__ZL34font_inter_regular_…`
+and the `_compressed_size` symbols are constant-folded away entirely.
+
+A host that wants the same bytes — rather than shipping a second copy of the
+same typeface as an asset — includes `"Fonts/MTEmbeddedFonts.h"` (the qualified
+path: include dirs expose `src/Embedded`, not `src/Embedded/Fonts`). PhotoCruise
+does exactly this for its UI face.
+
 ## Fonts Included
 
 | File | Font | Variant | Source |

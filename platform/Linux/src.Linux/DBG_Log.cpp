@@ -337,7 +337,7 @@ void DBG_SendLog(int debugLevel, char *message)
 
 	unsigned int threadId = 0; //valgrind complains: (long int)syscall(224);
 
-	int ms = tv.tv_usec/10000;
+	int ms = tv.tv_usec/1000;
 	
 	sprintf(buf, "%02d:%02d:%02d,%03d %4.4X %s %s\n",
 				tm->tm_hour, tm->tm_min, tm->tm_sec, ms,

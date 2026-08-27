@@ -1,65 +1,35 @@
-# ImGui notes
+# Dear ImGui (vendored)
 
-This is ImGui docking unstable branch which is heavily developed. There are a few changes required however.
+Dear ImGui `1.93.0 WIP` (`IMGUI_VERSION_NUM 19293`), **docking** branch,
+upstream `83f668625`, locally modified.
 
-## ImGuiWindow 
+This line drifted once already: it still said `1.92.6 WIP` / `19259` for
+months after the 2026-08-17 upgrade, because `tests/test-imgui-patches.sh`
+compares PATCH MARKERS against `MTENGINE_PATCHES.md` and can never see a
+version string. `imgui.h:32-33` and `MTENGINE_PATCHES.md`'s "Bundled
+version" row are the two places that must agree with this one.
 
-ImGuiWindow is extended with `void *userData` to allow assigning CGuiView to an ImGuiWindow.
-
-### imgui_internal.h
-
-```
-// Storage for one window
-struct IMGUI_API ImGuiWindow
-{
-```
-
-userData is added:
+**The list of local modifications lives in
+[`MTENGINE_PATCHES.md`](MTENGINE_PATCHES.md), not here.** Every patch is also
+bracketed in the source:
 
 ```
-    // any user data assigned to this ImGuiWindow
-    void *userData;
+grep -rn "MTENGINE-PATCH" src/Engine/Libs/imgui/ \
+     --include='*.h' --include='*.cpp' --include='*.mm'
 ```
 
-## Fix for DPI
+The extension filter is not optional: this file and `MTENGINE_PATCHES.md` both
+quote the marker, so an unfiltered grep counts documentation as code.
 
-ImGui does not support multiple monitor DPIs. The patch is required to allow different DPIs on 2 monitors. 
-Example use case is a Macbook Pro (high dpi) connected to a standard external HD monitor (low dpi). 
-This bug causes that all viewports contents on external monitor are rendered scaled 2x (bigger). 
-Also current SDL implementation of SDL_GetDisplayDPI gives wrong results on macOS and thus a workaround function is called.
+Run `tests/test-imgui-patches.sh` to check the markers and the registry still
+agree, and read `MTENGINE_PATCHES.md`'s *Upgrade procedure* before bumping the
+version.
 
-This hack below works, but is not recommended way of fixing the problem and may cause problems in the future.
-
-### imgui_impl_sdl.cpp
-
-```
-float MACOS_GetBackingScaleFactor(int screen);
-
-#if __APPLE__
-                monitor.DpiScale = MACOS_GetBackingScaleFactor(n);
-#elif SDL_HAS_PER_MONITOR_DPI
-        float dpi = 0.0f;
-        if (!SDL_GetDisplayDPI(n, &dpi, NULL, NULL))
-            monitor.DpiScale = dpi / 96.0f;
-#endif
-        platform_io.Monitors.push_back(monitor);
-```        
-        
-### imgui.cpp
-
-```
-	//draw_data->FramebufferScale = io.DisplayFramebufferScale; // FIXME-VIEWPORT: This may vary on a per-monitor/viewport basis?
-	ImGuiContext& g = *GImGui;
-	if (g.ConfigFlagsCurrFrame & ImGuiConfigFlags_ViewportsEnable)
-				draw_data->FramebufferScale = ImVec2(viewport->DpiScale, viewport->DpiScale);
-			else
-				draw_data->FramebufferScale = io.DisplayFramebufferScale;
-```
-
-# Notes
-
-DPI fix patch is being discussed here: 
-https://github.com/ocornut/imgui/commit/a843af4306e0d786fec5394bba07fd5067384661
-
-Correct way to approach this bug : 
-https://github.com/ocornut/imgui/blob/master/docs/FAQ.md#q-how-should-i-handle-dpi-in-my-application
+> Historical note: this file previously documented a per-monitor DPI patch
+> (`MACOS_GetBackingScaleFactor`, a `FramebufferScale` override). **That patch
+> no longer exists** — it was dropped in the 1.90.1 → 1.92.6 upgrade
+> (`fc92aff9`) because upstream added `Platform_GetWindowFramebufferScale()`
+> (`ImGui_ImplSDL2_GetWindowFramebufferScale` in `imgui_impl_sdl2.cpp`).
+> `MACOS_GetBackingScaleFactor()` survives as an ordinary engine function
+> (`platform/MacOS/src.MacOS/SYS_MacOS.mm:115`) with three call sites in the
+> renderer and UI debug view, but nothing in the ImGui sources calls it.

@@ -16,6 +16,8 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/wait.h>
+#include <string>
 #include <algorithm>
 #include <filesystem>
 #include <functional>
@@ -574,7 +576,7 @@ bool SYS_FileExists(const char *path)
 		return false;
 
 	struct stat info;
-	
+
 	if(stat( path, &info ) != 0)
 	{
 		return false;
@@ -583,6 +585,57 @@ bool SYS_FileExists(const char *path)
 	{
 		return true;
 	}
+}
+
+// Delegate to `gio trash` (standard on most modern desktops).
+// Never falls back to permanent delete on failure.
+bool SYS_FileDeleteToTrash(const char *path, std::string *outTrashPath, std::string *outError)
+{
+	pid_t pid = fork();
+	if (pid < 0)
+	{
+		if (outError) *outError = "fork() failed";
+		return false;
+	}
+	if (pid == 0)
+	{
+		execlp("gio", "gio", "trash", path, (char *)nullptr);
+		_exit(127);  // exec failed
+	}
+	int status = 0;
+	waitpid(pid, &status, 0);
+	bool ok = WIFEXITED(status) && WEXITSTATUS(status) == 0;
+	if (!ok)
+	{
+		if (outError)
+			*outError = "`gio trash` failed (exit " + std::to_string(WEXITSTATUS(status)) + ")";
+		return false;
+	}
+
+	// Best-effort: resolve where the file landed per the freedesktop.org trash
+	// spec ($XDG_DATA_HOME or ~/.local/share -> Trash/files/<basename>). Only set
+	// it if that path now exists (gio may rename on collision, in which case we
+	// leave it empty and undo is unavailable for this item).
+	if (outTrashPath)
+	{
+		std::string trashFilesDir;
+		const char *xdgData = getenv("XDG_DATA_HOME");
+		const char *home    = getenv("HOME");
+		if (xdgData && xdgData[0])   trashFilesDir = std::string(xdgData) + "/Trash/files/";
+		else if (home && home[0])    trashFilesDir = std::string(home) + "/.local/share/Trash/files/";
+
+		if (!trashFilesDir.empty())
+		{
+			std::string p(path);
+			size_t slash = p.find_last_of('/');
+			std::string base = (slash == std::string::npos) ? p : p.substr(slash + 1);
+			std::string candidate = trashFilesDir + base;
+			struct stat st;
+			if (::stat(candidate.c_str(), &st) == 0)
+				*outTrashPath = candidate;
+		}
+	}
+	return true;
 }
 
 bool SYS_FileExists(CSlrString *path)

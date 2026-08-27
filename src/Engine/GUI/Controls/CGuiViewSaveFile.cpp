@@ -11,16 +11,17 @@
 #include "SYS_KeyCodes.h"
 #include "CSlrString.h"
 #include "CGuiMain.h"
+#include "MT_UiScale.h"
 
 CGuiViewSaveFile::CGuiViewSaveFile(float posX, float posY, float posZ, float sizeX, float sizeY, CGuiViewSaveFileCallback *callback)
 : CGuiView(posX, posY, posZ, sizeX, sizeY)
 {
 	this->name = "CGuiViewSaveFile";
 
-	const int buttonGapX = 50;
-	const int buttonGapY = 5;
-	const int buttonSizeX = 60;
-	const int buttonSizeY = 25;
+	const int buttonGapX = (int)MT_UiScaled(50);
+	const int buttonGapY = (int)MT_UiScaled(5);
+	const int buttonSizeX = (int)MT_UiScaled(60);
+	const int buttonSizeY = (int)MT_UiScaled(25);
 	
 	this->callback = callback;
 	this->defaultFileName = NULL;
@@ -59,14 +60,14 @@ CGuiViewSaveFile::CGuiViewSaveFile(float posX, float posY, float posZ, float siz
 	btnSelectFolder = new CGuiButton("/", this->posX + 0.01 * this->sizeX + offsetX, this->posY + 0.24 * sizeY + offsetY, posZ, sizeX * 1.123f, sizeY * 0.07f, BUTTON_ALIGNED_LEFT, this);
 	btnSelectFolder->centerText = false;
 	btnSelectFolder->textOffsetY = 3.0f;
-	btnSelectFolder->SetFontScale(1.5f);
+	btnSelectFolder->SetFontScale(MT_UiScaled(1.5f));
 	this->AddGuiElement(btnSelectFolder);
 	
 	viewSelectFolder = new CGuiViewSelectFolder(0, 0, posZ, SCREEN_WIDTH, SCREEN_HEIGHT, true, this);
 	this->viewSelectFolder->btnCancel->textOffsetY = 3.5f;
 	this->viewSelectFolder->btnDone->textOffsetY = 3.5f;
 	
-	this->fontScale = 2.0f;
+	this->fontScale = MT_UiScaled(2.0f);
 
 }
 

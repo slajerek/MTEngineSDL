@@ -65,6 +65,12 @@ struct SI18nArg {
 	string ToString(const SI18nLocale *locale) const;
 };
 
+// --- Plural rule function pointer ---
+// Operands follow CLDR: n (number), i (integer digits), v (visible fraction
+// digit count), w (visible fraction digits without trailing zeros), f (visible
+// fraction digits as int), t (f without trailing zeros).
+typedef EI18nPluralCategory (*EI18nPluralRuleFn)(double n, int i, int v, int w, int f, int t);
+
 // --- Locale definition ---
 struct SI18nLocale {
 	string tag;          // BCP-47: "en", "pl", "it"
@@ -73,8 +79,10 @@ struct SI18nLocale {
 	vector<string> explicitFallbacks;  // appended after auto-truncation chain
 
 	// Pluggable plural rules — game registers these. NULL = always OTHER.
-	EI18nPluralCategory (*cardinalRule)(double n, int i, int v, int w, int f, int t) = nullptr;
-	EI18nPluralCategory (*ordinalRule)(double n, int i, int v, int w, int f, int t) = nullptr;
+	// CI18nManager::GetBuiltinCardinalRule()/GetBuiltinOrdinalRule() provide
+	// ready-made CLDR rules for common languages.
+	EI18nPluralRuleFn cardinalRule = nullptr;
+	EI18nPluralRuleFn ordinalRule  = nullptr;
 
 	SI18nNumberFormat numberFormat;
 };
@@ -108,6 +116,24 @@ public:
 	EI18nPluralCategory GetPluralCategory(double n) const;
 	EI18nPluralCategory GetPluralCategory(double n, const string &localeTag) const;
 	static const char *PluralCategoryName(EI18nPluralCategory cat);
+
+	// Built-in CLDR plural rules, keyed by base language. Cardinal rules exist for
+	// en, pl, it, de, fr, es, pt-BR, nl, cs, tr; ordinal rules for en, it, fr
+	// (every other language's ordinals are "other" for all counts). A region
+	// subtag falls back to its base language ("en-US" -> "en"), except pt-PT,
+	// which is deliberately unmapped so it cannot inherit the Brazilian rule.
+	//
+	// Returns nullptr when no built-in rule exists for that language (a nullptr
+	// rule means the manager treats every count as I18N_PLURAL_OTHER). Assign the
+	// result to SI18nLocale::cardinalRule / ordinalRule when registering a locale.
+	//
+	// Limitation: EI18nPluralRuleFn carries the CLDR operands n/i/v/w/f/t but not
+	// the compact-decimal operands c/e. The fr/es/pt "many" category (whole
+	// multiples of a million) is therefore implemented for plain numbers only,
+	// which is all this engine formats. Supporting compact decimals ("1,2 M")
+	// would require widening the callback signature.
+	static EI18nPluralRuleFn GetBuiltinCardinalRule(const string &lang);
+	static EI18nPluralRuleFn GetBuiltinOrdinalRule(const string &lang);
 
 	// ICU-like MessageFormat subset
 	string Format(const string &pattern, const map<string, SI18nArg> &args) const;

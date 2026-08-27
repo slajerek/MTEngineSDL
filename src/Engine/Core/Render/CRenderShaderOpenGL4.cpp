@@ -9,6 +9,8 @@ CRenderShaderOpenGL4::CRenderShaderOpenGL4(CRenderBackendOpenGL4 *renderBackend,
 {
 	LOGD("CRenderShaderOpenGL4: create shader %s", shaderName);
 	this->renderBackend = renderBackend;
+	this->isCompiled = false;
+	this->compileAttemptedAndFailed = false;
 }
 
 const char *CRenderShaderOpenGL4::GetVertexShaderSource()
@@ -47,6 +49,9 @@ const char *CRenderShaderOpenGL4::GetFragmentShaderSource()
 void CRenderShaderOpenGL4::CompileShaders()
 {
 	LOGD("CRenderShaderOpenGL4::CompileShaders");
+
+	if (isCompiled || compileAttemptedAndFailed)
+		return;
 	
 	// Create shaders
 	const char *glslVersionString = renderBackend->GetGlSlVersion();
@@ -65,7 +70,7 @@ void CRenderShaderOpenGL4::CompileShaders()
 	glCompileShader(vert_handle);
 	ASSERT_OPENGL();
 
-	CheckShader(vert_handle, "vertex shader");
+	bool vertexOk = CheckShader(vert_handle, "vertex shader");
 
 	const char *fragmentShaderSource = GetFragmentShaderSource();
 	LOGD("fragmentShaderSource=%s", fragmentShaderSource);
@@ -79,7 +84,7 @@ void CRenderShaderOpenGL4::CompileShaders()
 	glCompileShader(frag_handle);
 	ASSERT_OPENGL();
 
-	CheckShader(frag_handle, "fragment shader");
+	bool fragmentOk = CheckShader(frag_handle, "fragment shader");
 
 	SYS_ReleaseCharBuf(buf);
 	
@@ -92,7 +97,31 @@ void CRenderShaderOpenGL4::CompileShaders()
 	ASSERT_OPENGL();
 	glLinkProgram(shaderHandle);
 	ASSERT_OPENGL();
-	CheckProgram(shaderHandle, "shader program");
+	bool programOk = CheckProgram(shaderHandle, "shader program");
+
+	// HONOUR the three results. They used to be discarded and isCompiled was
+	// set unconditionally at the end of this function, so a shader that failed
+	// to compile or link still reported itself compiled -- which made every
+	// compile-time assertion in the engine false-green and hid exactly the
+	// failure mode a shader port produces.
+	if (!vertexOk || !fragmentOk || !programOk)
+	{
+		LOGError("CRenderShaderOpenGL4('%s'): shader unusable, drawing will be skipped", name);
+		glDetachShader(shaderHandle, vert_handle);
+		glDetachShader(shaderHandle, frag_handle);
+		glDeleteShader(vert_handle);
+		glDeleteShader(frag_handle);
+		glDeleteProgram(shaderHandle);
+		shaderHandle = 0;
+		isCompiled = false;
+		// LATCH. Gating isCompiled alone would turn one silent failure into a
+		// per-frame leak: UseShaderProgram() re-enters CompileShaders() whenever
+		// isCompiled is false, and each pass would allocate a fresh program and
+		// two shaders without releasing the last -- an unbounded GL object leak
+		// plus a compile stall every frame, worse than the bug being fixed.
+		compileAttemptedAndFailed = true;
+		return;
+	}
 
 	glDetachShader(shaderHandle, vert_handle);
 	ASSERT_OPENGL();
@@ -139,6 +168,12 @@ void CRenderShaderOpenGL4::UseShaderProgram()
 	if (!isCompiled)
 	{
 		CompileShaders();
+		// Still not compiled: either it just failed, or it failed earlier and
+		// the latch stopped it retrying. Either way there is no program to
+		// bind, and queuing a draw callback that binds program 0 would render
+		// garbage rather than nothing.
+		if (!isCompiled)
+			return;
 	}
 	
 //	ImVec2 p0 = ImGui::GetItemRectMin();
@@ -151,7 +186,23 @@ void CRenderShaderOpenGL4::UseShaderProgram()
 	float dpiScale = 1.0f; // Default
 	#ifdef __APPLE__
 		// Get DPI scale for the current display (works after window moves between screens)
-		dpiScale = MACOS_GetBackingScaleFactor(SDL_GetWindowDisplayIndex(VID_GetMainSDLWindow()));
+		// SDL3: this used to be MACOS_GetBackingScaleFactor(SDL_GetWindowDisplayIndex(w)),
+		// and the rename scripts turned the inner call into SDL_GetDisplayForWindow --
+		// which compiles and is WRONG. MACOS_GetBackingScaleFactor indexes
+		// [NSScreen screens]; SDL3 display IDs are OPAQUE HANDLES, not indices
+		// (they typically start at 1), so on a single-screen Mac this asked for
+		// screen 1 of 1, fell off the end, and silently returned 1.0f -- i.e. no
+		// Retina scaling, exactly where the shader needs it.
+		//
+		// SDL_GetWindowPixelDensity is the direct equivalent of NSScreen's
+		// backingScaleFactor ("a ratio of pixel size to window size"), it follows
+		// the window across screens by itself, and it needs no platform helper.
+		//
+		// The __APPLE__ guard STAYS. This API works everywhere, but non-Apple
+		// platforms have always taken the 1.0f default here, and switching them to
+		// a real density is a behaviour change with its own testing -- not
+		// something to slip into an SDL port.
+		dpiScale = SDL_GetWindowPixelDensity(VID_GetMainSDLWindow());
 	#endif
 
 //	LOGD("dpiScale=%f", dpiScale);

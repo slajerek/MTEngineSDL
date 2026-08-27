@@ -3,11 +3,12 @@
 
 #include "SYS_Defs.h"
 #include "CSlrFile.h"
+#include <string>
 
 class CSlrFileFromResources : public CSlrFile
 {
 public:
-	char osFileName[768];
+	std::string osFileName;
 
 	CSlrFileFromResources(const char *fileName);
 	virtual void Open(const char *fileName);
@@ -28,4 +29,3 @@ private:
 
 #endif
 //_CFILEFROMRESOURCES_H_
-

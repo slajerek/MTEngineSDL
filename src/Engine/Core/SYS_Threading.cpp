@@ -2,7 +2,7 @@
 #include "SYS_Threading.h"
 #include "SYS_Main.h"
 #include "SYS_Platform.h"
-#include <SDL.h>
+#include <SDL3/SDL.h>
 
 #if !defined(WIN32)
 #include <unistd.h>
@@ -63,7 +63,7 @@ void SYS_StartThread(CSlrThread *run, void *passData, float priority)
 
 	if (run->isRunning)
 	{
-		SDL_threadID threadId = SDL_GetThreadID(run->thread);
+		SDL_ThreadID threadId = SDL_GetThreadID(run->thread);
 		SYS_FatalExit("thread %d is already running", threadId);
 	}
 	
@@ -161,7 +161,12 @@ void CSlrMutex::Lock()
 #if defined(MT_DEBUG_MUTEX)
 	u64 timeout = SYS_GetCurrentTimeInMillis() + 3000;
 	
-	while (SDL_TryLockMutex(mutex) == SDL_MUTEX_TIMEDOUT)
+	// SDL3: SDL_TryLockMutex returns BOOL -- true when the lock was ACQUIRED,
+	// false when it was already held. SDL_MUTEX_TIMEDOUT is gone entirely, so
+	// this loop had to be rewritten rather than renamed. Note the polarity:
+	// `while (!acquired)` is the retry, and getting it backwards would spin
+	// forever on a lock we already own.
+	while (!SDL_TryLockMutex(mutex))
 	{
 		u64 now = SYS_GetCurrentTimeInMillis();
 		if (now >= timeout)
@@ -188,7 +193,10 @@ void CSlrMutex::Lock()
 bool CSlrMutex::TryLock()
 {
 #if defined(USE_SDL_MUTEX)
-	return ( SDL_TryLockMutex(mutex) != SDL_MUTEX_TIMEDOUT );
+	// SDL3: returns true when the lock was acquired -- which is exactly what
+	// TryLock() means, so this is now a straight forward. SDL_MUTEX_TIMEDOUT
+	// no longer exists.
+	return SDL_TryLockMutex(mutex);
 #else
 	return mutex.try_lock();
 #endif

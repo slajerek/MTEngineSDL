@@ -304,13 +304,33 @@ typedef void noreturn_t;
  */
 
 #ifndef HAVE_BOOLEAN
-#if defined FALSE || defined TRUE || defined QGLOBAL_H
-/* Qt3 defines FALSE and TRUE as "const" variables in qglobal.h */
-
-#if !defined(WIN32)
-typedef int boolean;
+#if defined(WIN32)
+/* Windows SDK headers (rpcndr.h, pulled in transitively by <windows.h>)
+ * independently typedef "boolean" as unsigned char. Whether a given
+ * translation unit sees FALSE/TRUE already defined -- and so would
+ * otherwise fall into the branch below that skips this typedef on WIN32 --
+ * depends entirely on include order: whether <windows.h> happened to be
+ * included before this header in THAT TU. Letting boolean's size vary by
+ * include order is not cosmetic: it silently produces two different
+ * struct jpeg_compress_struct (and therefore JPEGWriter) layouts for the
+ * identical type name. Code compiled under one layout and linked against
+ * (or sharing an object with) code compiled under the other corrupts
+ * memory at the first field whose offset differs -- observed in practice
+ * as stack corruption inside/adjacent to a JPEGWriter instance. Force the
+ * Windows-native size here, unconditionally, so every WIN32 TU agrees
+ * regardless of include order. A repeat of rpcndr.h's own
+ * "typedef unsigned char boolean;" is a harmless identical redeclaration.
+ */
+typedef unsigned char boolean;
+#ifndef FALSE
+#define FALSE	0
 #endif
-
+#ifndef TRUE
+#define TRUE	1
+#endif
+#elif defined FALSE || defined TRUE || defined QGLOBAL_H
+/* Qt3 defines FALSE and TRUE as "const" variables in qglobal.h */
+typedef int boolean;
 #ifndef FALSE			/* in case these macros already exist */
 #define FALSE	0		/* values of boolean */
 #endif

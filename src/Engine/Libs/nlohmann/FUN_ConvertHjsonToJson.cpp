@@ -36,7 +36,7 @@ nlohmann::json FUN_ConvertHJsonToJson(const Hjson::Value& fromHjson)
 	}
 	else if (fromHjson.type() == Hjson::Type::String)
 	{
-		return static_cast<std::string>(fromHjson);
+		return fromHjson.to_string();
 	}
 	else if (fromHjson.type() == Hjson::Type::Undefined
 			 || fromHjson.type() == Hjson::Type::Null)

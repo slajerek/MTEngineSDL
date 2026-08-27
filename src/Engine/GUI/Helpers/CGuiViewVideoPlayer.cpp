@@ -11,6 +11,7 @@
 #include "DBG_Log.h"
 #include "IconsFontAwesome_c.h"
 #include "imgui.h"
+#include <cstdlib>
 #include <cstdio>
 #include <cstring>
 
@@ -97,9 +98,9 @@ void CGuiViewVideoPlayer::OpenFile(const char *filePath)
 // File dialog callbacks
 void CGuiViewVideoPlayer::SystemDialogFileOpenSelected(CSlrString *path)
 {
-    char *cPath = path->GetStdASCII();
+    char *cPath = path->GetUTF8();
     OpenFile(cPath);
-    delete[] cPath;
+    free(cPath);
 }
 
 void CGuiViewVideoPlayer::SystemDialogFileOpenCancelled()
@@ -349,8 +350,8 @@ void CGuiViewVideoPlayer::RenderVideoFrame(float availW, float availH)
         return;
     }
 
-    GLuint texY = videoPlayer->GetYTexture();
-    if (texY == 0)
+    void *texY = videoPlayer->GetYTexture();
+    if (texY == NULL)
     {
         ImGui::Dummy(ImVec2(availW, availH));
         return;

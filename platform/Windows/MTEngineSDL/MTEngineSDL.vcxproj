@@ -1,21 +1,13 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|ARM64">
       <Configuration>Debug</Configuration>
       <Platform>ARM64</Platform>
     </ProjectConfiguration>
-    <ProjectConfiguration Include="Debug|Win32">
-      <Configuration>Debug</Configuration>
-      <Platform>Win32</Platform>
-    </ProjectConfiguration>
     <ProjectConfiguration Include="Release|ARM64">
       <Configuration>Release</Configuration>
       <Platform>ARM64</Platform>
-    </ProjectConfiguration>
-    <ProjectConfiguration Include="Release|Win32">
-      <Configuration>Release</Configuration>
-      <Platform>Win32</Platform>
     </ProjectConfiguration>
     <ProjectConfiguration Include="Debug|x64">
       <Configuration>Debug</Configuration>
@@ -49,8 +41,17 @@
     <ClCompile Include="..\..\..\src\Engine\Core\CConfigStorage.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Core\CConfigStorageHjson.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Core\CDataAdapter.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\CI18nManager.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\DBG_LogForCWrapper.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Core\CCameraCapture.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Core\CImageData.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\CImageDataTIFF.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\CImageDataWebP.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\CImageDataHEIF.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\CImageDataHEIF_libheif.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\CImageDataAVIF.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\CImageDataRAW.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\CKTX2Loader.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Core\CSlrAnimation.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Core\CSlrAnimationState.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Core\CSlrDate.cpp" />
@@ -76,7 +77,7 @@
     <ClCompile Include="..\..\..\src\Engine\Libs\basis_universal\zstd\zstd.c" />
     <ClCompile Include="..\..\..\src\Engine\Sci\Llama\LLamaBackend_Stub.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Sci\Llama\LLamaBackend_LlamaCpp.cpp" />
-    <ClCompile Include="..\..\..\src\Engine\Sci\Llama\LLamaBackend_WinCudaPlugin.cpp" />
+    <ClCompile Include="..\src.Windows\Llama\LLamaBackend_WinCudaPlugin.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Tests\CTestLlamaAvailability.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Core\CSlrResourceBase.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Core\CSlrString.cpp" />
@@ -87,6 +88,7 @@
     <ClCompile Include="..\..\..\src\Engine\Core\GamePads\CGamePadAxisMotionToButton.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Core\GamePads\GAM_GamePads.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Core\MTH_FastMath.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\MTH_Geodesy.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Core\MTH_FixedPoint.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Core\MTH_Random.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Core\Net\CNetClient.cpp" />
@@ -96,6 +98,44 @@
     <ClCompile Include="..\..\..\src\Engine\Core\Net\NET_Main.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Core\Pool\CPool.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Core\Render\CRenderBackend.cpp" />
+    <ClCompile Include="..\src.Windows\Render\CVideoYUVShaderD3D11.cpp" />
+    <ClInclude Include="..\src.Windows\Render\CVideoYUVShaderD3D11.h" />
+    <ClCompile Include="..\src.Windows\Render\CRenderShaderFlatColorD3D11.cpp" />
+    <ClInclude Include="..\src.Windows\Render\CRenderShaderFlatColorD3D11.h" />
+    <ClCompile Include="..\src.Windows\Render\CRenderBackendD3D11.cpp" />
+    <ClInclude Include="..\src.Windows\Render\CRenderBackendD3D11.h" />
+    <ClCompile Include="..\src.Windows\SYS_WindowsHdr.cpp" />
+    <ClInclude Include="..\src.Windows\Render\Generated\ResolveVSBytecode.h" />
+    <ClInclude Include="..\src.Windows\Render\Generated\ResolvePSBytecode.h" />
+    <ClInclude Include="..\src.Windows\Render\Generated\FlatColorPSBytecode.h" />
+    <ClInclude Include="..\src.Windows\Render\Generated\VideoYuvVSBytecode.h" />
+    <ClInclude Include="..\src.Windows\Render\Generated\VideoYuvPSBytecode.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\src.Windows\Render\Shaders\Resolve.hlsl" />
+    <None Include="..\src.Windows\Render\Shaders\FlatColor.hlsl" />
+    <None Include="..\src.Windows\Render\Shaders\VideoYUV.hlsl" />
+    <ClInclude Include="..\..\..\src\Engine\Core\MT_SrgbCurve.h" />
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestSurfaceEncoding.cpp" />
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestSurfaceEncoding.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\Render\MT_SurfaceEncoding.h" />
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestScissorClamp.cpp" />
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestScissorClamp.h" />
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestResidentFunnel.cpp" />
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestResidentFunnel.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\Render\ERenderTextureFormat.h" />
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestImageDataFloat.cpp" />
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestImageDataFloat.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\Render\CMaskedTileBoundsQueue.h" />
+    <ClCompile Include="..\..\..\src\Engine\Tests\MT_ShaderProbe.cpp" />
+    <ClInclude Include="..\..\..\src\Engine\Tests\MT_ShaderProbe.h" />
+    <ClCompile Include="..\..\..\src\Engine\Tests\MT_CaptureHelpers.cpp" />
+    <ClInclude Include="..\..\..\src\Engine\Tests\MT_CaptureHelpers.h" />
+    <ClCompile Include="..\..\..\src\Engine\Core\Render\CRenderShaderFlatColorOpenGL4.cpp" />
+    <ClInclude Include="..\..\..\src\Engine\Core\Render\CRenderShaderFlatColorOpenGL4.h" />
+    <ClInclude Include="..\..\..\src\Engine\Video\CVideoYUVConverter.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\Render\CMaskedTileShader.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\Render\CRenderTarget.h" />
     <ClCompile Include="..\..\..\src\Engine\Core\Render\CRenderBackendOpenGL4.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Core\Render\CRenderShader.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Core\Render\CRenderShaderOpenGL4.cpp" />
@@ -112,6 +152,8 @@
     <ClCompile Include="..\..\..\src\Engine\Core\SYS_Funct.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Core\SYS_KeyCodes.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Core\SYS_Main.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\SYS_PathValidate.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\SYS_FileBirthTime.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Core\SYS_PauseResume.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Core\SYS_PIPE.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Core\SYS_Startup.cpp" />
@@ -119,6 +161,7 @@
     <ClCompile Include="..\..\..\src\Engine\Core\VID_Fonts.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Funct\CFeatureConfig.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Funct\CHjsonSerializer.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\nlohmann\FUN_ConvertHjsonToJson.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Funct\ContinuousParam\CContinuousParam.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Funct\ContinuousParam\CContinuousParamBezier.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Funct\ContinuousParam\CContinuousParamLinear.cpp" />
@@ -128,6 +171,9 @@
     <ClCompile Include="..\..\..\src\Engine\Funct\DataTable\CGuiViewDataTable.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Funct\DataTable\FUN_CSVParser.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Funct\FUN_IntervalTree.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Funct\FUN_GenerateSinTab.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Funct\FFT\rad2fft.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Funct\FFT\SpectrumAnalysis.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Funct\ImageProcessing\CImageKernel.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Funct\ImageProcessing\IMG_Filters.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Funct\ImageProcessing\IMG_HoughLines.cpp" />
@@ -138,6 +184,7 @@
     <ClCompile Include="..\..\..\src\Engine\GUI\AudioMixer\CViewAudioMixer.cpp" />
     <ClCompile Include="..\..\..\src\Engine\GUI\Fonts\CGuiFontManager.cpp" />
     <ClCompile Include="..\..\..\src\Engine\GUI\CGuiMain.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\CMTNativeMenuBarImGui.cpp" />
     <ClCompile Include="..\..\..\src\Engine\GUI\COneTouchData.cpp" />
     <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CColorsTheme.cpp" />
     <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiBackground.cpp" />
@@ -190,10 +237,13 @@
     <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewImageWithLayer.cpp" />
     <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewTableItem.cpp" />
     <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewTableWithFilterAndButtons.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewSettings.cpp" />
     <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewMessages.cpp" />
     <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewProgressBarWindow.cpp" />
     <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewSearch.cpp" />
     <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\CViewCamera.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewVideoPlayer.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\ResourceManager\CGuiViewResourceManagerImGui.cpp" />
     <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewUiDebug.cpp" />
     <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\CRecentlyOpenedFiles.cpp" />
     <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\GUI_Debug.cpp" />
@@ -214,6 +264,18 @@
     <ClCompile Include="..\..\..\src\Engine\Libs\ENet\ENET_Peer.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Libs\ENet\ENET_Protocol.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Libs\ENet\ENET_Win32.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\exif\CExifReader.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\exif\CExifBuilder.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\icc\ICC_SRGBProfile.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\icc\CIccProfileCodec.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Color\CCmsEngineFactory.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Color\CColorManager.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Raw\CRawDecoder.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Develop\DevelopMath.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Develop\CDevelopBaselineSeams.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Develop\CDevelopChain.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Color\CCmsWindows.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Color\CCmsLittleCMS.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Libs\hjson\hjson_decode.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Libs\hjson\hjson_encode.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Libs\hjson\hjson_parsenumber.cpp" />
@@ -226,12 +288,18 @@
     <ClCompile Include="..\..\..\src\Engine\Libs\imguiext\imguifilesystem.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Libs\imguiext\imgui_stdlib.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Libs\imguiext\imgui_toggle.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\stb\stb_sprintf.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\imguiext\imgui_md.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\md4c\md4c.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\md4c\md4c-entity.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\md4c\md4c-html.c" />
     <ClCompile Include="..\..\..\src\Engine\Libs\imgui\imgui.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Libs\imgui\imgui_demo.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Libs\imgui\imgui_draw.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Libs\imgui\imgui_freetype.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\imgui\imgui_impl_dx11.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Libs\imgui\imgui_impl_opengl3.cpp" />
-    <ClCompile Include="..\..\..\src\Engine\Libs\imgui\imgui_impl_sdl2.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\imgui\imgui_impl_sdl3.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Libs\imgui\imgui_tables.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Libs\imgui\imgui_widgets.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Libs\implot\implot.cpp" />
@@ -315,6 +383,11 @@
     <ClCompile Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\JSONWriter.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Libs\libjson\_internal\Source\libjson.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Libs\libpng\png.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\libpng\arm\arm_init.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\libpng\arm\filter_neon_intrinsics.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\libpng\arm\palette_neon_intrinsics.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\libpng\intel\intel_init.c" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\libpng\intel\filter_sse2_intrinsics.c" />
     <ClCompile Include="..\..\..\src\Engine\Libs\libpng\pngerror.c" />
     <ClCompile Include="..\..\..\src\Engine\Libs\libpng\pngget.c" />
     <ClCompile Include="..\..\..\src\Engine\Libs\libpng\pngmem.c" />
@@ -331,6 +404,12 @@
     <ClCompile Include="..\..\..\src\Engine\Libs\libpng\pngwutil.c" />
     <ClCompile Include="..\..\..\src\Engine\Libs\libtmt\tmt.c" />
     <ClCompile Include="..\..\..\src\Engine\Libs\lodepng\lodepng.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\nestegg\nestegg.c">
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">CompileAsC</CompileAs>
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">CompileAsC</CompileAs>
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">CompileAsC</CompileAs>
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">CompileAsC</CompileAs>
+    </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\Libs\md5\MD5.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Libs\minizip\ioapi.c" />
     <ClCompile Include="..\..\..\src\Engine\Libs\minizip\mztools.c" />
@@ -372,9 +451,13 @@
     <ClCompile Include="..\..\..\src\Engine\Libs\zlib\trees.c" />
     <ClCompile Include="..\..\..\src\Engine\Libs\zlib\uncompr.c" />
     <ClCompile Include="..\..\..\src\Engine\Libs\zlib\zutil.c" />
+    <ClCompile Include="..\..\..\src\Engine\Crash\MT_CrashReporter.cpp" />
+    <ClCompile Include="..\src.Windows\Crash\MT_CrashReporter_Windows.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Tools\CInterruptibleSleep.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Tools\CTask.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Tools\CTaskScheduler.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Tools\Undo\CUndoManager.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Tools\Undo\ImGuiUndo.cpp" />
     <ClCompile Include="..\src.Windows\CCameraWindows.cpp" />
     <ClCompile Include="..\src.Windows\CLogByteBuffer.cpp" />
     <ClCompile Include="..\src.Windows\CSlrFileFromDocuments.cpp" />
@@ -393,13 +476,50 @@
     <ClCompile Include="..\src.Windows\SYS_Memory.cpp" />
     <ClCompile Include="..\src.Windows\SYS_MiniDump.cpp" />
     <ClCompile Include="..\src.Windows\SYS_Platform.cpp" />
+    <ClCompile Include="..\src.Windows\CMTNativeMenuBarWin32.cpp" />
     <ClCompile Include="..\src.Windows\SYS_SharedMemory.cpp" />
     <ClCompile Include="..\src.Windows\win-gettimeofday.cpp" />
     <ClCompile Include="..\src.Windows\win-registry.cpp" />
     <ClCompile Include="..\src.Windows\win-usleep.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Tests\CImGuiTestEngine.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\imgui_test_engine\imgui_capture_tool.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\imgui_test_engine\imgui_te_context.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\imgui_test_engine\imgui_te_coroutine.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\imgui_test_engine\imgui_te_engine.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\imgui_test_engine\imgui_te_exporters.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\imgui_test_engine\imgui_te_perftool.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\imgui_test_engine\imgui_te_ui.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Libs\imgui_test_engine\imgui_te_utils.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Tests\CTest.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Tests\CTestI18nEngine.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestExifEngine.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestExifMetadataReach.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Tests\RawTestFixtures.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestRawPreview.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestThemeMath.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestVideoTransfer.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestThemeRamp.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestThemeApply.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\CImageDataPlatformDecode.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Core\CImageDataWIC_Windows.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Theme\MTH_OkLab.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Theme\CMTThemeRamp.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Theme\CMTTheme.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\GUI\MT_UiScale.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Theme\MT_Theme.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Theme\CMTThemeRegistry.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestRawDecode.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Tests\PC_DcpFixtureWriter.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestDcpParse.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Color\CDcpProfile.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Color\CDcpTemperature.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Color\CDcpApply.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestDcpApply.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestJpegMarkers.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestIccProfileCodec.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestIccExtract.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestDisplayProfile.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestCms.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Tests\CTestRunner.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Tests\CTestSuite.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Tools\CProcessSpawner.cpp" />
@@ -417,6 +537,7 @@
     <ClCompile Include="..\..\..\src\Engine\Tools\NetGame\CNetLobbyServer.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Tools\NetGame\CNetGameClient.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Tools\NetGame\CViewGameClient.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Tools\NetGame\CImGuiChatRenderer.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Tools\NetGame\CViewGameServer.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Tools\NetGame\CGameServerProcessBase.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Tools\NetGame\CNetLobbyClient.cpp" />
@@ -433,6 +554,22 @@
     <ClCompile Include="..\..\..\src\Engine\Tools\NetGame\CFileDownloader.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Tools\NetGame\CNodeAgent.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Tools\NetGame\CSnapshotStorage.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Video\CVideoPlayer.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Video\CVideoSourceWebMVpx.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Video\CVideoSourceFFmpeg.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Video\CVideoDecoderHEVCVT.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Video\CVideoDecoderHEVCMF.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Video\CVideoDecoderWMVMF.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Video\CAudioDecoderWMAMF.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Video\CAudioDecoderAACApple.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Video\CAudioDecoderAACMF.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Video\AacAscParser.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Video\CVideoFrameExtractor.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Video\VideoFrameTransform.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Video\CVideoYUVShader.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Video\CVideoAudioChannel.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Video\CGLRenderTarget.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Video\CSlrImageExternalTexture.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\Embedded\console_inverted_plain_gfx.h" />
@@ -441,6 +578,7 @@
     <ClInclude Include="..\..\..\src\Embedded\default_font_gfx.h" />
     <ClInclude Include="..\..\..\src\Embedded\gamecontrollerdb_txt_zlib.h" />
     <ClInclude Include="..\..\..\src\Embedded\RES_Embedded.h" />
+    <ClInclude Include="..\..\..\src\Embedded\Fonts\MTEmbeddedFonts.h" />
     <ClInclude Include="..\..\..\src\Engine\Audio\CAudioChannel.h" />
     <ClInclude Include="..\..\..\src\Engine\Audio\CAudioChannelBusFloat.h" />
     <ClInclude Include="..\..\..\src\Engine\Audio\CAudioChannelBusInt.h" />
@@ -462,12 +600,17 @@
     <ClInclude Include="..\..\..\src\Engine\Core\CConfigStorage.h" />
     <ClInclude Include="..\..\..\src\Engine\Core\CConfigStorageHjson.h" />
     <ClInclude Include="..\..\..\src\Engine\Core\CDataAdapter.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\CI18nManager.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\DBG_LogForCWrapper.h" />
     <ClInclude Include="..\..\..\src\Engine\Core\CGlobalDropFileCallback.h" />
     <ClInclude Include="..\..\..\src\Engine\Core\CGlobalKeyboardCallback.h" />
     <ClInclude Include="..\..\..\src\Engine\Core\CGlobalLogicCallback.h" />
     <ClInclude Include="..\..\..\src\Engine\Core\CGlobalLayoutCallback.h" />
     <ClInclude Include="..\..\..\src\Engine\Core\CGlobalOSWindowChangedCallback.h" />
     <ClInclude Include="..\..\..\src\Engine\Core\CImageData.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\CKTX2Loader.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\bcdec.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\etcdec.h" />
     <ClInclude Include="..\..\..\src\Engine\Core\ConstantsAndMacros.h" />
     <ClInclude Include="..\..\..\src\Engine\Core\CSlrAnimation.h" />
     <ClInclude Include="..\..\..\src\Engine\Core\CSlrAnimationState.h" />
@@ -492,7 +635,7 @@
     <ClInclude Include="..\..\..\src\Engine\Sci\Llama\CLlamaTypes.h" />
     <ClInclude Include="..\..\..\src\Engine\Sci\Llama\LLamaBackend_Stub.h" />
     <ClInclude Include="..\..\..\src\Engine\Sci\Llama\LLamaBackend_LlamaCpp.h" />
-    <ClInclude Include="..\..\..\src\Engine\Sci\Llama\LLamaBackend_WinCudaPlugin.h" />
+    <ClInclude Include="..\src.Windows\Llama\LLamaBackend_WinCudaPlugin.h" />
     <ClInclude Include="..\..\..\src\Engine\Sci\Llama\mt_llama_cuda_plugin_api.h" />
     <ClInclude Include="..\..\..\src\Engine\Tests\CTestLlamaAvailability.h" />
     <ClInclude Include="..\..\..\src\Engine\Core\CSlrResourceBase.h" />
@@ -505,6 +648,7 @@
     <ClInclude Include="..\..\..\src\Engine\Core\GamePads\GAM_GamePads.h" />
     <ClInclude Include="..\..\..\src\Engine\Core\GFX_Types.h" />
     <ClInclude Include="..\..\..\src\Engine\Core\MTH_FastMath.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\MTH_Geodesy.h" />
     <ClInclude Include="..\..\..\src\Engine\Core\MTH_FastMathSinTab.h" />
     <ClInclude Include="..\..\..\src\Engine\Core\MTH_FixedPoint.h" />
     <ClInclude Include="..\..\..\src\Engine\Core\MTH_FixedPointUtils.h" />
@@ -533,9 +677,15 @@
     <ClInclude Include="..\..\..\src\Engine\Core\SYS_DefaultConfig.h" />
     <ClInclude Include="..\..\..\src\Engine\Core\SYS_Defs.h" />
     <ClInclude Include="..\..\..\src\Engine\Core\SYS_DocsVsRes.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\SYS_FileUtf8.h" />
     <ClInclude Include="..\..\..\src\Engine\Core\SYS_Funct.h" />
+    <ClInclude Include="..\src.Windows\SYS_WindowsPathUtils.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\SYS_WindowsPathUtils.h" />
     <ClInclude Include="..\..\..\src\Engine\Core\SYS_KeyCodes.h" />
     <ClInclude Include="..\..\..\src\Engine\Core\SYS_Main.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\SYS_PathValidate.h" />
+    <ClInclude Include="..\..\..\src\Engine\Core\SYS_FileBirthTime.h" />
+    <ClInclude Include="..\..\..\src\Engine\System\SYS_SecurityScopedAccess.h" />
     <ClInclude Include="..\..\..\src\Engine\Core\SYS_PauseResume.h" />
     <ClInclude Include="..\..\..\src\Engine\Core\SYS_PIPE.h" />
     <ClInclude Include="..\..\..\src\Engine\Core\SYS_Startup.h" />
@@ -545,6 +695,7 @@
     <ClInclude Include="..\..\..\src\Engine\Funct\CCombinations.h" />
     <ClInclude Include="..\..\..\src\Engine\Funct\CFeatureConfig.h" />
     <ClInclude Include="..\..\..\src\Engine\Funct\CHjsonSerializer.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\nlohmann\FUN_ConvertHjsonToJson.h" />
     <ClInclude Include="..\..\..\src\Engine\Funct\ContinuousParam\CContinuousParam.h" />
     <ClInclude Include="..\..\..\src\Engine\Funct\ContinuousParam\CContinuousParamBezier.h" />
     <ClInclude Include="..\..\..\src\Engine\Funct\ContinuousParam\CContinuousParamLinear.h" />
@@ -554,6 +705,9 @@
     <ClInclude Include="..\..\..\src\Engine\Funct\DataTable\CGuiViewDataTable.h" />
     <ClInclude Include="..\..\..\src\Engine\Funct\DataTable\FUN_CSVParser.h" />
     <ClInclude Include="..\..\..\src\Engine\Funct\FUN_IntervalTree.h" />
+    <ClInclude Include="..\..\..\src\Engine\Funct\FUN_GenerateSinTab.h" />
+    <ClInclude Include="..\..\..\src\Engine\Funct\FFT\rad2fft.h" />
+    <ClInclude Include="..\..\..\src\Engine\Funct\FFT\SpectrumAnalysis.h" />
     <ClInclude Include="..\..\..\src\Engine\Funct\ImageProcessing\CImageKernel.h" />
     <ClInclude Include="..\..\..\src\Engine\Funct\ImageProcessing\IMG_Filters.h" />
     <ClInclude Include="..\..\..\src\Engine\Funct\ImageProcessing\IMG_HoughLines.h" />
@@ -565,6 +719,8 @@
     <ClInclude Include="..\..\..\src\Engine\GUI\AudioMixer\CViewAudioMixer.h" />
     <ClInclude Include="..\..\..\src\Engine\GUI\Fonts\CGuiFontManager.h" />
     <ClInclude Include="..\..\..\src\Engine\GUI\CGuiMain.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\CMTNativeMenuBar.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\CMTNativeMenuBarImGui.h" />
     <ClInclude Include="..\..\..\src\Engine\GUI\COneTouchData.h" />
     <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CColorsTheme.h" />
     <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiBackground.h" />
@@ -619,7 +775,10 @@
     <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewImageWithLayer.h" />
     <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewTableItem.h" />
     <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewTableWithFilterAndButtons.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewSettings.h" />
     <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewMessages.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewVideoPlayer.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\ResourceManager\CGuiViewResourceManagerImGui.h" />
     <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewProgressBarWindow.h" />
     <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewSearch.h" />
     <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewUiDebug.h" />
@@ -643,6 +802,17 @@
     <ClInclude Include="..\..\..\src\Engine\Libs\ENet\ENET_Types.h" />
     <ClInclude Include="..\..\..\src\Engine\Libs\ENet\ENET_Utility.h" />
     <ClInclude Include="..\..\..\src\Engine\Libs\ENet\ENET_Win32.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\exif\CExifReader.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\exif\CExifBuilder.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\icc\ICC_SRGBProfile.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\icc\CIccProfileCodec.h" />
+    <ClInclude Include="..\..\..\src\Engine\Color\ICmsEngine.h" />
+    <ClInclude Include="..\..\..\src\Engine\Raw\CRawDecoder.h" />
+    <ClInclude Include="..\..\..\src\Engine\Develop\DevelopMath.h" />
+    <ClInclude Include="..\..\..\src\Engine\Develop\DevelopSeams.h" />
+    <ClInclude Include="..\..\..\src\Engine\Develop\CDevelopBaselineSeams.h" />
+    <ClInclude Include="..\..\..\src\Engine\Develop\CDevelopChain.h" />
+    <ClInclude Include="..\..\..\src\Engine\Color\CColorManager.h" />
     <ClInclude Include="..\..\..\src\Engine\Libs\hjson\hjson.h" />
     <ClInclude Include="..\..\..\src\Engine\Libs\httplib\httplib.h" />
     <ClInclude Include="..\..\..\src\Engine\Libs\imgui-notify\fa_solid_900.h" />
@@ -663,12 +833,14 @@
     <ClInclude Include="..\..\..\src\Engine\Libs\imguiext\imgui_memory_editor.h" />
     <ClInclude Include="..\..\..\src\Engine\Libs\imguiext\imgui_stdlib.h" />
     <ClInclude Include="..\..\..\src\Engine\Libs\imguiext\imgui_toggle.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\imguiext\imgui_md.h" />
     <ClInclude Include="..\..\..\src\Engine\Libs\imguiext\imspinner.h" />
     <ClInclude Include="..\..\..\src\Engine\Libs\imgui\imconfig.h" />
     <ClInclude Include="..\..\..\src\Engine\Libs\imgui\imgui.h" />
     <ClInclude Include="..\..\..\src\Engine\Libs\imgui\imgui_freetype.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\imgui\imgui_impl_dx11.h" />
     <ClInclude Include="..\..\..\src\Engine\Libs\imgui\imgui_impl_opengl3.h" />
-    <ClInclude Include="..\..\..\src\Engine\Libs\imgui\imgui_impl_sdl2.h" />
+    <ClInclude Include="..\..\..\src\Engine\Libs\imgui\imgui_impl_sdl3.h" />
     <ClInclude Include="..\..\..\src\Engine\Libs\imgui\imgui_internal.h" />
     <ClInclude Include="..\..\..\src\Engine\Libs\imgui\imstb_rectpack.h" />
     <ClInclude Include="..\..\..\src\Engine\Libs\imgui\imstb_textedit.h" />
@@ -774,9 +946,12 @@
     <ClInclude Include="..\..\..\src\Engine\Libs\zlib\zconf.h" />
     <ClInclude Include="..\..\..\src\Engine\Libs\zlib\zlib.h" />
     <ClInclude Include="..\..\..\src\Engine\Libs\zlib\zutil.h" />
+    <ClInclude Include="..\..\..\src\Engine\Crash\MT_CrashReporter.h" />
     <ClInclude Include="..\..\..\src\Engine\Tools\CInterruptibleSleep.h" />
     <ClInclude Include="..\..\..\src\Engine\Tools\CTask.h" />
     <ClInclude Include="..\..\..\src\Engine\Tools\CTaskScheduler.h" />
+    <ClInclude Include="..\..\..\src\Engine\Tools\Undo\CUndoManager.h" />
+    <ClInclude Include="..\..\..\src\Engine\Tools\Undo\ImGuiUndo.h" />
     <ClInclude Include="..\..\..\src\MT_API.h" />
     <ClInclude Include="..\..\..\src\MT_VERSION.h" />
     <ClInclude Include="..\src.Windows\CLogByteBuffer.h" />
@@ -797,6 +972,7 @@
     <ClInclude Include="..\src.Windows\SYS_Memory.h" />
     <ClInclude Include="..\src.Windows\SYS_MiniDump.h" />
     <ClInclude Include="..\src.Windows\SYS_Platform.h" />
+    <ClInclude Include="..\src.Windows\CMTNativeMenuBarWin32.h" />
     <ClInclude Include="..\src.Windows\SYS_SharedMemory.h" />
     <ClInclude Include="..\src.Windows\unistd.h" />
     <ClInclude Include="..\src.Windows\win-gettimeofday.h" />
@@ -805,6 +981,34 @@
     <ClInclude Include="..\..\..\src\Engine\Tests\CImGuiTestEngine.h" />
     <ClInclude Include="..\..\..\src\Engine\Tests\CTest.h" />
     <ClInclude Include="..\..\..\src\Engine\Tests\CTestI18nEngine.h" />
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestExifEngine.h" />
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestExifMetadataReach.h" />
+    <ClInclude Include="..\..\..\src\Engine\Tests\RawTestFixtures.h" />
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestRawPreview.h" />
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestThemeMath.h" />
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestVideoTransfer.h" />
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestThemeRamp.h" />
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestThemeApply.h" />
+    <ClInclude Include="..\..\..\src\Engine\Theme\MTH_OkLab.h" />
+    <ClInclude Include="..\..\..\src\Engine\Theme\CMTThemeSeed.h" />
+    <ClInclude Include="..\..\..\src\Engine\Theme\CMTThemeRamp.h" />
+    <ClInclude Include="..\..\..\src\Engine\Theme\CMTTheme.h" />
+    <ClInclude Include="..\..\..\src\Engine\GUI\MT_UiScale.h" />
+    <ClInclude Include="..\..\..\src\Engine\Theme\MT_Theme.h" />
+    <ClInclude Include="..\..\..\src\Engine\Theme\CMTThemeRegistry.h" />
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestRawDecode.h" />
+    <ClInclude Include="..\..\..\src\Engine\Tests\PC_DcpFixtureWriter.h" />
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestDcpParse.h" />
+    <ClInclude Include="..\..\..\src\Engine\Color\CDcpProfile.h" />
+    <ClInclude Include="..\..\..\src\Engine\Color\CDcpTemperature.h" />
+    <ClInclude Include="..\..\..\src\Engine\Color\CDcpApply.h" />
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestDcpApply.h" />
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestJpegMarkers.h" />
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestIccProfileCodec.h" />
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestIccExtract.h" />
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestDisplayProfile.h" />
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestCms.h" />
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestIccHelpers.h" />
     <ClInclude Include="..\..\..\src\Engine\Tests\CTestRunner.h" />
     <ClInclude Include="..\..\..\src\Engine\Tests\CTestSuite.h" />
     <ClInclude Include="..\..\..\src\Engine\Tests\ITestCallback.h" />
@@ -824,6 +1028,7 @@
     <ClInclude Include="..\..\..\src\Engine\Tools\NetGame\CNetLobbyServer.h" />
     <ClInclude Include="..\..\..\src\Engine\Tools\NetGame\CNetGameClient.h" />
     <ClInclude Include="..\..\..\src\Engine\Tools\NetGame\CViewGameClient.h" />
+    <ClInclude Include="..\..\..\src\Engine\Tools\NetGame\CImGuiChatRenderer.h" />
     <ClInclude Include="..\..\..\src\Engine\Tools\NetGame\CViewGameServer.h" />
     <ClInclude Include="..\..\..\src\Engine\Tools\NetGame\CGameServerProcessBase.h" />
     <ClInclude Include="..\..\..\src\Engine\Tools\NetGame\CNetLobbyClient.h" />
@@ -840,6 +1045,28 @@
     <ClInclude Include="..\..\..\src\Engine\Tools\NetGame\CFileDownloader.h" />
     <ClInclude Include="..\..\..\src\Engine\Tools\NetGame\CNodeAgent.h" />
     <ClInclude Include="..\..\..\src\Engine\Tools\NetGame\CSnapshotStorage.h" />
+    <ClInclude Include="..\..\..\src\Engine\Video\CVideoPlayer.h" />
+    <ClInclude Include="..\..\..\src\Engine\Video\IVideoSource.h" />
+    <ClInclude Include="..\..\..\src\Engine\Video\CVideoSourceWebMVpx.h" />
+    <ClInclude Include="..\..\..\src\Engine\Video\CVideoSourceFFmpeg.h" />
+    <ClInclude Include="..\..\..\src\Engine\Video\IVideoPacketDecoder.h" />
+    <ClInclude Include="..\..\..\src\Engine\Video\CVideoDecoderHEVCVT.h" />
+    <ClInclude Include="..\..\..\src\Engine\Video\CVideoDecoderHEVCMF.h" />
+    <ClInclude Include="..\..\..\src\Engine\Video\CVideoDecoderWMVMF.h" />
+    <ClInclude Include="..\..\..\src\Engine\Video\CAudioDecoderWMAMF.h" />
+    <ClInclude Include="..\..\..\src\Engine\Video\CAudioDecoderWMANative.h" />
+    <ClInclude Include="..\..\..\src\Engine\Video\CAudioDecoderAACApple.h" />
+    <ClInclude Include="..\..\..\src\Engine\Video\CAudioDecoderAACMF.h" />
+    <ClInclude Include="..\..\..\src\Engine\Video\CAudioDecoderAACNative.h" />
+    <ClInclude Include="..\..\..\src\Engine\Video\MFComThreadGuard.h" />
+    <ClInclude Include="..\..\..\src\Engine\Video\AacAscParser.h" />
+    <ClInclude Include="..\..\..\src\Engine\Video\CVideoFrameExtractor.h" />
+    <ClInclude Include="..\..\..\src\Engine\Video\CVideoTransferFunctions.h" />
+    <ClInclude Include="..\..\..\src\Engine\Video\VideoFrameTransform.h" />
+    <ClInclude Include="..\..\..\src\Engine\Video\CVideoYUVShader.h" />
+    <ClInclude Include="..\..\..\src\Engine\Video\CVideoAudioChannel.h" />
+    <ClInclude Include="..\..\..\src\Engine\Video\CGLRenderTarget.h" />
+    <ClInclude Include="..\..\..\src\Engine\Video\CSlrImageExternalTexture.h" />
     <ClInclude Include="..\..\..\src\Engine\Core\ILogSink.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
@@ -849,19 +1076,6 @@
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
-    <ConfigurationType>StaticLibrary</ConfigurationType>
-    <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>ClangCL</PlatformToolset>
-    <CharacterSet>MultiByte</CharacterSet>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
-    <ConfigurationType>StaticLibrary</ConfigurationType>
-    <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>ClangCL</PlatformToolset>
-    <WholeProgramOptimization Condition="'$(PlatformToolset)'!='ClangCL'">true</WholeProgramOptimization>
-    <CharacterSet>MultiByte</CharacterSet>
-  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
@@ -893,12 +1107,6 @@
   </ImportGroup>
   <ImportGroup Label="Shared">
   </ImportGroup>
-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-  </ImportGroup>
-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-  </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
@@ -912,39 +1120,52 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <IncludePath>$(ProjectDir)..\..\..\other\lib\llama.cpp\include;$(ProjectDir)..\..\..\other\lib\llama.cpp\ggml\include;$(ProjectDir)..\..\..\other\lib\ftxui\include;$(ProjectDir)..\include;$(IncludePath)</IncludePath>
-    <LibraryPath>$(ProjectDir)..\libs\$(Platform)\$(Configuration);$(LibraryPath)</LibraryPath>
-    <OutDir>$(ProjectDir)..\bin\$(Platform)\$(Configuration)\</OutDir>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <OutDir>$(ProjectDir)..\bin\$(Platform)\$(Configuration)\</OutDir>
-    <LibraryPath>$(ProjectDir)..\libs\$(Platform)\$(Configuration);$(LibraryPath)</LibraryPath>
-    <IncludePath>$(ProjectDir)..\..\..\other\lib\llama.cpp\include;$(ProjectDir)..\..\..\other\lib\llama.cpp\ggml\include;$(ProjectDir)..\..\..\other\lib\ftxui\include;$(ProjectDir)..\include;$(IncludePath)</IncludePath>
-  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <OutDir>$(ProjectDir)..\bin\$(Platform)\$(Configuration)\</OutDir>
-    <IntDir>$(Configuration)\</IntDir>
+    <OutDir>$(MTOutRoot)bin\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(MTOutRoot)obj\$(Platform)\$(Configuration)\</IntDir>
     <LibraryPath>$(ProjectDir)..\libs\$(Platform)\$(Configuration);$(LibraryPath)</LibraryPath>
     <IncludePath>$(ProjectDir)..\..\..\other\lib\llama.cpp\include;$(ProjectDir)..\..\..\other\lib\llama.cpp\ggml\include;$(ProjectDir)..\..\..\other\lib\ftxui\include;$(ProjectDir)..\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
     <LibraryPath>$(ProjectDir)..\libs\$(Platform)\$(Configuration);$(LibraryPath)</LibraryPath>
     <IncludePath>$(ProjectDir)..\..\..\other\lib\llama.cpp\include;$(ProjectDir)..\..\..\other\lib\llama.cpp\ggml\include;$(ProjectDir)..\..\..\other\lib\ftxui\include;$(ProjectDir)..\include;$(IncludePath)</IncludePath>
-    <OutDir>$(ProjectDir)..\bin\$(Platform)\$(Configuration)\</OutDir>
+    <OutDir>$(MTOutRoot)bin\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(MTOutRoot)obj\$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <OutDir>$(ProjectDir)..\bin\$(Platform)\$(Configuration)\</OutDir>
-    <IntDir>$(Configuration)\</IntDir>
+    <OutDir>$(MTOutRoot)bin\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(MTOutRoot)obj\$(Platform)\$(Configuration)\</IntDir>
     <LibraryPath>$(ProjectDir)..\libs\$(Platform)\$(Configuration);$(LibraryPath)</LibraryPath>
     <IncludePath>$(ProjectDir)..\..\..\other\lib\llama.cpp\include;$(ProjectDir)..\..\..\other\lib\llama.cpp\ggml\include;$(ProjectDir)..\..\..\other\lib\ftxui\include;$(ProjectDir)..\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
     <LibraryPath>$(ProjectDir)..\libs\$(Platform)\$(Configuration);$(LibraryPath)</LibraryPath>
     <IncludePath>$(ProjectDir)..\..\..\other\lib\llama.cpp\include;$(ProjectDir)..\..\..\other\lib\llama.cpp\ggml\include;$(ProjectDir)..\..\..\other\lib\ftxui\include;$(ProjectDir)..\include;$(IncludePath)</IncludePath>
-    <OutDir>$(ProjectDir)..\bin\$(Platform)\$(Configuration)\</OutDir>
+    <OutDir>$(MTOutRoot)bin\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(MTOutRoot)obj\$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>
   <!-- ClangCL warning suppressions (ignored when building with MSVC) -->
+  <!-- S-6 A4b: HLSL bytecode freshness.
+       Runs for EVERY configuration, before every build. It does not compile
+       anything - it verifies that each committed
+       platform/Windows/src.Windows/Render/Generated/*Bytecode.h still matches
+       the .hlsl it was generated from, by CONTENT HASH (git does not preserve
+       mtimes, so a timestamp would fail or pass depending on checkout order).
+       Editing a shader without regenerating FAILS the build here, which is the
+       one thing that must not slip through silently.
+       A header that is still a PLACEHOLDER only warns: an OpenGL-only Windows
+       build compiles none of the D3D sources and must not be broken by a stub
+       it never reads. A D3D build shipping stubs is caught by the BACKEND,
+       which refuses to initialise on a zero-length shader - the only place that
+       knows whether D3D is enabled at all.
+       powershell.exe, not pwsh: 5.1 ships with Windows and the script needs
+       nothing newer. -->
+  <ItemDefinitionGroup>
+    <PreBuildEvent>
+      <Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)..\..\..\tools\embed-hlsl-shaders.ps1" -Check</Command>
+      <Message>Checking HLSL bytecode headers are up to date with their sources</Message>
+    </PreBuildEvent>
+  </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(PlatformToolset)'=='ClangCL'">
     <ClCompile>
       <AdditionalOptions>-Wno-implicit-function-declaration -Wno-incompatible-pointer-types -Wno-pointer-sign -Wno-sign-compare -Wno-implicit-fallthrough -Wno-unused-function -Wno-unused-variable -Wno-unused-but-set-variable -Wno-sometimes-uninitialized -Wno-deprecated-declarations -Wno-macro-redefined -Wno-microsoft-include -Wno-pragma-pack -Wno-unused-parameter %(AdditionalOptions)</AdditionalOptions>
@@ -961,38 +1182,21 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <ClCompile>
-      <WarningLevel>Level3</WarningLevel>
-      <Optimization>Disabled</Optimization>
-      <SDLCheck>true</SDLCheck>
-      <ConformanceMode>false</ConformanceMode>
-      <PreprocessorDefinitions>_MBCS;_CRT_SECURE_NO_WARNINGS;WIN32;NOMINMAX;_WINSOCKAPI_;_HAS_STD_BYTE=0;MT_ENABLE_MBEDTLS=1;MT_CAMERA_CAPTURE_ENABLED;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\..\..\other\lib\mbedtls\include;$(ProjectDir)..\..\..\src\Engine\Libs\sgSHA256;$(ProjectDir)..\..\..\src\Engine\Libs\httplib;$(ProjectDir)..\..\..\src\Engine\Libs\crow;$(ProjectDir)..\..\..\src\Engine\Libs\nlohmann;$(ProjectDir)..\..\..\src\Engine\Libs\hjson;$(ProjectDir)..\..\..\src\Engine\Libs\stb;$(ProjectDir)..\..\..\src\Engine\Libs\ENet;$(ProjectDir)..\..\..\src\Engine\Libs\utf8;$(ProjectDir)..\..\..\src\Engine\Libs\zlib;$(ProjectDir)..\..\..\src\Engine\Libs\tremor\Ogg;$(ProjectDir)..\..\..\src\Engine\Libs\tremor;$(ProjectDir)..\..\..\src\Engine\Libs\rtmidi;$(ProjectDir)..\..\..\src\Engine\Libs\pugixml;$(ProjectDir)..\..\..\src\Engine\Libs\minizip;$(ProjectDir)..\..\..\src\Engine\Libs\md5;$(ProjectDir)..\..\..\src\Engine\Libs\mtrand;$(ProjectDir)..\..\..\src\Engine\Libs\lodepng;$(ProjectDir)..\..\..\src\Engine\Libs\libjson;$(ProjectDir)..\..\..\src\Engine\Libs\libpng;$(ProjectDir)..\..\..\src\Engine\Libs\jpeg\jpeg-9a;$(ProjectDir)..\..\..\src\Engine\Libs\jpeg;$(ProjectDir)..\..\..\src\Engine\Libs\imguiext;$(ProjectDir)..\..\..\src\Engine\Libs\implot;$(ProjectDir)..\..\..\src\Engine\Libs\imgui;$(ProjectDir)..\..\..\src\Engine\Libs\imgui-notify;$(ProjectDir)..\..\..\src\Engine\Libs\nfd;$(ProjectDir)..\..\..\src\Engine\Libs;$(ProjectDir)..\..\..\src\Engine\GUI\AudioMixer;$(ProjectDir)..\..\..\src\Engine\GUI\Fonts;$(ProjectDir)..\..\..\src\Engine\GUI\Helpers\ResourceManager;$(ProjectDir)..\..\..\src\Engine\GUI\Helpers\LoadingScreen;$(ProjectDir)..\..\..\src\Engine\GUI\Helpers;$(ProjectDir)..\..\..\src\Engine\GUI\Layout;$(ProjectDir)..\..\..\src\Engine\GUI\Controls;$(ProjectDir)..\..\..\src\Engine\GUI\Waveform;$(ProjectDir)..\..\..\src\Engine\GUI;$(ProjectDir)..\..\..\src\Engine\Funct\ImageProcessing\stb_image;$(ProjectDir)..\..\..\src\Engine\Funct\ImageProcessing\resampler;$(ProjectDir)..\..\..\src\Engine\Funct\ImageProcessing;$(ProjectDir)..\..\..\src\Engine\Funct\ContinuousParam;$(ProjectDir)..\..\..\src\Engine\Funct\DataTable;$(ProjectDir)..\..\..\src\Engine\Funct;$(ProjectDir)..\..\..\src\Engine\Core\GamePads;$(ProjectDir)..\..\..\src\Engine\Core\Render;$(ProjectDir)..\..\..\src\Engine\Core\Net;$(ProjectDir)..\..\..\src\Engine\Core\Pool;$(ProjectDir)..\..\..\src\Engine\Core;$(ProjectDir)..\..\..\src\Engine\Audio\MIDI;$(ProjectDir)..\..\..\src\Engine\Audio\WAV;$(ProjectDir)..\..\..\src\Engine\Audio;$(ProjectDir)..\..\..\src\Engine\Tests;$(ProjectDir)..\..\..\src\Engine\Tools;$(ProjectDir)..\..\..\src\Engine\Tools\NetGame;$(ProjectDir)..\..\..\src\Engine;$(ProjectDir)..\..\..\src\Embedded;$(ProjectDir)..\..\..\src;$(ProjectDir)..\..\..\src\Engine\Libs\libtmt;$(ProjectDir)..\..\..\src\Engine\Libs\md4c;$(ProjectDir)..\..\..\src\Engine\Libs\basis_universal\transcoder;$(ProjectDir)..\..\..\src\Engine\Libs\basis_universal\zstd;$(ProjectDir)..\..\..\platform\Windows\src.Windows;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <LanguageStandard>stdcpp17</LanguageStandard>
-      <MultiProcessorCompilation>true</MultiProcessorCompilation>
-    </ClCompile>
-    <Link>
-      <SubSystem>Windows</SubSystem>
-      <AdditionalDependencies>llama_cpp.lib;ftxui.lib;SDL2.lib;SDL2main.lib;version.lib;imm32.lib;setupapi.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
-    </Link>
-  </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>false</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\..\..\other\lib\mbedtls\include;$(ProjectDir)..\..\..\src\Engine\Libs\sgSHA256;$(ProjectDir)..\..\..\src\Engine\Libs\httplib;$(ProjectDir)..\..\..\src\Engine\Libs\crow;$(ProjectDir)..\..\..\src\Engine\Libs\nlohmann;$(ProjectDir)..\..\..\src\Engine\Libs\hjson;$(ProjectDir)..\..\..\src\Engine\Libs\stb;$(ProjectDir)..\..\..\src\Engine\Libs\ENet;$(ProjectDir)..\..\..\src\Engine\Libs\utf8;$(ProjectDir)..\..\..\src\Engine\Libs\zlib;$(ProjectDir)..\..\..\src\Engine\Libs\tremor\Ogg;$(ProjectDir)..\..\..\src\Engine\Libs\tremor;$(ProjectDir)..\..\..\src\Engine\Libs\rtmidi;$(ProjectDir)..\..\..\src\Engine\Libs\pugixml;$(ProjectDir)..\..\..\src\Engine\Libs\minizip;$(ProjectDir)..\..\..\src\Engine\Libs\md5;$(ProjectDir)..\..\..\src\Engine\Libs\mtrand;$(ProjectDir)..\..\..\src\Engine\Libs\lodepng;$(ProjectDir)..\..\..\src\Engine\Libs\libjson;$(ProjectDir)..\..\..\src\Engine\Libs\libpng;$(ProjectDir)..\..\..\src\Engine\Libs\jpeg\jpeg-9a;$(ProjectDir)..\..\..\src\Engine\Libs\jpeg;$(ProjectDir)..\..\..\src\Engine\Libs\imguiext;$(ProjectDir)..\..\..\src\Engine\Libs\implot;$(ProjectDir)..\..\..\src\Engine\Libs\imgui;$(ProjectDir)..\..\..\src\Engine\Libs\imgui-notify;$(ProjectDir)..\..\..\src\Engine\Libs\nfd;$(ProjectDir)..\..\..\src\Engine\Libs;$(ProjectDir)..\..\..\src\Engine\GUI\AudioMixer;$(ProjectDir)..\..\..\src\Engine\GUI\Fonts;$(ProjectDir)..\..\..\src\Engine\GUI\Helpers\ResourceManager;$(ProjectDir)..\..\..\src\Engine\GUI\Helpers\LoadingScreen;$(ProjectDir)..\..\..\src\Engine\GUI\Helpers;$(ProjectDir)..\..\..\src\Engine\GUI\Layout;$(ProjectDir)..\..\..\src\Engine\GUI\Controls;$(ProjectDir)..\..\..\src\Engine\GUI\Waveform;$(ProjectDir)..\..\..\src\Engine\GUI;$(ProjectDir)..\..\..\src\Engine\Funct\ImageProcessing\stb_image;$(ProjectDir)..\..\..\src\Engine\Funct\ImageProcessing\resampler;$(ProjectDir)..\..\..\src\Engine\Funct\ImageProcessing;$(ProjectDir)..\..\..\src\Engine\Funct\ContinuousParam;$(ProjectDir)..\..\..\src\Engine\Funct\DataTable;$(ProjectDir)..\..\..\src\Engine\Funct;$(ProjectDir)..\..\..\src\Engine\Core\GamePads;$(ProjectDir)..\..\..\src\Engine\Core\Render;$(ProjectDir)..\..\..\src\Engine\Core\Net;$(ProjectDir)..\..\..\src\Engine\Core\Pool;$(ProjectDir)..\..\..\src\Engine\Core;$(ProjectDir)..\..\..\src\Engine\Audio\MIDI;$(ProjectDir)..\..\..\src\Engine\Audio\WAV;$(ProjectDir)..\..\..\src\Engine\Audio;$(ProjectDir)..\..\..\src\Engine\Tests;$(ProjectDir)..\..\..\src\Engine\Tools;$(ProjectDir)..\..\..\src\Engine\Tools\NetGame;$(ProjectDir)..\..\..\src\Engine;$(ProjectDir)..\..\..\src\Embedded;$(ProjectDir)..\..\..\src;$(ProjectDir)..\..\..\src\Engine\Libs\libtmt;$(ProjectDir)..\..\..\src\Engine\Libs\md4c;$(ProjectDir)..\..\..\src\Engine\Libs\basis_universal\transcoder;$(ProjectDir)..\..\..\src\Engine\Libs\basis_universal\zstd;$(ProjectDir)..\..\..\platform\Windows\src.Windows;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;WIN32;NOMINMAX;_WINSOCKAPI_;_HAS_STD_BYTE=0;MT_ENABLE_MBEDTLS=1;MT_CAMERA_CAPTURE_ENABLED;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\..\..\other\lib\mbedtls\include;$(ProjectDir)..\..\..\src\Engine\Libs\sgSHA256;$(ProjectDir)..\..\..\src\Engine\Libs\httplib;$(ProjectDir)..\..\..\src\Engine\Libs\crow;$(ProjectDir)..\..\..\src\Engine\Libs\nlohmann;$(ProjectDir)..\..\..\src\Engine\Libs\hjson;$(ProjectDir)..\..\..\src\Engine\Libs\exif;$(ProjectDir)..\..\..\src\Engine\Libs\icc;$(ProjectDir)..\..\..\src\Engine\Color;$(ProjectDir)..\..\..\src\Engine\Theme;$(ProjectDir)..\..\..\src\Engine\Raw;$(ProjectDir)..\..\..\src\Engine\Develop;$(ProjectDir)..\..\..\src\Engine\Libs\stb;$(ProjectDir)..\..\..\src\Engine\Libs\ENet;$(ProjectDir)..\..\..\src\Engine\Libs\utf8;$(ProjectDir)..\..\..\src\Engine\Libs\zlib;$(ProjectDir)..\..\..\src\Engine\Libs\tremor\Ogg;$(ProjectDir)..\..\..\src\Engine\Libs\tremor;$(ProjectDir)..\..\..\src\Engine\Libs\rtmidi;$(ProjectDir)..\..\..\src\Engine\Libs\pugixml;$(ProjectDir)..\..\..\src\Engine\Libs\minizip;$(ProjectDir)..\..\..\src\Engine\Libs\md5;$(ProjectDir)..\..\..\src\Engine\Libs\mtrand;$(ProjectDir)..\..\..\src\Engine\Libs\lodepng;$(ProjectDir)..\..\..\src\Engine\Libs\libjson;$(ProjectDir)..\..\..\src\Engine\Libs\libpng;$(ProjectDir)..\..\..\src\Engine\Libs\jpeg\jpeg-9a;$(ProjectDir)..\..\..\src\Engine\Libs\jpeg;$(ProjectDir)..\..\..\src\Engine\Libs\imguiext;$(ProjectDir)..\..\..\src\Engine\Libs\implot;$(ProjectDir)..\..\..\src\Engine\Libs\imgui;$(ProjectDir)..\..\..\src\Engine\Libs\imgui-notify;$(ProjectDir)..\..\..\src\Engine\Libs\imgui_test_engine;$(ProjectDir)..\..\..\src\Engine\Libs\imgui_test_engine\thirdparty;$(ProjectDir)..\..\..\src\Engine\Libs\imgui_test_engine\thirdparty\Str;$(ProjectDir)..\..\..\src\Engine\Libs\nfd;$(ProjectDir)..\..\..\src\Engine\Libs\nestegg;$(ProjectDir)..\..\..\src\Engine\Libs;$(ProjectDir)..\..\..\src\Engine\GUI\AudioMixer;$(ProjectDir)..\..\..\src\Engine\GUI\Fonts;$(ProjectDir)..\..\..\src\Engine\GUI\Helpers\ResourceManager;$(ProjectDir)..\..\..\src\Engine\GUI\Helpers\LoadingScreen;$(ProjectDir)..\..\..\src\Engine\GUI\Helpers;$(ProjectDir)..\..\..\src\Engine\GUI\Layout;$(ProjectDir)..\..\..\src\Engine\GUI\Controls;$(ProjectDir)..\..\..\src\Engine\GUI\Waveform;$(ProjectDir)..\..\..\src\Engine\GUI;$(ProjectDir)..\..\..\src\Engine\Funct\ImageProcessing\stb_image;$(ProjectDir)..\..\..\src\Engine\Funct\ImageProcessing\resampler;$(ProjectDir)..\..\..\src\Engine\Funct\FFT;$(ProjectDir)..\..\..\src\Engine\Funct\ImageProcessing;$(ProjectDir)..\..\..\src\Engine\Funct\ContinuousParam;$(ProjectDir)..\..\..\src\Engine\Funct\DataTable;$(ProjectDir)..\..\..\src\Engine\Funct;$(ProjectDir)..\..\..\src\Engine\Core\GamePads;$(ProjectDir)..\..\..\src\Engine\Core\Render;$(ProjectDir)..\..\..\src\Engine\Core\Net;$(ProjectDir)..\..\..\src\Engine\Core\Pool;$(ProjectDir)..\..\..\src\Engine\System;$(ProjectDir)..\..\..\src\Engine\Core;$(ProjectDir)..\..\..\src\Engine\Audio\MIDI;$(ProjectDir)..\..\..\src\Engine\Audio\WAV;$(ProjectDir)..\..\..\src\Engine\Audio;$(ProjectDir)..\..\..\src\Engine\Tests;$(ProjectDir)..\..\..\src\Engine\Tools;$(ProjectDir)..\..\..\src\Engine\Tools\NetGame;$(ProjectDir)..\..\..\src\Engine\Video;$(ProjectDir)..\..\..\src\Engine\Libs\libvpx;$(ProjectDir)..\..\..\src\Engine\Libs\libopus;$(ProjectDir)..\..\..\src\Engine\Tools\Undo;$(ProjectDir)..\..\..\src\Engine;$(ProjectDir)..\..\..\src\Embedded;$(ProjectDir)..\..\..\src;$(ProjectDir)..\..\..\src\Engine\Libs\libtmt;$(ProjectDir)..\..\..\src\Engine\Libs\md4c;$(ProjectDir)..\..\..\src\Engine\Libs\basis_universal\transcoder;$(ProjectDir)..\..\..\src\Engine\Libs\basis_universal\zstd;$(ProjectDir)..\..\..\platform\Windows\src.Windows;$(ProjectDir)..\..\..\platform\Windows\src.Windows\Llama;$(ProjectDir)..\..\..\platform\Windows\src.Windows\Render;$(ProjectDir)..\..\..\src\Engine\Crash;$(ProjectDir)..\..\..\src\Engine\Sci\Llama;$(ProjectDir)..\..\..\other\lib\image-codecs\install-win-$(Platform)\include;$(MTCapsLibsDir)\ffmpeg\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;WIN32;NOMINMAX;_WINSOCKAPI_;_HAS_STD_BYTE=0;MT_ENABLE_MBEDTLS=1;MT_CAMERA_CAPTURE_ENABLED;MT_ENABLE_LIBTIFF;MT_ENABLE_LIBWEBP;MT_ENABLE_LIBAVIF;MT_ENABLE_LIBRAW;LIBRAW_NODLL;MT_ENABLE_FFMPEG;MT_ENABLE_LCMS2;MT_ENABLE_IMGUI_TEST_ENGINE;MT_RENDER_BACKEND_D3D11;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
-      <AdditionalDependencies>llama_cpp.lib;ftxui.lib;SDL2.lib;SDL2main.lib;version.lib;imm32.lib;setupapi.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>llama_cpp.lib;ftxui.lib;SDL3.lib;MTImageCodecs.lib;version.lib;imm32.lib;setupapi.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
@@ -1001,36 +1205,15 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>false</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\..\..\other\lib\mbedtls\include;$(ProjectDir)..\..\..\src\Engine\Libs\sgSHA256;$(ProjectDir)..\..\..\src\Engine\Libs\httplib;$(ProjectDir)..\..\..\src\Engine\Libs\crow;$(ProjectDir)..\..\..\src\Engine\Libs\nlohmann;$(ProjectDir)..\..\..\src\Engine\Libs\hjson;$(ProjectDir)..\..\..\src\Engine\Libs\stb;$(ProjectDir)..\..\..\src\Engine\Libs\ENet;$(ProjectDir)..\..\..\src\Engine\Libs\utf8;$(ProjectDir)..\..\..\src\Engine\Libs\zlib;$(ProjectDir)..\..\..\src\Engine\Libs\tremor\Ogg;$(ProjectDir)..\..\..\src\Engine\Libs\tremor;$(ProjectDir)..\..\..\src\Engine\Libs\rtmidi;$(ProjectDir)..\..\..\src\Engine\Libs\pugixml;$(ProjectDir)..\..\..\src\Engine\Libs\minizip;$(ProjectDir)..\..\..\src\Engine\Libs\md5;$(ProjectDir)..\..\..\src\Engine\Libs\mtrand;$(ProjectDir)..\..\..\src\Engine\Libs\lodepng;$(ProjectDir)..\..\..\src\Engine\Libs\libjson;$(ProjectDir)..\..\..\src\Engine\Libs\libpng;$(ProjectDir)..\..\..\src\Engine\Libs\jpeg\jpeg-9a;$(ProjectDir)..\..\..\src\Engine\Libs\jpeg;$(ProjectDir)..\..\..\src\Engine\Libs\imguiext;$(ProjectDir)..\..\..\src\Engine\Libs\implot;$(ProjectDir)..\..\..\src\Engine\Libs\imgui;$(ProjectDir)..\..\..\src\Engine\Libs\imgui-notify;$(ProjectDir)..\..\..\src\Engine\Libs\nfd;$(ProjectDir)..\..\..\src\Engine\Libs;$(ProjectDir)..\..\..\src\Engine\GUI\AudioMixer;$(ProjectDir)..\..\..\src\Engine\GUI\Fonts;$(ProjectDir)..\..\..\src\Engine\GUI\Helpers\ResourceManager;$(ProjectDir)..\..\..\src\Engine\GUI\Helpers\LoadingScreen;$(ProjectDir)..\..\..\src\Engine\GUI\Helpers;$(ProjectDir)..\..\..\src\Engine\GUI\Layout;$(ProjectDir)..\..\..\src\Engine\GUI\Controls;$(ProjectDir)..\..\..\src\Engine\GUI\Waveform;$(ProjectDir)..\..\..\src\Engine\GUI;$(ProjectDir)..\..\..\src\Engine\Funct\ImageProcessing\stb_image;$(ProjectDir)..\..\..\src\Engine\Funct\ImageProcessing\resampler;$(ProjectDir)..\..\..\src\Engine\Funct\ImageProcessing;$(ProjectDir)..\..\..\src\Engine\Funct\ContinuousParam;$(ProjectDir)..\..\..\src\Engine\Funct\DataTable;$(ProjectDir)..\..\..\src\Engine\Funct;$(ProjectDir)..\..\..\src\Engine\Core\GamePads;$(ProjectDir)..\..\..\src\Engine\Core\Render;$(ProjectDir)..\..\..\src\Engine\Core\Net;$(ProjectDir)..\..\..\src\Engine\Core\Pool;$(ProjectDir)..\..\..\src\Engine\Core;$(ProjectDir)..\..\..\src\Engine\Audio\MIDI;$(ProjectDir)..\..\..\src\Engine\Audio\WAV;$(ProjectDir)..\..\..\src\Engine\Audio;$(ProjectDir)..\..\..\src\Engine\Tests;$(ProjectDir)..\..\..\src\Engine\Tools;$(ProjectDir)..\..\..\src\Engine\Tools\NetGame;$(ProjectDir)..\..\..\src\Engine;$(ProjectDir)..\..\..\src\Embedded;$(ProjectDir)..\..\..\src;$(ProjectDir)..\..\..\src\Engine\Libs\libtmt;$(ProjectDir)..\..\..\src\Engine\Libs\md4c;$(ProjectDir)..\..\..\src\Engine\Libs\basis_universal\transcoder;$(ProjectDir)..\..\..\src\Engine\Libs\basis_universal\zstd;$(ProjectDir)..\..\..\platform\Windows\src.Windows;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;WIN32;NOMINMAX;_WINSOCKAPI_;_HAS_STD_BYTE=0;MT_ENABLE_MBEDTLS=1;MT_CAMERA_CAPTURE_ENABLED;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\..\..\other\lib\mbedtls\include;$(ProjectDir)..\..\..\src\Engine\Libs\sgSHA256;$(ProjectDir)..\..\..\src\Engine\Libs\httplib;$(ProjectDir)..\..\..\src\Engine\Libs\crow;$(ProjectDir)..\..\..\src\Engine\Libs\nlohmann;$(ProjectDir)..\..\..\src\Engine\Libs\hjson;$(ProjectDir)..\..\..\src\Engine\Libs\exif;$(ProjectDir)..\..\..\src\Engine\Libs\icc;$(ProjectDir)..\..\..\src\Engine\Color;$(ProjectDir)..\..\..\src\Engine\Theme;$(ProjectDir)..\..\..\src\Engine\Raw;$(ProjectDir)..\..\..\src\Engine\Develop;$(ProjectDir)..\..\..\src\Engine\Libs\stb;$(ProjectDir)..\..\..\src\Engine\Libs\ENet;$(ProjectDir)..\..\..\src\Engine\Libs\utf8;$(ProjectDir)..\..\..\src\Engine\Libs\zlib;$(ProjectDir)..\..\..\src\Engine\Libs\tremor\Ogg;$(ProjectDir)..\..\..\src\Engine\Libs\tremor;$(ProjectDir)..\..\..\src\Engine\Libs\rtmidi;$(ProjectDir)..\..\..\src\Engine\Libs\pugixml;$(ProjectDir)..\..\..\src\Engine\Libs\minizip;$(ProjectDir)..\..\..\src\Engine\Libs\md5;$(ProjectDir)..\..\..\src\Engine\Libs\mtrand;$(ProjectDir)..\..\..\src\Engine\Libs\lodepng;$(ProjectDir)..\..\..\src\Engine\Libs\libjson;$(ProjectDir)..\..\..\src\Engine\Libs\libpng;$(ProjectDir)..\..\..\src\Engine\Libs\jpeg\jpeg-9a;$(ProjectDir)..\..\..\src\Engine\Libs\jpeg;$(ProjectDir)..\..\..\src\Engine\Libs\imguiext;$(ProjectDir)..\..\..\src\Engine\Libs\implot;$(ProjectDir)..\..\..\src\Engine\Libs\imgui;$(ProjectDir)..\..\..\src\Engine\Libs\imgui-notify;$(ProjectDir)..\..\..\src\Engine\Libs\imgui_test_engine;$(ProjectDir)..\..\..\src\Engine\Libs\imgui_test_engine\thirdparty;$(ProjectDir)..\..\..\src\Engine\Libs\imgui_test_engine\thirdparty\Str;$(ProjectDir)..\..\..\src\Engine\Libs\nfd;$(ProjectDir)..\..\..\src\Engine\Libs\nestegg;$(ProjectDir)..\..\..\src\Engine\Libs;$(ProjectDir)..\..\..\src\Engine\GUI\AudioMixer;$(ProjectDir)..\..\..\src\Engine\GUI\Fonts;$(ProjectDir)..\..\..\src\Engine\GUI\Helpers\ResourceManager;$(ProjectDir)..\..\..\src\Engine\GUI\Helpers\LoadingScreen;$(ProjectDir)..\..\..\src\Engine\GUI\Helpers;$(ProjectDir)..\..\..\src\Engine\GUI\Layout;$(ProjectDir)..\..\..\src\Engine\GUI\Controls;$(ProjectDir)..\..\..\src\Engine\GUI\Waveform;$(ProjectDir)..\..\..\src\Engine\GUI;$(ProjectDir)..\..\..\src\Engine\Funct\ImageProcessing\stb_image;$(ProjectDir)..\..\..\src\Engine\Funct\ImageProcessing\resampler;$(ProjectDir)..\..\..\src\Engine\Funct\FFT;$(ProjectDir)..\..\..\src\Engine\Funct\ImageProcessing;$(ProjectDir)..\..\..\src\Engine\Funct\ContinuousParam;$(ProjectDir)..\..\..\src\Engine\Funct\DataTable;$(ProjectDir)..\..\..\src\Engine\Funct;$(ProjectDir)..\..\..\src\Engine\Core\GamePads;$(ProjectDir)..\..\..\src\Engine\Core\Render;$(ProjectDir)..\..\..\src\Engine\Core\Net;$(ProjectDir)..\..\..\src\Engine\Core\Pool;$(ProjectDir)..\..\..\src\Engine\System;$(ProjectDir)..\..\..\src\Engine\Core;$(ProjectDir)..\..\..\src\Engine\Audio\MIDI;$(ProjectDir)..\..\..\src\Engine\Audio\WAV;$(ProjectDir)..\..\..\src\Engine\Audio;$(ProjectDir)..\..\..\src\Engine\Tests;$(ProjectDir)..\..\..\src\Engine\Tools;$(ProjectDir)..\..\..\src\Engine\Tools\NetGame;$(ProjectDir)..\..\..\src\Engine\Video;$(ProjectDir)..\..\..\src\Engine\Libs\libvpx;$(ProjectDir)..\..\..\src\Engine\Libs\libopus;$(ProjectDir)..\..\..\src\Engine\Tools\Undo;$(ProjectDir)..\..\..\src\Engine;$(ProjectDir)..\..\..\src\Embedded;$(ProjectDir)..\..\..\src;$(ProjectDir)..\..\..\src\Engine\Libs\libtmt;$(ProjectDir)..\..\..\src\Engine\Libs\md4c;$(ProjectDir)..\..\..\src\Engine\Libs\basis_universal\transcoder;$(ProjectDir)..\..\..\src\Engine\Libs\basis_universal\zstd;$(ProjectDir)..\..\..\platform\Windows\src.Windows;$(ProjectDir)..\..\..\platform\Windows\src.Windows\Llama;$(ProjectDir)..\..\..\platform\Windows\src.Windows\Render;$(ProjectDir)..\..\..\src\Engine\Crash;$(ProjectDir)..\..\..\src\Engine\Sci\Llama;$(ProjectDir)..\..\..\other\lib\image-codecs\install-win-$(Platform)\include;$(MTCapsLibsDir)\ffmpeg\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;WIN32;NOMINMAX;_WINSOCKAPI_;_HAS_STD_BYTE=0;MT_ENABLE_MBEDTLS=1;MT_CAMERA_CAPTURE_ENABLED;MT_ENABLE_LIBTIFF;MT_ENABLE_LIBWEBP;MT_ENABLE_LIBAVIF;MT_ENABLE_LIBRAW;LIBRAW_NODLL;MT_ENABLE_FFMPEG;MT_ENABLE_LCMS2;MT_ENABLE_IMGUI_TEST_ENGINE;MT_RENDER_BACKEND_D3D11;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
-      <AdditionalDependencies>llama_cpp.lib;ftxui.lib;SDL2.lib;SDL2main.lib;version.lib;imm32.lib;setupapi.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
-    </Link>
-  </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <ClCompile>
-      <WarningLevel>Level3</WarningLevel>
-      <Optimization>MaxSpeed</Optimization>
-      <FunctionLevelLinking>true</FunctionLevelLinking>
-      <IntrinsicFunctions>true</IntrinsicFunctions>
-      <SDLCheck>true</SDLCheck>
-      <ConformanceMode>false</ConformanceMode>
-      <PreprocessorDefinitions>_MBCS;_CRT_SECURE_NO_WARNINGS;WIN32;NOMINMAX;_WINSOCKAPI_;VC_EXTRALEAN;_HAS_STD_BYTE=0;MT_ENABLE_MBEDTLS=1;MT_CAMERA_CAPTURE_ENABLED;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\..\..\other\lib\mbedtls\include;$(ProjectDir)..\..\..\src\Engine\Libs\sgSHA256;$(ProjectDir)..\..\..\src\Engine\Libs\httplib;$(ProjectDir)..\..\..\src\Engine\Libs\crow;$(ProjectDir)..\..\..\src\Engine\Libs\nlohmann;$(ProjectDir)..\..\..\src\Engine\Libs\hjson;$(ProjectDir)..\..\..\src\Engine\Libs\stb;$(ProjectDir)..\..\..\src\Engine\Libs\ENet;$(ProjectDir)..\..\..\src\Engine\Libs\utf8;$(ProjectDir)..\..\..\src\Engine\Libs\zlib;$(ProjectDir)..\..\..\src\Engine\Libs\tremor\Ogg;$(ProjectDir)..\..\..\src\Engine\Libs\tremor;$(ProjectDir)..\..\..\src\Engine\Libs\rtmidi;$(ProjectDir)..\..\..\src\Engine\Libs\pugixml;$(ProjectDir)..\..\..\src\Engine\Libs\minizip;$(ProjectDir)..\..\..\src\Engine\Libs\md5;$(ProjectDir)..\..\..\src\Engine\Libs\mtrand;$(ProjectDir)..\..\..\src\Engine\Libs\lodepng;$(ProjectDir)..\..\..\src\Engine\Libs\libjson;$(ProjectDir)..\..\..\src\Engine\Libs\libpng;$(ProjectDir)..\..\..\src\Engine\Libs\jpeg\jpeg-9a;$(ProjectDir)..\..\..\src\Engine\Libs\jpeg;$(ProjectDir)..\..\..\src\Engine\Libs\imguiext;$(ProjectDir)..\..\..\src\Engine\Libs\implot;$(ProjectDir)..\..\..\src\Engine\Libs\imgui;$(ProjectDir)..\..\..\src\Engine\Libs\imgui-notify;$(ProjectDir)..\..\..\src\Engine\Libs\nfd;$(ProjectDir)..\..\..\src\Engine\Libs;$(ProjectDir)..\..\..\src\Engine\GUI\AudioMixer;$(ProjectDir)..\..\..\src\Engine\GUI\Fonts;$(ProjectDir)..\..\..\src\Engine\GUI\Helpers\ResourceManager;$(ProjectDir)..\..\..\src\Engine\GUI\Helpers\LoadingScreen;$(ProjectDir)..\..\..\src\Engine\GUI\Helpers;$(ProjectDir)..\..\..\src\Engine\GUI\Layout;$(ProjectDir)..\..\..\src\Engine\GUI\Controls;$(ProjectDir)..\..\..\src\Engine\GUI\Waveform;$(ProjectDir)..\..\..\src\Engine\GUI;$(ProjectDir)..\..\..\src\Engine\Funct\ImageProcessing\stb_image;$(ProjectDir)..\..\..\src\Engine\Funct\ImageProcessing\resampler;$(ProjectDir)..\..\..\src\Engine\Funct\ImageProcessing;$(ProjectDir)..\..\..\src\Engine\Funct\ContinuousParam;$(ProjectDir)..\..\..\src\Engine\Funct\DataTable;$(ProjectDir)..\..\..\src\Engine\Funct;$(ProjectDir)..\..\..\src\Engine\Core\GamePads;$(ProjectDir)..\..\..\src\Engine\Core\Render;$(ProjectDir)..\..\..\src\Engine\Core\Net;$(ProjectDir)..\..\..\src\Engine\Core\Pool;$(ProjectDir)..\..\..\src\Engine\Core;$(ProjectDir)..\..\..\src\Engine\Audio\MIDI;$(ProjectDir)..\..\..\src\Engine\Audio\WAV;$(ProjectDir)..\..\..\src\Engine\Audio;$(ProjectDir)..\..\..\src\Engine\Tests;$(ProjectDir)..\..\..\src\Engine\Tools;$(ProjectDir)..\..\..\src\Engine\Tools\NetGame;$(ProjectDir)..\..\..\src\Engine;$(ProjectDir)..\..\..\src\Embedded;$(ProjectDir)..\..\..\src;$(ProjectDir)..\..\..\src\Engine\Libs\libtmt;$(ProjectDir)..\..\..\src\Engine\Libs\md4c;$(ProjectDir)..\..\..\src\Engine\Libs\basis_universal\transcoder;$(ProjectDir)..\..\..\src\Engine\Libs\basis_universal\zstd;$(ProjectDir)..\..\..\platform\Windows\src.Windows;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <LanguageStandard>stdcpp17</LanguageStandard>
-      <MultiProcessorCompilation>true</MultiProcessorCompilation>
-    </ClCompile>
-    <Link>
-      <SubSystem>Windows</SubSystem>
-      <EnableCOMDATFolding>true</EnableCOMDATFolding>
-      <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>llama_cpp.lib;ftxui.lib;SDL2.lib;SDL2main.lib;version.lib;imm32.lib;setupapi.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>llama_cpp.lib;ftxui.lib;SDL3.lib;MTImageCodecs.lib;version.lib;imm32.lib;setupapi.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -1041,17 +1224,17 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>false</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\..\..\other\lib\mbedtls\include;$(ProjectDir)..\..\..\src\Engine\Libs\sgSHA256;$(ProjectDir)..\..\..\src\Engine\Libs\httplib;$(ProjectDir)..\..\..\src\Engine\Libs\crow;$(ProjectDir)..\..\..\src\Engine\Libs\nlohmann;$(ProjectDir)..\..\..\src\Engine\Libs\hjson;$(ProjectDir)..\..\..\src\Engine\Libs\stb;$(ProjectDir)..\..\..\src\Engine\Libs\ENet;$(ProjectDir)..\..\..\src\Engine\Libs\utf8;$(ProjectDir)..\..\..\src\Engine\Libs\zlib;$(ProjectDir)..\..\..\src\Engine\Libs\tremor\Ogg;$(ProjectDir)..\..\..\src\Engine\Libs\tremor;$(ProjectDir)..\..\..\src\Engine\Libs\rtmidi;$(ProjectDir)..\..\..\src\Engine\Libs\pugixml;$(ProjectDir)..\..\..\src\Engine\Libs\minizip;$(ProjectDir)..\..\..\src\Engine\Libs\md5;$(ProjectDir)..\..\..\src\Engine\Libs\mtrand;$(ProjectDir)..\..\..\src\Engine\Libs\lodepng;$(ProjectDir)..\..\..\src\Engine\Libs\libjson;$(ProjectDir)..\..\..\src\Engine\Libs\libpng;$(ProjectDir)..\..\..\src\Engine\Libs\jpeg\jpeg-9a;$(ProjectDir)..\..\..\src\Engine\Libs\jpeg;$(ProjectDir)..\..\..\src\Engine\Libs\imguiext;$(ProjectDir)..\..\..\src\Engine\Libs\implot;$(ProjectDir)..\..\..\src\Engine\Libs\imgui;$(ProjectDir)..\..\..\src\Engine\Libs\imgui-notify;$(ProjectDir)..\..\..\src\Engine\Libs\nfd;$(ProjectDir)..\..\..\src\Engine\Libs;$(ProjectDir)..\..\..\src\Engine\GUI\AudioMixer;$(ProjectDir)..\..\..\src\Engine\GUI\Fonts;$(ProjectDir)..\..\..\src\Engine\GUI\Helpers\ResourceManager;$(ProjectDir)..\..\..\src\Engine\GUI\Helpers\LoadingScreen;$(ProjectDir)..\..\..\src\Engine\GUI\Helpers;$(ProjectDir)..\..\..\src\Engine\GUI\Layout;$(ProjectDir)..\..\..\src\Engine\GUI\Controls;$(ProjectDir)..\..\..\src\Engine\GUI\Waveform;$(ProjectDir)..\..\..\src\Engine\GUI;$(ProjectDir)..\..\..\src\Engine\Funct\ImageProcessing\stb_image;$(ProjectDir)..\..\..\src\Engine\Funct\ImageProcessing\resampler;$(ProjectDir)..\..\..\src\Engine\Funct\ImageProcessing;$(ProjectDir)..\..\..\src\Engine\Funct\ContinuousParam;$(ProjectDir)..\..\..\src\Engine\Funct\DataTable;$(ProjectDir)..\..\..\src\Engine\Funct;$(ProjectDir)..\..\..\src\Engine\Core\GamePads;$(ProjectDir)..\..\..\src\Engine\Core\Render;$(ProjectDir)..\..\..\src\Engine\Core\Net;$(ProjectDir)..\..\..\src\Engine\Core\Pool;$(ProjectDir)..\..\..\src\Engine\Core;$(ProjectDir)..\..\..\src\Engine\Audio\MIDI;$(ProjectDir)..\..\..\src\Engine\Audio\WAV;$(ProjectDir)..\..\..\src\Engine\Audio;$(ProjectDir)..\..\..\src\Engine\Tests;$(ProjectDir)..\..\..\src\Engine\Tools;$(ProjectDir)..\..\..\src\Engine\Tools\NetGame;$(ProjectDir)..\..\..\src\Engine;$(ProjectDir)..\..\..\src\Embedded;$(ProjectDir)..\..\..\src;$(ProjectDir)..\..\..\src\Engine\Libs\libtmt;$(ProjectDir)..\..\..\src\Engine\Libs\md4c;$(ProjectDir)..\..\..\src\Engine\Libs\basis_universal\transcoder;$(ProjectDir)..\..\..\src\Engine\Libs\basis_universal\zstd;$(ProjectDir)..\..\..\platform\Windows\src.Windows;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;WIN32;NOMINMAX;_WINSOCKAPI_;_HAS_STD_BYTE=0;MT_ENABLE_MBEDTLS=1;MT_CAMERA_CAPTURE_ENABLED;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\..\..\other\lib\mbedtls\include;$(ProjectDir)..\..\..\src\Engine\Libs\sgSHA256;$(ProjectDir)..\..\..\src\Engine\Libs\httplib;$(ProjectDir)..\..\..\src\Engine\Libs\crow;$(ProjectDir)..\..\..\src\Engine\Libs\nlohmann;$(ProjectDir)..\..\..\src\Engine\Libs\hjson;$(ProjectDir)..\..\..\src\Engine\Libs\exif;$(ProjectDir)..\..\..\src\Engine\Libs\icc;$(ProjectDir)..\..\..\src\Engine\Color;$(ProjectDir)..\..\..\src\Engine\Theme;$(ProjectDir)..\..\..\src\Engine\Raw;$(ProjectDir)..\..\..\src\Engine\Develop;$(ProjectDir)..\..\..\src\Engine\Libs\stb;$(ProjectDir)..\..\..\src\Engine\Libs\ENet;$(ProjectDir)..\..\..\src\Engine\Libs\utf8;$(ProjectDir)..\..\..\src\Engine\Libs\zlib;$(ProjectDir)..\..\..\src\Engine\Libs\tremor\Ogg;$(ProjectDir)..\..\..\src\Engine\Libs\tremor;$(ProjectDir)..\..\..\src\Engine\Libs\rtmidi;$(ProjectDir)..\..\..\src\Engine\Libs\pugixml;$(ProjectDir)..\..\..\src\Engine\Libs\minizip;$(ProjectDir)..\..\..\src\Engine\Libs\md5;$(ProjectDir)..\..\..\src\Engine\Libs\mtrand;$(ProjectDir)..\..\..\src\Engine\Libs\lodepng;$(ProjectDir)..\..\..\src\Engine\Libs\libjson;$(ProjectDir)..\..\..\src\Engine\Libs\libpng;$(ProjectDir)..\..\..\src\Engine\Libs\jpeg\jpeg-9a;$(ProjectDir)..\..\..\src\Engine\Libs\jpeg;$(ProjectDir)..\..\..\src\Engine\Libs\imguiext;$(ProjectDir)..\..\..\src\Engine\Libs\implot;$(ProjectDir)..\..\..\src\Engine\Libs\imgui;$(ProjectDir)..\..\..\src\Engine\Libs\imgui-notify;$(ProjectDir)..\..\..\src\Engine\Libs\imgui_test_engine;$(ProjectDir)..\..\..\src\Engine\Libs\imgui_test_engine\thirdparty;$(ProjectDir)..\..\..\src\Engine\Libs\imgui_test_engine\thirdparty\Str;$(ProjectDir)..\..\..\src\Engine\Libs\nfd;$(ProjectDir)..\..\..\src\Engine\Libs\nestegg;$(ProjectDir)..\..\..\src\Engine\Libs;$(ProjectDir)..\..\..\src\Engine\GUI\AudioMixer;$(ProjectDir)..\..\..\src\Engine\GUI\Fonts;$(ProjectDir)..\..\..\src\Engine\GUI\Helpers\ResourceManager;$(ProjectDir)..\..\..\src\Engine\GUI\Helpers\LoadingScreen;$(ProjectDir)..\..\..\src\Engine\GUI\Helpers;$(ProjectDir)..\..\..\src\Engine\GUI\Layout;$(ProjectDir)..\..\..\src\Engine\GUI\Controls;$(ProjectDir)..\..\..\src\Engine\GUI\Waveform;$(ProjectDir)..\..\..\src\Engine\GUI;$(ProjectDir)..\..\..\src\Engine\Funct\ImageProcessing\stb_image;$(ProjectDir)..\..\..\src\Engine\Funct\ImageProcessing\resampler;$(ProjectDir)..\..\..\src\Engine\Funct\FFT;$(ProjectDir)..\..\..\src\Engine\Funct\ImageProcessing;$(ProjectDir)..\..\..\src\Engine\Funct\ContinuousParam;$(ProjectDir)..\..\..\src\Engine\Funct\DataTable;$(ProjectDir)..\..\..\src\Engine\Funct;$(ProjectDir)..\..\..\src\Engine\Core\GamePads;$(ProjectDir)..\..\..\src\Engine\Core\Render;$(ProjectDir)..\..\..\src\Engine\Core\Net;$(ProjectDir)..\..\..\src\Engine\Core\Pool;$(ProjectDir)..\..\..\src\Engine\System;$(ProjectDir)..\..\..\src\Engine\Core;$(ProjectDir)..\..\..\src\Engine\Audio\MIDI;$(ProjectDir)..\..\..\src\Engine\Audio\WAV;$(ProjectDir)..\..\..\src\Engine\Audio;$(ProjectDir)..\..\..\src\Engine\Tests;$(ProjectDir)..\..\..\src\Engine\Tools;$(ProjectDir)..\..\..\src\Engine\Tools\NetGame;$(ProjectDir)..\..\..\src\Engine\Video;$(ProjectDir)..\..\..\src\Engine\Libs\libvpx;$(ProjectDir)..\..\..\src\Engine\Libs\libopus;$(ProjectDir)..\..\..\src\Engine\Tools\Undo;$(ProjectDir)..\..\..\src\Engine;$(ProjectDir)..\..\..\src\Embedded;$(ProjectDir)..\..\..\src;$(ProjectDir)..\..\..\src\Engine\Libs\libtmt;$(ProjectDir)..\..\..\src\Engine\Libs\md4c;$(ProjectDir)..\..\..\src\Engine\Libs\basis_universal\transcoder;$(ProjectDir)..\..\..\src\Engine\Libs\basis_universal\zstd;$(ProjectDir)..\..\..\platform\Windows\src.Windows;$(ProjectDir)..\..\..\platform\Windows\src.Windows\Llama;$(ProjectDir)..\..\..\platform\Windows\src.Windows\Render;$(ProjectDir)..\..\..\src\Engine\Crash;$(ProjectDir)..\..\..\src\Engine\Sci\Llama;$(ProjectDir)..\..\..\other\lib\image-codecs\install-win-$(Platform)\include;$(MTCapsLibsDir)\ffmpeg\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;WIN32;NOMINMAX;_WINSOCKAPI_;_HAS_STD_BYTE=0;MT_ENABLE_MBEDTLS=1;MT_CAMERA_CAPTURE_ENABLED;MT_ENABLE_LIBTIFF;MT_ENABLE_LIBWEBP;MT_ENABLE_LIBAVIF;MT_ENABLE_LIBRAW;LIBRAW_NODLL;MT_ENABLE_FFMPEG;MT_ENABLE_LCMS2;MT_ENABLE_IMGUI_TEST_ENGINE;MT_RENDER_BACKEND_D3D11;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>llama_cpp.lib;ftxui.lib;SDL2.lib;SDL2main.lib;version.lib;imm32.lib;setupapi.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>llama_cpp.lib;ftxui.lib;SDL3.lib;MTImageCodecs.lib;version.lib;imm32.lib;setupapi.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
@@ -1062,17 +1245,17 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>false</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\..\..\other\lib\mbedtls\include;$(ProjectDir)..\..\..\src\Engine\Libs\sgSHA256;$(ProjectDir)..\..\..\src\Engine\Libs\httplib;$(ProjectDir)..\..\..\src\Engine\Libs\crow;$(ProjectDir)..\..\..\src\Engine\Libs\nlohmann;$(ProjectDir)..\..\..\src\Engine\Libs\hjson;$(ProjectDir)..\..\..\src\Engine\Libs\stb;$(ProjectDir)..\..\..\src\Engine\Libs\ENet;$(ProjectDir)..\..\..\src\Engine\Libs\utf8;$(ProjectDir)..\..\..\src\Engine\Libs\zlib;$(ProjectDir)..\..\..\src\Engine\Libs\tremor\Ogg;$(ProjectDir)..\..\..\src\Engine\Libs\tremor;$(ProjectDir)..\..\..\src\Engine\Libs\rtmidi;$(ProjectDir)..\..\..\src\Engine\Libs\pugixml;$(ProjectDir)..\..\..\src\Engine\Libs\minizip;$(ProjectDir)..\..\..\src\Engine\Libs\md5;$(ProjectDir)..\..\..\src\Engine\Libs\mtrand;$(ProjectDir)..\..\..\src\Engine\Libs\lodepng;$(ProjectDir)..\..\..\src\Engine\Libs\libjson;$(ProjectDir)..\..\..\src\Engine\Libs\libpng;$(ProjectDir)..\..\..\src\Engine\Libs\jpeg\jpeg-9a;$(ProjectDir)..\..\..\src\Engine\Libs\jpeg;$(ProjectDir)..\..\..\src\Engine\Libs\imguiext;$(ProjectDir)..\..\..\src\Engine\Libs\implot;$(ProjectDir)..\..\..\src\Engine\Libs\imgui;$(ProjectDir)..\..\..\src\Engine\Libs\imgui-notify;$(ProjectDir)..\..\..\src\Engine\Libs\nfd;$(ProjectDir)..\..\..\src\Engine\Libs;$(ProjectDir)..\..\..\src\Engine\GUI\AudioMixer;$(ProjectDir)..\..\..\src\Engine\GUI\Fonts;$(ProjectDir)..\..\..\src\Engine\GUI\Helpers\ResourceManager;$(ProjectDir)..\..\..\src\Engine\GUI\Helpers\LoadingScreen;$(ProjectDir)..\..\..\src\Engine\GUI\Helpers;$(ProjectDir)..\..\..\src\Engine\GUI\Layout;$(ProjectDir)..\..\..\src\Engine\GUI\Controls;$(ProjectDir)..\..\..\src\Engine\GUI\Waveform;$(ProjectDir)..\..\..\src\Engine\GUI;$(ProjectDir)..\..\..\src\Engine\Funct\ImageProcessing\stb_image;$(ProjectDir)..\..\..\src\Engine\Funct\ImageProcessing\resampler;$(ProjectDir)..\..\..\src\Engine\Funct\ImageProcessing;$(ProjectDir)..\..\..\src\Engine\Funct\ContinuousParam;$(ProjectDir)..\..\..\src\Engine\Funct\DataTable;$(ProjectDir)..\..\..\src\Engine\Funct;$(ProjectDir)..\..\..\src\Engine\Core\GamePads;$(ProjectDir)..\..\..\src\Engine\Core\Render;$(ProjectDir)..\..\..\src\Engine\Core\Net;$(ProjectDir)..\..\..\src\Engine\Core\Pool;$(ProjectDir)..\..\..\src\Engine\Core;$(ProjectDir)..\..\..\src\Engine\Audio\MIDI;$(ProjectDir)..\..\..\src\Engine\Audio\WAV;$(ProjectDir)..\..\..\src\Engine\Audio;$(ProjectDir)..\..\..\src\Engine\Tests;$(ProjectDir)..\..\..\src\Engine\Tools;$(ProjectDir)..\..\..\src\Engine\Tools\NetGame;$(ProjectDir)..\..\..\src\Engine;$(ProjectDir)..\..\..\src\Embedded;$(ProjectDir)..\..\..\src;$(ProjectDir)..\..\..\src\Engine\Libs\libtmt;$(ProjectDir)..\..\..\src\Engine\Libs\md4c;$(ProjectDir)..\..\..\src\Engine\Libs\basis_universal\transcoder;$(ProjectDir)..\..\..\src\Engine\Libs\basis_universal\zstd;$(ProjectDir)..\..\..\platform\Windows\src.Windows;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;WIN32;NOMINMAX;_WINSOCKAPI_;_HAS_STD_BYTE=0;MT_ENABLE_MBEDTLS=1;MT_CAMERA_CAPTURE_ENABLED;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\..\..\other\lib\mbedtls\include;$(ProjectDir)..\..\..\src\Engine\Libs\sgSHA256;$(ProjectDir)..\..\..\src\Engine\Libs\httplib;$(ProjectDir)..\..\..\src\Engine\Libs\crow;$(ProjectDir)..\..\..\src\Engine\Libs\nlohmann;$(ProjectDir)..\..\..\src\Engine\Libs\hjson;$(ProjectDir)..\..\..\src\Engine\Libs\exif;$(ProjectDir)..\..\..\src\Engine\Libs\icc;$(ProjectDir)..\..\..\src\Engine\Color;$(ProjectDir)..\..\..\src\Engine\Theme;$(ProjectDir)..\..\..\src\Engine\Raw;$(ProjectDir)..\..\..\src\Engine\Develop;$(ProjectDir)..\..\..\src\Engine\Libs\stb;$(ProjectDir)..\..\..\src\Engine\Libs\ENet;$(ProjectDir)..\..\..\src\Engine\Libs\utf8;$(ProjectDir)..\..\..\src\Engine\Libs\zlib;$(ProjectDir)..\..\..\src\Engine\Libs\tremor\Ogg;$(ProjectDir)..\..\..\src\Engine\Libs\tremor;$(ProjectDir)..\..\..\src\Engine\Libs\rtmidi;$(ProjectDir)..\..\..\src\Engine\Libs\pugixml;$(ProjectDir)..\..\..\src\Engine\Libs\minizip;$(ProjectDir)..\..\..\src\Engine\Libs\md5;$(ProjectDir)..\..\..\src\Engine\Libs\mtrand;$(ProjectDir)..\..\..\src\Engine\Libs\lodepng;$(ProjectDir)..\..\..\src\Engine\Libs\libjson;$(ProjectDir)..\..\..\src\Engine\Libs\libpng;$(ProjectDir)..\..\..\src\Engine\Libs\jpeg\jpeg-9a;$(ProjectDir)..\..\..\src\Engine\Libs\jpeg;$(ProjectDir)..\..\..\src\Engine\Libs\imguiext;$(ProjectDir)..\..\..\src\Engine\Libs\implot;$(ProjectDir)..\..\..\src\Engine\Libs\imgui;$(ProjectDir)..\..\..\src\Engine\Libs\imgui-notify;$(ProjectDir)..\..\..\src\Engine\Libs\imgui_test_engine;$(ProjectDir)..\..\..\src\Engine\Libs\imgui_test_engine\thirdparty;$(ProjectDir)..\..\..\src\Engine\Libs\imgui_test_engine\thirdparty\Str;$(ProjectDir)..\..\..\src\Engine\Libs\nfd;$(ProjectDir)..\..\..\src\Engine\Libs\nestegg;$(ProjectDir)..\..\..\src\Engine\Libs;$(ProjectDir)..\..\..\src\Engine\GUI\AudioMixer;$(ProjectDir)..\..\..\src\Engine\GUI\Fonts;$(ProjectDir)..\..\..\src\Engine\GUI\Helpers\ResourceManager;$(ProjectDir)..\..\..\src\Engine\GUI\Helpers\LoadingScreen;$(ProjectDir)..\..\..\src\Engine\GUI\Helpers;$(ProjectDir)..\..\..\src\Engine\GUI\Layout;$(ProjectDir)..\..\..\src\Engine\GUI\Controls;$(ProjectDir)..\..\..\src\Engine\GUI\Waveform;$(ProjectDir)..\..\..\src\Engine\GUI;$(ProjectDir)..\..\..\src\Engine\Funct\ImageProcessing\stb_image;$(ProjectDir)..\..\..\src\Engine\Funct\ImageProcessing\resampler;$(ProjectDir)..\..\..\src\Engine\Funct\FFT;$(ProjectDir)..\..\..\src\Engine\Funct\ImageProcessing;$(ProjectDir)..\..\..\src\Engine\Funct\ContinuousParam;$(ProjectDir)..\..\..\src\Engine\Funct\DataTable;$(ProjectDir)..\..\..\src\Engine\Funct;$(ProjectDir)..\..\..\src\Engine\Core\GamePads;$(ProjectDir)..\..\..\src\Engine\Core\Render;$(ProjectDir)..\..\..\src\Engine\Core\Net;$(ProjectDir)..\..\..\src\Engine\Core\Pool;$(ProjectDir)..\..\..\src\Engine\System;$(ProjectDir)..\..\..\src\Engine\Core;$(ProjectDir)..\..\..\src\Engine\Audio\MIDI;$(ProjectDir)..\..\..\src\Engine\Audio\WAV;$(ProjectDir)..\..\..\src\Engine\Audio;$(ProjectDir)..\..\..\src\Engine\Tests;$(ProjectDir)..\..\..\src\Engine\Tools;$(ProjectDir)..\..\..\src\Engine\Tools\NetGame;$(ProjectDir)..\..\..\src\Engine\Video;$(ProjectDir)..\..\..\src\Engine\Libs\libvpx;$(ProjectDir)..\..\..\src\Engine\Libs\libopus;$(ProjectDir)..\..\..\src\Engine\Tools\Undo;$(ProjectDir)..\..\..\src\Engine;$(ProjectDir)..\..\..\src\Embedded;$(ProjectDir)..\..\..\src;$(ProjectDir)..\..\..\src\Engine\Libs\libtmt;$(ProjectDir)..\..\..\src\Engine\Libs\md4c;$(ProjectDir)..\..\..\src\Engine\Libs\basis_universal\transcoder;$(ProjectDir)..\..\..\src\Engine\Libs\basis_universal\zstd;$(ProjectDir)..\..\..\platform\Windows\src.Windows;$(ProjectDir)..\..\..\platform\Windows\src.Windows\Llama;$(ProjectDir)..\..\..\platform\Windows\src.Windows\Render;$(ProjectDir)..\..\..\src\Engine\Crash;$(ProjectDir)..\..\..\src\Engine\Sci\Llama;$(ProjectDir)..\..\..\other\lib\image-codecs\install-win-$(Platform)\include;$(MTCapsLibsDir)\ffmpeg\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;WIN32;NOMINMAX;_WINSOCKAPI_;_HAS_STD_BYTE=0;MT_ENABLE_MBEDTLS=1;MT_CAMERA_CAPTURE_ENABLED;MT_ENABLE_LIBTIFF;MT_ENABLE_LIBWEBP;MT_ENABLE_LIBAVIF;MT_ENABLE_LIBRAW;LIBRAW_NODLL;MT_ENABLE_FFMPEG;MT_ENABLE_LCMS2;MT_ENABLE_IMGUI_TEST_ENGINE;MT_RENDER_BACKEND_D3D11;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>llama_cpp.lib;ftxui.lib;SDL2.lib;SDL2main.lib;version.lib;imm32.lib;setupapi.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>llama_cpp.lib;ftxui.lib;SDL3.lib;MTImageCodecs.lib;version.lib;imm32.lib;setupapi.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

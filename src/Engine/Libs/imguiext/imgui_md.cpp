@@ -353,7 +353,10 @@ void imgui_md::SPAN_IMG(const MD_SPAN_IMG_DETAIL* d, bool e)
 		image_info nfo;
 		if (get_image(nfo)) {
 
-			const float scale = ImGui::GetIO().FontGlobalScale;
+			// style.FontScaleMain, not the obsolete io.* global: nothing
+			// writes that field any more, so at guiScale 1.5 the whole UI
+			// grew and markdown images stayed at 1.0.
+			const float scale = ImGui::GetStyle().FontScaleMain;
 			nfo.size.x *= scale;
 			nfo.size.y *= scale;
 
@@ -414,7 +417,9 @@ void imgui_md::SPAN_DEL(bool e)
 
 void imgui_md::render_text(const char* str, const char* str_end)
 {
-	const float scale = ImGui::GetIO().FontGlobalScale;
+	// style.FontScaleMain, not the obsolete io.* global -- see the note in
+	// SPAN_IMG above.
+	const float scale = ImGui::GetStyle().FontScaleMain;
 	const ImGuiStyle& s = ImGui::GetStyle();
 	bool is_lf = false;
 

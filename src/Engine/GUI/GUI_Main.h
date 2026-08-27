@@ -10,9 +10,8 @@
 
 #include "imgui.h"
 #include "imgui_internal.h"
-#include "imguihelper.h"
 #include "imgui_toggle.h"
-#include "imgui_impl_sdl2.h"
+#include "imgui_impl_sdl3.h"
 
 #define GUI_GAP_WIDTH 2
 

@@ -19,6 +19,7 @@
 //#include "VID_CAppView.h"
 #include "CSlrFile.h"
 #include "CSlrImageTexture.h"
+#include "Render/ERenderTextureFormat.h"
 
 #include <atomic>
 
@@ -54,6 +55,22 @@ public:
 private:
 	std::atomic<void *> value;
 };
+
+// THE RESIDENT-FORMAT FUNNEL (S-5).
+//
+// A decoder may produce any decode-time type, but exactly one decision turns
+// that into a resident format, and it has only two answers. Pure and free of
+// any backend so it can be tested without one -- the caller passes the
+// backend's answer rather than the function reaching for it:
+//
+//   IMG_TYPE_RGBA        -> RGBA8
+//   IMG_TYPE_RGBA_16BIT  -> RGBA8   (unchanged: unorm16 is about PRECISION,
+//                                    and promoting it to float would gain no
+//                                    range while doubling the memory)
+//   IMG_TYPE_RGBA_16F    -> RGBA16F when the backend can take it, else RGBA8
+//                                    via the tone-map
+//   anything else        -> RGBA8   (the guards downstream reject it)
+ERenderTextureFormat SlrResidentFormatFor(u8 decodeType, bool backendSupportsFloat);
 
 class CSlrImage : public CSlrImageTexture
 {
@@ -96,6 +113,14 @@ public:
 	void PreloadImage(CSlrFile *imgFile);
 	void LoadImage(CSlrFile *imgFile);
 
+	// Applies SlrResidentFormatFor to `imageData`, converting IN PLACE when the
+	// answer is RGBA8 but the data is not, and setting residentFormat.
+	//
+	// ONE helper rather than the same two lines at six entry points: five
+	// copies of a two-answer decision is precisely how the sixth entry point
+	// (ReBindImageData) came to exist without one.
+	void ApplyResidentFormat(CImageData *imageData);
+
 	void SetLoadImageData(CImageData *imageData);
     void ReBindImageData(CImageData *imageData);
 	void SetLinearScaling(bool isLinearScaling);
@@ -117,6 +142,25 @@ public:
 	CSlrImage *imgAtlas;
 
 	CAtomicTexturePtr texturePtr;
+
+	// What the GPU texture is made of. Set by the resident-format funnel
+	// (SlrResidentFormatFor) at load time and read by CreateTexture /
+	// ReBindTexture. RGBA8 until something decides otherwise, so every
+	// existing path keeps exactly today's behaviour.
+	ERenderTextureFormat residentFormat = RENDER_TEXTURE_RGBA8;
+
+	// The format the LIVE texture was actually created with. A rebind that
+	// finds these two disagreeing must destroy and recreate rather than write:
+	// neither backend's rebind reallocates storage (GL glTexSubImage2D, Metal
+	// replaceRegion), so writing 8-byte pixels into a 4-byte allocation is a
+	// buffer overrun, not a wrong colour.
+	ERenderTextureFormat boundFormat = RENDER_TEXTURE_RGBA8;
+
+	// The content's peak linear value, carried up from the CImageData by the
+	// funnel so the viewer can describe what it is displaying without holding
+	// on to the decode buffer.
+	float contentMaxComponent = 0.0f;
+
 	u64 cacheKey;
 	bool cacheLinearScaling;
 

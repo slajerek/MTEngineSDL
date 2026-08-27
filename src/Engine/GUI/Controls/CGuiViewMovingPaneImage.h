@@ -33,6 +33,14 @@ public:
 	CRenderShader *shader;
 	void SetShader(CRenderShader *shader);
 
+	// Display rotation in CLOCKWISE quarter turns (0..3), applied at blit time
+	// via BlitQuarterTurns -- the stored texture is never touched. Pane (map)
+	// space is DISPLAY-oriented: odd values swap paneWidth/paneHeight, so a
+	// host's existing fit/zoom math keeps working against the dimensions the
+	// user actually sees. Default 0 leaves every existing host unchanged.
+	int rotationQuarters = 0;
+	void SetRotationQuarters(int quarterTurns);
+
 	virtual void SetImageData(CImageData *imageData);
 	virtual void SetImage(CSlrImage *setImage);
 

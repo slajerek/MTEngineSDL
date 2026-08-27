@@ -202,14 +202,35 @@ void CGuiViewMovingPaneImage::SetImage(CSlrImage *setImage, bool clearZoom)
 	{
 		paneWidth = image->width;
 		paneHeight = image->height;
+		// Pane space is display-oriented: an odd quarter turn swaps the
+		// dimensions the host fits/zooms against (see SetRotationQuarters).
+		if (rotationQuarters & 1)
+		{
+			paneWidth  = (int)image->height;
+			paneHeight = (int)image->width;
+		}
 		rasterWidth = image->rasterWidth;
 		rasterHeight = image->rasterHeight;
-	}
 
-	renderTextureStartX = 0.0f;
-	renderTextureEndX = ((float)paneWidth / (float)rasterWidth);
-	renderTextureStartY = 0.0f;
-	renderTextureEndY = ((float)paneHeight / (float)rasterHeight);
+		// Use the image's own UV layout rather than recomputing it from
+		// paneWidth/rasterWidth. The POT ratio is only correct for images
+		// uploaded POT-padded (CSlrImage::LoadImage). Images uploaded at
+		// original pixel dimensions (CSlrImage::LoadImageForRebinding) cover
+		// the full [0,1] range, and recomputing the ratio here would sample
+		// only the top-left paneWidth/rasterWidth of the texture, cropping and
+		// stretching the image. defaultTex* is set correctly by both paths.
+		renderTextureStartX = image->defaultTexStartX;
+		renderTextureEndX   = image->defaultTexEndX;
+		renderTextureStartY = image->defaultTexStartY;
+		renderTextureEndY   = image->defaultTexEndY;
+	}
+	else
+	{
+		renderTextureStartX = 0.0f;
+		renderTextureEndX   = 1.0f;
+		renderTextureStartY = 0.0f;
+		renderTextureEndY   = 1.0f;
+	}
 
 	if (clearZoom)
 	{
@@ -219,6 +240,26 @@ void CGuiViewMovingPaneImage::SetImage(CSlrImage *setImage, bool clearZoom)
 	SetKeepAspectRatio(true, paneWidth / paneHeight);
 
 	guiMain->UnlockMutex();
+}
+
+void CGuiViewMovingPaneImage::SetRotationQuarters(int quarterTurns)
+{
+	rotationQuarters = ((quarterTurns % 4) + 4) % 4;
+	if (image)
+	{
+		// Recomputed from the image rather than swapped in place, so repeated
+		// calls with the same value are idempotent.
+		if (rotationQuarters & 1)
+		{
+			paneWidth  = (int)image->height;
+			paneHeight = (int)image->width;
+		}
+		else
+		{
+			paneWidth  = (int)image->width;
+			paneHeight = (int)image->height;
+		}
+	}
 }
 
 void CGuiViewMovingPaneImage::RefreshRenderTextureParameters()
@@ -285,11 +326,12 @@ void CGuiViewMovingPaneImage::RenderImGui()
 				shader->UseShaderProgram();
 			}
 			
-			Blit(image, renderMapPosX, renderMapPosY, -1, renderMapSizeX, renderMapSizeY,
-				 renderTextureStartX,
-				 renderTextureStartY,
-				 renderTextureEndX,
-				 renderTextureEndY);
+			BlitQuarterTurns(image, renderMapPosX, renderMapPosY, -1, renderMapSizeX, renderMapSizeY,
+							 renderTextureStartX,
+							 renderTextureStartY,
+							 renderTextureEndX,
+							 renderTextureEndY,
+							 rotationQuarters);
 			
 			if (shader)
 			{

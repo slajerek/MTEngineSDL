@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/slajerek/MTEngineSDL/tools/mtcaps/vocabulary.schema.json",
+  "title": "MTEngineSDL capability vocabulary",
+  "description": "Validated by mtcaps as its FIRST action, not by CI alone: a malformed vocabulary must fail with the offending key and the rule it broke, before anything else runs.",
+  "type": "object",
+  "required": ["version", "core", "capabilities"],
+  "additionalProperties": true,
+
+  "$defs": {
+    "dependency": {
+      "type": "object",
+      "required": ["name", "licence", "version", "provenance"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "licence": {
+          "type": "string",
+          "minLength": 1,
+          "description": "LICENSES.txt is generated from this. 'unknown' is not acceptable -- a legally incomplete SBOM that looks complete is worse than an obviously partial one."
+        },
+        "version": { "type": "string", "minLength": 1 },
+        "provenance": {
+          "type": "string",
+          "minLength": 1,
+          "description": "submodule / downloaded tarball / git clone / vendored source / committed prebuilt / system package. The third mode -- committed prebuilt -- is otherwise invisible to the model, and the clean-clone proof would not know it was expected."
+        },
+        "size_mb": { "type": "number" },
+        "system_package": { "type": "object" }
+      },
+      "additionalProperties": true
+    }
+  },
+
+  "properties": {
+    "version": { "type": "integer", "minimum": 1 },
+
+    "core": {
+      "type": "object",
+      "required": ["dependencies"],
+      "description": "Always-on libraries belonging to no capability. Without this section LICENSES.txt would omit SDL3, zlib, ALSA, GTK3, freetype, libuv and the committed prebuilts.",
+      "properties": {
+        "description": { "type": "string" },
+        "dependencies": { "type": "array", "items": { "$ref": "#/$defs/dependency" } }
+      },
+      "additionalProperties": false
+    },
+
+    "capabilities": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {
+        "pattern": "^MT_CAP_[A-Z][A-Z0-9_]*$",
+        "description": "A capability key must be a legal shell identifier. bash `source` is the binding constraint and it is stricter than PowerShell's ConvertFrom-StringData or CMake's file(STRINGS): anything else is not an assignment, the shell tries to run the line as a command, and every build-*.sh runs `set -e`, so it is a hard build abort."
+      },
+      "additionalProperties": {
+        "type": "object",
+        "required": ["short", "description", "default", "kind", "implies", "enables", "app_visible", "dependencies", "commercial", "symbols"],
+        "properties": {
+          "short": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]*$",
+            "description": "The enum enumerator, DISTINCT from the MT_CAP_ token. Two spellings are needed per capability and confusing them does not compile: the tokens are object-like macros in the same generated header, so `enum class MTCapability { MT_CAP_LLM }` expands to `{ 0 }`."
+          },
+          "description": { "type": "string", "minLength": 1 },
+          "default": {
+            "enum": [0, 1],
+            "description": "Rung 4 of resolution: the engine default for a key the manifest does not list. These are set to today's engine behaviour, so a manifest is a deliberate-choices document rather than an exhaustive one."
+          },
+          "kind": { "enum": ["engine-compiled", "dependency-only"] },
+          "implies": {
+            "type": "array",
+            "items": { "type": "string", "pattern": "^MT_CAP_[A-Z][A-Z0-9_]*$" },
+            "description": "Downward only. Every target must itself be a capability key -- an implication onto a core concept (audio, i18n, ICC) is an unknown key and exits 2."
+          },
+          "enables": {
+            "type": "array",
+            "items": { "type": "string", "pattern": "^MT_(ENABLE|CAMERA)_[A-Z0-9_]*$" },
+            "description": "The MT_ENABLE_* library flags the engine turns on to satisfy this capability. Apps never write these."
+          },
+          "app_visible": {
+            "type": "boolean",
+            "description": "Whether this capability's MT_ENABLE_* flags must reach APP translation units. TWO ways it becomes true, and header dependence alone is the wrong test: the flag appears in a header an app TU includes (the httplib ODR shape), OR an app guards on it directly in its own src/. Populated by grepping all four app trees, never by judgement."
+          },
+          "dependencies": { "type": "array", "items": { "$ref": "#/$defs/dependency" } },
+          "acquisition": {
+            "type": "object",
+            "description": "Per-platform script that acquires and builds this capability's dependencies.",
+            "propertyNames": { "enum": ["linux", "macos", "windows"] },
+            "additionalProperties": { "type": "string" }
+          },
+          "artefacts": {
+            "type": "object",
+            "description": "The archive each platform produces. #3.4's hard error needs the path to test; decision A (stub archives) needs the name to stub.",
+            "propertyNames": { "enum": ["linux", "macos", "windows"] },
+            "additionalProperties": { "type": "string" }
+          },
+          "commercial": {
+            "type": "object",
+            "required": ["effect"],
+            "description": "MT_COMMERCIAL_BUILD's effect on this capability. THREE values, because the tree exhibits all three -- a boolean veto would describe none of the FFmpeg decoder cases correctly.",
+            "properties": {
+              "effect": {
+                "enum": ["none", "capability-off", "variant"],
+                "description": "none: unaffected. capability-off: the whole capability is withheld. variant: the capability stays ON and a subset of its libraries or decoders is withheld -- the common case."
+              },
+              "note": { "type": "string" },
+              "forbidden_decoders_commercial": { "type": "array", "items": { "type": "string" } },
+              "permitted_libraries_commercial": { "type": "array", "items": { "type": "string" } },
+              "sites": { "type": "array", "items": { "type": "string" } }
+            },
+            "additionalProperties": false
+          },
+          "symbols": {
+            "type": "object",
+            "required": ["forbidden_when_off", "required_when_on"],
+            "description": "Phase 6 asserts BOTH directions. The positive matters: a build that silently linked nothing passes the negative check trivially.",
+            "properties": {
+              "forbidden_when_off": { "type": "string" },
+              "required_when_on": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": true
+      }
+    }
+  }
+}

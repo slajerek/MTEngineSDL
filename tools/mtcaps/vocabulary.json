@@ -1,0 +1,452 @@
+{
+  "$schema": "./vocabulary.schema.json",
+  "version": 1,
+  "description": "MTEngineSDL capability vocabulary. THE single source of truth for the capability list, defaults, implications, dependencies, licences and symbol patterns. The engine owns this file; apps own only their mtengine.caps manifests. Adding a new app is a manifest, never a patch here.",
+
+  "core": {
+    "description": "Always-on libraries that belong to no capability. They must appear in LICENSES.txt: a document derived from the resolved capability set alone is legally incomplete while looking complete.",
+    "dependencies": [
+      { "name": "SDL3", "licence": "Zlib", "version": "vendored", "provenance": "vendored source, CMakeLists.txt:133-146 (FATAL_ERROR if absent)" },
+      { "name": "Dear ImGui", "licence": "MIT", "version": "1.93.0 WIP", "provenance": "vendored source, src/Engine/Libs/imgui" },
+      { "name": "ImPlot", "licence": "MIT", "version": "vendored", "provenance": "vendored source; core because VID_Main.cpp:198 creates its context and ImPlotColorsExtensionGetterCallback is in the MT_API.h contract" },
+      { "name": "zlib", "licence": "Zlib", "version": "vendored", "provenance": "compiled straight into the engine, CMakeLists.txt:899-913" },
+      { "name": "ALSA", "licence": "LGPL-2.1", "version": "system", "provenance": "system package, find_package(ALSA REQUIRED) at CMakeLists.txt:147 (Linux)" },
+      { "name": "GTK3", "licence": "LGPL-2.1", "version": "system", "provenance": "system package, pkg_check_modules(GTK3 REQUIRED) (Linux)" },
+      { "name": "freetype", "licence": "FTL or GPL-2.0", "version": "committed prebuilt", "provenance": "committed prebuilt, platform/Windows/libs" },
+      { "name": "libuv", "licence": "MIT", "version": "committed prebuilt", "provenance": "committed prebuilt, platform/Windows/libs" },
+      { "name": "libicc / sRGB profile", "licence": "see src/Engine/Libs/icc", "version": "vendored", "provenance": "core: on the render path, no third-party dependency. NOT the same thing as MT_CAP_COLOR_MANAGEMENT, which is Color/ and lcms2" },
+      { "name": "EXIF reader", "licence": "engine source", "version": "vendored", "provenance": "core: Core/CImageData.cpp:21 includes CExifReader.h unconditionally, no third-party dependency" },
+      { "name": "i18n", "licence": "engine source", "version": "n/a", "provenance": "core by decision 4 -- c64d is due to be localised" },
+      { "name": "audio (SND, channels, ogg/tremor)", "licence": "BSD-3-Clause (Ogg/Tremor)", "version": "vendored", "provenance": "core: every app has it on, it is on the MT_API.h path, and a key that cannot change the build is configuration without capability" }
+    ]
+  },
+
+  "capabilities": {
+    "MT_CAP_LLM": {
+      "short": "LLM",
+      "description": "Local large-language-model inference via llama.cpp, plus model discovery and download.",
+      "default": 1,
+      "kind": "engine-compiled",
+      "implies": ["MT_CAP_HTTP", "MT_CAP_HTTPS"],
+      "implies_note": "HTTPS, not merely HTTP, and it is settled rather than assumed: CLlamaModelManager.cpp:228 builds EVERY model URL as https://huggingface.co/..., and httplib::Client on an https:// host without TLS support fails at runtime. LLM=1 HTTPS=0 would build, link and be unable to fetch any model -- the succeeds-and-lies shape #3.4 abolishes. There is no plain-HTTP model source in the tree, so splitting the downloader would buy a configuration nothing uses.",
+      "enables": ["MT_ENABLE_LLAMA_CPP"],
+      "app_visible": false,
+      "app_visible_note": "No app guards on MT_ENABLE_LLAMA_CPP. Measured by grepping all four app src/ trees.",
+      "dependencies": [
+        { "name": "llama.cpp", "licence": "MIT", "version": "submodule other/lib/llama.cpp", "provenance": "git submodule", "size_mb": 598 }
+      ],
+      "acquisition": {
+        "linux": "platform/Linux/build-llama-cpp.sh",
+        "macos": "platform/MacOS/build-llama_cpp.sh",
+        "windows": "platform/Windows/build-llama-cpp.ps1"
+      },
+      "artefacts": {
+        "linux": "libllama_cpp.a",
+        "macos": "libllama_cpp.a",
+        "windows": "llama_cpp.lib"
+      },
+      "commercial": { "effect": "none" },
+      "symbols": { "forbidden_when_off": "llama_|ggml_", "required_when_on": "llama_" }
+    },
+
+    "MT_CAP_VIDEO_PLAYBACK": {
+      "short": "VIDEO_PLAYBACK",
+      "description": "Video decoding and playback: FFmpeg, libvpx, opus, nestegg, and the platform hardware decoders.",
+      "default": 1,
+      "kind": "engine-compiled",
+      "implies": [],
+      "enables": ["MT_ENABLE_FFMPEG"],
+      "app_visible": true,
+      "app_visible_note": "MT_ENABLE_FFMPEG appears in Video/CVideoSourceFFmpeg.h:10, a header app TUs include, AND PhotoCruise guards on it 40 times in its own src/. Both routes to app-visible are exercised by this one flag.",
+      "conditional_headers": [
+        "Video/CAudioDecoderAACMF.h:17", "Video/CAudioDecoderWMAMF.h:23",
+        "Video/CVideoDecoderWMVMF.h:22", "Video/CVideoDecoderHEVCVT.h:11",
+        "Video/CVideoDecoderHEVCMF.h:16", "Video/CVideoFrameExtractor.h:10",
+        "Video/CVideoSourceFFmpeg.h:10", "Video/MFComThreadGuard.h:16"
+      ],
+      "dependencies": [
+        { "name": "FFmpeg", "licence": "LGPL-2.1 (GPL components excluded)", "version": "see platform/*/build-video_codecs.*", "provenance": "downloaded tarball" },
+        { "name": "libvpx", "licence": "BSD-3-Clause", "version": "see build-video_codecs", "provenance": "downloaded tarball" },
+        { "name": "opus", "licence": "BSD-3-Clause", "version": "see build-video_codecs", "provenance": "downloaded tarball" },
+        { "name": "nestegg", "licence": "ISC", "version": "vendored", "provenance": "vendored source" }
+      ],
+      "acquisition": {
+        "linux": "platform/Linux/build-video_codecs.sh",
+        "macos": "platform/MacOS/build-video_codecs.sh",
+        "windows": "platform/Windows/build-video_codecs.ps1"
+      },
+      "artefacts": { "linux": "libmt_video_codecs.a", "macos": "libmt_video_codecs.a", "windows": "MTVideoCodecs.lib" },
+      "commercial": {
+        "effect": "variant",
+        "note": "NOT a whole-capability veto. Video playback stays fully on and a decoder SET is withheld. A boolean field would describe none of this correctly.",
+        "forbidden_decoders_commercial": ["hevc", "wmv1", "wmv2", "wmv3", "vc1", "wmav1", "wmav2", "aac", "eac3"],
+        "sites": ["Video/CVideoSourceFFmpeg.cpp:290-301", "Video/CVideoSourceFFmpeg.cpp:419-442", "Video/CVideoSourceFFmpeg.cpp:696-760"]
+      },
+      "symbols": { "forbidden_when_off": "av_|avcodec_|avformat_|vpx_|opus_", "required_when_on": "avcodec_" }
+    },
+
+    "MT_CAP_PHOTO_CODECS": {
+      "short": "PHOTO_CODECS",
+      "description": "Still-image codecs beyond the core set: TIFF, WebP, AVIF and HEIF.",
+      "default": 1,
+      "kind": "engine-compiled",
+      "implies": [],
+      "enables": ["MT_ENABLE_LIBTIFF", "MT_ENABLE_LIBWEBP", "MT_ENABLE_LIBAVIF", "MT_ENABLE_LIBHEIF"],
+      "app_visible": true,
+      "app_visible_note": "PhotoCruise guards on MT_ENABLE_LIBTIFF, MT_ENABLE_LIBWEBP (x2), MT_ENABLE_LIBAVIF and MT_ENABLE_LIBHEIF in its own src/Tests/CTestFormatSupport.cpp. Decision E was reversed on this measurement.",
+      "dependencies": [
+        { "name": "libtiff", "licence": "libtiff (BSD-like)", "version": "see build-image_codecs", "provenance": "downloaded tarball" },
+        { "name": "libwebp", "licence": "BSD-3-Clause", "version": "see build-image_codecs", "provenance": "downloaded tarball" },
+        { "name": "libavif", "licence": "BSD-2-Clause", "version": "see build-image_codecs", "provenance": "downloaded tarball" },
+        { "name": "libgav1", "licence": "Apache-2.0", "version": "see build-image_codecs", "provenance": "git clone (call sites Linux:293, MacOS:396, Windows:258)" },
+        { "name": "libjxl", "licence": "BSD-3-Clause", "version": "see build-image_codecs", "provenance": "git clone + its own submodules highway/brotli/skcms (Linux:296, MacOS:398, Windows:399/:401)" },
+        { "name": "libheif", "licence": "LGPL-3.0 (container); its HEVC decoder is the licence question", "version": "system package on Linux today; vendored in #5.5a", "provenance": "pkg_check_modules on Linux, ImageIO on macOS, absent on Windows" }
+      ],
+      "acquisition": {
+        "linux": "platform/Linux/build-image_codecs.sh",
+        "macos": "platform/MacOS/build-image_codecs.sh",
+        "windows": "platform/Windows/build-image_codecs.ps1"
+      },
+      "artefacts": { "linux": "libmt_image_codecs.a", "macos": "libmt_image_codecs.a", "windows": "MTImageCodecs.lib" },
+      "commercial": {
+        "effect": "variant",
+        "note": "HEIF has no key of its own -- it lives under this capability -- so 'commercial mode turns HEIF off' CANNOT be capability-off, which would take TIFF, WebP, AVIF and RAW with it. It is the FFmpeg shape: the capability stays on and a decoder is withheld. Pending the #5.5a licence spike.",
+        "forbidden_decoders_commercial": ["heif"]
+      },
+      "symbols": { "forbidden_when_off": "TIFF|WebP|avif|heif", "required_when_on": "TIFF" }
+    },
+
+    "MT_CAP_RAW": {
+      "short": "RAW",
+      "description": "Camera RAW decoding via LibRaw.",
+      "default": 1,
+      "kind": "engine-compiled",
+      "implies": [],
+      "enables": ["MT_ENABLE_LIBRAW"],
+      "app_visible": false,
+      "app_visible_note": "Measured: MT_ENABLE_LIBRAW appears in the four app trees only inside a COMMENT (PhotoCruise/src/PhotoCruiseInit.cpp:352) saying the opposite. It joins the app-visible set if and when a grep finds a real guard.",
+      "dependencies": [
+        { "name": "LibRaw", "licence": "CDDL-1.0 or LGPL-2.1 (dual; the CDDL option is what makes a commercial build possible -- see PhotoCruise's 2026-08-19 jpegxl-dng licence spike)", "version": "see build-image_codecs", "provenance": "downloaded tarball" }
+      ],
+      "acquisition": {
+        "linux": "platform/Linux/build-image_codecs.sh",
+        "macos": "platform/MacOS/build-image_codecs.sh",
+        "windows": "platform/Windows/build-image_codecs.ps1"
+      },
+      "artefacts": { "linux": "libmt_image_codecs.a", "macos": "libmt_image_codecs.a", "windows": "MTImageCodecs.lib" },
+      "commercial": { "effect": "none" },
+      "symbols": { "forbidden_when_off": "libraw|LibRaw", "required_when_on": "LibRaw" }
+    },
+
+    "MT_CAP_DEVELOP": {
+      "short": "DEVELOP",
+      "description": "RAW development maths and pipeline (Develop/).",
+      "default": 1,
+      "kind": "engine-compiled",
+      "implies": ["MT_CAP_RAW"],
+      "implies_note": "Verified by the includes: Develop/DevelopMath.cpp:3 includes CRawDecoder.h. The WORK ORDER in #5.5 is the opposite direction -- gate RAW first, because a guard on DEVELOP written before RAW has a stub has nothing to degrade to.",
+      "enables": [],
+      "app_visible": false,
+      "dependencies": [],
+      "acquisition": {},
+      "artefacts": {},
+      "commercial": { "effect": "none" },
+      "symbols": { "forbidden_when_off": "", "required_when_on": "" }
+    },
+
+    "MT_CAP_COLOR_MANAGEMENT": {
+      "short": "COLOR_MANAGEMENT",
+      "description": "Colour-management engines and DCP profile handling (Color/). NOT ICC parsing, which is core: Libs/icc is on the render path with no third-party dependency, and conflating the two is a mistake this design made twice.",
+      "default": 1,
+      "kind": "engine-compiled",
+      "implies": ["MT_CAP_DEVELOP"],
+      "implies_note": "Color/CDcpApply.cpp:3 and CDcpTemperature.cpp:2 include DevelopMath.h.",
+      "enables": ["MT_ENABLE_LCMS2"],
+      "app_visible": false,
+      "dependencies": [
+        { "name": "Little CMS (lcms2)", "licence": "MIT", "version": "see build-image_codecs", "provenance": "downloaded tarball (Linux/Windows), part of the image-codec bundle" }
+      ],
+      "acquisition": {
+        "linux": "platform/Linux/build-image_codecs.sh",
+        "macos": "platform/MacOS/build-image_codecs.sh",
+        "windows": "platform/Windows/build-image_codecs.ps1"
+      },
+      "artefacts": { "linux": "libmt_image_codecs.a", "macos": "libmt_image_codecs.a", "windows": "MTImageCodecs.lib" },
+      "commercial": { "effect": "none" },
+      "symbols": { "forbidden_when_off": "cmsCreate|cmsOpen|lcms", "required_when_on": "cmsCreate" }
+    },
+
+    "MT_CAP_KTX2": {
+      "short": "KTX2",
+      "description": "KTX2 / basis_universal texture transcoding.",
+      "default": 1,
+      "kind": "engine-compiled",
+      "implies": [],
+      "enables": ["MT_ENABLE_KTX2"],
+      "app_visible": false,
+      "needs_guard_first": "Core/CKTX2Loader.cpp has NO preprocessor guard today and is consumed unconditionally by CImageData.cpp, so unlike every other capability here there is no existing off-path to switch on. It needs the CImageDataTIFF.cpp treatment -- guard the body, keep the header unconditional, keep the file in all three build lists, #else-stub the entry points -- before it can be gated at all.",
+      "dependencies": [
+        { "name": "basis_universal", "licence": "Apache-2.0", "version": "vendored", "provenance": "vendored source" }
+      ],
+      "acquisition": {},
+      "artefacts": {},
+      "commercial": { "effect": "none" },
+      "symbols": { "forbidden_when_off": "basisu|ktx2", "required_when_on": "" }
+    },
+
+    "MT_CAP_CAMERA": {
+      "short": "CAMERA",
+      "description": "Live camera capture. c64d needs it for C64 Ultimate support (decision 5).",
+      "default": 1,
+      "kind": "engine-compiled",
+      "implies": [],
+      "enables": ["MT_CAMERA_CAPTURE_ENABLED"],
+      "app_visible": false,
+      "off_path_exists": "Core/CCameraCapture.cpp:3 already guards the platform factory on MT_CAMERA_CAPTURE_ENABLED and :17-21 falls back to new CCameraDummy(). The off-path is written and compiling.",
+      "linux_extra": "On Linux the define is not the whole story: CMakeLists.txt:916 compiles platform/Linux/src.Linux/CCameraLinux.cpp and :949 links v4l2, both unconditionally. Both move behind the capability. v4l2 is a SYSTEM PACKAGE, so decision H applies -- a Linux manifest asking for camera without it fails the configure naming the install command.",
+      "dependencies": [
+        { "name": "libv4l2", "licence": "LGPL-2.1", "version": "system", "provenance": "system package (Linux only)", "system_package": { "debian": "libv4l-dev" } }
+      ],
+      "acquisition": {},
+      "artefacts": {},
+      "commercial": { "effect": "none" },
+      "symbols": { "forbidden_when_off": "v4l2_", "required_when_on": "" }
+    },
+
+    "MT_CAP_NET_TRANSPORT": {
+      "short": "NET_TRANSPORT",
+      "description": "Reliable UDP transport (ENet) and Core/Net.",
+      "default": 1,
+      "kind": "engine-compiled",
+      "implies": [],
+      "enables": ["MT_ENABLE_ENET"],
+      "app_visible": false,
+      "dependencies": [
+        { "name": "ENet", "licence": "MIT", "version": "vendored", "provenance": "vendored source" }
+      ],
+      "acquisition": {},
+      "artefacts": {},
+      "commercial": { "effect": "none" },
+      "symbols": { "forbidden_when_off": "enet_", "required_when_on": "enet_" }
+    },
+
+    "MT_CAP_NET_GAME": {
+      "short": "NET_GAME",
+      "description": "Networked-game session layer (Tools/NetGame).",
+      "default": 1,
+      "kind": "engine-compiled",
+      "implies": ["MT_CAP_NET_TRANSPORT", "MT_CAP_HTTP"],
+      "implies_note": "Gating NET_GAME without these gates nothing, and its acceptance criterion then passes vacuously.",
+      "enables": [],
+      "app_visible": false,
+      "dependencies": [],
+      "acquisition": {},
+      "artefacts": {},
+      "commercial": { "effect": "none" },
+      "symbols": { "forbidden_when_off": "", "required_when_on": "" }
+    },
+
+    "MT_CAP_HTTP": {
+      "short": "HTTP",
+      "description": "Plain HTTP client (cpp-httplib) and the shared file downloader.",
+      "default": 1,
+      "kind": "engine-compiled",
+      "implies": [],
+      "enables": ["MT_ENABLE_HTTPLIB"],
+      "app_visible": false,
+      "ownership_note": "MT_CAP_HTTP OWNS cpp-httplib. MT_CAP_LLM depends on it and must not own it: Tools/NetGame/CFileDownloader.cpp is a shared consumer independent of any LLM, so leaving httplib inside the llama.cpp submodule makes a plain HTTP-only app pay for a 598 MB dependency to download a file.",
+      "dependencies": [
+        { "name": "cpp-httplib", "licence": "MIT", "version": "currently reached through other/lib/llama.cpp/vendor/cpp-httplib; #5.3 vendors it as an engine-owned dependency", "provenance": "vendored (via submodule today)" }
+      ],
+      "acquisition": {},
+      "artefacts": {},
+      "commercial": { "effect": "none" },
+      "symbols": { "forbidden_when_off": "httplib", "required_when_on": "" }
+    },
+
+    "MT_CAP_HTTPS": {
+      "short": "HTTPS",
+      "description": "TLS for the HTTP client, via mbedTLS.",
+      "default": 1,
+      "kind": "engine-compiled",
+      "implies": ["MT_CAP_HTTP"],
+      "enables": ["MT_ENABLE_MBEDTLS"],
+      "app_visible": true,
+      "app_visible_note": "MT_ENABLE_MBEDTLS appears in Libs/httplib/httplib.h:21, a header app TUs include, and it changes httplib::Client's STRUCT LAYOUT. This is the ODR case: an engine built with it on and an app TU compiled with it off stack-allocate different-sized Clients. c64d exhibits it on macOS and Windows today.",
+      "dependencies": [
+        { "name": "mbedTLS", "licence": "Apache-2.0 or GPL-2.0", "version": "submodule other/lib/mbedtls", "provenance": "git submodule", "size_mb": 542 }
+      ],
+      "acquisition": {
+        "linux": "platform/Linux/build-mbedtls.sh",
+        "macos": "platform/MacOS/build-mbedtls.sh",
+        "windows": "platform/Windows/build-mbedtls.ps1"
+      },
+      "artefacts": { "linux": "libmbedtls_bundle.a", "macos": "libmbedtls_bundle.a", "windows": "mbedtls_bundle.lib" },
+      "commercial": { "effect": "none" },
+      "symbols": { "forbidden_when_off": "mbedtls_", "required_when_on": "mbedtls_" }
+    },
+
+    "MT_CAP_WEBSOCKETS": {
+      "short": "WEBSOCKETS",
+      "description": "WebSocket server/client via uWebSockets on uSockets.",
+      "default": 1,
+      "kind": "dependency-only",
+      "implies": [],
+      "enables": ["MT_ENABLE_UWEBSOCKETS"],
+      "app_visible": false,
+      "phase_note": "Gated in Phase 4, not Phase 3: the uSockets consolidation in #5.4b rewrites the same archive this capability gates, so gating it first would gate a copy that is about to move.",
+      "dependencies": [
+        { "name": "uSockets", "licence": "Apache-2.0", "version": "VENDORED at other/lib/uSockets with a local ARM64 fix (listenAddr = NULL, src/bsd.c:484, :602). Pristine upstream leaves that pointer uninitialised -- cloning upstream over it silently produces a broken archive.", "provenance": "vendored source, NOT a submodule and NOT a sibling checkout" },
+        { "name": "uWebSockets", "licence": "Apache-2.0", "version": "vendored", "provenance": "vendored source" }
+      ],
+      "acquisition": { "linux": "platform/Linux/build-usockets.sh" },
+      "artefacts": { "linux": "uSockets.a", "macos": "uSockets.a", "windows": "uSockets.lib" },
+      "commercial": { "effect": "none" },
+      "symbols": { "forbidden_when_off": "us_socket_|uWS", "required_when_on": "us_socket_" }
+    },
+
+    "MT_CAP_MUSIC_PLAYER": {
+      "short": "MUSIC_PLAYER",
+      "description": "Music player and playlists. LightHeroes only.",
+      "default": 1,
+      "kind": "engine-compiled",
+      "implies": [],
+      "implies_note": "It does NOT imply an AUDIO capability: audio is CORE and has no vocabulary key, so an implication onto it would make mtcaps exit 2 on an unknown key. The coupling is real and is stated here as prose: the music player needs the core audio path, which is always present.",
+      "enables": [],
+      "app_visible": false,
+      "dependencies": [],
+      "acquisition": {},
+      "artefacts": {},
+      "commercial": { "effect": "none" },
+      "symbols": { "forbidden_when_off": "", "required_when_on": "" }
+    },
+
+    "MT_CAP_MIDI": {
+      "short": "MIDI",
+      "description": "MIDI input and output via rtmidi.",
+      "default": 1,
+      "kind": "engine-compiled",
+      "implies": [],
+      "enables": ["MT_ENABLE_RTMIDI"],
+      "app_visible": false,
+      "dependencies": [
+        { "name": "RtMidi", "licence": "MIT-like (RtMidi licence)", "version": "vendored", "provenance": "vendored source" }
+      ],
+      "acquisition": {},
+      "artefacts": {},
+      "commercial": { "effect": "none" },
+      "symbols": { "forbidden_when_off": "RtMidi|rtmidi", "required_when_on": "RtMidi" }
+    },
+
+    "MT_CAP_GAMEPADS": {
+      "short": "GAMEPADS",
+      "description": "Gamepad support: the SDL gamepad layer and Core/GamePads.",
+      "default": 1,
+      "kind": "engine-compiled",
+      "implies": [],
+      "enables": ["MT_ENABLE_GAMEPADS"],
+      "app_visible": false,
+      "dependencies": [],
+      "acquisition": {},
+      "artefacts": {},
+      "commercial": { "effect": "none" },
+      "symbols": { "forbidden_when_off": "GAM_InitGamepads", "required_when_on": "GAM_InitGamepads" }
+    },
+
+    "MT_CAP_UNDO": {
+      "short": "UNDO",
+      "description": "Undo/redo framework (Tools/Undo). LightHeroes only.",
+      "default": 1,
+      "kind": "engine-compiled",
+      "implies": [],
+      "enables": ["MT_ENABLE_UNDO"],
+      "app_visible": false,
+      "note": "No third-party dependency, so this is a CODE-SIZE capability rather than an acquisition one -- which makes it the cheapest place to prove the guard machinery without any acquisition change.",
+      "dependencies": [],
+      "acquisition": {},
+      "artefacts": {},
+      "commercial": { "effect": "none" },
+      "symbols": { "forbidden_when_off": "CUndoManager", "required_when_on": "CUndoManager" }
+    },
+
+    "MT_CAP_FTXUI": {
+      "short": "FTXUI",
+      "description": "Terminal UI toolkit, linked and used directly by the app.",
+      "default": 1,
+      "kind": "dependency-only",
+      "implies": [],
+      "enables": ["MT_ENABLE_FTXUI"],
+      "app_visible": true,
+      "app_visible_note": "LightHeroes guards on MT_ENABLE_FTXUI in six of its own sites, and in the `#if X` style -- so on Linux and Windows, where the flag is defined nowhere, its admin dashboard is OFF today and a value-style normalisation would turn it ON.",
+      "naming_note": "It keeps the library name deliberately. A dependency-only capability has no engine feature to abstract -- no engine source includes ftxui, verified zero hits in src/ -- so the app links ftxui's API directly and the library name IS the feature name. Renaming it MT_CAP_TERMINAL_UI would also collide with MT_CAP_TERMINAL, a different capability.",
+      "dependencies": [
+        { "name": "FTXUI", "licence": "MIT", "version": "submodule other/lib/ftxui", "provenance": "git submodule", "size_mb": 140 }
+      ],
+      "acquisition": {
+        "linux": "platform/Linux/build-ftxui.sh",
+        "macos": "platform/MacOS/build-ftxui.sh",
+        "windows": "platform/Windows/build-ftxui.ps1"
+      },
+      "artefacts": { "linux": "libftxui.a", "macos": "libftxui.a", "windows": "ftxui.lib" },
+      "commercial": { "effect": "none" },
+      "symbols": { "forbidden_when_off": "ftxui", "required_when_on": "ftxui" }
+    },
+
+    "MT_CAP_CRASH_REPORTER": {
+      "short": "CRASH_REPORTER",
+      "description": "Crash reporting (MT_CrashReporter).",
+      "default": 1,
+      "kind": "engine-compiled",
+      "implies": [],
+      "enables": ["MT_ENABLE_CRASH_REPORTER"],
+      "app_visible": false,
+      "note": "The off-path has precedent: it is already headless-aware ('CrashReporter: disabled (headless=1 ...)').",
+      "dependencies": [],
+      "acquisition": {},
+      "artefacts": {},
+      "commercial": { "effect": "none" },
+      "symbols": { "forbidden_when_off": "MT_CrashReporter", "required_when_on": "MT_CrashReporter" }
+    },
+
+    "MT_CAP_TEST_ENGINE": {
+      "short": "TEST_ENGINE",
+      "description": "imgui_test_engine UI-automation harness.",
+      "default": 1,
+      "kind": "engine-compiled",
+      "implies": [],
+      "enables": ["MT_ENABLE_IMGUI_TEST_ENGINE"],
+      "app_visible": true,
+      "app_visible_note": "Appears in three headers app TUs include, and all four apps' src/Tests/ guard on it. Renamed from ENABLE_IMGUI_TEST_ENGINE in Phase 1 -- do not emit both spellings.",
+      "conditional_headers": [
+        "Tests/CImGuiTestEngine.h:3",
+        "Tests/MT_CaptureHelpers.h:14",
+        "Libs/imgui/imconfig.h:150"
+      ],
+      "conditional_headers_note": "imconfig.h:150 is the dangerous one -- miss it and every test-engine hook compiles out with NO build error at all, so the suites go quiet rather than red.",
+      "dependencies": [
+        { "name": "imgui_test_engine", "licence": "Dear ImGui Test Engine licence (free for open source; commercial use requires a licence from Omar Cornut)", "version": "vendored", "provenance": "vendored source" }
+      ],
+      "acquisition": {},
+      "artefacts": {},
+      "commercial": { "effect": "none" },
+      "symbols": { "forbidden_when_off": "ImGuiTestEngine_", "required_when_on": "ImGuiTestEngine_" }
+    },
+
+    "MT_CAP_TERMINAL": {
+      "short": "TERMINAL",
+      "description": "Embedded terminal emulator: libtmt and GUI/Controls/CGuiViewTerminal. A different capability from MT_CAP_FTXUI.",
+      "default": 1,
+      "kind": "engine-compiled",
+      "implies": [],
+      "enables": ["MT_ENABLE_LIBTMT"],
+      "app_visible": false,
+      "dependencies": [
+        { "name": "libtmt", "licence": "BSD-2-Clause", "version": "vendored", "provenance": "vendored source" }
+      ],
+      "acquisition": {},
+      "artefacts": {},
+      "commercial": { "effect": "none" },
+      "symbols": { "forbidden_when_off": "tmt_", "required_when_on": "tmt_" }
+    }
+  }
+}

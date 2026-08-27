@@ -16,6 +16,7 @@ class CSlrKeyboardShortcut;
 class CSlrKeyboardShortcuts;
 
 class CGuiViewUiDebug;
+class CMTNativeMenuBar;
 
 class CLayoutManager;
 class CLayoutData;
@@ -342,7 +343,12 @@ public:
 	
 	// MTEngineSDL debug view
 	CGuiViewUiDebug *viewUiDebug;
-	
+
+	CMTNativeMenuBar *nativeMenuBar = nullptr;
+	bool HasNativeManagedMenuBar() const { return nativeMenuBar != nullptr; }
+	void SetNativeMenuBar(CMTNativeMenuBar *bar);
+	void RenderNativeMenuBarFrame();
+
 private:
 	CSlrMutex *renderMutex;
 	CSlrMutex *notificationMutex;

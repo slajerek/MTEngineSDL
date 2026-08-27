@@ -2,7 +2,7 @@
 #define _CRenderShaderMaskedTileQueued_h_
 
 #include "CRenderShaderMaskedTile.h"
-#include <vector>
+#include "CMaskedTileBoundsQueue.h"
 
 // Queued version of CRenderShaderMaskedTile for rendering multiple tiles per frame.
 // Each PushTileBounds() call stores tile bounds that are consumed in order by
@@ -33,14 +33,11 @@ public:
 	virtual void ResetState() override;
 
 private:
-	struct TileBounds
-	{
-		GLuint maskTexId;
-		float px, py, sx, sy;
-	};
-
-	std::vector<TileBounds> boundsQueue;
-	int readIndex;
+	// SHARED with the Metal port (CRenderShaderMaskedTileMetal) rather than
+	// duplicated. The push/pop and the deferred-callback lifetime rule are
+	// entirely backend-independent, and the lifetime rule is the part that is
+	// easy to get wrong twice.
+	CMaskedTileBoundsQueue boundsQueue;
 };
 
 #endif

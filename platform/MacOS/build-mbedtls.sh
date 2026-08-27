@@ -7,8 +7,22 @@ set -euo pipefail
 export PATH="/opt/local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
+# FIRST, before this script defines anything of its own. A script phase inherits
+# ~600 Xcode build settings, and this script's own BUILD_DIR is one of the names
+# in that namespace -- so the strip has to happen while those values are still
+# purely inherited. (Measured the other way round: called after the assignments,
+# it deleted the script's BUILD_DIR and the build died on an unbound variable.)
+# shellcheck source=../caps-lib.sh
+. "$ROOT_DIR/platform/caps-lib.sh"
+mt_caps_strip_host_build_env
 MBEDTLS_SRC_DIR="$ROOT_DIR/other/lib/mbedtls"
-OUT_LIB_DIR="$ROOT_DIR/platform/MacOS/libs"
+# OUTSIDE the checkout -- see mt_caps_lib_dir in ../caps-lib.sh for why this
+# is a correctness change and not tidiness.
+if ! declare -f mt_caps_lib_dir >/dev/null 2>&1; then
+  . "$ROOT_DIR/platform/caps-lib.sh"
+fi
+OUT_LIB_DIR="$(mt_caps_lib_dir)"
 OUT_LIB="$OUT_LIB_DIR/libmbedtls_bundle.a"
 STAMP_FILE="$OUT_LIB_DIR/libmbedtls_bundle.stamp"
 

@@ -1,4 +1,5 @@
 #include "CGuiMain.h"
+#include "CMTNativeMenuBar.h"
 #include "CGuiView.h"
 #include "CConfigStorage.h"
 #include "SYS_Threading.h"
@@ -1531,21 +1532,59 @@ void CGuiMain::DoDropFile(u32 windowId, char *filePath)
 	return;
 }
 
+// True when the mouse is over a plain, floating ImGui overlay/dialog that ImGui
+// should own — a window that is NOT one of our CGuiViews (which tag their window
+// with window->userData = this in CGuiView::PreRenderImGui). In that case raw
+// mouse events (tap/scroll/right-click) must be swallowed so they can't leak to
+// the view rendered behind the overlay (which, for a full-screen moving pane,
+// would arm panning or zoom).
+//
+// Deliberately conservative: it returns false for the invisible
+// DockSpaceOverViewport host (which covers the whole viewport as a background,
+// so hovering it really means the mouse is over the pane floating on top — let
+// the normal IsInsideView routing handle that) and for the ImGui fallback debug
+// window. Genuine floating overlays (the cache-debug log, modeless dialogs,
+// filmstrip, grid, menu bar) have neither trait and are correctly swallowed.
+static bool IsMouseOverBlockingImGuiWindow()
+{
+	ImGuiContext *g = ImGui::GetCurrentContext();
+	ImGuiWindow *hovered = g ? g->HoveredWindow : NULL;
+	if (hovered == NULL)
+		return false;
+	ImGuiWindow *root = hovered->RootWindow ? hovered->RootWindow : hovered;
+	if (root->userData != NULL)      // one of our CGuiViews -> route normally
+		return false;
+	if (root->DockNodeAsHost != NULL) // full-viewport dockspace host background
+		return false;
+	if (root->IsFallbackWindow)       // "Debug##Default"
+		return false;
+	return true;
+}
+
 bool CGuiMain::DoTap(float x, float y)
 {
 	LOGI("CGuiMain: DoTap: px=%3.2f; py=%3.2f;", x, y);
-	
+
 	isLeftMouseButtonPressed = true;
-	
+
 	moveStartTapPosX = movePrevTapPosX = x;
 	moveStartTapPosY = movePrevTapPosY = y;
-	
+
 	if (IsOnAnyOpenedPopup(x, y))
 	{
 		LOGI("...is on popup, skipping tap");
 		return false;
 	}
-	
+
+	// Global gate: if the mouse is over a plain (non-view) floating ImGui
+	// overlay/dialog, ImGui owns the click. Swallow it so it can't leak to the
+	// view behind it (which, for a full-screen moving pane, would arm panning).
+	if (IsMouseOverBlockingImGuiWindow())
+	{
+		LOGI("...over non-view ImGui overlay, skipping tap");
+		return false;
+	}
+
 #if !defined(FINAL_RELEASE)
 	if (x > SCREEN_WIDTH - 20 && y < 20)
 		//if (x > SCREEN_WIDTH - 20 && y > SCREEN_HEIGHT - 20)
@@ -1584,11 +1623,13 @@ bool CGuiMain::DoTap(float x, float y)
 			if (view->IsInsideView(x, y))
 			{
 				LOGI("....... IsInsideView, DoTap(): %s", view->name);
-				if (view->DoTap(x, y))
-				{
+				// The topmost view under the cursor owns the tap. Even if it
+				// does not consume it, stop here — never fall through to a
+				// view rendered behind it (e.g. a floating window over a pane).
+				bool consumed = view->DoTap(x, y);
+				if (consumed)
 					LOGI("......... view %s consumed tap", view->name);
-					return true;
-				}
+				return consumed;
 			}
 			else
 			{
@@ -1699,7 +1740,15 @@ bool CGuiMain::DoRightClick(float x, float y)
 		LOGI("...is on popup, skipping right-click");
 		return false;
 	}
-	
+
+	// Global gate: don't leak right-clicks over a plain (non-view) floating
+	// ImGui overlay/dialog to the view behind it.
+	if (IsMouseOverBlockingImGuiWindow())
+	{
+		LOGI("...over non-view ImGui overlay, skipping right-click");
+		return false;
+	}
+
 #if !defined(FINAL_RELEASE)
 	if (x > SCREEN_WIDTH - 20 && y < 20)
 		//if (x > SCREEN_WIDTH - 20 && y > SCREEN_HEIGHT - 20)
@@ -1726,11 +1775,11 @@ bool CGuiMain::DoRightClick(float x, float y)
 			if (view->IsInsideView(x, y))
 			{
 //				LOGD("....... IsInside, DoTap()");
-				if (view->DoRightClick(x, y))
-				{
-//					LOGD("......... view %s consumed tap", view->name);
-					return true;
-				}
+				// Topmost view under the cursor owns the right-click; do not
+				// fall through to views rendered behind it.
+				bool consumed = view->DoRightClick(x, y);
+//				if (consumed) LOGD("......... view %s consumed tap", view->name);
+				return consumed;
 			}
 		}
 	}
@@ -1992,7 +2041,16 @@ void CGuiMain::DoScrollWheel(float deltaX, float deltaY)
 		LOGI("...is on popup, skipping scroll wheel");
 		return;
 	}
-	
+
+	// Global gate: if the wheel is over a plain (non-view) floating ImGui
+	// overlay/dialog (e.g. the cache-debug log), ImGui handles the scroll.
+	// Swallow it so it can't leak through and zoom the view behind it.
+	if (IsMouseOverBlockingImGuiWindow())
+	{
+		LOGI("...over non-view ImGui overlay, skipping scroll wheel");
+		return;
+	}
+
 	// TODO: iteration top-down by ImGui windows is not valid after system open file dialog on macos
 
 	// iterate top-down by ImGui windows
@@ -2017,15 +2075,11 @@ void CGuiMain::DoScrollWheel(float deltaX, float deltaY)
 			if (view->IsInsideView(mousePosX, mousePosY))
 			{
 				LOGG("  view %s ->DoScrollWheel(%f %f)", view->name, deltaX, deltaY);
-				if (view->DoScrollWheel(deltaX, deltaY))
-				{
-					LOGG("  view %s consumed scroll wheel event", view->name);
-					return;
-				}
-				else
-				{
-//					LOGG("  view %s NOT consumed scroll wheel event", view->name);					
-				}
+				// Topmost view under the cursor owns the wheel; do not fall
+				// through to views rendered behind it even if it doesn't
+				// consume the event.
+				view->DoScrollWheel(deltaX, deltaY);
+				return;
 			}
 			else
 			{
@@ -5870,4 +5924,15 @@ CUiThreadTaskSetViewVisible::CUiThreadTaskSetViewVisible(CGuiView *view, bool is
 void CUiThreadTaskSetViewVisible::RunUIThreadTask()
 {
 	view->visible = isVisible;
+}
+
+void CGuiMain::SetNativeMenuBar(CMTNativeMenuBar *bar)
+{
+	nativeMenuBar = bar;
+}
+
+void CGuiMain::RenderNativeMenuBarFrame()
+{
+	if (nativeMenuBar && !nativeMenuBar->IsNative())
+		nativeMenuBar->RenderFrame();
 }

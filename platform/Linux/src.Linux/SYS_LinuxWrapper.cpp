@@ -3,7 +3,7 @@
 #include "VID_Main.h"
 #include "MT_API.h"
 #include "SYS_DefaultConfig.h"
-#include <SDL.h>
+#include <SDL3/SDL.h>
 
 void VID_GetStartupMainWindowPosition(int *x, int *y, int *width, int *height, bool *maximized)
 {

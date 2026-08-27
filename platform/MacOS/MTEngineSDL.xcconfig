@@ -1,0 +1,135 @@
+// MTEngineSDL -- TRACKED engine build settings.
+//
+// This is NOT the generated MTEngineCaps.xcconfig. Two files, one job each, and
+// three earlier drafts of the plan used one name for both:
+//
+//   * THIS file is tracked, hand-written, and named by the engine target's
+//     baseConfigurationReference. It holds the engine's OWN defaults -- the ones
+//     a developer gets when they clone the engine and open it in Xcode with no
+//     app in sight -- plus one line that consumes the wrapper's settings.
+//
+//   * $MT_OUT/MTEngineCaps.xcconfig is GENERATED and is imported by nothing. Its
+//     path ends in a capability hash, so no tracked baseConfigurationReference
+//     could ever name it. build-macos.sh READS it and turns it into xcodebuild
+//     settings.
+//
+// MEASURED (spike G, 2026-08-23, claude/spikes/xcconfig/README.md):
+//
+//   * $(MT_CAPS_DEFINES) DOES expand here when the value is supplied on the
+//     xcodebuild command line -- question 9, and the whole mechanism rests on it;
+//   * a target's own buildSettings OUTRANK its own xcconfig, so the define list
+//     had to MOVE here rather than be added alongside;
+//   * a command-line setting cannot be scoped per-target and does not need to be:
+//     it reaches every target in the invocation, and the split is made HERE, by
+//     which settings this file chooses to reference. MT_CAPS_DEFINES_ENGINE is
+//     referenced by this file and by no app's, so a flag no app guards on stays
+//     out of app translation units.
+
+// Platform defines. NOT capabilities and never emitted by mtcaps: MACOS has 74
+// sites in the engine, many with no __APPLE__ fallback, and the generator has no
+// source for it.
+GCC_PREPROCESSOR_DEFINITIONS = $(inherited) MACOS $(MT_CAPS_DEFINES) $(MT_CAPS_DEFINES_ENGINE) $(MT_ENGINE_DEFAULT_CAPS)
+
+// The engine's own capability defaults, for STANDALONE use only.
+//
+// "Clone the engine, open it, build it" is the first thing an external
+// contributor does, and MTEngineSDL ships on public GitHub -- a design where that
+// fails with "run some app's wrapper" is not shippable. So when no wrapper has
+// supplied MT_CAPS_DEFINES, these are what the engine compiles with.
+//
+// The wrapper leaves MT_ENGINE_DEFAULT_CAPS empty, so an app build gets its own
+// manifest's set and nothing else. Standalone leaves MT_CAPS_DEFINES empty and
+// gets this list.
+MT_ENGINE_DEFAULT_CAPS = $(MT_ENGINE_DEFAULT_CAPS_$(MT_CAPS_SUPPLIED))
+MT_CAPS_SUPPLIED = NO
+MT_ENGINE_DEFAULT_CAPS_NO = MT_ENABLE_IMGUI_TEST_ENGINE=1 MT_ENABLE_MBEDTLS=1 MT_ENABLE_FTXUI=1 MT_CAMERA_CAPTURE_ENABLED=1 MT_ENABLE_LIBTIFF=1 MT_ENABLE_LIBWEBP=1 MT_ENABLE_LIBAVIF=1 MT_ENABLE_LIBRAW=1 MT_ENABLE_FFMPEG=1 MT_ENABLE_LLAMA_CPP=1 MT_ENABLE_LCMS2=1 MT_ENABLE_HTTPLIB=1 MT_ENABLE_ENET=1 MT_ENABLE_RTMIDI=1 MT_ENABLE_GAMEPADS=1 MT_ENABLE_UNDO=1 MT_ENABLE_CRASH_REPORTER=1 MT_ENABLE_LIBTMT=1 MT_ENABLE_LIBHEIF=1 MT_ENABLE_KTX2=1 MT_ENABLE_UWEBSOCKETS=1
+MT_ENGINE_DEFAULT_CAPS_YES =
+
+// $MT_OUT/include, where MT_Capabilities.h and llama_cpp_version.h land. On a
+// WRAPPER build the wrapper passes it as HEADER_SEARCH_PATHS with $(inherited) --
+// measured: a BARE assignment replaces the engine's own list wholesale, which is
+// substantial, so it would break every include and not merely the capability
+// header.
+//
+// This line is for the STANDALONE build, which has no wrapper to pass anything.
+// llama_cpp_version.h used to be a TRACKED file in src/Engine/Sci/Llama/ that
+// build-llama_cpp.sh rewrote on every build; it now lands under the generated
+// include dir, and CGuiViewLlamaModelLoader.cpp includes it unconditionally, so
+// a bare `xcodebuild -scheme MTEngineSDL` needs that directory on the path.
+//
+// It is set on the TARGET, not here, and that is this project's own spike result
+// applied to itself: a target's own buildSettings OUTRANK its own xcconfig, so a
+// HEADER_SEARCH_PATHS line in this file would be silently inert -- measured, it
+// was. The defines could move here because nothing else set them; the search
+// paths could not, because the target's list is substantial and stays.
+//
+// The default root only. A standalone build with MTENGINE_BUILD_ROOT or
+// XDG_CACHE_HOME set must pass HEADER_SEARCH_PATHS itself: an xcconfig cannot
+// evaluate a shell fallback chain, and inventing a second expression of the same
+// rule is how two copies drift.
+
+// WHERE DEPENDENCY ARCHIVES LIVE, and it is not in this checkout.
+//
+// The six acquisition phases used to stage libSDL3.a, libllama_cpp.a and the
+// rest into platform/MacOS/libs/ -- inside the repository, shared by four apps,
+// and DIFFERENT PER CAPABILITY SET, so two apps with different manifests fought
+// over one archive. That fight is what the build lock was serializing.
+//
+// $(MT_CAPS_OUT) is supplied by both channels (the wrapper on the command line,
+// the pre-action through the include below) and is already keyed by app, engine
+// revision, platform, arch, config, licence mode, backend and capability hash.
+// The fallback is the standalone root the acquisition scripts use when no
+// manifest exists -- see mt_caps_lib_dir in platform/caps-lib.sh, which is the
+// single definition this line mirrors.
+// The STANDALONE FALLBACK only. Both real channels override it: the CLI wrapper
+// passes MT_CAPS_LIBS_DIR on the xcodebuild command line (which outranks every
+// xcconfig), and the IDE pre-action writes it into the generated xcconfig this
+// file #include?s below (which is read after this assignment, so it wins).
+//
+// This value therefore applies to exactly one case -- opening the engine on its
+// own with no manifest anywhere -- and it must agree with mt_caps_lib_dir's own
+// fallback in platform/caps-lib.sh, since that is what the acquisition scripts
+// use in the same situation. An xcconfig cannot read $MTENGINE_BUILD_ROOT or
+// $XDG_CACHE_HOME, so the default location is spelled out literally; overriding
+// either variable means using one of the two real channels.
+MT_CAPS_LIBS_DIR = $(HOME)/.cache/mtengine/_deps/standalone/libs
+
+// ---------------------------------------------------------------------------
+// THE IDE CHANNEL.
+//
+// Written by the scheme's build PRE-ACTION (tools/mtcaps/xcode-preaction.sh) at
+// the start of every Xcode build, and OUTSIDE every checkout. It is what makes
+// an IDE Build or Archive honour mtengine.caps rather than the engine's
+// defaults -- without it, Archive could ship libraries the manifest turns off.
+//
+// `#include?`, not `#include`: a missing file degrades SILENTLY, so a developer
+// who has never run the pre-action still gets a working build (falling back to
+// the defaults below, with the in-target backstop deciding whether that is
+// acceptable for this manifest).
+//
+// Measured: a pre-action's write takes effect in the SAME build, and an absolute
+// #include? resolves. See claude/spikes/xcconfig/README.md.
+//
+// A command-line setting still beats this, so the script path is never a VICTIM
+// of a stale file here: the wrapper's values win and the two agree anyway.
+//
+// It IS an aggressor, though, and that surprised the design: MEASURED,
+// `xcodebuild -scheme` runs the scheme's pre-action too, so a script build
+// rewrites this shared file exactly like an IDE build does. Concurrent builds of
+// DIFFERENT apps therefore serialize on tools/mtcaps/build-lock.sh.
+//
+//
+// THE PATH IS RELATIVE, and it has to be. Measured: $(HOME) and build settings
+// generally do NOT expand inside an #include? path -- only a literal absolute
+// path works there, and hardcoding one is both forbidden here and wrong for
+// anyone else's machine. A relative path resolves from THIS file's directory,
+// which lands on `.mtengine-ide/` beside the five repos: inside none of them,
+// and requiring only the sibling layout the whole programme already assumes.
+//
+// IT MUST COME LAST IN THIS FILE. In an xcconfig a LATER assignment wins, so
+// an include placed above the fallback defaults is silently overwritten by
+// them -- measured: MT_CAPS_SUPPLIED stayed NO with the include at the top,
+// and the IDE build compiled against the defaults while the pre-action had
+// written the correct file.
+#include? "../../../.mtengine-ide/_current/engine.xcconfig"
+

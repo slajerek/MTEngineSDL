@@ -2,6 +2,9 @@
 #import <Foundation/Foundation.h>
 #import <AppKit/AppKit.h>
 #include "DBG_Log.h"
+#include "CMTNativeMenuBarMacOS.h"
+#include "CGuiMain.h"
+#include "VID_Main.h"
 
 void SYS_PlatformInit()
 {
@@ -99,39 +102,12 @@ bool VID_IsMouseCursorVisible()
 
 void PLATFORM_UpdateMenus()
 {
-	// remove Close Window (Cmd+W), it will be handled by SDL2/ImGui
+	if (gHeadlessMode)
+		return;
 
-	//	NSMenu *menu = [NSApp mainMenu];
-	
-	NSMenu  *mainMenu = [[NSApplication sharedApplication] mainMenu];
-	LOGD("PLATFORM_UpdateMenus: count=%d", [mainMenu numberOfItems]);
-	
-	NSMenu  *appMenu = [[mainMenu itemAtIndex:1] submenu];
+	// Create native menu bar backend (constructor strips SDL's auto-generated menus)
+	CMTNativeMenuBarMacOS *menuBar = new CMTNativeMenuBarMacOS();
+	guiMain->SetNativeMenuBar(menuBar);
 
-//	[appMenu removeAllItems];
-//	for (int i = 0; i < [appMenu numberOfItems]; i++)
-//	{
-//		NSMenuItem *menuItem = [appMenu itemAtIndex:i];
-//		NSLog(@"%d menuItem=%@", i, [menuItem title]);
-//	}
-	
-	// remove Ctrl+W Close Window
-	[appMenu removeItemAtIndex:0];
-
-	// remove Close All
-	[appMenu removeItemAtIndex:0];
-
-	// remove Minimize Cmd+M (as Cmd+M is switch memory)
-	[appMenu removeItemAtIndex:0];
-
-	// example adding menu
-//	NSMenuItem *item=[[NSMenuItem alloc]initWithTitle:@"Tutorial" action:@selector(actionTutorial:) keyEquivalent:@"T"];
-//
-//	[item setTarget:self];
-//	[item setTag:0];
-//
-//	[appMenu addItem:item];
-//	[appMenu removeItemAtIndex:2]; // which is the index of above added item
-	
 	LOGD("PLATFORM_UpdateMenus: DONE");
 }

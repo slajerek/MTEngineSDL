@@ -1,20 +1,31 @@
 #include "CImageData.h"
 #include "SYS_Defs.h"
 #include "SYS_Funct.h"
+// SYS_FopenUtf8 rather than fopen throughout this file: image file names are
+// UTF-8 by engine convention, and fopen decodes a char* with the process ANSI
+// code page on Windows, so a non-ASCII name failed to open. See SYS_FileUtf8.h.
+#include "SYS_FileUtf8.h"
+// png.h ONLY. pnginfo.h and pngpriv.h are libpng's PRIVATE headers and were
+// included here for the read path that has been commented out for years (it
+// called png_read_destroy, which lives in pngpriv.h). libpng 1.5 let an
+// application include them; 1.6 refuses with an #error, and it is right to --
+// they describe struct internals that are not API. The live code uses the
+// public write API only.
 #include "png.h"
-#include "pnginfo.h"
-#include "pngpriv.h"
 #include "lodepng.h"
 #include "CByteBuffer.h"
 #include "IMG_Scale.h"
 #include "GFX_Types.h"
 #include "zlib.h"
+#include "CIccProfileCodec.h"
+#include "CExifReader.h"
 #include "JPEGWriter.h"
 #include "CSlrFileZlib.h"
 #include "CSlrFileMemory.h"
 #include "stb_image.h"
 #include "VID_Main.h"           // gRenderBackend + (transitively, via CRenderBackend.h) EImageGpuFormat.h
 #include "basisu_transcoder.h"  // KTX2/UASTC transcoder
+#include "CKTX2Loader.h"
 
 #if defined(ANDROID)
 #include "SYS_ApkManager.h"
@@ -113,15 +124,8 @@ CImageData::CImageData(const char *fileName)
 	this->compressedMipCount = 0;
 	this->compressedMips = NULL;
 
-	// dispatch by extension: .ktx2 -> compressed/transcode path, all else unchanged.
-	if (strcasecmp(IMG_FileExtension(fileName), ".ktx2") == 0)
-	{
-		this->LoadKTX2(fileName);
-	}
-	else
-	{
-		this->Load(fileName, true);
-	}
+	// dispatch by extension: Load() handles all format routing.
+	this->Load(fileName, true);
 
 #ifdef USE_BUFFER_OFFSETS
 	if (this->type != IMG_TYPE_UNKNOWN && this->type != IMG_TYPE_GPU_COMPRESSED)
@@ -286,6 +290,16 @@ CImageData::CImageData(CImageData *src)
 	//this->origData = NULL;
 	this->tempData = NULL;
 
+	// Deep-copy the profile. A clone that silently dropped it would be
+	// indistinguishable from a genuinely untagged image, and would then be
+	// rendered with the assumed profile instead of its own -- a wrong-colour
+	// bug with no error path.
+	if (src->iccProfile != NULL && src->iccProfileSize > 0)
+		SetIccProfile(src->iccProfile, src->iccProfileSize);
+	// The preview hint describes the same pixels, so it travels with them.
+	this->previewColorHint       = src->previewColorHint;
+	this->previewColorHintSource = src->previewColorHintSource;
+
 	switch(this->type)
 	{
 		default:
@@ -300,21 +314,23 @@ CImageData::CImageData(CImageData *src)
 				memcpy(this->tempData, src->tempData, width * height);
 			}
 			break;
-		case IMG_TYPE_SHORT_INT:
+		case IMG_TYPE_GRAYSCALE_16BIT:
 			this->resultData = (u8*)new unsigned short int[width * height];
 			memcpy(this->resultData, src->resultData, width * height * sizeof(unsigned short int));
 			if (src->tempData)
 			{
-				this->tempData = new u8[width * height];
+				// Sized to what is COPIED -- new u8[w*h] here was a heap overflow
+				// for every non-grayscale type (programme review 2026-08-11).
+				this->tempData = new u8[width * height * sizeof(unsigned short int)];
 				memcpy(this->tempData, src->tempData, width * height * sizeof(unsigned short int));
 			}
 			break;
-		case IMG_TYPE_LONG_INT:
+		case IMG_TYPE_GRAYSCALE_32BIT:
 			this->resultData = (u8*)new long unsigned int[width * height];
 			memcpy(this->resultData, src->resultData, width * height * sizeof(unsigned long int));
 			if (src->tempData)
 			{
-				this->tempData = new u8[width * height];
+				this->tempData = new u8[width * height * sizeof(unsigned long int)];
 				memcpy(this->tempData, src->tempData, width * height * sizeof(unsigned long int));
 			}
 			break;
@@ -323,8 +339,20 @@ CImageData::CImageData(CImageData *src)
 			memcpy(this->resultData, src->resultData, width * height * 3);
 			if (src->tempData)
 			{
-				this->tempData = new u8[width * height];
+				this->tempData = new u8[width * height * 3];
 				memcpy(this->tempData, src->tempData,  width * height * 3);
+			}
+			break;
+		case IMG_TYPE_RGBA_16BIT:
+		case IMG_TYPE_RGBA_16F:
+			this->floatIsSurfaceEncoded = src->floatIsSurfaceEncoded;
+			this->contentMaxComponent = src->contentMaxComponent;
+			this->resultData = (u8*)new unsigned short int[width * height * 4];
+			memcpy(this->resultData, src->resultData, width * height * 4 * sizeof(unsigned short int));
+			if (src->tempData)
+			{
+				this->tempData = new u8[width * height * 4 * sizeof(unsigned short int)];
+				memcpy(this->tempData, src->tempData, width * height * 4 * sizeof(unsigned short int));
 			}
 			break;
 		case IMG_TYPE_RGBA:
@@ -332,7 +360,7 @@ CImageData::CImageData(CImageData *src)
 			memcpy(this->resultData, src->resultData, width * height * 4);
 			if (src->tempData)
 			{
-				this->tempData = new u8[width * height];
+				this->tempData = new u8[width * height * 4];
 				memcpy(this->tempData, src->tempData,  width * height * 4);
 			}
 			break;
@@ -341,7 +369,7 @@ CImageData::CImageData(CImageData *src)
 			memcpy(this->resultData, src->resultData, width * height * 3 * sizeof(int));
 			if (src->tempData)
 			{
-				this->tempData = new u8[width * height];
+				this->tempData = new u8[width * height * 3 * sizeof(int)];
 				memcpy(this->tempData, src->tempData,  width * height * 3 * sizeof(int));
 			}
 			break;
@@ -393,10 +421,10 @@ void CImageData::copyTemporaryToResult()
 		case IMG_TYPE_GRAYSCALE:
 			memcpy(this->resultData, this->tempData, width * height);
 			break;
-		case IMG_TYPE_SHORT_INT:
+		case IMG_TYPE_GRAYSCALE_16BIT:
 			memcpy(this->resultData, this->tempData, width * height * sizeof(unsigned short int));
 			break;
-		case IMG_TYPE_LONG_INT:
+		case IMG_TYPE_GRAYSCALE_32BIT:
 			memcpy(this->resultData, this->tempData, width * height * sizeof(unsigned long int));
 			break;
 		case IMG_TYPE_RGB:
@@ -404,6 +432,10 @@ void CImageData::copyTemporaryToResult()
 			break;
 		case IMG_TYPE_RGBA:
 			memcpy(this->resultData, this->tempData, width * height * 4);
+			break;
+		case IMG_TYPE_RGBA_16BIT:
+		case IMG_TYPE_RGBA_16F:
+			memcpy(this->resultData, this->tempData, width * height * 4 * sizeof(unsigned short int));
 			break;
 		case IMG_TYPE_CIELAB:
 			memcpy(this->resultData, this->tempData, width * height * 3 * sizeof(int));
@@ -429,10 +461,10 @@ void CImageData::copyResultToTemporary()
 		case IMG_TYPE_GRAYSCALE:
 			memcpy(this->tempData, this->resultData, width * height);
 			break;
-		case IMG_TYPE_SHORT_INT:
+		case IMG_TYPE_GRAYSCALE_16BIT:
 			memcpy(this->tempData, this->resultData, width * height * sizeof(unsigned short int));
 			break;
-		case IMG_TYPE_LONG_INT:
+		case IMG_TYPE_GRAYSCALE_32BIT:
 			memcpy(this->tempData, this->resultData, width * height * sizeof(unsigned long int));
 			break;
 		case IMG_TYPE_RGB:
@@ -440,6 +472,10 @@ void CImageData::copyResultToTemporary()
 			break;
 		case IMG_TYPE_RGBA:
 			memcpy(this->tempData, this->resultData, width * height * 4);
+			break;
+		case IMG_TYPE_RGBA_16BIT:
+		case IMG_TYPE_RGBA_16F:
+			memcpy(this->tempData, this->resultData, width * height * 4 * sizeof(unsigned short int));
 			break;
 		case IMG_TYPE_CIELAB:
 			memcpy(this->tempData, this->resultData, width * height * 3 * sizeof(int));
@@ -480,10 +516,17 @@ void CImageData::DeallocTemp()
 				//LOGD("delete data");
 				delete [] (u8 *)tempData;
 				break;
-			case IMG_TYPE_SHORT_INT:
+			case IMG_TYPE_GRAYSCALE_16BIT:
 				delete [] (unsigned short int*)tempData;
 				break;
-			case IMG_TYPE_LONG_INT:
+			case IMG_TYPE_RGBA_16BIT:
+			case IMG_TYPE_RGBA_16F:
+				// new unsigned short int[w*h*4] -- the array form must match
+				// the allocation, or this is a heap corruption rather than a
+				// leak.
+				delete [] (unsigned short int*)tempData;
+				break;
+			case IMG_TYPE_GRAYSCALE_32BIT:
 				delete [] (unsigned long int*)tempData;
 				break;
 			case IMG_TYPE_CIELAB:
@@ -514,10 +557,17 @@ void CImageData::DeallocResult()
 				//LOGD("delete data");
 				delete [] (u8 *)resultData;
 				break;
-			case IMG_TYPE_SHORT_INT:
+			case IMG_TYPE_GRAYSCALE_16BIT:
 				delete [] (unsigned short int*)resultData;
 				break;
-			case IMG_TYPE_LONG_INT:
+			case IMG_TYPE_RGBA_16BIT:
+			case IMG_TYPE_RGBA_16F:
+				// new unsigned short int[w*h*4] -- the array form must match
+				// the allocation, or this is a heap corruption rather than a
+				// leak.
+				delete [] (unsigned short int*)resultData;
+				break;
+			case IMG_TYPE_GRAYSCALE_32BIT:
 				delete [] (unsigned long int*)resultData;
 				break;
 			case IMG_TYPE_CIELAB:
@@ -530,6 +580,34 @@ void CImageData::DeallocResult()
 		}
 	}
 	this->resultData = NULL;
+}
+
+void CImageData::SetIccProfile(const u8 *bytes, u32 size)
+{
+	DeallocIccProfile();
+	if (bytes == NULL || size == 0)
+		return;
+	// Validate before storing. Loaders read these bytes out of untrusted files,
+	// and a truncated or malformed profile handed to a CMM is a crash, not a
+	// wrong colour -- so an image that would carry one stays untagged instead.
+	if (!CIccProfileCodec::ValidateHeader(bytes, size))
+	{
+		LOGD("CImageData::SetIccProfile: rejected a malformed %d-byte profile", (int)size);
+		return;
+	}
+	this->iccProfile = new u8[size];
+	memcpy(this->iccProfile, bytes, size);
+	this->iccProfileSize = size;
+}
+
+void CImageData::DeallocIccProfile()
+{
+	if (this->iccProfile)
+	{
+		delete [] this->iccProfile;
+		this->iccProfile = NULL;
+	}
+	this->iccProfileSize = 0;
 }
 
 void CImageData::DeallocImage()
@@ -547,10 +625,10 @@ void CImageData::DeallocImage()
 				//LOGD("delete data");
 				delete (u8 *)origData;
 				break;
-			case IMG_TYPE_SHORT_INT:
+			case IMG_TYPE_GRAYSCALE_16BIT:
 				delete (unsigned short int*)origData;
 				break;
-			case IMG_TYPE_LONG_INT:
+			case IMG_TYPE_GRAYSCALE_32BIT:
 				delete (unsigned long int*)origData;
 				break;
 			case IMG_TYPE_CIELAB:
@@ -562,6 +640,7 @@ void CImageData::DeallocImage()
 	this->DeallocTemp();
 	this->DeallocResult();
 	this->DeallocCompressed();   // free GPU-compressed mip buffers if any (no-op otherwise)
+	this->DeallocIccProfile();
 	if (this->mask)
 	{
 		delete [] this->mask;
@@ -608,12 +687,12 @@ void CImageData::AllocImage(bool allocTemp, bool allocResult)
 				origData = new u8[this->width * this->height];
 				memset(origData, 0x00, this->width * this->height);
 				break;
-			case IMG_TYPE_SHORT_INT:
+			case IMG_TYPE_GRAYSCALE_16BIT:
 				//LOGD("alloc grayscale");
 				origData = new unsigned short int[this->width * this->height];
 				memset(origData, 0x00, this->width * this->height * sizeof(unsigned short int));
 				break;
-			case IMG_TYPE_LONG_INT:
+			case IMG_TYPE_GRAYSCALE_32BIT:
 				//LOGD("alloc grayscale");
 				origData = new unsigned long int[this->width * this->height];
 				memset(origData, 0x00, this->width * this->height * sizeof(unsigned long int));
@@ -643,12 +722,12 @@ void CImageData::AllocImage(bool allocTemp, bool allocResult)
 				tempData = new u8[this->width * this->height];
 				memset(tempData, 0x00, this->width * this->height);
 				break;
-			case IMG_TYPE_SHORT_INT:
+			case IMG_TYPE_GRAYSCALE_16BIT:
 				//LOGD("alloc grayscale");
 				tempData = (u8*)new unsigned short int[this->width * this->height];
 				memset(tempData, 0x00, this->width * this->height * sizeof(unsigned short int));
 				break;
-			case IMG_TYPE_LONG_INT:
+			case IMG_TYPE_GRAYSCALE_32BIT:
 				//LOGD("alloc grayscale");
 				tempData = (u8*)new unsigned long int[this->width * this->height];
 				memset(tempData, 0x00, this->width * this->height * sizeof(unsigned long int));
@@ -662,6 +741,11 @@ void CImageData::AllocImage(bool allocTemp, bool allocResult)
 				//LOGD("alloc RGB");
 				tempData = new u8[this->width * this->height * 4];
 				memset(tempData, 0x00, this->width * this->height * 4);
+				break;
+			case IMG_TYPE_RGBA_16BIT:
+			case IMG_TYPE_RGBA_16F:
+				tempData = (u8*)new unsigned short int[this->width * this->height * 4];
+				memset(tempData, 0x00, this->width * this->height * 4 * sizeof(unsigned short int));
 				break;
 			case IMG_TYPE_CIELAB:
 				//LOGD("alloc cielab");
@@ -687,12 +771,12 @@ void CImageData::AllocImage(bool allocTemp, bool allocResult)
 				resultData = new u8[this->width * this->height];
 				memset(resultData, 0x00, this->width * this->height);
 				break;
-			case IMG_TYPE_SHORT_INT:
+			case IMG_TYPE_GRAYSCALE_16BIT:
 				//LOGD("alloc grayscale");
 				resultData = (u8*)new unsigned short int[this->width * this->height];
 				memset(resultData, 0x00, this->width * this->height * sizeof(unsigned short int));
 				break;
-			case IMG_TYPE_LONG_INT:
+			case IMG_TYPE_GRAYSCALE_32BIT:
 				//LOGD("alloc grayscale");
 				resultData = (u8*)new unsigned long int[this->width * this->height];
 				memset(resultData, 0x00, this->width * this->height * sizeof(unsigned long int));
@@ -706,6 +790,11 @@ void CImageData::AllocImage(bool allocTemp, bool allocResult)
 				//LOGD("alloc RGB");
 				resultData = new u8[this->width * this->height * 4];
 				memset(resultData, 0x00, this->width * this->height * 4);
+				break;
+			case IMG_TYPE_RGBA_16BIT:
+			case IMG_TYPE_RGBA_16F:
+				resultData = (u8*)new unsigned short int[this->width * this->height * 4];
+				memset(resultData, 0x00, this->width * this->height * 4 * sizeof(unsigned short int));
 				break;
 			case IMG_TYPE_CIELAB:
 				//LOGD("alloc cielab");
@@ -741,12 +830,12 @@ void CImageData::AllocTempImage()
 			tempData = new u8[this->width * this->height];
 			memset(tempData, 0x00, this->width * this->height);
 			break;
-		case IMG_TYPE_SHORT_INT:
+		case IMG_TYPE_GRAYSCALE_16BIT:
 			//LOGD("alloc grayscale");
 			tempData = (u8*)new unsigned short int[this->width * this->height];
 			memset(tempData, 0x00, this->width * this->height * sizeof(unsigned short int));
 			break;
-		case IMG_TYPE_LONG_INT:
+		case IMG_TYPE_GRAYSCALE_32BIT:
 			//LOGD("alloc grayscale");
 			tempData = (u8*)new unsigned long int[this->width * this->height];
 			memset(tempData, 0x00, this->width * this->height * sizeof(unsigned long int));
@@ -760,6 +849,11 @@ void CImageData::AllocTempImage()
 			//LOGD("alloc RGB");
 			tempData = new u8[this->width * this->height * 4];
 			memset(tempData, 0x00, this->width * this->height * 4);
+			break;
+		case IMG_TYPE_RGBA_16BIT:
+		case IMG_TYPE_RGBA_16F:
+			tempData = (u8*)new unsigned short int[this->width * this->height * 4];
+			memset(tempData, 0x00, this->width * this->height * 4 * sizeof(unsigned short int));
 			break;
 		case IMG_TYPE_CIELAB:
 			//LOGD("alloc cielab");
@@ -789,12 +883,12 @@ void CImageData::AllocResultImage()
 			resultData = new u8[this->width * this->height];
 			memset(resultData, 0x00, this->width * this->height);
 			break;
-		case IMG_TYPE_SHORT_INT:
+		case IMG_TYPE_GRAYSCALE_16BIT:
 			//LOGD("alloc grayscale");
 			resultData = (u8*)new unsigned short int[this->width * this->height];
 			memset(resultData, 0x00, this->width * this->height * sizeof(unsigned short int));
 			break;
-		case IMG_TYPE_LONG_INT:
+		case IMG_TYPE_GRAYSCALE_32BIT:
 			//LOGD("alloc grayscale");
 			resultData = (u8*)new unsigned long int[this->width * this->height];
 			memset(resultData, 0x00, this->width * this->height * sizeof(unsigned long int));
@@ -808,6 +902,11 @@ void CImageData::AllocResultImage()
 			//LOGD("alloc RGB");
 			resultData = new u8[this->width * this->height * 4];
 			memset(resultData, 0x00, this->width * this->height * 4);
+			break;
+		case IMG_TYPE_RGBA_16BIT:
+		case IMG_TYPE_RGBA_16F:
+			resultData = (u8*)new unsigned short int[this->width * this->height * 4];
+			memset(resultData, 0x00, this->width * this->height * 4 * sizeof(unsigned short int));
 			break;
 		case IMG_TYPE_CIELAB:
 			//LOGD("alloc cielab");
@@ -1126,26 +1225,26 @@ u8 *CImageData::getGrayscaleTemporaryData()
 	return (u8 *)this->tempData;
 }
 
-unsigned short CImageData::GetPixelResultShort(int x, int y)
+unsigned short CImageData::GetPixelResultGrayscale16Bit(int x, int y)
 {
 #ifdef PEDANTIC
 	if (x < 0 || y < 0 || x >= width || y >= height)
 	{
-		LOGError("CImageData::GetPixelResultShort: outside image (x=%d y=%d w=%d h=%d)", x, y, width, height);
+		LOGError("CImageData::GetPixelResultGrayscale16Bit: outside image (x=%d y=%d w=%d h=%d)", x, y, width, height);
 		//log_backtrace();
 		return 0x00;
 	}
 #endif
 #ifdef MORE_PEDANTIC
-	if (this->type != IMG_TYPE_SHORT_INT)
+	if (this->type != IMG_TYPE_GRAYSCALE_16BIT)
 	{
-		LOGError("GetPixelResultShort: image type is not unsigned short (%2.2x)", this->type);
+		LOGError("GetPixelResultGrayscale16Bit: image type is not unsigned short (%2.2x)", this->type);
 		//log_backtrace();
 		return 0x00;
 	}
 	if (this->resultData == NULL)
 	{
-		LOGError("GetPixelResultShort: result data is null\n");
+		LOGError("GetPixelResultGrayscale16Bit: result data is null\n");
 		//log_backtrace();
 		return 0x00;
 	}
@@ -1161,26 +1260,26 @@ unsigned short CImageData::GetPixelResultShort(int x, int y)
 
 }
 
-void CImageData::SetPixelResultShort(int x, int y, short unsigned int val)
+void CImageData::SetPixelResultGrayscale16Bit(int x, int y, short unsigned int val)
 {
 #ifdef PEDANTIC
 	if (x < 0 || y < 0 || x >= width || y >= height)
 	{
-		LOGError("CImageData::SetPixelResultShort: outside image (x=%d y=%d w=%d h=%d)", x, y, width, height);
+		LOGError("CImageData::SetPixelResultGrayscale16Bit: outside image (x=%d y=%d w=%d h=%d)", x, y, width, height);
 		//log_backtrace();
 		return;
 	}
 #endif
 #ifdef MORE_PEDANTIC
-	if (this->type != IMG_TYPE_SHORT_INT)
+	if (this->type != IMG_TYPE_GRAYSCALE_16BIT)
 	{
-		LOGError("SetPixelResultShort: image type is not unsigned short (%2.2x)", this->type);
+		LOGError("SetPixelResultGrayscale16Bit: image type is not unsigned short (%2.2x)", this->type);
 		//log_backtrace();
 		return;
 	}
 	if (this->resultData == NULL)
 	{
-		LOGError("SetPixelResultShort: result data is null\n");
+		LOGError("SetPixelResultGrayscale16Bit: result data is null\n");
 		//log_backtrace();
 		return;
 	}
@@ -1196,26 +1295,26 @@ void CImageData::SetPixelResultShort(int x, int y, short unsigned int val)
 
 }
 
-unsigned short CImageData::GetPixelTemporaryShort(int x, int y)
+unsigned short CImageData::GetPixelTemporaryGrayscale16Bit(int x, int y)
 {
 #ifdef PEDANTIC
 	if (x < 0 || y < 0 || x >= width || y >= height)
 	{
-		LOGError("CImageData::GetPixelTemporaryShort: outside image (x=%d y=%d w=%d h=%d)", x, y, width, height);
+		LOGError("CImageData::GetPixelTemporaryGrayscale16Bit: outside image (x=%d y=%d w=%d h=%d)", x, y, width, height);
 		//log_backtrace();
 		return 0x00;
 	}
 #endif
 #ifdef MORE_PEDANTIC
-	if (this->type != IMG_TYPE_SHORT_INT)
+	if (this->type != IMG_TYPE_GRAYSCALE_16BIT)
 	{
-		LOGError("GetPixelTemporaryShort: image type is not unsigned short (%2.2x)", this->type);
+		LOGError("GetPixelTemporaryGrayscale16Bit: image type is not unsigned short (%2.2x)", this->type);
 		//log_backtrace();
 		return 0x00;
 	}
 	if (this->resultData == NULL)
 	{
-		LOGError("GetPixelTemporaryShort: data is null\n");
+		LOGError("GetPixelTemporaryGrayscale16Bit: data is null\n");
 		//log_backtrace();
 		return 0x00;
 	}
@@ -1231,26 +1330,26 @@ unsigned short CImageData::GetPixelTemporaryShort(int x, int y)
 
 }
 
-void CImageData::SetPixelTemporaryShort(int x, int y, short unsigned int val)
+void CImageData::SetPixelTemporaryGrayscale16Bit(int x, int y, short unsigned int val)
 {
 #ifdef PEDANTIC
 	if (x < 0 || y < 0 || x >= width || y >= height)
 	{
-		LOGError("CImageData::SetPixelTemporaryShort: outside image (x=%d y=%d w=%d h=%d)", x, y, width, height);
+		LOGError("CImageData::SetPixelTemporaryGrayscale16Bit: outside image (x=%d y=%d w=%d h=%d)", x, y, width, height);
 		//log_backtrace();
 		return;
 	}
 #endif
 #ifdef MORE_PEDANTIC
-	if (this->type != IMG_TYPE_SHORT_INT)
+	if (this->type != IMG_TYPE_GRAYSCALE_16BIT)
 	{
-		LOGError("SetPixelTemporaryShort: image type is not unsigned short (%2.2x)", this->type);
+		LOGError("SetPixelTemporaryGrayscale16Bit: image type is not unsigned short (%2.2x)", this->type);
 		//log_backtrace();
 		return;
 	}
 	if (this->resultData == NULL)
 	{
-		LOGError("SetPixelTemporaryShort: data is null\n");
+		LOGError("SetPixelTemporaryGrayscale16Bit: data is null\n");
 		//log_backtrace();
 		return;
 	}
@@ -1266,22 +1365,22 @@ void CImageData::SetPixelTemporaryShort(int x, int y, short unsigned int val)
 
 }
 
-short unsigned int *CImageData::getShortIntResultData()
+short unsigned int *CImageData::getGrayscale16BitResultData()
 {
-	if (this->type != IMG_TYPE_SHORT_INT)
+	if (this->type != IMG_TYPE_GRAYSCALE_16BIT)
 	{
-		LOGError("getShortIntResultData: image type is not short int (%2.2x)", this->type);
+		LOGError("getGrayscale16BitResultData: image type is not short int (%2.2x)", this->type);
 		//log_backtrace();
 		SYS_FatalExit();
 	}
 	return (short unsigned int *)this->resultData;
 }
 
-void CImageData::setShortIntResultData(short unsigned int *data)
+void CImageData::setGrayscale16BitResultData(short unsigned int *data)
 {
-	if (this->type != IMG_TYPE_SHORT_INT)
+	if (this->type != IMG_TYPE_GRAYSCALE_16BIT)
 	{
-		LOGError("setShortIntResultData: image type is not short int (%2.2x)", this->type);
+		LOGError("setGrayscale16BitResultData: image type is not short int (%2.2x)", this->type);
 		//log_backtrace();
 		SYS_FatalExit();
 	}
@@ -1289,26 +1388,26 @@ void CImageData::setShortIntResultData(short unsigned int *data)
 }
 
 //long
-unsigned long int CImageData::GetPixelResultLong(int x, int y)
+unsigned long int CImageData::GetPixelResultGrayscale32Bit(int x, int y)
 {
 #ifdef PEDANTIC
 	if (x < 0 || y < 0 || x >= width || y >= height)
 	{
-		LOGError("CImageData::GetPixelResultLong: outside image (x=%d y=%d w=%d h=%d)", x, y, width, height);
+		LOGError("CImageData::GetPixelResultGrayscale32Bit: outside image (x=%d y=%d w=%d h=%d)", x, y, width, height);
 		//log_backtrace();
 		return 0x00;
 	}
 #endif
 #ifdef MORE_PEDANTIC
-	if (this->type != IMG_TYPE_LONG_INT)
+	if (this->type != IMG_TYPE_GRAYSCALE_32BIT)
 	{
-		LOGError("GetPixelResultLong: image type is not unsigned long (%2.2x)", this->type);
+		LOGError("GetPixelResultGrayscale32Bit: image type is not unsigned long (%2.2x)", this->type);
 		//log_backtrace();
 		return 0x00;
 	}
 	if (this->resultData == NULL)
 	{
-		LOGError("GetPixelResultLong: result data is null\n");
+		LOGError("GetPixelResultGrayscale32Bit: result data is null\n");
 		//log_backtrace();
 		return 0x00;
 	}
@@ -1324,26 +1423,26 @@ unsigned long int CImageData::GetPixelResultLong(int x, int y)
 
 }
 
-void CImageData::SetPixelResultLong(int x, int y, long unsigned int val)
+void CImageData::SetPixelResultGrayscale32Bit(int x, int y, long unsigned int val)
 {
 #ifdef PEDANTIC
 	if (x < 0 || y < 0 || x >= width || y >= height)
 	{
-		LOGError("CImageData::SetPixelResultLong: outside image (x=%d y=%d w=%d h=%d)", x, y, width, height);
+		LOGError("CImageData::SetPixelResultGrayscale32Bit: outside image (x=%d y=%d w=%d h=%d)", x, y, width, height);
 		//log_backtrace();
 		return;
 	}
 #endif
 #ifdef MORE_PEDANTIC
-	if (this->type != IMG_TYPE_LONG_INT)
+	if (this->type != IMG_TYPE_GRAYSCALE_32BIT)
 	{
-		LOGError("SetPixelResultLong: image type is not unsigned long (%2.2x)", this->type);
+		LOGError("SetPixelResultGrayscale32Bit: image type is not unsigned long (%2.2x)", this->type);
 		//log_backtrace();
 		return;
 	}
 	if (this->resultData == NULL)
 	{
-		LOGError("SetPixelResultLong: result data is null\n");
+		LOGError("SetPixelResultGrayscale32Bit: result data is null\n");
 		//log_backtrace();
 		return;
 	}
@@ -1359,26 +1458,26 @@ void CImageData::SetPixelResultLong(int x, int y, long unsigned int val)
 
 }
 
-unsigned long int CImageData::GetPixelTemporaryLong(int x, int y)
+unsigned long int CImageData::GetPixelTemporaryGrayscale32Bit(int x, int y)
 {
 #ifdef PEDANTIC
 	if (x < 0 || y < 0 || x >= width || y >= height)
 	{
-		LOGError("CImageData::GetPixelTemporaryLong: outside image (x=%d y=%d w=%d h=%d)", x, y, width, height);
+		LOGError("CImageData::GetPixelTemporaryGrayscale32Bit: outside image (x=%d y=%d w=%d h=%d)", x, y, width, height);
 		//log_backtrace();
 		return 0x00;
 	}
 #endif
 #ifdef MORE_PEDANTIC
-	if (this->type != IMG_TYPE_LONG_INT)
+	if (this->type != IMG_TYPE_GRAYSCALE_32BIT)
 	{
-		LOGError("GetPixelTemporaryLong: image type is not unsigned long (%2.2x)", this->type);
+		LOGError("GetPixelTemporaryGrayscale32Bit: image type is not unsigned long (%2.2x)", this->type);
 		//log_backtrace();
 		return 0x00;
 	}
 	if (this->resultData == NULL)
 	{
-		LOGError("GetPixelTemporaryLong: data is null\n");
+		LOGError("GetPixelTemporaryGrayscale32Bit: data is null\n");
 		//log_backtrace();
 		return 0x00;
 	}
@@ -1394,26 +1493,26 @@ unsigned long int CImageData::GetPixelTemporaryLong(int x, int y)
 
 }
 
-void CImageData::SetPixelTemporaryLong(int x, int y, long unsigned int val)
+void CImageData::SetPixelTemporaryGrayscale32Bit(int x, int y, long unsigned int val)
 {
 #ifdef PEDANTIC
 	if (x < 0 || y < 0 || x >= width || y >= height)
 	{
-		LOGError("CImageData::SetPixelTemporaryLong: outside image (x=%d y=%d w=%d h=%d)", x, y, width, height);
+		LOGError("CImageData::SetPixelTemporaryGrayscale32Bit: outside image (x=%d y=%d w=%d h=%d)", x, y, width, height);
 		//log_backtrace();
 		return;
 	}
 #endif
 #ifdef MORE_PEDANTIC
-	if (this->type != IMG_TYPE_LONG_INT)
+	if (this->type != IMG_TYPE_GRAYSCALE_32BIT)
 	{
-		LOGError("SetPixelTemporaryLong: image type is not unsigned long (%2.2x)", this->type);
+		LOGError("SetPixelTemporaryGrayscale32Bit: image type is not unsigned long (%2.2x)", this->type);
 		//log_backtrace();
 		return;
 	}
 	if (this->resultData == NULL)
 	{
-		LOGError("SetPixelTemporaryLong: data is null\n");
+		LOGError("SetPixelTemporaryGrayscale32Bit: data is null\n");
 		//log_backtrace();
 		return;
 	}
@@ -1429,22 +1528,22 @@ void CImageData::SetPixelTemporaryLong(int x, int y, long unsigned int val)
 
 }
 
-long unsigned int *CImageData::getLongIntResultData()
+long unsigned int *CImageData::getGrayscale32BitResultData()
 {
-	if (this->type != IMG_TYPE_LONG_INT)
+	if (this->type != IMG_TYPE_GRAYSCALE_32BIT)
 	{
-		LOGError("getLongIntResultData: image type is not long int (%2.2x)", this->type);
+		LOGError("getGrayscale32BitResultData: image type is not long int (%2.2x)", this->type);
 		//log_backtrace();
 		SYS_FatalExit();
 	}
 	return (long unsigned int *)this->resultData;
 }
 
-void CImageData::setLongIntResultData(long unsigned int *data)
+void CImageData::setGrayscale32BitResultData(long unsigned int *data)
 {
-	if (this->type != IMG_TYPE_LONG_INT)
+	if (this->type != IMG_TYPE_GRAYSCALE_32BIT)
 	{
-		LOGError("setLongIntResultData: image type is not long int (%2.2x)", this->type);
+		LOGError("setGrayscale32BitResultData: image type is not long int (%2.2x)", this->type);
 		//log_backtrace();
 		SYS_FatalExit();
 	}
@@ -1676,6 +1775,38 @@ void CImageData::GetPixelResultRGBA(int x, int y, u8 *r, u8 *g, u8 *b, u8 *a)
 		return;
 	}
 #endif
+	// 16-bit colour answers this 8-bit question by scaling, not truncating:
+	// (v * 255 + 32767) / 65535 rounds to nearest, so 65535 -> 255 and
+	// 32768 -> 128. A plain >> 8 would map 65535 to 255 but 257 to 1 and
+	// biases every value downward.
+	// Float answers it by clamping to 0..1 and scaling: an above-white value
+	// has nowhere to go in 8 bits, and this accessor is not the tone-map
+	// (that is ConvertRGBA16FToRGBA8, which is given a headroom).
+	if (this->type == IMG_TYPE_RGBA_16F)
+	{
+		const u16 *px = (const u16 *)this->resultData;
+		const size_t off = ((size_t)y * (size_t)width + (size_t)x) * 4;
+		u8 *out[4] = { r, g, b, a };
+		for (int c = 0; c < 4; c++)
+		{
+			float v = HalfToFloat(px[off + c]);
+			if (v < 0.0f) v = 0.0f;
+			if (v > 1.0f) v = 1.0f;
+			*out[c] = (u8)(v * 255.0f + 0.5f);
+		}
+		return;
+	}
+	if (this->type == IMG_TYPE_RGBA_16BIT)
+	{
+		const unsigned short *px = (const unsigned short *)this->resultData;
+		const size_t off = ((size_t)y * (size_t)width + (size_t)x) * 4;
+		*r = (u8)(((unsigned)px[off + 0] * 255u + 32767u) / 65535u);
+		*g = (u8)(((unsigned)px[off + 1] * 255u + 32767u) / 65535u);
+		*b = (u8)(((unsigned)px[off + 2] * 255u + 32767u) / 65535u);
+		*a = (u8)(((unsigned)px[off + 3] * 255u + 32767u) / 65535u);
+		return;
+	}
+
 	u8 *imageData = (u8 *)this->resultData;
 
 #ifdef USE_BUFFER_OFFSETS
@@ -1687,6 +1818,194 @@ void CImageData::GetPixelResultRGBA(int x, int y, u8 *r, u8 *g, u8 *b, u8 *a)
 	*g = imageData[offset++];
 	*b = imageData[offset++];
 	*a = imageData[offset];
+}
+
+// The 16-bit reader, for callers that want the precision the file carried.
+// Returns false for any other type rather than inventing values.
+bool CImageData::GetPixelResultRGBA16Bit(int x, int y,
+                                      unsigned short *r, unsigned short *g,
+                                      unsigned short *b, unsigned short *a)
+{
+	if (this->type != IMG_TYPE_RGBA_16BIT || this->resultData == NULL)
+		return false;
+	if (x < 0 || y < 0 || x >= width || y >= height)
+		return false;
+	const unsigned short *px = (const unsigned short *)this->resultData;
+	const size_t off = ((size_t)y * (size_t)width + (size_t)x) * 4;
+	*r = px[off + 0]; *g = px[off + 1]; *b = px[off + 2]; *a = px[off + 3];
+	return true;
+}
+
+// Collapse a 16-bit image to RGBA8 IN PLACE (new buffer, old one freed).
+// The GPU path is 8-bit, so something has to do this; doing it here means one
+// implementation with one rounding rule instead of a copy at every consumer.
+bool CImageData::ConvertRGBA16BitToRGBA8()
+{
+	if (this->type != IMG_TYPE_RGBA_16BIT || this->resultData == NULL)
+		return false;
+	const size_t count = (size_t)width * (size_t)height * 4;
+	const unsigned short *src = (const unsigned short *)this->resultData;
+	u8 *dst = new u8[count];
+	for (size_t i = 0; i < count; i++)
+		dst[i] = (u8)(((unsigned)src[i] * 255u + 32767u) / 65535u);
+	delete [] (unsigned short int *)this->resultData;
+	this->resultData = dst;
+	this->type = IMG_TYPE_RGBA;
+	return true;
+}
+
+// The 16-bit writer. There was a getter and no setter, so nothing outside a
+// decoder could build a 16-bit image -- including a test.
+void CImageData::SetPixelResultRGBA16Bit(int x, int y,
+                                      unsigned short r, unsigned short g,
+                                      unsigned short b, unsigned short a)
+{
+	if (this->type != IMG_TYPE_RGBA_16BIT || this->resultData == NULL)
+		return;
+	if (x < 0 || y < 0 || x >= width || y >= height)
+		return;
+	unsigned short *px = (unsigned short *)this->resultData;
+	const size_t off = ((size_t)y * (size_t)width + (size_t)x) * 4;
+	px[off + 0] = r; px[off + 1] = g; px[off + 2] = b; px[off + 3] = a;
+}
+
+// ---------------------------------------------------------------------------
+// IMG_TYPE_RGBA_16F (S-5)
+// ---------------------------------------------------------------------------
+
+// CONVENIENCE ACCESSOR, NOT THE HOT PATH -- see the header. Each call converts
+// in software; the bulk producers write half directly with FloatToHalf.
+bool CImageData::GetPixelResultFloat(int x, int y, float *r, float *g, float *b, float *a)
+{
+	if (this->type != IMG_TYPE_RGBA_16F || this->resultData == NULL)
+		return false;
+	if (x < 0 || y < 0 || x >= width || y >= height)
+		return false;
+	const u16 *px = (const u16 *)this->resultData;
+	const size_t off = ((size_t)y * (size_t)width + (size_t)x) * 4;
+	*r = HalfToFloat(px[off + 0]); *g = HalfToFloat(px[off + 1]);
+	*b = HalfToFloat(px[off + 2]); *a = HalfToFloat(px[off + 3]);
+	return true;
+}
+
+void CImageData::SetPixelResultFloat(int x, int y, float r, float g, float b, float a)
+{
+	if (this->type != IMG_TYPE_RGBA_16F || this->resultData == NULL)
+		return;
+	if (x < 0 || y < 0 || x >= width || y >= height)
+		return;
+	u16 *px = (u16 *)this->resultData;
+	const size_t off = ((size_t)y * (size_t)width + (size_t)x) * 4;
+	px[off + 0] = FloatToHalf(r); px[off + 1] = FloatToHalf(g);
+	px[off + 2] = FloatToHalf(b); px[off + 3] = FloatToHalf(a);
+}
+
+// unorm16 -> half, IN PLACE (same buffer size: both are 4 x u16 per pixel, so
+// this reinterprets rather than reallocates).
+//
+// Promoting integer 16-bit to float gains no range -- the source had none
+// above 1.0 to begin with -- so nothing in the resident funnel does this. It
+// exists for producers that compute in float, hand off through a 16-bit
+// carrier, and need the float type at the end.
+bool CImageData::ConvertRGBA16BitToRGBA16F()
+{
+	MT_ASSERT_NOT_RENDER_THREAD("ConvertRGBA16BitToRGBA16F");
+
+	if (this->type != IMG_TYPE_RGBA_16BIT || this->resultData == NULL)
+		return false;
+	const size_t count = (size_t)width * (size_t)height * 4;
+	u16 *px = (u16 *)this->resultData;
+	for (size_t i = 0; i < count; i++)
+		px[i] = FloatToHalf((float)px[i] * (1.0f / 65535.0f));
+	this->type = IMG_TYPE_RGBA_16F;
+	return true;
+}
+
+// Standard 8x8 Bayer threshold matrix, values 0..63. LIFTED from the app's
+// PC_ColorTransform.cpp (DitherTo8), which stays the master copy: the engine
+// cannot include an app header, and both halves of the pipeline must quantise
+// the same way or an image that took the float path would band differently
+// from one that did not. Ordered rather than random on purpose -- it is
+// spatially DETERMINISTIC, so a test that renders the same pixels twice gets
+// the same bytes twice.
+static const u8 kImgBayer8[8][8] = {
+	{  0, 32,  8, 40,  2, 34, 10, 42 },
+	{ 48, 16, 56, 24, 50, 18, 58, 26 },
+	{ 12, 44,  4, 36, 14, 46,  6, 38 },
+	{ 60, 28, 52, 20, 62, 30, 54, 22 },
+	{  3, 35, 11, 43,  1, 33,  9, 41 },
+	{ 51, 19, 59, 27, 49, 17, 57, 25 },
+	{ 15, 47,  7, 39, 13, 45,  5, 37 },
+	{ 63, 31, 55, 23, 61, 29, 53, 21 },
+};
+
+// half -> RGBA8 with a tone-map, IN PLACE (new buffer, old one freed).
+//
+// THE CURVE, and why it is this one: extended Reinhard, normalised so that the
+// value equal to `headroom` maps exactly to 1.0 --
+//
+//     out = v * (1 + v/hÂ²) / (1 + v)
+//
+// At headroom 1.0 this is EXACTLY the identity -- v*(1+v)/(1+v) == v -- so the
+// 0..1 body comes out precisely where it does today, which is the property the
+// regression test pins, and anything above 1.0 clips as it does today.
+//
+// At headroom > 1.0 the curve maps 0..headroom onto 0..1, so above-white values
+// stay SEPARABLE from one another rather than all flattening to 255. That
+// separation is the point: an 8-bit output has no headroom whatever the display
+// does, so the parameter buys highlight DETAIL, not brightness. The body
+// darkens slightly in exchange.
+//
+// Reinhard rather than something filmic (ACES, Hable) deliberately: those bake
+// in a contrast/saturation look, and this is a CULLING tool -- a photographer
+// judging a frame needs to see the frame, not a grade. The roll-off is the
+// minimum intervention that maps an unbounded range into a bounded one.
+bool CImageData::ConvertRGBA16FToRGBA8(float headroom, bool inputIsLinear)
+{
+	MT_ASSERT_NOT_RENDER_THREAD("ConvertRGBA16FToRGBA8");
+
+	if (this->type != IMG_TYPE_RGBA_16F || this->resultData == NULL)
+		return false;
+	if (!(headroom >= 1.0f))     // also catches NaN
+		headroom = 1.0f;
+
+	const size_t pixels = (size_t)width * (size_t)height;
+	const u16 *src = (const u16 *)this->resultData;
+	u8 *dst = new u8[pixels * 4];
+	const float invH2 = 1.0f / (headroom * headroom);
+
+	for (size_t i = 0; i < pixels; i++)
+	{
+		const int x = (int)(i % (size_t)width);
+		const int y = (int)(i / (size_t)width);
+		for (int c = 0; c < 3; c++)
+		{
+			float v = HalfToFloat(src[i * 4 + c]);
+			// The tone-map has to happen in LINEAR, so undo the surface
+			// encoding first when the caller says the pixels carry it.
+			if (!inputIsLinear)
+				v = SrgbExtendedDecode(v);
+			if (v < 0.0f) v = 0.0f;
+			v = v * (1.0f + v * invH2) / (1.0f + v);
+			if (v > 1.0f) v = 1.0f;
+			// Back to 8-bit sRGB, with the app's ordered dither so the float
+			// lane bands no worse than the 16-bit one.
+			const float e = SrgbExtendedEncode(v);
+			const u32 q = (u32)(e * 65535.0f + 0.5f);
+			const u32 d = (u32)kImgBayer8[y & 7][x & 7] * 4 + 2;   // 2..254
+			const u32 o = (q + d) / 257u;
+			dst[i * 4 + c] = (u8)(o > 255u ? 255u : o);
+		}
+		float av = HalfToFloat(src[i * 4 + 3]);
+		if (av < 0.0f) av = 0.0f;
+		if (av > 1.0f) av = 1.0f;
+		dst[i * 4 + 3] = (u8)(av * 255.0f + 0.5f);
+	}
+
+	delete [] (u16 *)this->resultData;
+	this->resultData = dst;
+	this->type = IMG_TYPE_RGBA;
+	return true;
 }
 
 void CImageData::SetPixelResultRGBA(int x, int y, u8 r, u8 g, u8 b, u8 a)
@@ -1823,6 +2142,16 @@ void CImageData::EraseContent(u8 r, u8 g, u8 b, u8 a)
 }
 
 
+u8 *CImageData::getResultDataForUpload()
+{
+	if (this->type != IMG_TYPE_RGBA && this->type != IMG_TYPE_RGBA_16F)
+	{
+		LOGError("getResultDataForUpload: type %2.2x is not uploadable", this->type);
+		return NULL;
+	}
+	return (u8 *)this->resultData;
+}
+
 u8 *CImageData::getRGBAResultData()
 {
 	if (this->type != IMG_TYPE_RGBA)
@@ -1836,9 +2165,12 @@ u8 *CImageData::getRGBAResultData()
 
 void CImageData::setRGBAResultData(u8 *data)
 {
-	if (this->type != IMG_TYPE_RGBA)
+	// RGBA8 and RGBA16F both. This guard exists to catch data that does not
+	// match the image's own type, and half-float pixels in an IMG_TYPE_RGBA_16F
+	// image are not that -- the funnel already agreed to the type.
+	if (this->type != IMG_TYPE_RGBA && this->type != IMG_TYPE_RGBA_16F)
 	{
-		LOGError("setRGBResultData: image type is not rgba (%2.2x)", this->type);
+		LOGError("setRGBResultData: image type is not rgba/rgba16f (%2.2x)", this->type);
 		//log_backtrace();
 		SYS_FatalExit();
 	}
@@ -2029,7 +2361,7 @@ void CImageData::ConvertToGrayscale(u8 componentNum)
 void CImageData::ConvertToByte()
 {
 	//LOGD("ConvertToByte()");
-	if (this->type == IMG_TYPE_SHORT_INT)
+	if (this->type == IMG_TYPE_GRAYSCALE_16BIT)
 	{
 		u8 *newData = new u8[this->width * this->height];
 		unsigned short int *imageData = (unsigned short int *)this->resultData;
@@ -2204,10 +2536,10 @@ void CImageData::ConvertToRGB()
 	//LOGD("CImageData::ConvertToRGBA: done");
 }
 
-void CImageData::ConvertToShort()
+void CImageData::ConvertToGrayscale16Bit()
 {
-	LOGD("ConvertToShort()");
-	if (this->type != IMG_TYPE_LONG_INT)
+	LOGD("ConvertToGrayscale16Bit()");
+	if (this->type != IMG_TYPE_GRAYSCALE_32BIT)
 	{
 		LOGError("image type is not long int, not implemented");
 		SYS_FatalExit();
@@ -2226,15 +2558,15 @@ void CImageData::ConvertToShort()
 	//LOGD("dealloc");
 	DeallocImage();
 	//LOGD("dealloc ok");
-	this->type = IMG_TYPE_SHORT_INT;
+	this->type = IMG_TYPE_GRAYSCALE_16BIT;
 	this->resultData = (u8*)newData;
 
-	LOGD("~ConvertToShort()");
+	LOGD("~ConvertToGrayscale16Bit()");
 }
 
-void CImageData::ConvertToShortCount()
+void CImageData::ConvertToGrayscale16BitCount()
 {
-	LOGD("ConvertToShortCount()");
+	LOGD("ConvertToGrayscale16BitCount()");
 	if (this->type != IMG_TYPE_RGB)
 	{
 		LOGError("image type is not rgb, not implemented");
@@ -2265,7 +2597,7 @@ void CImageData::ConvertToShortCount()
 				colors[colorVal] = curColor;
 				if (classNum == 0xFFFF)
 				{
-					LOGError("CImageData::ConvertToShortCount: more than 0xFFFF classes");
+					LOGError("CImageData::ConvertToGrayscale16BitCount: more than 0xFFFF classes");
 					SYS_FatalExit();
 				}
 			}
@@ -2281,18 +2613,116 @@ void CImageData::ConvertToShortCount()
 	LOGD("DeallocImage()");
 	DeallocImage();
 	LOGD("DeallocImage() finished");
-	this->type = IMG_TYPE_SHORT_INT;
+	this->type = IMG_TYPE_GRAYSCALE_16BIT;
 	this->resultData = (u8*)newData;
-	LOGD("~ConvertToShortCount()");
+	LOGD("~ConvertToGrayscale16BitCount()");
 
+}
+
+// Are 16-bit samples stored the way this host reads an unsigned short? PNG is
+// big-endian by spec; almost every machine we ship on is little-endian, but
+// asking is cheaper than assuming and costs nothing at runtime.
+static bool PC_HostIsLittleEndian()
+{
+	const unsigned short probe = 0x0102;
+	return *(const unsigned char *)&probe == 0x02;
+}
+
+// 16-bit PNG writer, for the two 16-bit image types. Separate from Save()'s
+// 8-bit machinery on purpose: that code allocates one byte per sample and its
+// fill chain has branches for GRAYSCALE, RGB and RGBA only -- so a
+// GRAYSCALE_16BIT image was accepted by the guard, given width-byte rows, and
+// then written from rows nothing ever filled. It saved uninitialised heap.
+//
+// PNG stores 16-bit samples big-endian; png_set_swap converts from native
+// order on a little-endian host, mirroring the read path exactly.
+bool CImageData::SavePNG16(const char *fileName)
+{
+	const bool isGray = (this->type == IMG_TYPE_GRAYSCALE_16BIT);
+	if (!isGray && this->type != IMG_TYPE_RGBA_16BIT)
+		return false;
+	if (this->resultData == NULL || width <= 0 || height <= 0)
+		return false;
+
+	FILE *fp = SYS_FopenUtf8(fileName, "wb");
+	if (fp == NULL)
+	{
+		LOGError("CImageData::SavePNG16: cannot open '%s' for writing", fileName);
+		return false;
+	}
+
+	png_structp png = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+	if (png == NULL) { fclose(fp); return false; }
+	png_infop info = png_create_info_struct(png);
+	if (info == NULL) { png_destroy_write_struct(&png, NULL); fclose(fp); return false; }
+
+	png_bytep *rows = NULL;
+	if (setjmp(png_jmpbuf(png)))
+	{
+		free(rows);
+		png_destroy_write_struct(&png, &info);
+		fclose(fp);
+		return false;
+	}
+
+	png_init_io(png, fp);
+	png_set_IHDR(png, info, (png_uint_32)width, (png_uint_32)height, 16,
+	             isGray ? PNG_COLOR_TYPE_GRAY : PNG_COLOR_TYPE_RGB_ALPHA,
+	             PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_BASE, PNG_FILTER_TYPE_BASE);
+	png_write_info(png, info);
+#ifdef PNG_WRITE_SWAP_SUPPORTED
+	if (PC_HostIsLittleEndian())
+		png_set_swap(png);
+#endif
+
+	const size_t samplesPerPixel = isGray ? 1 : 4;
+	const size_t rowSamples = (size_t)width * samplesPerPixel;
+	rows = (png_bytep *)malloc(sizeof(png_bytep) * (size_t)height);
+	if (rows == NULL)
+	{
+		png_destroy_write_struct(&png, &info);
+		fclose(fp);
+		return false;
+	}
+	// Rows point INTO resultData -- no copy, and no per-row malloc to leak.
+	for (int y = 0; y < height; y++)
+		rows[y] = (png_bytep)((unsigned short *)this->resultData + (size_t)y * rowSamples);
+
+	png_write_image(png, rows);
+	png_write_end(png, NULL);
+
+	free(rows);
+	png_destroy_write_struct(&png, &info);
+	fclose(fp);
+	return true;
 }
 
 void CImageData::Save(const char *fileName)
 {
+	// Float has no writer here: every path below treats resultData as bytes or
+	// as unorm16, and half bits are neither. Refuse loudly rather than emit a
+	// file whose pixels are the bit patterns of the wrong format -- no
+	// production caller does this today, and the day one appears it should
+	// fail at the call rather than in an image viewer.
+	if (this->type == IMG_TYPE_RGBA_16F)
+	{
+		LOGError("CImageData::Save: IMG_TYPE_RGBA_16F has no writer -- "
+				 "tone-map to RGBA8 or convert first ('%s')", fileName);
+		return;
+	}
+
+	// The 16-bit types get the 16-bit writer; everything below this is the
+	// 8-bit path and stays exactly as it was.
+	if (this->type == IMG_TYPE_GRAYSCALE_16BIT || this->type == IMG_TYPE_RGBA_16BIT)
+	{
+		if (!SavePNG16(fileName))
+			LOGError("CImageData::Save: 16-bit write failed for '%s'", fileName);
+		return;
+	}
+
 	if (this->type != IMG_TYPE_GRAYSCALE
 		&& this->type != IMG_TYPE_RGB
-		&& this->type != IMG_TYPE_RGBA
-		&& this->type != IMG_TYPE_SHORT_INT)
+		&& this->type != IMG_TYPE_RGBA)
 	{
 		LOGError("saving image type %2.2x not implemented (%s)", this->type, fileName);
 		return;
@@ -2307,14 +2737,14 @@ void CImageData::Save(const char *fileName)
 	int x, y;
 
 	// create file
-	FILE *fp = fopen(fileName, "wb");
+	FILE *fp = SYS_FopenUtf8(fileName, "wb");
 	if (!fp)
 	{
 		LOGError("CImageData::Save: File %s could not be opened for writing", fileName);
 		return;
 	}
 
-	if (this->type == IMG_TYPE_GRAYSCALE || this->type == IMG_TYPE_RGB || this->type == IMG_TYPE_SHORT_INT)
+	if (this->type == IMG_TYPE_GRAYSCALE || this->type == IMG_TYPE_RGB || this->type == IMG_TYPE_GRAYSCALE_16BIT)
 	{
 		row_pointers = (png_bytep*) malloc(sizeof(png_bytep) * this->height);
 		for (y=0; y < height; y++)
@@ -2404,7 +2834,7 @@ void CImageData::Save(const char *fileName)
 			}
 		}
 	}
-	else if (this->type == IMG_TYPE_SHORT_INT)
+	else if (this->type == IMG_TYPE_GRAYSCALE_16BIT)
 	{
 		unsigned short int *shortData = (unsigned short int *)this->resultData;
 
@@ -2516,7 +2946,7 @@ void CImageData::SaveScaled(const char *fileName, short int min, short int max)
 {
 	if (this->type != IMG_TYPE_GRAYSCALE
 		&& this->type != IMG_TYPE_RGB
-		&& this->type != IMG_TYPE_SHORT_INT)
+		&& this->type != IMG_TYPE_GRAYSCALE_16BIT)
 	{
 		LOGError("saving image type %2.2x not implemented (%s)", this->type, fileName);
 		return;
@@ -2531,7 +2961,7 @@ void CImageData::SaveScaled(const char *fileName, short int min, short int max)
 	int x, y;
 
 	// create file
-	FILE *fp = fopen(fileName, "wb");
+	FILE *fp = SYS_FopenUtf8(fileName, "wb");
 	if (!fp)
 	{
 		LOGError("CImageData::Save: File %s could not be opened for writing", fileName);
@@ -2580,7 +3010,7 @@ void CImageData::SaveScaled(const char *fileName, short int min, short int max)
 
 		}
 	}
-	else if (this->type == IMG_TYPE_SHORT_INT)
+	else if (this->type == IMG_TYPE_GRAYSCALE_16BIT)
 	{
 		unsigned short int *shortData = (unsigned short int *)this->resultData;
 
@@ -2680,24 +3110,301 @@ const char *CImageData::GetLoadError()
 	return stbi_failure_reason();
 }
 
+// Decode a JPEG that stb_image refused, after repairing it IN MEMORY.
+//
+// One repair, deliberately: trim trailing NUL padding and append the EOI
+// marker. That is the damage seen in practice and the only one that can be
+// fixed without inventing pixels. Anything else -- a broken header, a
+// corrupt Huffman table -- still fails, and should.
+//
+// Returns true and fills resultData/width/height on success.
+bool CImageData::LoadRepairedJpeg(const char *fileName)
+{
+	FILE *f = fopen(fileName, "rb");
+	if (f == NULL) return false;
+
+	fseek(f, 0, SEEK_END);
+	long len = ftell(f);
+	fseek(f, 0, SEEK_SET);
+	// A guard, not a policy: this path runs only after a failed decode, but a
+	// pathological file should not become a pathological allocation.
+	const long kMaxRepairBytes = 256L * 1024L * 1024L;
+	if (len < 4 || len > kMaxRepairBytes) { fclose(f); return false; }
+
+	u8 *buf = (u8 *)malloc((size_t)len + 2);
+	if (buf == NULL) { fclose(f); return false; }
+	size_t got = fread(buf, 1, (size_t)len, f);
+	fclose(f);
+	if (got != (size_t)len) { free(buf); return false; }
+
+	// JPEG only. The missing-EOI repair means nothing for PNG or BMP, and
+	// guessing at other formats would turn a clear failure into a vague one.
+	if (!(buf[0] == 0xFF && buf[1] == 0xD8)) { free(buf); return false; }
+
+	size_t end = (size_t)len;
+	while (end > 2 && buf[end - 1] == 0x00)
+		end--;
+	// Already correctly terminated -- then the failure was something else and
+	// re-decoding the same bytes would only fail again.
+	if (end >= 2 && buf[end - 2] == 0xFF && buf[end - 1] == 0xD9) { free(buf); return false; }
+	buf[end++] = 0xFF;
+	buf[end++] = 0xD9;
+
+	this->resultData = stbi_load_from_memory(buf, (int)end, &this->width, &this->height, NULL, 4);
+	free(buf);
+	return this->resultData != NULL;
+}
+
+// PNG via libpng. Replaces the stb_image path for .png (Load falls back to stb
+// if this refuses the file, which libpng 1.6 does for some malformed PNGs that
+// stb accepts -- a bad critical-chunk CRC, a broken zlib stream).
+//
+// Output contract is EXACTLY what stb_image produced here: tightly packed
+// RGBA8, top row first, `new u8[]` so DeallocResult's delete[] matches. Every
+// input colour type is normalised to that, so callers cannot tell which
+// decoder ran -- except that the ICC profile now arrives in the same pass.
+bool CImageData::LoadPNG(const char *fileName)
+{
+	FILE *fp = SYS_FopenUtf8(fileName, "rb");
+	if (fp == NULL)
+		return false;
+
+	png_structp png = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+	if (png == NULL) { fclose(fp); return false; }
+	png_infop info = png_create_info_struct(png);
+	if (info == NULL) { png_destroy_read_struct(&png, NULL, NULL); fclose(fp); return false; }
+
+	u8 *pixels = NULL;
+	png_bytep *rows = NULL;
+
+	// libpng longjmps here on any error it raises. Everything freed below must
+	// therefore be declared ABOVE this point and zero-initialised.
+	if (setjmp(png_jmpbuf(png)))
+	{
+		delete [] pixels;
+		free(rows);
+		png_destroy_read_struct(&png, &info, NULL);
+		fclose(fp);
+		return false;
+	}
+
+	png_init_io(png, fp);
+	png_read_info(png, info);
+
+	png_uint_32 w = 0, h = 0;
+	int bitDepth = 0, colorType = 0;
+	png_get_IHDR(png, info, &w, &h, &bitDepth, &colorType, NULL, NULL, NULL);
+
+	// The ICC profile, in this pass. This is the whole metadata argument: with
+	// stb the caller had to open the file a SECOND time and parse a header
+	// just to find these bytes.
+	{
+		png_charp name = NULL;
+		png_bytep profile = NULL;
+		png_uint_32 profileLen = 0;
+		int compression = 0;
+		if (png_get_iCCP(png, info, &name, &compression, &profile, &profileLen) == PNG_INFO_iCCP
+			&& profile != NULL && profileLen > 0)
+		{
+			SetIccProfile((u8 *)profile, (u32)profileLen);
+		}
+	}
+
+	// 16-bit input KEEPS its 16 bits. A 16-bit PNG is what Lightroom and
+	// Photoshop write when the point of the export was to avoid banding, so
+	// truncating it at the decoder throws away the only thing that made the
+	// file worth its size. The image comes out as IMG_TYPE_RGBA_16BIT and the GPU
+	// path converts at upload -- see CSlrImage.
+	//
+	// libpng hands 16-bit samples over in PNG byte order (big-endian);
+	// png_set_swap fixes that on a little-endian host so the buffer is native
+	// unsigned short, which is what every reader of it assumes.
+	const bool keep16 = (bitDepth == 16);
+	if (keep16)
+	{
+#ifdef PNG_READ_SWAP_SUPPORTED
+		if (PC_HostIsLittleEndian())
+			png_set_swap(png);
+#endif
+	}
+	if (colorType == PNG_COLOR_TYPE_PALETTE)
+		png_set_palette_to_rgb(png);
+	if (colorType == PNG_COLOR_TYPE_GRAY && bitDepth < 8)
+		png_set_expand_gray_1_2_4_to_8(png);
+	if (png_get_valid(png, info, PNG_INFO_tRNS))
+		png_set_tRNS_to_alpha(png);
+	if (colorType == PNG_COLOR_TYPE_RGB
+		|| colorType == PNG_COLOR_TYPE_GRAY
+		|| colorType == PNG_COLOR_TYPE_PALETTE)
+	{
+		// The filler is a SAMPLE VALUE, so it has to match the bit depth:
+		// 0xFF into a 16-bit alpha channel is 255/65535 -- very nearly
+		// transparent -- not opaque.
+		png_set_filler(png, keep16 ? 0xFFFF : 0xFF, PNG_FILLER_AFTER);
+	}
+	if (colorType == PNG_COLOR_TYPE_GRAY || colorType == PNG_COLOR_TYPE_GRAY_ALPHA)
+		png_set_gray_to_rgb(png);
+	// Adam7: collapses the seven passes into whole rows for us.
+	png_set_interlace_handling(png);
+	png_read_update_info(png, info);
+
+	// Refuse anything whose row stride is not the 4 bytes/pixel promised above
+	// rather than writing past the buffer -- a transform that silently did not
+	// apply must not become a heap overflow.
+	const size_t sampleBytes = keep16 ? 2 : 1;
+	const png_size_t rowBytes = png_get_rowbytes(png, info);
+	if (w == 0 || h == 0 || rowBytes != (png_size_t)w * 4 * sampleBytes)
+	{
+		LOGError("CImageData::LoadPNG: unexpected %lu-byte rows for %ux%u RGBA%s in '%s'",
+		         (unsigned long)rowBytes, (unsigned)w, (unsigned)h,
+		         keep16 ? "16" : "8", fileName);
+		png_destroy_read_struct(&png, &info, NULL);
+		fclose(fp);
+		return false;
+	}
+
+	// Allocated as unsigned short[] for the 16-bit case so DeallocResult's
+	// delete[] (unsigned short int*) matches the array form exactly.
+	pixels = keep16
+		? (u8 *)new unsigned short int[(size_t)w * (size_t)h * 4]
+		: new u8[(size_t)w * (size_t)h * 4];
+	rows = (png_bytep *)malloc(sizeof(png_bytep) * (size_t)h);
+	if (rows == NULL)
+	{
+		delete [] pixels;
+		png_destroy_read_struct(&png, &info, NULL);
+		fclose(fp);
+		return false;
+	}
+	for (png_uint_32 y = 0; y < h; y++)
+		rows[y] = pixels + (size_t)y * (size_t)w * 4 * sampleBytes;
+
+	png_read_image(png, rows);
+	png_read_end(png, NULL);
+
+	free(rows);
+	png_destroy_read_struct(&png, &info, NULL);
+	fclose(fp);
+
+	this->width      = (int)w;
+	this->height     = (int)h;
+	this->type       = keep16 ? IMG_TYPE_RGBA_16BIT : IMG_TYPE_RGBA;
+	this->resultData = pixels;
+	return true;
+}
+
 bool CImageData::Load(const char *fileName, bool dealloc)
 {
 	LOGR("CImageData::Load: %s", fileName);
 
-	// .ktx2 files go through the KTX2/UASTC transcode path; all else unchanged.
-	if (strcasecmp(IMG_FileExtension(fileName), ".ktx2") == 0)
-	{
-		return this->LoadKTX2(fileName);
-	}
+	// Drop any profile from a previous load BEFORE the extension dispatch
+	// below. The specialized loaders (TIFF/WebP/HEIF/AVIF/RAW) return without
+	// ever reaching the `if (dealloc) DeallocImage()` further down, so without
+	// this a tagged image reloaded as an untagged one would keep the old
+	// profile and be colour-managed as the wrong file. The profile describes
+	// the file being loaded, so this is never conditional on `dealloc`.
+	DeallocIccProfile();
+	// Same reasoning, same unconditional reset: the specialised loaders below
+	// return without reaching this class's own dealloc, so a stale hint would
+	// otherwise describe the PREVIOUS file.
+	previewColorHint       = EExifColorSpaceHint::Unknown;
+	previewColorHintSource = EExifColorHintSource::None;
+	decodeWasRepaired      = false;
 
+	// Free the PREVIOUS pixel buffer BEFORE the extension dispatch: the
+	// specialized loaders below assign fresh buffers without freeing the old
+	// one and return without reaching the stbi path's dealloc, so a reused
+	// CImageData leaked its previous image (programme review 2026-08-11).
+	// DeallocImage() is idempotent, so the KTX2 loader's own dealloc and the
+	// stbi path both stay correct.
 	if (dealloc)
 		DeallocImage();
+
+	// .ktx2 files go through the KTX2/UASTC transcode path; all else unchanged.
+	const char *ext = IMG_FileExtension(fileName);
+	if (strcasecmp(ext, ".ktx2") == 0)
+		return this->LoadKTX2(fileName);
+	if (strcasecmp(ext, ".tiff") == 0 || strcasecmp(ext, ".tif") == 0)
+		return this->LoadTIFF(fileName);
+	if (strcasecmp(ext, ".webp") == 0)
+		return this->LoadWebP(fileName);
+	if (strcasecmp(ext, ".heic") == 0 || strcasecmp(ext, ".heif") == 0)
+		return this->LoadHEIF(fileName);
+	if (strcasecmp(ext, ".avif") == 0)
+		return this->LoadAVIF(fileName);
+	{
+		static const char *rawExts[] = {
+			".cr2", ".cr3", ".nef", ".arw", ".dng", ".raf", ".rw2", ".orf", ".pef", nullptr
+		};
+		for (int i = 0; rawExts[i]; i++)
+			if (strcasecmp(ext, rawExts[i]) == 0) return this->LoadRAWPreview(fileName);
+	}
+
+	// PNG goes to libpng, not stb_image: same pixels, measurably faster with
+	// SIMD, and the ICC profile comes back in this one pass instead of costing
+	// a second read of the file header. A refusal falls through to the stb
+	// chain below -- libpng 1.6 rejects some malformed PNGs that stb accepts,
+	// and showing a damaged picture beats showing none.
+	if (strcasecmp(ext, ".png") == 0)
+	{
+		if (this->LoadPNG(fileName))
+			return true;
+		LOGD("CImageData::Load: libpng refused '%s'; retrying with stb_image", fileName);
+	}
 
 	this->type = IMG_TYPE_RGBA;
 	this->resultData = stbi_load(fileName, &this->width, &this->height, NULL, 4);
 	if (this->resultData == NULL)
 	{
+		// SALVAGE PASS. stb_image is strict about the trailing EOI marker: it
+		// decodes the entire image, then throws the result away with
+		// "expected marker" because the file does not end in FF D9. Files
+		// like that are common in the wild -- an interrupted copy or a
+		// download that padded the tail with NULs -- and macOS Preview,
+		// Finder and every browser show them without complaint, so a
+		// photographer reasonably reads our refusal as OUR bug.
+		//
+		// Retry from memory with the file repaired: drop the NUL padding and
+		// append the EOI that should have been there. If the entropy data is
+		// genuinely short, stb pads the missing part and we get however much
+		// of the picture survived -- which is the point. Nothing is written
+		// to disk; the file is not ours to modify.
+		if (LoadRepairedJpeg(fileName))
+		{
+			decodeWasRepaired = true;
+			LOGD("CImageData::Load: %s repaired (missing EOI) -- decoded %dx%d",
+			     fileName, this->width, this->height);
+		}
+	}
+	if (this->resultData == NULL)
+	{
+		// LAST RESORT: the operating system's own decoder. stb_image aborts on
+		// the first bad symbol; ImageIO and WIC decode up to the damage and
+		// keep what they got, which is why files we refuse open in Preview.
+		// Measured on a real library: this recovers photos with corruption
+		// INSIDE the entropy stream, which no amount of marker repair can
+		// reach. Returns false on Linux, where there is no such decoder.
+		if (LoadWithPlatformDecoder(fileName))
+		{
+			decodeWasRepaired = true;
+			LOGD("CImageData::Load: %s recovered by the platform decoder -- %dx%d",
+			     fileName, this->width, this->height);
+		}
+	}
+	if (this->resultData == NULL)
+	{
 		LOGError("CImageData::Load: %s failed", fileName);
+	}
+	else
+	{
+		// stb_image discards every byte of metadata, so the profile needs its
+		// own pass over the file. ReadFileHeader, not ReadFile: this runs on
+		// the decode workers for every JPEG/PNG/BMP, and ReadFile would read up
+		// to 16 MB and build tag strings we immediately throw away. 128 KB is
+		// enough -- APP2 precedes SOS and iCCP precedes IDAT by spec.
+		CExifData iccOnly = CExifReader::ReadFileHeader(fileName, 131072, true);
+		if (!iccOnly.iccProfile.empty())
+			SetIccProfile(&iccOnly.iccProfile[0], (u32)iccOnly.iccProfile.size());
 	}
 
 	/*
@@ -2759,7 +3466,7 @@ bool CImageData::Load(const char *fileName, bool dealloc)
 	int x, y;
 
 	// open file and test for it being a png
-	FILE *fp = fopen(fileName, "rb");
+	FILE *fp = SYS_FopenUtf8(fileName, "rb");
 	if (!fp)
 	{
 		LOGError("CImageData::Load: '%s' not found", fileName);
@@ -3173,8 +3880,8 @@ bool CImageData::Load(const char *fileName, bool dealloc)
 
 #endif
 	 */
-	
-	return false;
+
+	return this->resultData != nullptr;
 }
 
 // =====================================================================
@@ -3214,7 +3921,7 @@ bool CImageData::LoadKTX2(const char *fileName)
 		tf = basist::transcoder_texture_format::cTFRGBA32;  // uncompressed fallback
 
 	// --- read whole file into memory ---
-	FILE *fp = fopen(fileName, "rb");
+	FILE *fp = SYS_FopenUtf8(fileName, "rb");
 	if (!fp)
 	{
 		LOGError("CImageData::LoadKTX2: '%s' not found", fileName);
@@ -3242,9 +3949,54 @@ bool CImageData::LoadKTX2(const char *fileName)
 		return false;
 	}
 
-	// --- transcoder must be initialised once before any transcode (idempotent) ---
-	basist::basisu_transcoder_init();
+	// --- safe preflight: parse identifier, header, level index ---
+	KTX2HeaderInfo ktx2Hdr;
+	bool validHeader = KTX2_ReadHeaderForDispatch(fileBytes, (size_t)fileSize, ktx2Hdr);
 
+	// --- dispatch ---
+	// BasisLZ (supercompression=1) or vkFormat=UNDEFINED → existing transcoder path
+	// Concrete vkFormat with no supercompression → new CKTX2Loader software path
+	// Anything else → clean failure
+
+	if (!validHeader) {
+		LOGError("CImageData::LoadKTX2: invalid KTX2 container '%s'", fileName);
+		delete [] fileBytes;
+		this->type = IMG_TYPE_UNKNOWN;
+		return false;
+	}
+
+	const bool isBasis = (ktx2Hdr.supercompressionScheme == 1 /*BasisLZ*/
+	                      || ktx2Hdr.vkFormat == 0 /*UNDEFINED — UASTC in DFD*/);
+	const bool isConcrete = (!isBasis && ktx2Hdr.supercompressionScheme == 0);
+
+	if (!isBasis && !isConcrete) {
+		LOGError("CImageData::LoadKTX2: unsupported supercompression scheme %u in '%s'",
+		         ktx2Hdr.supercompressionScheme, fileName);
+		delete [] fileBytes;
+		this->type = IMG_TYPE_UNKNOWN;
+		return false;
+	}
+
+	if (isConcrete) {
+		// --- concrete-format software decode ---
+		KTX2DecodeResult res;
+		if (!KTX2_DecodeToRGBA8(fileBytes, (size_t)fileSize, res)) {
+			LOGError("CImageData::LoadKTX2: concrete-format decode failed for '%s'", fileName);
+			delete [] fileBytes;
+			this->type = IMG_TYPE_UNKNOWN;
+			return false;
+		}
+		delete [] fileBytes;
+		this->width      = res.width;
+		this->height     = res.height;
+		this->type       = IMG_TYPE_RGBA;
+		this->resultData = res.rgba8;    // CImageData takes ownership
+		this->isCompressed = false;
+		return true;
+	}
+
+	// --- BasisLZ / UASTC path (unchanged) ---
+	basist::basisu_transcoder_init();
 	basist::ktx2_transcoder transcoder;
 	if (!transcoder.init(fileBytes, (uint32_t)fileSize))
 	{
@@ -3382,7 +4134,7 @@ bool CImageData::LoadKTX2(const char *fileName)
 
 void CImageData::RawSave(const char *fileName)
 {
-	FILE *fp = fopen(fileName, "wb");
+	FILE *fp = SYS_FopenUtf8(fileName, "wb");
 	if (!fp)
 	{
 		LOGError("CImageData::Save: fp NULL (%s)", fileName);
@@ -3399,7 +4151,7 @@ void CImageData::RawSave(const char *fileName)
 
 void CImageData::RawLoad(const char *fileName)
 {
-	FILE *fp = fopen(fileName, "rb");
+	FILE *fp = SYS_FopenUtf8(fileName, "rb");
 	if (!fp)
 	{
 		LOGError("CImageData::Load: fp NULL (%s)", fileName);
@@ -3756,7 +4508,7 @@ void CImageData::debugPrint()
 			LOGD(buf);
 		}
 	}
-	else if (this->type == IMG_TYPE_SHORT_INT)
+	else if (this->type == IMG_TYPE_GRAYSCALE_16BIT)
 	{
 		char buf[MAX_STRING_LENGTH*4];
 		char buf2[MAX_STRING_LENGTH];
@@ -3765,7 +4517,7 @@ void CImageData::debugPrint()
 			sprintf(buf, "%-2.2x: ", y);
 			for (int x = 0; x < width; x++)
 			{
-				sprintf(buf2, "%-4.4x ", this->GetPixelResultShort(x, y));
+				sprintf(buf2, "%-4.4x ", this->GetPixelResultGrayscale16Bit(x, y));
 				strcat(buf, buf2);
 			}
 			LOGD(buf);
@@ -3788,6 +4540,16 @@ void CImageData::CopyDataFrom(CImageData *src)
 	
 	// TODO: fixme and get the real size per pixel
 	memcpy(resultData, src->resultData, GetDataLength());
+
+	// The profile travels with the pixels it describes (see the copy ctor).
+	if (src->iccProfile != NULL && src->iccProfileSize > 0)
+		SetIccProfile(src->iccProfile, src->iccProfileSize);
+	else
+		DeallocIccProfile();
+	// Copied-or-cleared, never left standing: copying FROM a source with no
+	// hint must erase this one's.
+	this->previewColorHint       = src->previewColorHint;
+	this->previewColorHintSource = src->previewColorHintSource;
 }
 
 void CImageData::DrawImage(CImageData *drawImage, int x, int y, int width, int height, float alpha)

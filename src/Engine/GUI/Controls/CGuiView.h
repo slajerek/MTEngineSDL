@@ -216,6 +216,7 @@ public:
 	bool imGuiWindowSkipFocusCheck;
 	bool imGuiNoWindowPadding;
 	bool imGuiNoScrollbar;
+	ImGuiWindowFlags imGuiExtraWindowFlags = 0;
 	bool imGuiSkipKeyPressWhenIoWantsTextInput;
 	bool imGuiWindowKeepAspectRatio;
 	float imGuiWindowAspectRatio;

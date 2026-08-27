@@ -6,7 +6,15 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 FTXUI_SRC_DIR="$ROOT_DIR/other/lib/ftxui"
-OUT_LIB_DIR="$ROOT_DIR/platform/Linux/libs"
+# OUTSIDE the checkout, and keyed by the resolved capability set -- see
+# mt_caps_lib_dir in ../caps-lib.sh and resolve.deps_dir for why this is a
+# correctness change and not tidiness. One flat platform/Linux/libs served all
+# four apps, and a capability being off writes a STUB over the real archive.
+if ! declare -f mt_caps_lib_dir >/dev/null 2>&1; then
+  # shellcheck source=../caps-lib.sh
+  . "$ROOT_DIR/platform/caps-lib.sh"
+fi
+OUT_LIB_DIR="$(mt_caps_lib_dir)"
 OUT_LIB="$OUT_LIB_DIR/libftxui.a"
 
 mkdir -p "$OUT_LIB_DIR"
@@ -30,6 +38,22 @@ if command -v sha256sum >/dev/null 2>&1; then
   SCRIPT_SHA="$(sha256sum "${BASH_SOURCE[0]}" | cut -d ' ' -f 1)"
 elif command -v shasum >/dev/null 2>&1; then
   SCRIPT_SHA="$(shasum -a 256 "${BASH_SOURCE[0]}" | cut -d ' ' -f 1)"
+fi
+
+# THE CAPABILITY GATE. The macOS script has had one since the programme started;
+# this one did not, so MT_CAP_FTXUI=0 still built FTXUI on Linux. build-linux.sh
+# already exports the flags via mt_caps_read_flags, so the gate only had to be
+# written -- unlike Windows, where the publishing half was missing too.
+#
+# Absent means ON, so a bare engine build still builds everything.
+if [[ "${MT_ENABLE_FTXUI:-1}" == "0" ]]; then
+  STUB_STAMP="disabled:${SCRIPT_SHA}"
+  if [[ -f "$OUT_LIB" && -f "$OUT_LIB_DIR/libftxui.stamp" && "$(cat "$OUT_LIB_DIR/libftxui.stamp" 2>/dev/null)" == "$STUB_STAMP" ]]; then
+    exit 0
+  fi
+  mt_caps_stub_archive "$OUT_LIB" "ftxui"
+  echo -n "$STUB_STAMP" > "$OUT_LIB_DIR/libftxui.stamp"
+  exit 0
 fi
 
 STAMP_FILE="$OUT_LIB_DIR/libftxui.stamp"

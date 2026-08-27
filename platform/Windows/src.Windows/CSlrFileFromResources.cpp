@@ -2,6 +2,8 @@
 #include "SYS_Main.h"
 #include "SYS_FileSystem.h"
 #include "SYS_DocsVsRes.h"
+#include "SYS_WindowsPathUtils.h"
+#include <cstring>
 
 #if defined(USE_DOCS_INSTEAD_OF_RESOURCES)
 #define RESOURCES_DIR_NAME gPathToDocuments
@@ -18,8 +20,9 @@ CSlrFileFromResources::CSlrFileFromResources(const char *fileName)
 void CSlrFileFromResources::Open(const char *fileName)
 {
 	LOGR("CSlrFileFromResources: opening %s", fileName);
-	strcpy(this->fileName, fileName);
-	sprintf(this->osFileName, "%s%s", RESOURCES_DIR_NAME, fileName);
+	strncpy(this->fileName, fileName ? fileName : "", 511);
+	this->fileName[511] = 0;
+	this->osFileName = std::string(RESOURCES_DIR_NAME ? RESOURCES_DIR_NAME : "") + (fileName ? fileName : "");
 
 	this->fileSize = 0;
 	this->Reopen();
@@ -27,17 +30,18 @@ void CSlrFileFromResources::Open(const char *fileName)
 
 void CSlrFileFromResources::Reopen()
 {
-	LOGR("CSlrFileFromResources: opening %s size=%d", this->osFileName, this->fileSize);
+	this->osFileName = SYS_WindowsPathBackslashes(this->osFileName);
+	LOGR("CSlrFileFromResources: opening %s size=%d", this->osFileName.c_str(), this->fileSize);
 
 	if (this->fp != NULL)
 		fclose(fp);
 
 	this->filePos = 0;
-	this->fp = fopen(this->osFileName, "rb");
+	this->fp = SYS_OpenFile(this->osFileName.c_str(), "rb");
 
 	if (this->fp == NULL)
 	{
-		LOGError("CSlrFileFromResources: failed to open %s", this->osFileName);
+		LOGError("CSlrFileFromResources: failed to open %s", this->osFileName.c_str());
 		return;
 	}
 
@@ -45,7 +49,7 @@ void CSlrFileFromResources::Reopen()
 	this->fileSize = ftell(fp);
 	fseek(fp, 0L, SEEK_SET);
 
-	LOGR("CSlrFileFromResources: %s opened fileSize=%d", this->osFileName, this->fileSize);
+	LOGR("CSlrFileFromResources: %s opened fileSize=%d", this->osFileName.c_str(), this->fileSize);
 }
 
 bool CSlrFileFromResources::Exists()
@@ -103,4 +107,3 @@ CSlrFileFromResources::~CSlrFileFromResources()
 {
 	this->Close();
 }
-

@@ -1,12 +1,13 @@
 #include "SYS_Platform.h"
-#include <SDL.h>
-#include <SDL_syswm.h>
+#include <SDL3/SDL.h>
 #include "SYS_Defs.h"
 #include "DBG_Log.h"
 #include "win-registry.h"
 #include "MT_API.h"
 #include "VID_Main.h"
 #include "SYS_DefaultConfig.h"
+#include "CMTNativeMenuBarWin32.h"
+#include "CGuiMain.h"
 #include <timeapi.h>
 #include <Windows.h>
 #include <stdio.h>
@@ -308,5 +309,22 @@ void PLATFORM_SetThreadName(const char *name)
 
 void PLATFORM_UpdateMenus()
 {
+	SDL_Window *sdlWindow = VID_GetMainSDLWindow();
+	if (!sdlWindow) return;
+
+	// SDL3 removed SDL_syswm.h; the HWND comes from the window's property bag.
+	// Note the failure mode changed: SDL_GetWindowWMInfo returned a bool, while
+	// SDL_GetPointerProperty returns the DEFAULT we pass (NULL) when absent --
+	// so the check is on the pointer now, not on a return code.
+	HWND hwnd = (HWND)SDL_GetPointerProperty(SDL_GetWindowProperties(sdlWindow),
+	                                         SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
+	if (hwnd == NULL)
+	{
+		LOGError("PLATFORM_UpdateMenus: no SDL_PROP_WINDOW_WIN32_HWND_POINTER: %s", SDL_GetError());
+		return;
+	}
+
+	CMTNativeMenuBarWin32 *menuBar = new CMTNativeMenuBarWin32(hwnd);
+	guiMain->SetNativeMenuBar(menuBar);
 }
 

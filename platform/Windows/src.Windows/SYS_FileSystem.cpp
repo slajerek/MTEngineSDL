@@ -26,6 +26,7 @@
 #include <algorithm>
 #include <functional>
 #include <Shlobj.h>
+#include <shellapi.h>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -35,9 +36,12 @@
 #include <deque>
 #include <thread>
 #include <filesystem>
+#include <vector>
+#include <cwchar>
 
 #include "SYS_Startup.h"
 #include "SYS_DocsVsRes.h"
+#include "SYS_WindowsPathUtils.h"
 #include "VID_Main.h"
 #include "CGuiMain.h"
 
@@ -45,6 +49,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <io.h>
+#include <cstring>
 
 #include "mman.h"
 #include "nfd.h"
@@ -79,6 +84,151 @@ namespace fs = std::filesystem;
 
 bool SYS_MoveFilesAndDeleteSource(const std::string& source, const std::string& destination);
 
+static std::wstring SYS_WinUtf8ToWide(const char *utf8)
+{
+	if (utf8 == NULL || utf8[0] == 0)
+		return std::wstring();
+
+	int count = MultiByteToWideChar(CP_UTF8, 0, utf8, -1, NULL, 0);
+	if (count <= 0)
+		return std::wstring();
+
+	std::wstring wide(count, L'\0');
+	MultiByteToWideChar(CP_UTF8, 0, utf8, -1, wide.data(), count);
+	if (!wide.empty() && wide.back() == L'\0')
+		wide.pop_back();
+	return wide;
+}
+
+static std::string SYS_WinWideToUtf8(const wchar_t *wide)
+{
+	if (wide == NULL || wide[0] == 0)
+		return std::string();
+
+	int count = WideCharToMultiByte(CP_UTF8, 0, wide, -1, NULL, 0, NULL, NULL);
+	if (count <= 0)
+		return std::string();
+
+	std::string utf8(count, '\0');
+	WideCharToMultiByte(CP_UTF8, 0, wide, -1, utf8.data(), count, NULL, NULL);
+	if (!utf8.empty() && utf8.back() == '\0')
+		utf8.pop_back();
+	return utf8;
+}
+
+static std::string SYS_CSlrStringToUtf8(CSlrString *value)
+{
+	if (value == NULL)
+		return std::string();
+
+	char *utf8 = value->GetUTF8();
+	std::string out = utf8 ? utf8 : "";
+	free(utf8);
+	return out;
+}
+
+static std::wstring SYS_WinDialogFilterToWide(std::string filter)
+{
+	std::wstring wide = SYS_WinUtf8ToWide(filter.c_str());
+	for (wchar_t &c : wide)
+	{
+		if (c == L'$')
+			c = L'\0';
+	}
+	return wide;
+}
+
+static std::vector<std::string> SYS_WinDialogBufferToPathsUtf8(const wchar_t *buffer)
+{
+	std::vector<std::string> dialogParts;
+	if (buffer == NULL)
+		return dialogParts;
+
+	const wchar_t *part = buffer;
+	while (*part != L'\0')
+	{
+		dialogParts.push_back(SYS_WinWideToUtf8(part));
+		part += wcslen(part) + 1;
+	}
+
+	return SYS_WindowsExpandDialogSelectionUtf8(dialogParts);
+}
+
+static std::wstring SYS_WinUtf8PathToWideLong(const char *path)
+{
+	std::string normalized = SYS_WindowsNormalizeLongPathUtf8(path ? path : "");
+	return SYS_WinUtf8ToWide(normalized.c_str());
+}
+
+static char *SYS_DupUtf8Path(const std::string &path)
+{
+	char *out = new char[path.size() + 1];
+	memcpy(out, path.c_str(), path.size() + 1);
+	return out;
+}
+
+static void SYS_AssignGlobalPath(char **path, char **cPath, CSlrString **utfPath, const std::string &value)
+{
+	*path = SYS_DupUtf8Path(value);
+	*cPath = *path;
+	*utfPath = new CSlrString(std::string(*cPath));
+}
+
+static std::string SYS_WinGetCurrentDirectoryUtf8()
+{
+	DWORD needed = GetCurrentDirectoryW(0, NULL);
+	if (needed == 0)
+		return std::string();
+
+	std::wstring wide(needed, L'\0');
+	DWORD copied = GetCurrentDirectoryW(needed, wide.data());
+	if (copied == 0)
+		return std::string();
+	wide.resize(copied);
+	return SYS_WinWideToUtf8(wide.c_str());
+}
+
+static std::string SYS_WinGetSpecialFolderUtf8(int csidl)
+{
+	wchar_t buf[MAX_PATH];
+	buf[0] = 0;
+	if (!SUCCEEDED(SHGetFolderPathW(NULL, csidl, NULL, 0, buf)))
+		return std::string();
+	return SYS_WinWideToUtf8(buf);
+}
+
+static std::string SYS_WinGetTempPathUtf8()
+{
+	DWORD needed = GetTempPathW(0, NULL);
+	if (needed == 0)
+		return std::string();
+
+	std::wstring wide(needed + 1, L'\0');
+	DWORD copied = GetTempPathW((DWORD)wide.size(), wide.data());
+	if (copied == 0)
+		return std::string();
+	wide.resize(copied);
+	return SYS_WinWideToUtf8(wide.c_str());
+}
+
+static bool SYS_WinPathExistsUtf8(const std::string &path)
+{
+	std::wstring wide = SYS_WinUtf8PathToWideLong(path.c_str());
+	if (wide.empty())
+		return false;
+	return GetFileAttributesW(wide.c_str()) != INVALID_FILE_ATTRIBUTES;
+}
+
+static bool SYS_WinCreateDirectoryUtf8(const std::string &path)
+{
+	std::wstring wide = SYS_WinUtf8PathToWideLong(path.c_str());
+	if (wide.empty())
+		return false;
+	if (CreateDirectoryW(wide.c_str(), NULL))
+		return true;
+	return GetLastError() == ERROR_ALREADY_EXISTS;
+}
+
 // shall we use new folder for settings (CSIDL_LOCAL_APPDATA instead of CSIDL_COMMON_APPDATA)
 //#define SKIP_SETTINGS_MIGRATION
 
@@ -91,154 +241,136 @@ void SYS_InitFileSystem()
 
 	LOGM("SYS_InitFileSystem\n");
 
-	TCHAR curDir[MAX_PATH];
-	DWORD dwRet;
+	std::string curDir = SYS_WinGetCurrentDirectoryUtf8();
+	if (curDir.empty())
+		curDir = ".";
+	LOGD("curDir='%s'", curDir.c_str());
 
-	dwRet = GetCurrentDirectory(MAX_PATH, curDir);
+	SYS_AssignGlobalPath(&gPathToCurrentDirectory, &gCPathToCurrentDirectory,
+		&gUTFPathToCurrentDirectory, curDir);
 
-	LOGD("curDir='%s'", curDir);
-
-	gPathToCurrentDirectory = new char[MAX_PATH];
-	strcpy(gPathToCurrentDirectory, curDir);
-	gCPathToCurrentDirectory = gPathToCurrentDirectory;
-	gUTFPathToCurrentDirectory = new CSlrString(gCPathToCurrentDirectory);
-
-	gPathToResources = new char[MAX_PATH];
-	sprintf(gPathToResources, "%s\\Resources\\", curDir);
+	std::string resourcesPath = curDir + "\\Resources\\";
+	gPathToResources = SYS_DupUtf8Path(resourcesPath);
 	LOGM("pathToResource=%s", gPathToResources);
 
-	gPathToDocuments = new char[MAX_PATH];
-	HRESULT hr = SHGetFolderPath(0, CSIDL_MYDOCUMENTS, 0, 0, gPathToDocuments);
+	std::string documentsPath = SYS_WinGetSpecialFolderUtf8(CSIDL_MYDOCUMENTS);
+	if (documentsPath.empty())
+		documentsPath = curDir;
+	SYS_AssignGlobalPath(&gPathToDocuments, &gCPathToDocuments,
+		&gUTFPathToDocuments, documentsPath);
 	LOGM("pathToDocuments=%s", gPathToDocuments);
-	gCPathToDocuments = gPathToDocuments;
-	gUTFPathToDocuments = new CSlrString(gCPathToDocuments);
 
-	gPathToTemp = new char[MAX_PATH];
-	GetTempPathA(MAX_PATH, gPathToTemp);
+	std::string tempPath = SYS_WinGetTempPathUtf8();
+	if (tempPath.empty())
+		tempPath = curDir;
+	SYS_AssignGlobalPath(&gPathToTemp, &gCPathToTemp,
+		&gUTFPathToTemp, tempPath);
 	LOGM("gPathToTemp=%s", gPathToTemp);
-	gCPathToTemp = gPathToTemp;
-	gUTFPathToTemp = new CSlrString(gCPathToTemp);
-
-	gPathToSettings = new char[MAX_PATH];
 	
 #if defined(SKIP_SETTINGS_MIGRATION)
 	// use old code for settings location
-
-	char* buf = SYS_GetCharBuf();
-	if (!SUCCEEDED(SHGetFolderPath(NULL, CSIDL_COMMON_APPDATA, NULL, 0, buf)))
+	std::string commonAppData = SYS_WinGetSpecialFolderUtf8(CSIDL_COMMON_APPDATA);
+	if (commonAppData.empty())
 	{
 		LOGError("failed to get app setings folder");
-		sprintf(gPathToSettings, "%s\\", curDir);
+		SYS_AssignGlobalPath(&gPathToSettings, &gCPathToSettings,
+			&gUTFPathToSettings, curDir + "\\");
 	}
 	else
 	{
 		const char *settingsFolderName = MT_GetSettingsFolderName();
-		sprintf(gPathToSettings, "%s\\%s\\", buf, settingsFolderName);
+		std::string settingsPath = commonAppData + "\\" + settingsFolderName + "\\";
 
 		// check if folder exists & create new if needed
-		DWORD dwAttrib = GetFileAttributes(gPathToSettings);
-		if (dwAttrib == INVALID_FILE_ATTRIBUTES)
+		if (!SYS_WinPathExistsUtf8(settingsPath))
 		{
-			if (!CreateDirectory(gPathToSettings, NULL))
+			if (!SYS_WinCreateDirectoryUtf8(settingsPath))
 			{
 				LOGError("failed to create app setings folder");
-				sprintf(gPathToSettings, "%s\\", curDir);
+				settingsPath = curDir + "\\";
 			}
 		}
-		strcat(gPathToSettings, "\\");
+		SYS_AssignGlobalPath(&gPathToSettings, &gCPathToSettings,
+			&gUTFPathToSettings, settingsPath);
 	}
-	SYS_ReleaseCharBuf(buf);
 
 #else
 	// upgrade and move settings from old location to a new location
 	// we need to move from CSIDL_COMMON_APPDATA to CSIDL_LOCAL_APPDATA as the CSIDL_COMMON_APPDATA is not writable anymore in new Windows (we all love Windows don't we)
-
-	char* buf = SYS_GetCharBuf();
-
-	if (!SUCCEEDED(SHGetFolderPath(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, buf)))
+	std::string localAppData = SYS_WinGetSpecialFolderUtf8(CSIDL_LOCAL_APPDATA);
+	if (localAppData.empty())
 	{
 		LOGError("failed to get app setings folder: CSIDL_LOCAL_APPDATA");
-		sprintf(gPathToSettings, "%s\\", curDir);
+		SYS_AssignGlobalPath(&gPathToSettings, &gCPathToSettings,
+			&gUTFPathToSettings, curDir + "\\");
 	}
 	else
 	{
 		const char *settingsFolderName = MT_GetSettingsFolderName();
-		sprintf(gPathToSettings, "%s\\%s\\", buf, settingsFolderName);
+		std::string settingsPath = localAppData + "\\" + settingsFolderName + "\\";
 		
 		// check if folder exists & create new if needed
-		DWORD dwAttrib = GetFileAttributes(gPathToSettings);
-		if (dwAttrib == INVALID_FILE_ATTRIBUTES)
+		if (!SYS_WinPathExistsUtf8(settingsPath))
 		{
 			// settings folder does not exist
-			if (!CreateDirectory(gPathToSettings, NULL))
+			if (!SYS_WinCreateDirectoryUtf8(settingsPath))
 			{
 				LOGError("failed to create app setings folder");
-				sprintf(gPathToSettings, "%s\\", curDir);
+				settingsPath = curDir + "\\";
 			}
 			else
 			{
 				// created new settings folder, check if we need to move from old location
-				char *oldSettingsFolder = NULL;
-				bool oldFolderExists = false;
-				if (!SUCCEEDED(SHGetFolderPath(NULL, CSIDL_COMMON_APPDATA, NULL, 0, buf)))
+				std::string commonAppData = SYS_WinGetSpecialFolderUtf8(CSIDL_COMMON_APPDATA);
+				if (commonAppData.empty())
 				{
 					LOGError("failed to get app setings folder: CSIDL_COMMON_APPDATA");
 				}
 				else
 				{
-					const char *settingsFolderName = MT_GetSettingsFolderName();
-					oldSettingsFolder = new char[MAX_STRING_LENGTH];
-					sprintf(oldSettingsFolder, "%s\\%s\\", buf, settingsFolderName);
+					std::string oldSettingsFolder = commonAppData + "\\" + settingsFolderName + "\\";
 
-					if (SYS_FileExists(oldSettingsFolder))
+					if (SYS_FileExists(oldSettingsFolder.c_str()))
 					{
-						LOGM("Upgrading settings path, moving settings from %s to %s", oldSettingsFolder, gPathToSettings);
+						LOGM("Upgrading settings path, moving settings from %s to %s", oldSettingsFolder.c_str(), settingsPath.c_str());
 						
 						// we need to move all settings files from old folder
-						std::string folderFrom = std::string(oldSettingsFolder);
-						std::string folderTo = std::string(gPathToSettings);
-						SYS_MoveFilesAndDeleteSource(folderFrom, folderTo);
+						SYS_MoveFilesAndDeleteSource(oldSettingsFolder, settingsPath);
 	//					SYS_MoveFilesFromFolderAtoFolderB(folderFrom, folderTo);
 						
 						// remove old settings folder
 //						RemoveDirectory(oldSettingsFolder);
 					}
-
-					if (oldSettingsFolder != NULL)
-						delete[] oldSettingsFolder;
 				}
 			}
 		}
-		
-		// do we need this?? --- no!
-		//strcat(gPathToSettings, "\\");
-		//LOGTODO(" is settings folder correct: %s", gPathToSettings);
+		SYS_AssignGlobalPath(&gPathToSettings, &gCPathToSettings,
+			&gUTFPathToSettings, settingsPath);
 	}
-	
-	SYS_ReleaseCharBuf(buf);
 
 #endif
 	
 	LOGM("pathToSettings=%s", gPathToSettings);
-
-	gCPathToSettings = gPathToSettings;
-	gUTFPathToSettings = new CSlrString(gCPathToSettings);
 }
 
 bool SYS_MoveFilesAndDeleteSource(const std::string& source, const std::string& destination)
 {
 	try
 	{
-		fs::create_directory(destination);
+		fs::path sourcePath(SYS_WinUtf8ToWide(source.c_str()));
+		fs::path destinationPath(SYS_WinUtf8ToWide(destination.c_str()));
+		fs::create_directory(destinationPath);
 
-		for (const auto& entry : fs::directory_iterator(source))
+		for (const auto& entry : fs::directory_iterator(sourcePath))
 		{
 			const auto& path = entry.path();
-			auto dest = fs::path(destination) / path.filename();
+			auto dest = destinationPath / path.filename();
 
 			if (fs::is_directory(path))
 			{
-				if (!SYS_MoveFilesAndDeleteSource(path.string(), dest.string()))
+				std::string fromUtf8 = SYS_WinWideToUtf8(path.wstring().c_str());
+				std::string toUtf8 = SYS_WinWideToUtf8(dest.wstring().c_str());
+				if (!SYS_MoveFilesAndDeleteSource(fromUtf8, toUtf8))
 				{
 					return false;
 				}
@@ -265,12 +397,13 @@ void SYS_MoveFilesFromFolderAtoFolderB(const std::string& folderA, const std::st
 {
 	LOGD("SYS_MoveFilesFromFolderAtoFolderB");
 	
-	WIN32_FIND_DATA findFileData;
-	HANDLE hFind = FindFirstFile((folderA + "\\*").c_str(), &findFileData);
+	WIN32_FIND_DATAW findFileData;
+	std::wstring searchPath = SYS_WinUtf8PathToWideLong((folderA + "\\*").c_str());
+	HANDLE hFind = FindFirstFileW(searchPath.c_str(), &findFileData);
 
 	if (hFind == INVALID_HANDLE_VALUE)
 	{
-		LOGError("FindFirstFile failed with error %s", GetLastError());
+		LOGError("FindFirstFile failed with error %lu", GetLastError());
 		return;
 	}
 
@@ -282,17 +415,20 @@ void SYS_MoveFilesFromFolderAtoFolderB(const std::string& folderA, const std::st
 			continue;
 		}
 
-		std::string sourceFile = folderA + "\\" + findFileData.cFileName;
-		std::string destFile = folderB + "\\" + findFileData.cFileName;
+		std::string fileName = SYS_WinWideToUtf8(findFileData.cFileName);
+		std::string sourceFile = folderA + "\\" + fileName;
+		std::string destFile = folderB + "\\" + fileName;
+		std::wstring sourceWide = SYS_WinUtf8PathToWideLong(sourceFile.c_str());
+		std::wstring destWide = SYS_WinUtf8PathToWideLong(destFile.c_str());
 
 		// Move the file
-		if (!MoveFile(sourceFile.c_str(), destFile.c_str()))
+		if (!MoveFileW(sourceWide.c_str(), destWide.c_str()))
 		{
-			LOGError("Failed to move file: %s with error %s", sourceFile.c_str(), GetLastError());
+			LOGError("Failed to move file: %s with error %lu", sourceFile.c_str(), GetLastError());
 		}
 
 	}
-	while (FindNextFile(hFind, &findFileData) != 0);
+	while (FindNextFileW(hFind, &findFileData) != 0);
 
 	FindClose(hFind);
 }
@@ -388,66 +524,49 @@ std::vector<CFileItem *> *SYS_GetFilesInFolder(char *directoryPath, std::list<ch
 	LOGD("CFileSystem::GetFiles: %s", directoryPath);
 	std::vector<CFileItem *> *files = new std::vector<CFileItem *>();
 
-	WIN32_FIND_DATA ffd;
+	WIN32_FIND_DATAW ffd;
 	LARGE_INTEGER filesize;
-	TCHAR szDir[MAX_PATH];
-	size_t length_of_arg;
 	HANDLE hFind = INVALID_HANDLE_VALUE;
 	DWORD dwError =0;
 
-	DWORD  retval = 0;
-	BOOL   success;
-	TCHAR  buffer[BUFSIZE] = TEXT("");
-	TCHAR  buf[BUFSIZE] = TEXT("");
-	TCHAR** lppPart = { NULL };
+	std::string directoryUtf8 = SYS_WindowsPathBackslashes(directoryPath ? directoryPath : "");
+	std::string searchUtf8 = directoryUtf8;
+	if (!searchUtf8.empty() && searchUtf8.back() != '\\')
+		searchUtf8 += "\\";
+	searchUtf8 += "*";
+	std::wstring searchWide = SYS_WinUtf8PathToWideLong(searchUtf8.c_str());
 
-	StringCchLength(directoryPath, MAX_PATH, &length_of_arg);
-	if (length_of_arg > (MAX_PATH-3))
-	{
-		LOGError("CFileSystem::GetFiles: directoryPath too long");
-		return files;
-	}
-
-	StringCchCopy(szDir, MAX_PATH, directoryPath);
-	StringCchCat(szDir, MAX_PATH, TEXT("\\*"));
-
-	hFind = FindFirstFile(szDir, &ffd);
+	hFind = FindFirstFileW(searchWide.c_str(), &ffd);
 
 	if (hFind == INVALID_HANDLE_VALUE)
 	{
-		LOGError("CFileSystem::GetFiles: FindFirstFile");
+		LOGError("CFileSystem::GetFiles: FindFirstFileW failed for %s", directoryUtf8.c_str());
 		return files;
 	}
 
 	do
 	{
+		std::string entryName = SYS_WinWideToUtf8(ffd.cFileName);
 		if (ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
 		{
 			if (withFolders)
 			{
-				LOGD("<DIR> %s", ffd.cFileName);
+				LOGD("<DIR> %s", entryName.c_str());
 
-				if (!strcmp(ffd.cFileName, ".") || !strcmp(ffd.cFileName, ".."))
+				if (entryName == "." || entryName == "..")
 				{
 				}
 				else
 				{
-					// oh, I forgot that Windows is for retards (as Gideon said)
-					// this is not giving full path to file, but just random strings
-	/*				retval = GetFullPathName(ffd.cFileName, BUFSIZE, buffer, lppPart);
-
-					if (retval == 0)
-					{
-						// Handle an error condition.
-						LOGError("GetFullPathName failed (%d)\n", GetLastError());
-						return NULL;
-					}*/
-					sprintf(buffer, "%s\\%s", directoryPath, ffd.cFileName);
-					LOGD("the full path name is %s", buffer);
+					std::string fullPath = directoryUtf8;
+					if (!fullPath.empty() && fullPath.back() != '\\')
+						fullPath += "\\";
+					fullPath += entryName;
+					LOGD("the full path name is %s", fullPath.c_str());
 
 					char *modDateDup = strdup("");
 
-					CFileItem *item = new CFileItem(ffd.cFileName, buffer, modDateDup, true);
+					CFileItem *item = new CFileItem((char*)entryName.c_str(), (char*)fullPath.c_str(), modDateDup, true);
 					files->push_back(item);
 				}
 			}
@@ -456,7 +575,7 @@ std::vector<CFileItem *> *SYS_GetFilesInFolder(char *directoryPath, std::list<ch
 		{
 			if (extensions != NULL)
 			{
-				char *fileExtension = SYS_FileSystemGetExtension(ffd.cFileName);
+				char *fileExtension = SYS_FileSystemGetExtension((char*)entryName.c_str());
 
 				if (fileExtension != NULL)
 				{
@@ -468,31 +587,16 @@ std::vector<CFileItem *> *SYS_GetFilesInFolder(char *directoryPath, std::list<ch
 						//LOGD("fileExtension='%s' extension='%s'", fileExtension, extension);
 						if (!strcmp(extension, fileExtension))
 						{
-							//LOGD("adding");
-							//LOGD(fname);
-
 							filesize.LowPart = ffd.nFileSizeLow;
 							filesize.HighPart = ffd.nFileSizeHigh;
-							LOGD("     %s %ld", ffd.cFileName, filesize.QuadPart);
+							LOGD("     %s %ld", entryName.c_str(), filesize.QuadPart);
 
-							// note, this below is copy pasted on purpose, because on this shitty platform I fucking do not care (as Windows devs also do).
+							std::string fullPath = directoryUtf8;
+							if (!fullPath.empty() && fullPath.back() != '\\')
+								fullPath += "\\";
+							fullPath += entryName;
 
-							/*
-							// oh, I forgot that Windows is for retards (as Gideon said)
-							//char *fileFullPath = strdup(ffd.path)
-							retval = GetFullPathName(ffd.cFileName, BUFSIZE, buffer, lppPart);
-
-							if (retval == 0)
-							{
-								// Handle an error condition.
-								LOGError("GetFullPathName failed (%d)\n", GetLastError());
-								return NULL;
-							}
-							*/
-
-							sprintf(buffer, "%s\\%s", directoryPath, ffd.cFileName);
-
-							CFileItem *item = new CFileItem(ffd.cFileName, buffer, "", false);
+							CFileItem *item = new CFileItem((char*)entryName.c_str(), (char*)fullPath.c_str(), (char*)"", false);
 							files->push_back(item);
 							break;
 						}
@@ -502,26 +606,19 @@ std::vector<CFileItem *> *SYS_GetFilesInFolder(char *directoryPath, std::list<ch
 			}
 			else
 			{
-				/*
-				retval = GetFullPathName(ffd.cFileName, BUFSIZE, buffer, lppPart);
+				std::string fullPath = directoryUtf8;
+				if (!fullPath.empty() && fullPath.back() != '\\')
+					fullPath += "\\";
+				fullPath += entryName;
 
-				if (retval == 0)
-				{
-					// Handle an error condition.
-					LOGError("GetFullPathName failed (%d)\n", GetLastError());
-					return NULL;
-				}
-				*/
-				sprintf(buffer, "%s\\%s", directoryPath, ffd.cFileName);
+				LOGD("the full path name is %s", fullPath.c_str());
 
-				LOGD("the full path name is %s", buffer);
-
-				CFileItem *item = new CFileItem(ffd.cFileName, buffer, (char*)"<mod date>", false);
+				CFileItem *item = new CFileItem((char*)entryName.c_str(), (char*)fullPath.c_str(), (char*)"<mod date>", false);
 				files->push_back(item);
 			}
 		}
 	}
-	while(FindNextFile(hFind, &ffd) != 0);
+	while(FindNextFileW(hFind, &ffd) != 0);
 
 	dwError = GetLastError();
 	if (dwError != ERROR_NO_MORE_FILES)
@@ -553,10 +650,15 @@ void SYS_RefreshFiles()
 
 FILE *SYS_OpenFile(const char *path, const char *mode)
 {
-	return fopen(path, mode);
-//	std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
-//	std::wstring wpath = converter.from_bytes(path);
-//	return _wfopen(wpath.c_str(), converter.from_bytes(mode).c_str());
+	if (path == NULL || mode == NULL)
+		return NULL;
+
+	std::wstring wpath = SYS_WinUtf8PathToWideLong(path);
+	std::wstring wmode = SYS_WinUtf8ToWide(mode);
+	if (wpath.empty() || wmode.empty())
+		return NULL;
+
+	return _wfopen(wpath.c_str(), wmode.c_str());
 }
 
 void GUI_KeyUpAllModifiers()
@@ -580,8 +682,8 @@ void SYS_DialogOpenFile(CSystemFileDialogCallback *callback, std::list<CSlrStrin
 {
 	LOGD("SYS_DialogOpenFile");
 
-	OPENFILENAME ofn;
-	char szFileName[65536] = "";
+	OPENFILENAMEW ofn;
+	std::vector<wchar_t> selectedFileBuffer(65536, L'\0');
 
 	// temporary remove always on top window flag
 	SYS_windowAlwaysOnTopBeforeFileDialog = VID_IsMainWindowAlwaysOnTop();
@@ -592,124 +694,93 @@ void SYS_DialogOpenFile(CSystemFileDialogCallback *callback, std::list<CSlrStrin
     ofn.lStructSize = sizeof(ofn); // SEE NOTE BELOW
     ofn.hwndOwner = hWnd;
 
-	char *initialFolder = NULL;
-
-	char *buf = SYS_GetCharBuf();
-	char *ext = NULL;
+	std::wstring filterWide;
+	std::wstring titleWide;
+	std::wstring initialFolderWide;
 
 	if (extensions != NULL)
 	{
-		char *filterExtAll = new char[1024];
-		filterExtAll[0] = 0x00;
-
-		char *filterExtSingle = new char[1024];
-		filterExtSingle[0] = 0x00;
+		std::string filterExtAll;
+		std::string filterExtSingle;
 		
 		for (std::list<CSlrString *>::iterator it = extensions->begin();
 			it != extensions->end(); it++)
 		{
 			CSlrString *extStr = *it;
-			ext = extStr->GetStdASCII();
+			std::string ext = SYS_CSlrStringToUtf8(extStr);
 
-			char extBuf[128];
 			if (it == extensions->begin())
 			{
-				sprintf(extBuf, "*.%s", ext);
+				filterExtAll += "*.";
 			}
 			else
 			{
-				sprintf(extBuf, ";*.%s", ext);
+				filterExtAll += ";*.";
 			}
-			strcat(filterExtAll, extBuf);
+			filterExtAll += ext;
 
-			sprintf(extBuf, "Only %s files$*.%s$", ext, ext);
-			strcat(filterExtSingle, extBuf);
-
-			free(ext); ext = NULL;
+			filterExtSingle += "Only ";
+			filterExtSingle += ext;
+			filterExtSingle += " files$*.";
+			filterExtSingle += ext;
+			filterExtSingle += "$";
 		}
 		
+		std::string filterUtf8;
 		if (extensions->size() == 1)
 		{
-			sprintf(buf, "Supported files$%s$All Files(*.*)$*.*$", filterExtAll);
+			filterUtf8 = "Supported files$" + filterExtAll + "$All Files(*.*)$*.*$";
 		}
 		else
 		{
-			sprintf(buf, "Supported files$%s$%sAll Files(*.*)$*.*$", filterExtAll, filterExtSingle);
+			filterUtf8 = "Supported files$" + filterExtAll + "$" + filterExtSingle + "All Files(*.*)$*.*$";
 		}
 
-		delete [] filterExtAll;
-		delete [] filterExtSingle;
-
-		int z = strlen(buf);
-		for (int i = 0; i < z; i++)
-		{
-			if (buf[i] == '$')
-				buf[i] = '\0';
-		}
-
-		ofn.lpstrFilter = buf;
+		filterWide = SYS_WinDialogFilterToWide(filterUtf8);
+		ofn.lpstrFilter = filterWide.c_str();
 	    ofn.lpstrDefExt = NULL;
 	}
 
-	char *title = NULL;
-
 	if (windowTitle != NULL)
 	{
-		title = windowTitle->GetStdASCII();
-		ofn.lpstrTitle = title;
+		titleWide = SYS_WinUtf8ToWide(SYS_CSlrStringToUtf8(windowTitle).c_str());
+		ofn.lpstrTitle = titleWide.c_str();
 	}
 
-    ofn.lpstrFile = szFileName;
+	    ofn.lpstrFile = selectedFileBuffer.data();
 
 	if (defaultFolder != NULL)
 	{
-		initialFolder = defaultFolder->GetStdASCII();
-		ofn.lpstrInitialDir = initialFolder;
+		std::string initialFolder = SYS_CSlrStringToUtf8(defaultFolder);
+		initialFolderWide = SYS_WinUtf8ToWide(initialFolder.c_str());
+		ofn.lpstrInitialDir = initialFolderWide.c_str();
 
-		LOGD(">> set ofn.lpstrInitialDir='%s'", initialFolder);
+		LOGD(">> set ofn.lpstrInitialDir='%s'", initialFolder.c_str());
 	}
 	else
 	{
 		LOGD(">> defaultFolder is NULL");
 	}
 
-	ofn.nMaxFile = sizeof(szFileName);
+	ofn.nMaxFile = (DWORD)selectedFileBuffer.size();
 	ofn.Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY | OFN_ALLOWMULTISELECT;
     
     // workaround
-    GUI_KeyUpAllModifiers();
+	GUI_KeyUpAllModifiers();
     
-    LOGD("...... GetOpenFileName");
-    if(GetOpenFileName(&ofn))
+	LOGD("...... GetOpenFileName");
+	if(GetOpenFileNameW(&ofn))
     {
     	LOGD("..... callback: file open selected");
 		VID_SetMainWindowAlwaysOnTopTemporary(SYS_windowAlwaysOnTopBeforeFileDialog);
 
-		if (title != NULL)
-			free(title);
-
-		LOGD("szFileName='%s'", szFileName);
-		SYS_ReleaseCharBuf(buf);
+		std::vector<std::string> selectedUtf8 = SYS_WinDialogBufferToPathsUtf8(selectedFileBuffer.data());
 
 		std::vector<CSlrString *> selectedPaths;
-		char *base = szFileName;
-		char *next = base + strlen(base) + 1;
-
-		if (*next == '\0')
+		for (const std::string &path : selectedUtf8)
 		{
-			selectedPaths.push_back(new CSlrString(base));
-		}
-		else
-		{
-			std::string folder = base;
-			while (*next != '\0')
-			{
-				std::string fullPath = folder;
-				fullPath += "\\";
-				fullPath += next;
-				selectedPaths.push_back(new CSlrString(fullPath.c_str()));
-				next += strlen(next) + 1;
-			}
+			LOGD("selected file='%s'", path.c_str());
+			selectedPaths.push_back(new CSlrString(path));
 		}
 
 		if (selectedPaths.empty())
@@ -719,18 +790,12 @@ void SYS_DialogOpenFile(CSystemFileDialogCallback *callback, std::list<CSlrStrin
 
 		for (CSlrString *path : selectedPaths)
 			delete path;
-
-		if (initialFolder != NULL)
-			delete initialFolder;
 	}
 	else
 	{
 		LOGD("..... callback: file open cancelled");
 		VID_SetMainWindowAlwaysOnTopTemporary(SYS_windowAlwaysOnTopBeforeFileDialog);
 
-		if (title != NULL)
-			free(title);
-		SYS_ReleaseCharBuf(buf);
 		callback->SystemDialogFileOpenCancelled();
 	}
 }
@@ -742,9 +807,8 @@ void SYS_DialogOpenFiles(CSystemFileDialogCallback *callback, std::list<CSlrStri
 
 void SYS_DialogSaveFile(CSystemFileDialogCallback *callback, std::list<CSlrString *> *extensions, CSlrString *defaultFileName, CSlrString *defaultFolder, CSlrString *windowTitle)
 {
-	OPENFILENAME ofn;
-	char szFileName[MAX_PATH];
-	memset(szFileName, 0, MAX_PATH - 1);
+	OPENFILENAMEW ofn;
+	std::vector<wchar_t> selectedFileBuffer(65536, L'\0');
 
 	// temporary remove always on top window flag
 	SYS_windowAlwaysOnTopBeforeFileDialog = VID_IsMainWindowAlwaysOnTop();
@@ -755,91 +819,82 @@ void SYS_DialogSaveFile(CSystemFileDialogCallback *callback, std::list<CSlrStrin
     ofn.lStructSize = sizeof(ofn); // SEE NOTE BELOW
     ofn.hwndOwner = hWnd;
 
-	char *initialFolder = NULL;
-	char *buf = SYS_GetCharBuf();
-	char *ext = NULL;
-	char defExt[16];
+	std::wstring filterWide;
+	std::wstring defExtWide;
+	std::wstring titleWide;
+	std::wstring initialFolderWide;
 
 	if (extensions != NULL)
 	{
-		char *filterExtAll = new char[1024];
-		filterExtAll[0] = 0x00;
-
-		char *filterExtSingle = new char[1024];
-		filterExtSingle[0] = 0x00;
+		std::string filterExtAll;
+		std::string filterExtSingle;
+		std::string defExt;
 		
 		for (std::list<CSlrString *>::iterator it = extensions->begin();
 			it != extensions->end(); it++)
 		{
 			CSlrString *extStr = *it;
-			ext = extStr->GetStdASCII();
+			std::string ext = SYS_CSlrStringToUtf8(extStr);
 
-			char extBuf[128];
 			if (it == extensions->begin())
 			{
-				sprintf(extBuf, "*.%s", ext);
-				strcpy(defExt, ext);
+				filterExtAll += "*.";
+				defExt = ext;
 			}
 			else
 			{
-				sprintf(extBuf, ";*.%s", ext);
+				filterExtAll += ";*.";
 			}
-			strcat(filterExtAll, extBuf);
+			filterExtAll += ext;
 
-			sprintf(extBuf, "Only %s files$*.%s$", ext, ext);
-			strcat(filterExtSingle, extBuf);
-
-			free(ext); ext = NULL;
+			filterExtSingle += "Only ";
+			filterExtSingle += ext;
+			filterExtSingle += " files$*.";
+			filterExtSingle += ext;
+			filterExtSingle += "$";
 		}
 		
+		std::string filterUtf8;
 		if (extensions->size() == 1)
 		{
-			sprintf(buf, "%s file$%s$All Files(*.*)$*.*$", defExt, filterExtAll);
+			filterUtf8 = defExt + " file$" + filterExtAll + "$All Files(*.*)$*.*$";
 		}
 		else
 		{
-			sprintf(buf, "Supported files$%s$%sAll Files(*.*)$*.*$", filterExtAll, filterExtSingle);
+			filterUtf8 = "Supported files$" + filterExtAll + "$" + filterExtSingle + "All Files(*.*)$*.*$";
 		}
 
-		delete [] filterExtAll;
-		delete [] filterExtSingle;
-
-		int z = strlen(buf);
-		for (int i = 0; i < z; i++)
-		{
-			if (buf[i] == '$')
-				buf[i] = '\0';
-		}
-
-		ofn.lpstrFilter = buf;
-	    ofn.lpstrDefExt = defExt;
+		filterWide = SYS_WinDialogFilterToWide(filterUtf8);
+		defExtWide = SYS_WinUtf8ToWide(defExt.c_str());
+		ofn.lpstrFilter = filterWide.c_str();
+	    ofn.lpstrDefExt = defExtWide.empty() ? NULL : defExtWide.c_str();
 	}
-
-	char *title = NULL;
 
 	if (windowTitle != NULL)
 	{
-		title = windowTitle->GetStdASCII();
-		ofn.lpstrTitle = title;
+		titleWide = SYS_WinUtf8ToWide(SYS_CSlrStringToUtf8(windowTitle).c_str());
+		ofn.lpstrTitle = titleWide.c_str();
 	}
 
 	if (defaultFileName != NULL)
 	{
 		LOGD("defaultFileName != NULL");
 		defaultFileName->DebugPrint("defaultFileName=");
-		char *fileName = defaultFileName->GetStdASCII();
-		strncpy(szFileName, fileName, MAX_PATH-1);
-		LOGD("szFileName=%s", szFileName);
-		STRFREE(fileName);
+		std::string fileName = SYS_CSlrStringToUtf8(defaultFileName);
+		std::wstring fileNameWide = SYS_WinUtf8ToWide(fileName.c_str());
+		size_t copyLen = std::min(fileNameWide.size(), selectedFileBuffer.size() - 1);
+		wmemcpy(selectedFileBuffer.data(), fileNameWide.c_str(), copyLen);
+		selectedFileBuffer[copyLen] = L'\0';
+		LOGD("szFileName=%s", fileName.c_str());
 	}
-    ofn.lpstrFile = szFileName;
+	    ofn.lpstrFile = selectedFileBuffer.data();
 
 	if (defaultFolder != NULL)
 	{
-		initialFolder = defaultFolder->GetStdASCII();
-		ofn.lpstrInitialDir = initialFolder;
+		initialFolderWide = SYS_WinUtf8ToWide(SYS_CSlrStringToUtf8(defaultFolder).c_str());
+		ofn.lpstrInitialDir = initialFolderWide.c_str();
 	}
-    ofn.nMaxFile = MAX_PATH;
+	    ofn.nMaxFile = (DWORD)selectedFileBuffer.size();
 	ofn.Flags = OFN_EXPLORER | OFN_PATHMUSTEXIST | OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT;
 	
 	
@@ -847,31 +902,22 @@ void SYS_DialogSaveFile(CSystemFileDialogCallback *callback, std::list<CSlrStrin
 	GUI_KeyUpAllModifiers();
 	
 	LOGD("....... GetSaveFileName");
-    if(GetSaveFileName(&ofn))
+    if(GetSaveFileNameW(&ofn))
     {
     	LOGD("     ...callback OK");
 		VID_SetMainWindowAlwaysOnTopTemporary(SYS_windowAlwaysOnTopBeforeFileDialog);
 
-		if (title != NULL)
-			free(title);
-
-		LOGD("szFileName='%s'", szFileName);
-		SYS_ReleaseCharBuf(buf);
-		CSlrString *outPath = new CSlrString(szFileName);
+		std::string outPathUtf8 = SYS_WinWideToUtf8(selectedFileBuffer.data());
+		LOGD("szFileName='%s'", outPathUtf8.c_str());
+		CSlrString *outPath = new CSlrString(outPathUtf8);
 		callback->SystemDialogFileSaveSelected(outPath);
-
-		if (initialFolder != NULL)
-			delete initialFolder;
+		delete outPath;
 	}
 	else
 	{
 		LOGD("    ...callback cancelled");
 		VID_SetMainWindowAlwaysOnTopTemporary(SYS_windowAlwaysOnTopBeforeFileDialog);
 
-		if (title != NULL)
-			free(title);
-
-		SYS_ReleaseCharBuf(buf);
 		callback->SystemDialogFileSaveCancelled();
 	}
 }
@@ -881,7 +927,7 @@ void SYS_DialogPickFolder(CSystemFileDialogCallback* callback, CSlrString* defau
 	char* defaultPath = NULL;
 	if (defaultFolder)
 	{
-		defaultPath = defaultFolder->GetStdASCII();
+		defaultPath = defaultFolder->GetUTF8();
 	}
 	else
 	{
@@ -891,7 +937,7 @@ void SYS_DialogPickFolder(CSystemFileDialogCallback* callback, CSlrString* defau
 	nfdresult_t result = NFD_PickFolder(defaultPath, &outPath);
 	if (result == NFD_OKAY)
 	{
-		CSlrString* path = new CSlrString(outPath);
+		CSlrString* path = new CSlrString(std::string(outPath));
 		callback->SystemDialogPickFolderSelected(path);
 		free(outPath);
 		delete path;
@@ -904,6 +950,169 @@ void SYS_DialogPickFolder(CSystemFileDialogCallback* callback, CSlrString* defau
 	{
 		LOGError("SYS_DialogPickFolder: %s", NFD_GetError());
 	}
+	free(defaultPath);
+}
+
+// Move the file to the Recycle Bin via SHFileOperation (FOF_ALLOWUNDO).
+// Never falls back to permanent delete on failure.
+namespace {
+
+// Converts a wide string to UTF-8.
+std::string PC_WideToUtf8(const std::wstring &w)
+{
+	if (w.empty()) return std::string();
+	int len = WideCharToMultiByte(CP_UTF8, 0, w.data(), (int)w.size(),
+	                              nullptr, 0, nullptr, nullptr);
+	if (len <= 0) return std::string();
+	std::string s(len, '\0');
+	WideCharToMultiByte(CP_UTF8, 0, w.data(), (int)w.size(),
+	                    &s[0], len, nullptr, nullptr);
+	return s;
+}
+
+// IFileOperation progress sink: captures the path the deleted file lands at in
+// the Recycle Bin (the "$R..." item), reported via PostDeleteItem's
+// psiNewlyCreated. This is what makes Windows trash-undo possible.
+class PCTrashSink : public IFileOperationProgressSink
+{
+public:
+	std::wstring recycledPath;
+
+	IFACEMETHODIMP QueryInterface(REFIID riid, void **ppv) override
+	{
+		if (ppv == nullptr) return E_POINTER;
+		if (riid == __uuidof(IUnknown) || riid == __uuidof(IFileOperationProgressSink))
+		{
+			*ppv = static_cast<IFileOperationProgressSink *>(this);
+			AddRef();
+			return S_OK;
+		}
+		*ppv = nullptr;
+		return E_NOINTERFACE;
+	}
+	IFACEMETHODIMP_(ULONG) AddRef()  override { return InterlockedIncrement(&ref_); }
+	IFACEMETHODIMP_(ULONG) Release() override
+	{
+		LONG c = InterlockedDecrement(&ref_);
+		if (c == 0) delete this;
+		return c;
+	}
+
+	IFACEMETHODIMP StartOperations() override { return S_OK; }
+	IFACEMETHODIMP FinishOperations(HRESULT) override { return S_OK; }
+	IFACEMETHODIMP PreRenameItem(DWORD, IShellItem *, LPCWSTR) override { return S_OK; }
+	IFACEMETHODIMP PostRenameItem(DWORD, IShellItem *, LPCWSTR, HRESULT, IShellItem *) override { return S_OK; }
+	IFACEMETHODIMP PreMoveItem(DWORD, IShellItem *, IShellItem *, LPCWSTR) override { return S_OK; }
+	IFACEMETHODIMP PostMoveItem(DWORD, IShellItem *, IShellItem *, LPCWSTR, HRESULT, IShellItem *) override { return S_OK; }
+	IFACEMETHODIMP PreCopyItem(DWORD, IShellItem *, IShellItem *, LPCWSTR) override { return S_OK; }
+	IFACEMETHODIMP PostCopyItem(DWORD, IShellItem *, IShellItem *, LPCWSTR, HRESULT, IShellItem *) override { return S_OK; }
+	IFACEMETHODIMP PreDeleteItem(DWORD, IShellItem *) override { return S_OK; }
+	IFACEMETHODIMP PostDeleteItem(DWORD, IShellItem *, HRESULT hr, IShellItem *psiNewlyCreated) override
+	{
+		if (SUCCEEDED(hr) && psiNewlyCreated != nullptr)
+		{
+			PWSTR p = nullptr;
+			if (SUCCEEDED(psiNewlyCreated->GetDisplayName(SIGDN_FILESYSPATH, &p)) && p)
+			{
+				recycledPath = p;
+				CoTaskMemFree(p);
+			}
+		}
+		return S_OK;
+	}
+	IFACEMETHODIMP PreNewItem(DWORD, IShellItem *, LPCWSTR) override { return S_OK; }
+	IFACEMETHODIMP PostNewItem(DWORD, IShellItem *, LPCWSTR, LPCWSTR, DWORD, HRESULT, IShellItem *) override { return S_OK; }
+	IFACEMETHODIMP UpdateProgress(UINT, UINT) override { return S_OK; }
+	IFACEMETHODIMP ResetTimer()  override { return S_OK; }
+	IFACEMETHODIMP PauseTimer()  override { return S_OK; }
+	IFACEMETHODIMP ResumeTimer() override { return S_OK; }
+
+private:
+	LONG ref_ = 1;
+};
+
+} // namespace
+
+bool SYS_FileDeleteToTrash(const char *path, std::string *outTrashPath, std::string *outError)
+{
+	// Convert UTF-8 -> wide (shell APIs take a normal path, no \\?\ prefix).
+	int wlen = MultiByteToWideChar(CP_UTF8, 0, path, -1, nullptr, 0);
+	if (wlen <= 0)
+	{
+		if (outError) *outError = "path conversion failed";
+		return false;
+	}
+	std::wstring wpath(wlen, L'\0');
+	MultiByteToWideChar(CP_UTF8, 0, path, -1, wpath.data(), wlen);
+	if (!wpath.empty() && wpath.back() == L'\0') wpath.pop_back();
+
+	// Ensure COM is available on this thread. If it is already initialized (even
+	// with a different apartment model) we proceed and skip the balancing uninit.
+	HRESULT hrInit  = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+	bool    needUninit = (hrInit == S_OK || hrInit == S_FALSE);
+
+	bool         ok = false;
+	std::string  errMsg;
+	std::wstring recycled;
+
+	IFileOperation *op = nullptr;
+	HRESULT hr = CoCreateInstance(CLSID_FileOperation, nullptr, CLSCTX_ALL,
+	                              IID_PPV_ARGS(&op));
+	if (SUCCEEDED(hr) && op != nullptr)
+	{
+		// FOF_ALLOWUNDO routes the delete to the Recycle Bin; FOF_NO_UI keeps it
+		// silent (no confirmation/progress/error dialogs).
+		op->SetOperationFlags(FOF_ALLOWUNDO | FOF_NO_UI);
+
+		IShellItem *item = nullptr;
+		hr = SHCreateItemFromParsingName(wpath.c_str(), nullptr, IID_PPV_ARGS(&item));
+		if (SUCCEEDED(hr) && item != nullptr)
+		{
+			PCTrashSink *sink = new PCTrashSink();
+			DWORD cookie = 0;
+			op->Advise(sink, &cookie);
+
+			hr = op->DeleteItem(item, nullptr);
+			if (SUCCEEDED(hr)) hr = op->PerformOperations();
+
+			BOOL aborted = FALSE;
+			if (SUCCEEDED(hr)) op->GetAnyOperationsAborted(&aborted);
+
+			op->Unadvise(cookie);
+
+			if (SUCCEEDED(hr) && !aborted)
+			{
+				ok       = true;
+				recycled = sink->recycledPath;   // "" if the shell did not report it
+			}
+			else
+			{
+				errMsg = "IFileOperation delete failed (hr=0x" + std::to_string((unsigned long)hr) + ")";
+			}
+			sink->Release();
+			item->Release();
+		}
+		else
+		{
+			errMsg = "SHCreateItemFromParsingName failed (hr=0x" + std::to_string((unsigned long)hr) + ")";
+		}
+		op->Release();
+	}
+	else
+	{
+		errMsg = "CoCreateInstance(FileOperation) failed (hr=0x" + std::to_string((unsigned long)hr) + ")";
+	}
+
+	if (needUninit) CoUninitialize();
+
+	if (!ok)
+	{
+		if (outError) *outError = errMsg;
+		return false;
+	}
+	if (outTrashPath && !recycled.empty())
+		*outTrashPath = PC_WideToUtf8(recycled);
+	return true;
 }
 
 bool SYS_FileExists(const char *cPath)
@@ -911,11 +1120,10 @@ bool SYS_FileExists(const char *cPath)
 	if (cPath == NULL)
 		return false;
 
-	struct stat info;
-
 	LOGD("SYS_FileExists, cPath='%s'", cPath);
 	
-	if(stat( cPath, &info ) != 0)
+	DWORD attr = GetFileAttributesW(SYS_WinUtf8PathToWideLong(cPath).c_str());
+	if(attr == INVALID_FILE_ATTRIBUTES)
 	{
 		LOGD("..false");
 		return false;
@@ -932,48 +1140,29 @@ bool SYS_FileExists(CSlrString *path)
 	if (path == NULL)
 		return false;
 
-	char *cPath = path->GetStdASCII();
-	
-	struct stat info;
-	
-	if(stat( cPath, &info ) != 0)
-	{
-		delete [] cPath;
-		return false;
-	}
-	else 
-	{
-		delete [] cPath;
-		return true;
-	}
+	char *cPath = path->GetUTF8();
+	bool exists = SYS_FileExists(cPath);
+	free(cPath);
+	return exists;
 }
 
 bool SYS_FileDirExists(const char *cPath)
 {
-	struct stat info;
-	
-	if(stat( cPath, &info ) != 0)
+	if (cPath == NULL)
 		return false;
-	else if(info.st_mode & S_IFDIR)
-		return true;
-	else
+
+	DWORD attr = GetFileAttributesW(SYS_WinUtf8PathToWideLong(cPath).c_str());
+	if(attr == INVALID_FILE_ATTRIBUTES)
 		return false;
+	return (attr & FILE_ATTRIBUTE_DIRECTORY) != 0;
 }
 
 bool SYS_FileDirExists(CSlrString *path)
 {
-	char *cPath = path->GetStdASCII();
-	
-	struct stat info;
-	
-	if(stat( cPath, &info ) != 0)
-		return false;
-	else if(info.st_mode & S_IFDIR)
-		return true;
-	else
-		return false;
-	
-	delete [] cPath;
+	char *cPath = path->GetUTF8();
+	bool exists = SYS_FileDirExists(cPath);
+	free(cPath);
+	return exists;
 }
 
 uint8 *SYS_MapMemoryToFile(int memorySize, char *filePath, void **fileDescriptor)
@@ -981,7 +1170,8 @@ uint8 *SYS_MapMemoryToFile(int memorySize, char *filePath, void **fileDescriptor
 	int *fileHandle = (int*)malloc(sizeof(int));
 	fileDescriptor = (void**)(&fileHandle);
 	
-	*fileHandle = open(filePath, O_RDWR | O_CREAT | O_TRUNC, _S_IREAD | S_IWRITE);
+	std::wstring wpath = SYS_WinUtf8PathToWideLong(filePath);
+	*fileHandle = _wopen(wpath.c_str(), O_RDWR | O_CREAT | O_TRUNC | O_BINARY, _S_IREAD | _S_IWRITE);
 	
 	if(*fileHandle == -1)
 	{
@@ -1032,27 +1222,27 @@ void SYS_UnMapMemoryFromFile(uint8 *memoryMap, int memorySize, void **fileDescri
 void SYS_CreateFolder(const char *path)
 {
 	LOGTODO("SYS_CreateFolder, path=%s", path);
-	CreateDirectory(path, NULL);
+	SYS_WinCreateDirectoryUtf8(path ? path : "");
 }
 
 void SYS_CreateFolder(CSlrString *path)
 {
 	LOGTODO("SYS_CreateFolder");
 	path->DebugPrint("SYS_CreateFolder: ");
-	char *cPath = path->GetStdASCII();
-	CreateDirectory(cPath, NULL);
+	char *cPath = path->GetUTF8();
+	SYS_WinCreateDirectoryUtf8(cPath);
 
-	delete [] cPath;
+	free(cPath);
 }
 
 void SYS_SetCurrentFolder(CSlrString *path)
 {
 	LOGD("SYS_SetCurrentFolder");
 	path->DebugPrint("SYS_SetCurrentFolder: ");
-	char *cPath = path->GetStdASCII();
-	SetCurrentDirectory(cPath);
+	char *cPath = path->GetUTF8();
+	SetCurrentDirectoryW(SYS_WinUtf8PathToWideLong(cPath).c_str());
 
-	delete [] cPath;
+	free(cPath);
 }
 
 char* SYS_GetFileName(const char* filePath)
@@ -1150,8 +1340,9 @@ char* SYS_GetPathToDocuments()
 
 long SYS_GetFileModifiedTime(const char* filePath)
 {
-	struct stat result;
-	if (stat(filePath, &result) == 0)
+	struct _stat64 result;
+	std::wstring wpath = SYS_WinUtf8PathToWideLong(filePath);
+	if (_wstat64(wpath.c_str(), &result) == 0)
 	{
 		return (long)(result.st_mtime);
 	}
@@ -1353,19 +1544,19 @@ std::vector<std::string> SYS_Win32GetAvailableDrivesPaths()
 
 std::string SYS_GetRelativePath(const char* pathToFolder, const char* pathToFile)
 {
-	fs::path base = fs::absolute(pathToFolder);
-	fs::path target = fs::absolute(pathToFile);
+	fs::path base = fs::absolute(fs::path(SYS_WinUtf8ToWide(pathToFolder)));
+	fs::path target = fs::absolute(fs::path(SYS_WinUtf8ToWide(pathToFile)));
 
-	return fs::relative(target, base).generic_string();
+	return SYS_WinWideToUtf8(fs::relative(target, base).generic_wstring().c_str());
 }
 
 std::string SYS_GetAbsolutePath(const char* pathToFolder, const char* relativePath)
 {
-	fs::path base = fs::absolute(pathToFolder);
-	fs::path relative = relativePath;
+	fs::path base = fs::absolute(fs::path(SYS_WinUtf8ToWide(pathToFolder)));
+	fs::path relative = fs::path(SYS_WinUtf8ToWide(relativePath));
 
 	fs::path fullPath = fs::absolute(base / relative);
-	return fullPath.generic_string();
+	return SYS_WinWideToUtf8(fullPath.generic_wstring().c_str());
 }
 
 void SYS_OpenURLInBrowser(const char *url)

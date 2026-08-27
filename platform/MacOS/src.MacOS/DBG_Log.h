@@ -30,7 +30,7 @@
 #include <type_traits>
 #endif
 
-#define GLOBAL_DEBUG_OFF
+//#define GLOBAL_DEBUG_OFF
 
 #define DBGLVL_DEBUG		(1 << 0)
 #define DBGLVL_MAIN			(1 << 1)
@@ -155,54 +155,69 @@ inline int _LOGGER_S(unsigned int level, const char *fileName, unsigned int line
 
 #else
 
-#define LOGD(...) {};
-#define LOGD2(...) {};
-#define LOGM(...) {};
-#define LOGI(...) {};
-#define LOGP(...) {};
-#define LOGR(...) {};
-#define LOGG(...) {};
-#define LOGF(...) {};
-#define LOGH(...) {};
-#define LOGA(...) {};
-#define LOGDATA(...) {};
-#define LOGN(...) {};
-#define LOGS(...) {};
-#define LOGC(...) {};
-#define LOGCS(...) {};
-#define LOGCC(...) {};
-#define LOGMEM(...) {};
-#define LOGL(...) {};
-#define LOGW(...) {};
-#define LOGX(...) {};
-#define LOGVM(...) {};
-#define LOGVD(...) {};
-#define LOGVV(...) {};
+// do {} while(0), NOT "{};": a macro body that is already a complete
+// statement (a bare block, or a bare ';') leaves the call site's OWN
+// trailing ';' as a SECOND, sibling empty statement. In a brace-less
+// "if (x) LOGM(...); else ...;" that stray statement sits between the if
+// and the else, so the compiler sees an 'else' with no 'if' to attach to.
+// do{}while(0) does not have this problem: a bare "do {} while(0)" is not
+// itself a valid statement -- the grammar requires the trailing ';' to
+// complete it -- so the call site's ';' is consumed as part of ONE
+// statement instead of becoming a stray sibling. GLOBAL_DEBUG_OFF defaults
+// to OFF (commented out) on macOS, so this branch is currently dormant
+// here, but it is live by default on Linux, where this exact "{}"-style
+// shape (there: a bare ';') broke PhotoCruise's CViewPhotoCruiseMain.cpp
+// font loader with "error: 'else' without a previous 'if'". Fixed on all
+// three platforms' DBG_Log.h for consistency, since GLOBAL_DEBUG_OFF is a
+// supported toggle on each.
+#define LOGD(...) do {} while(0)
+#define LOGD2(...) do {} while(0)
+#define LOGM(...) do {} while(0)
+#define LOGI(...) do {} while(0)
+#define LOGP(...) do {} while(0)
+#define LOGR(...) do {} while(0)
+#define LOGG(...) do {} while(0)
+#define LOGF(...) do {} while(0)
+#define LOGH(...) do {} while(0)
+#define LOGA(...) do {} while(0)
+#define LOGDATA(...) do {} while(0)
+#define LOGN(...) do {} while(0)
+#define LOGS(...) do {} while(0)
+#define LOGC(...) do {} while(0)
+#define LOGCS(...) do {} while(0)
+#define LOGCC(...) do {} while(0)
+#define LOGMEM(...) do {} while(0)
+#define LOGL(...) do {} while(0)
+#define LOGW(...) do {} while(0)
+#define LOGX(...) do {} while(0)
+#define LOGVM(...) do {} while(0)
+#define LOGVD(...) do {} while(0)
+#define LOGVV(...) do {} while(0)
 
-#define LOG_Atari_Main(...) {};
-#define LOG_Atari_Debug(...) {};
+#define LOG_Atari_Main(...) do {} while(0)
+#define LOG_Atari_Debug(...) do {} while(0)
 
-#define LOGTODO(...) {};
-#define LOGWarning(...) {};
-#define LOGError(...) {};
+#define LOGTODO(...) do {} while(0)
+#define LOGWarning(...) do {} while(0)
+#define LOGError(...) do {} while(0)
 
-#define LOGND(...) {};
-#define LOGNM(...) {};
-#define LOGNP(...) {};
-#define LOGNR(...) {};
-#define LOGNG(...) {};
-#define LOGNF(...) {};
-#define LOGNH(...) {};
-#define LOGNA(...) {};
-#define LOGNN(...) {};
-#define LOGNS(...) {};
-#define LOGNMEM(...) {};
-#define LOGNL(...) {};
-#define LOGNW(...) {};
-#define LOGNX(...) {};
-#define LOGNTODO(...) {};
-#define LOGNWarning(...) {};
-#define LOGNError(...) {};
+#define LOGND(...) do {} while(0)
+#define LOGNM(...) do {} while(0)
+#define LOGNP(...) do {} while(0)
+#define LOGNR(...) do {} while(0)
+#define LOGNG(...) do {} while(0)
+#define LOGNF(...) do {} while(0)
+#define LOGNH(...) do {} while(0)
+#define LOGNA(...) do {} while(0)
+#define LOGNN(...) do {} while(0)
+#define LOGNS(...) do {} while(0)
+#define LOGNMEM(...) do {} while(0)
+#define LOGNL(...) do {} while(0)
+#define LOGNW(...) do {} while(0)
+#define LOGNX(...) do {} while(0)
+#define LOGNTODO(...) do {} while(0)
+#define LOGNWarning(...) do {} while(0)
+#define LOGNError(...) do {} while(0)
 
 #endif
 // GLOBAL_DEBUG_OFF

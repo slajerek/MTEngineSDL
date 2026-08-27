@@ -112,6 +112,18 @@ NSString *MACOS_GetPathForResource(char *fileNameX)
 
 // workaround for SDL 2.0.10 bug: https://bugzilla.libsdl.org/show_bug.cgi?id=4856
 // based on: https://github.com/ocornut/imgui/commit/a843af4306e0d786fec5394bba07fd5067384661
+//
+// `screen` IS AN INDEX INTO [NSScreen screens]. It is NOT an SDL display ID.
+// Under SDL2 the two were interchangeable in practice because
+// SDL_GetWindowDisplayIndex also returned an index; under SDL3
+// SDL_GetDisplayForWindow returns an OPAQUE HANDLE that typically starts at 1,
+// so passing it here reads the wrong screen or falls off the end and silently
+// returns 1.0f. That happened, and it cost the shaders their Retina scale.
+//
+// Currently UNUSED: every caller moved to SDL_GetWindowPixelDensity, which is
+// the same quantity, follows the window across screens, and needs no index.
+// Kept because it is a legitimate platform primitive -- but if you reach for
+// it, feed it an NSScreen index or do not use it.
 float MACOS_GetBackingScaleFactor(int screen)
 {
 	if (screen >= [NSScreen screens].count)

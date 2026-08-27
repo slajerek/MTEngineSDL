@@ -8,9 +8,18 @@
  */
 
 #include "VID_ImageBinding.h"
+#include "CRenderBackend.h"
+#include "VID_Main.h"
 #include <time.h>
 #include <list>
+#include <vector>
 #include "SYS_Threading.h"
+
+#ifdef __APPLE__
+#include <OpenGL/gl3.h>
+#else
+#include <GL/gl3w.h>
+#endif
 
 //#define LOG_BINDING
 
@@ -32,6 +41,12 @@ public:
 };
 
 std::list<CBindingImageData *> imageBindings;
+
+// Raw GL texture ids queued for deferred deletion -- executed at the start of
+// VID_BindImages(), i.e. after the previous frame's ImGui draw data ran and
+// before the new frame's draw lists are recorded. See VID_PostDeleteGLTexture()
+// in the header for the full mid-frame-deletion hazard rationale.
+static std::vector<unsigned int> deferredTextureDeletes;
 
 CSlrMutex* bindingMutex = NULL;
 
@@ -125,6 +140,16 @@ void VID_PostImageBinding(CSlrImage *image, CSlrImage **dest, u8 mode)
 //	imageBindings.push_back(bindingData);
 //	UnlockBindingMutex();
 //}
+
+void VID_PostDeleteGLTexture(unsigned int textureId)
+{
+	if (textureId == 0)
+		return;
+
+	VID_LockImageBindingMutex();
+	deferredTextureDeletes.push_back(textureId);
+	VID_UnlockImageBindingMutex();
+}
 
 void VID_PostImageDealloc(CSlrImage *image)
 {
@@ -229,6 +254,24 @@ bool VID_BindImages()
 	bool ret = false;
 
 	VID_LockImageBindingMutex();
+
+	// Deferred GL texture deletions (VID_PostDeleteGLTexture): safe here --
+	// the previous frame's draw lists have been executed and this frame's
+	// have not been recorded yet, so no recorded ImDrawCmd can still
+	// reference these ids.
+	if (!deferredTextureDeletes.empty())
+	{
+		// GL-ONLY. This queue is fed exclusively by VID_PostDeleteGLTexture(),
+		// whose only caller is CGLRenderTarget -- so on a non-GL backend it is
+		// always empty and this never runs. Guarded anyway because glDeleteTextures
+		// under Metal is not a harmless no-op: the gl3w symbol is unresolved, so
+		// calling it jumps through NULL. Metal's own deferred release lives in
+		// CRenderBackendMetal::DeleteTexture.
+		CRenderBackend *backend = VID_GetRenderBackend();
+		if (backend != NULL && backend->SupportsOpenGLShaders())
+			glDeleteTextures((GLsizei)deferredTextureDeletes.size(), (const GLuint *)deferredTextureDeletes.data());
+		deferredTextureDeletes.clear();
+	}
 
 #ifdef LOG_BINDING
 	if (imageBindings.empty())

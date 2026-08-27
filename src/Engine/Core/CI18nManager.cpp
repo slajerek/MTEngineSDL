@@ -536,6 +536,211 @@ const SI18nLocale *CI18nManager::GetLocaleOrFallback(const string &tag) const
 	return nullptr;
 }
 
+// ============================================================================
+// Built-in CLDR plural rules
+// ============================================================================
+//
+// Ready-made rules for common languages so apps don't have to hand-roll the
+// CLDR tables. Operand names follow CLDR (see EI18nPluralRuleFn). Retrieve via
+// CI18nManager::GetBuiltinCardinalRule() / GetBuiltinOrdinalRule().
+
+// English cardinal: i=1 and v=0 -> one, else -> other
+static EI18nPluralCategory I18n_CardinalEN(double n, int i, int v, int w, int f, int t)
+{
+	if (i == 1 && v == 0)
+		return I18N_PLURAL_ONE;
+	return I18N_PLURAL_OTHER;
+}
+
+// English ordinal: n%10=1 & n%100!=11 -> one; n%10=2 & n%100!=12 -> two;
+//                  n%10=3 & n%100!=13 -> few; else -> other
+static EI18nPluralCategory I18n_OrdinalEN(double n, int i, int v, int w, int f, int t)
+{
+	int mod10  = i % 10;
+	int mod100 = i % 100;
+	if (mod10 == 1 && mod100 != 11)
+		return I18N_PLURAL_ONE;
+	if (mod10 == 2 && mod100 != 12)
+		return I18N_PLURAL_TWO;
+	if (mod10 == 3 && mod100 != 13)
+		return I18N_PLURAL_FEW;
+	return I18N_PLURAL_OTHER;
+}
+
+// Polish cardinal: i=1 & v=0 -> one;
+//   v=0 & i%10 in 2..4 & i%100 not in 12..14 -> few;
+//   v=0 & (i%10 in 0,1 or i%10 in 5..9 or i%100 in 12..14) -> many;
+//   else -> other
+static EI18nPluralCategory I18n_CardinalPL(double n, int i, int v, int w, int f, int t)
+{
+	if (i == 1 && v == 0)
+		return I18N_PLURAL_ONE;
+
+	if (v != 0)
+		return I18N_PLURAL_OTHER;
+
+	int mod10  = i % 10;
+	int mod100 = i % 100;
+
+	if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14))
+		return I18N_PLURAL_FEW;
+
+	if ((mod10 == 0 || mod10 == 1) ||
+		(mod10 >= 5 && mod10 <= 9) ||
+		(mod100 >= 12 && mod100 <= 14))
+		return I18N_PLURAL_MANY;
+
+	return I18N_PLURAL_OTHER;
+}
+
+// Italian cardinal: i=1 & v=0 -> one, else -> other
+static EI18nPluralCategory I18n_CardinalIT(double n, int i, int v, int w, int f, int t)
+{
+	if (i == 1 && v == 0)
+		return I18N_PLURAL_ONE;
+	return I18N_PLURAL_OTHER;
+}
+
+// German cardinal: i=1 & v=0 -> one, else -> other
+static EI18nPluralCategory I18n_CardinalDE(double n, int i, int v, int w, int f, int t)
+{
+	if (i == 1 && v == 0)
+		return I18N_PLURAL_ONE;
+	return I18N_PLURAL_OTHER;
+}
+
+// Italian ordinal: 8, 11, 80, 800 -> many, else -> other
+static EI18nPluralCategory I18n_OrdinalIT(double n, int i, int v, int w, int f, int t)
+{
+	if (i == 11 || i == 8 || i == 80 || i == 800)
+		return I18N_PLURAL_MANY;
+	return I18N_PLURAL_OTHER;
+}
+
+// CLDR gives French, Spanish and Portuguese a "many" category for whole
+// multiples of a million (1 000 000, 2 000 000, ...): "un million de photos".
+// The full CLDR condition also involves the compact-decimal operands c/e, which
+// EI18nPluralRuleFn does not carry — see the note in CI18nManager.h. For plain
+// (non-compact) numbers, which is all this engine formats, c/e are 0 and the
+// condition reduces to this.
+static bool I18n_IsWholeMillionMultiple(int i, int v)
+{
+	return v == 0 && i != 0 && (i % 1000000) == 0;
+}
+
+// French cardinal: i=0,1 -> one; whole non-zero million multiples -> many;
+//                  else -> other. Note 0 is "one" in French, unlike Spanish.
+static EI18nPluralCategory I18n_CardinalFR(double n, int i, int v, int w, int f, int t)
+{
+	if (i == 0 || i == 1)
+		return I18N_PLURAL_ONE;
+	if (I18n_IsWholeMillionMultiple(i, v))
+		return I18N_PLURAL_MANY;
+	return I18N_PLURAL_OTHER;
+}
+
+// French ordinal: n=1 -> one, else -> other ("1er" vs "2e")
+static EI18nPluralCategory I18n_OrdinalFR(double n, int i, int v, int w, int f, int t)
+{
+	if (fabs(n - 1.0) < 0.0000001)
+		return I18N_PLURAL_ONE;
+	return I18N_PLURAL_OTHER;
+}
+
+// Spanish cardinal: n=1 -> one; whole non-zero million multiples -> many;
+//                   else -> other
+static EI18nPluralCategory I18n_CardinalES(double n, int i, int v, int w, int f, int t)
+{
+	if (fabs(n - 1.0) < 0.0000001)
+		return I18N_PLURAL_ONE;
+	if (I18n_IsWholeMillionMultiple(i, v))
+		return I18N_PLURAL_MANY;
+	return I18N_PLURAL_OTHER;
+}
+
+// Brazilian Portuguese cardinal: i=0,1 -> one; whole non-zero million multiples
+//                                -> many; else -> other
+static EI18nPluralCategory I18n_CardinalPTBR(double n, int i, int v, int w, int f, int t)
+{
+	if (i == 0 || i == 1)
+		return I18N_PLURAL_ONE;
+	if (I18n_IsWholeMillionMultiple(i, v))
+		return I18N_PLURAL_MANY;
+	return I18N_PLURAL_OTHER;
+}
+
+// Dutch cardinal: i=1 & v=0 -> one, else -> other
+static EI18nPluralCategory I18n_CardinalNL(double n, int i, int v, int w, int f, int t)
+{
+	if (i == 1 && v == 0)
+		return I18N_PLURAL_ONE;
+	return I18N_PLURAL_OTHER;
+}
+
+// Czech cardinal: i=1 & v=0 -> one; i=2..4 & v=0 -> few; v!=0 -> many;
+//                 else -> other
+static EI18nPluralCategory I18n_CardinalCS(double n, int i, int v, int w, int f, int t)
+{
+	if (i == 1 && v == 0)
+		return I18N_PLURAL_ONE;
+	if (i >= 2 && i <= 4 && v == 0)
+		return I18N_PLURAL_FEW;
+	if (v != 0)
+		return I18N_PLURAL_MANY;
+	return I18N_PLURAL_OTHER;
+}
+
+// Turkish cardinal: n=1 -> one, else -> other
+static EI18nPluralCategory I18n_CardinalTR(double n, int i, int v, int w, int f, int t)
+{
+	if (fabs(n - 1.0) < 0.0000001)
+		return I18N_PLURAL_ONE;
+	return I18N_PLURAL_OTHER;
+}
+
+EI18nPluralRuleFn CI18nManager::GetBuiltinCardinalRule(const string &lang)
+{
+	const string normalized = NormalizeLocaleTag(lang);
+
+	// Portuguese is matched before the primary-subtag truncation below: European
+	// Portuguese has a different CLDR rule, so pt-PT must not silently inherit the
+	// Brazilian one. Bare "pt" follows the Brazilian rule, which is the CLDR root
+	// for the language.
+	if (normalized == "pt" || normalized == "pt-BR") return &I18n_CardinalPTBR;
+
+	// Use the primary language subtag ("en-US" -> "en").
+	string base = normalized;
+	size_t dash = base.find('-');
+	if (dash != string::npos)
+		base = base.substr(0, dash);
+
+	if (base == "en") return &I18n_CardinalEN;
+	if (base == "pl") return &I18n_CardinalPL;
+	if (base == "it") return &I18n_CardinalIT;
+	if (base == "de") return &I18n_CardinalDE;
+	if (base == "fr") return &I18n_CardinalFR;
+	if (base == "es") return &I18n_CardinalES;
+	if (base == "nl") return &I18n_CardinalNL;
+	if (base == "cs") return &I18n_CardinalCS;
+	if (base == "tr") return &I18n_CardinalTR;
+	return nullptr;
+}
+
+EI18nPluralRuleFn CI18nManager::GetBuiltinOrdinalRule(const string &lang)
+{
+	string base = NormalizeLocaleTag(lang);
+	size_t dash = base.find('-');
+	if (dash != string::npos)
+		base = base.substr(0, dash);
+
+	if (base == "en") return &I18n_OrdinalEN;
+	if (base == "it") return &I18n_OrdinalIT;
+	if (base == "fr") return &I18n_OrdinalFR;
+	// Polish, German, Spanish, Portuguese, Dutch, Czech and Turkish ordinals are
+	// "other" for all counts -> no dedicated rule.
+	return nullptr;
+}
+
 EI18nPluralCategory CI18nManager::GetPluralCategory(double n) const
 {
 	return GetPluralCategory(n, activeLocale);
@@ -663,18 +868,18 @@ string CI18nManager::FormatNumber(int n, const string &localeTag) const
 // ============================================================================
 
 enum EI18nNodeType {
-	NODE_TEXT,          // literal text
-	NODE_ARGUMENT,      // simple {var} substitution
-	NODE_PLURAL,        // {var, plural, ...}
-	NODE_SELECT,        // {var, select, ...}
-	NODE_SELECTORDINAL, // {var, selectordinal, ...}
-	NODE_HASH           // # (number placeholder in plural/selectordinal)
+	I18N_NODE_TEXT,          // literal text
+	I18N_NODE_ARGUMENT,      // simple {var} substitution
+	I18N_NODE_PLURAL,        // {var, plural, ...}
+	I18N_NODE_SELECT,        // {var, select, ...}
+	I18N_NODE_SELECTORDINAL, // {var, selectordinal, ...}
+	I18N_NODE_HASH           // # (number placeholder in plural/selectordinal)
 };
 
 struct SI18nPatternNode {
 	EI18nNodeType type;
-	string text;        // for NODE_TEXT
-	string argName;     // for NODE_ARGUMENT, NODE_PLURAL, NODE_SELECT, NODE_SELECTORDINAL
+	string text;        // for I18N_NODE_TEXT
+	string argName;     // for I18N_NODE_ARGUMENT, I18N_NODE_PLURAL, I18N_NODE_SELECT, I18N_NODE_SELECTORDINAL
 	int offset = 0;     // for plural offset:N
 
 	// Branches for plural/select: keyword -> sub-pattern
@@ -739,7 +944,7 @@ bool CI18nPatternParser::ParseNodes(vector<unique_ptr<SI18nPatternNode>> &nodes,
 		if (!textAccum.empty())
 		{
 			auto node = make_unique<SI18nPatternNode>();
-			node->type = NODE_TEXT;
+			node->type = I18N_NODE_TEXT;
 			node->text = textAccum;
 			nodes.push_back(std::move(node));
 			textAccum.clear();
@@ -824,7 +1029,7 @@ bool CI18nPatternParser::ParseNodes(vector<unique_ptr<SI18nPatternNode>> &nodes,
 		{
 			flushText();
 			auto node = make_unique<SI18nPatternNode>();
-			node->type = NODE_HASH;
+			node->type = I18N_NODE_HASH;
 			nodes.push_back(std::move(node));
 			pos++;
 			continue;
@@ -865,7 +1070,7 @@ bool CI18nPatternParser::ParsePlaceholder(vector<unique_ptr<SI18nPatternNode>> &
 		// Simple substitution: {var}
 		pos++;  // consume '}'
 		auto node = make_unique<SI18nPatternNode>();
-		node->type = NODE_ARGUMENT;
+		node->type = I18N_NODE_ARGUMENT;
 		node->argName = argName;
 		nodes.push_back(std::move(node));
 		return true;
@@ -888,15 +1093,15 @@ bool CI18nPatternParser::ParsePlaceholder(vector<unique_ptr<SI18nPatternNode>> &
 
 		if (formatType == "plural")
 		{
-			node->type = NODE_PLURAL;
+			node->type = I18N_NODE_PLURAL;
 		}
 		else if (formatType == "select")
 		{
-			node->type = NODE_SELECT;
+			node->type = I18N_NODE_SELECT;
 		}
 		else if (formatType == "selectordinal")
 		{
-			node->type = NODE_SELECTORDINAL;
+			node->type = I18N_NODE_SELECTORDINAL;
 		}
 		else
 		{
@@ -926,7 +1131,7 @@ bool CI18nPatternParser::ParsePlaceholder(vector<unique_ptr<SI18nPatternNode>> &
 bool CI18nPatternParser::ParseBranches(SI18nPatternNode *node)
 {
 	// Check for offset:N (plural only)
-	if (node->type == NODE_PLURAL || node->type == NODE_SELECTORDINAL)
+	if (node->type == I18N_NODE_PLURAL || node->type == I18N_NODE_SELECTORDINAL)
 	{
 		size_t savedPos = pos;
 		string maybeOffset = ReadIdentifier();
@@ -1036,7 +1241,7 @@ const SI18nCompiledPattern *CI18nManager::GetCompiledPattern(const string &patte
 		// Store a single text node with the raw pattern as fallback
 		compiled->nodes.clear();
 		auto node = make_unique<SI18nPatternNode>();
-		node->type = NODE_TEXT;
+		node->type = I18N_NODE_TEXT;
 		node->text = pattern;
 		compiled->nodes.push_back(std::move(node));
 	}
@@ -1070,11 +1275,11 @@ static void EvaluateNodes(const vector<unique_ptr<SI18nPatternNode>> &nodes,
 
 		switch (node.type)
 		{
-			case NODE_TEXT:
+			case I18N_NODE_TEXT:
 				out += node.text;
 				break;
 
-			case NODE_HASH:
+			case I18N_NODE_HASH:
 			{
 				// # is replaced with the plural argument value minus offset, locale-formatted
 				if (pluralArg)
@@ -1101,7 +1306,7 @@ static void EvaluateNodes(const vector<unique_ptr<SI18nPatternNode>> &nodes,
 				break;
 			}
 
-			case NODE_ARGUMENT:
+			case I18N_NODE_ARGUMENT:
 			{
 				auto it = args.find(node.argName);
 				if (it != args.end())
@@ -1118,8 +1323,8 @@ static void EvaluateNodes(const vector<unique_ptr<SI18nPatternNode>> &nodes,
 				break;
 			}
 
-			case NODE_PLURAL:
-			case NODE_SELECTORDINAL:
+			case I18N_NODE_PLURAL:
+			case I18N_NODE_SELECTORDINAL:
 			{
 				auto argIt = args.find(node.argName);
 				if (argIt == args.end())
@@ -1157,7 +1362,7 @@ static void EvaluateNodes(const vector<unique_ptr<SI18nPatternNode>> &nodes,
 					EI18nPluralCategory cat = I18N_PLURAL_OTHER;
 					if (locale)
 					{
-						auto rule = (node.type == NODE_PLURAL) ? locale->cardinalRule : locale->ordinalRule;
+						auto rule = (node.type == I18N_NODE_PLURAL) ? locale->cardinalRule : locale->ordinalRule;
 						if (rule)
 						{
 							// Use offset values for category determination
@@ -1203,7 +1408,7 @@ static void EvaluateNodes(const vector<unique_ptr<SI18nPatternNode>> &nodes,
 				break;
 			}
 
-			case NODE_SELECT:
+			case I18N_NODE_SELECT:
 			{
 				auto argIt = args.find(node.argName);
 				string selectValue;

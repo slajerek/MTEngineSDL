@@ -1,4 +1,5 @@
 #include "JPEGReader.h"
+#include "SYS_FileUtf8.h"
 #include <stdexcept>
 #include <cassert>
 #include <limits>
@@ -51,7 +52,8 @@ void JPEGReader::header(const std::string& path) {
     warningMsg.clear();
     
     // Specify the source of the compressed data (eg, a file)
-    if ((file = fopen(path.c_str(), "rb")) == NULL)
+    // SYS_FopenUtf8, not fopen: `path` is UTF-8 (see SYS_FileUtf8.h).
+    if ((file = SYS_FopenUtf8(path.c_str(), "rb")) == NULL)
         throw std::runtime_error("Cannot open " + path);
     
     jpeg_stdio_src(&cinfo, file);

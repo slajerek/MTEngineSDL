@@ -19,6 +19,9 @@
     <Filter Include="Source Files\src\Embedded">
       <UniqueIdentifier>{01cacc41-3719-4504-9998-60f2b8f4b019}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\src\Embedded\Fonts">
+      <UniqueIdentifier>{3b1e7f52-9c04-4a8d-b6d1-7e2a0c5f4411}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Source Files\src\Engine">
       <UniqueIdentifier>{a43dd8ee-f8f4-45c1-acf8-db598f27509a}</UniqueIdentifier>
     </Filter>
@@ -52,6 +55,9 @@
     <Filter Include="Source Files\src\Engine\Libs\imgui">
       <UniqueIdentifier>{57eab370-9115-495f-9e8b-aac554e988e6}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\src\Engine\Libs\imgui_test_engine">
+      <UniqueIdentifier>{e39a2fcd-fd58-4f85-8b44-7f8d87d0c0d9}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Source Files\src\Engine\Libs\jpeg">
       <UniqueIdentifier>{c7b55a29-9046-4cfc-9919-b41656e4231c}</UniqueIdentifier>
     </Filter>
@@ -63,6 +69,9 @@
     </Filter>
     <Filter Include="Source Files\src\Engine\Libs\lodepng">
       <UniqueIdentifier>{3a607960-034c-4cae-a850-c56b08a4c4ab}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Libs\nestegg">
+      <UniqueIdentifier>{b0000001-0001-0001-0001-000000000001}</UniqueIdentifier>
     </Filter>
     <Filter Include="Source Files\src\Engine\Libs\mtrand">
       <UniqueIdentifier>{bdaa3a08-48f7-42f9-8881-b3ba604f4000}</UniqueIdentifier>
@@ -142,6 +151,12 @@
     <Filter Include="Source Files\src\Engine\GUI\Layout">
       <UniqueIdentifier>{eee14c14-44a6-40a3-9205-f49850274837}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\src\Engine\Libs\exif">
+      <UniqueIdentifier>{a0e1f000-0000-0000-0000-0000000000e7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Libs\icc">
+      <UniqueIdentifier>{7e178c76-29b4-43bf-8a56-0b3f83e9c397}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Source Files\src\Engine\Libs\hjson">
       <UniqueIdentifier>{5dacc4f1-46ba-40a6-b061-740f27e5675e}</UniqueIdentifier>
     </Filter>
@@ -199,8 +214,32 @@
     <Filter Include="Source Files\src\Engine\Tools">
       <UniqueIdentifier>{fe172705-1946-43d2-978f-8f869bd776f9}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\src.Windows\Render">
+      <UniqueIdentifier>{5e2f9c30-4a86-4d71-b0c9-1f7ae5348b62}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src.Windows\Render\Generated">
+      <UniqueIdentifier>{8f41d6b2-1c07-4a95-b3e8-5d2917fc604a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src.Windows\Render\Shaders">
+      <UniqueIdentifier>{3ac95e18-72d4-4b60-9f21-c8e0b7a41d55}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Video">
+      <UniqueIdentifier>{6d3f2a51-0b7c-4e18-9a44-2f8c51d70e93}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Source Files\src\Engine\Tests">
       <UniqueIdentifier>{a1b2c3d4-e5f6-7890-abcd-ef1234567890}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Theme">
+      <UniqueIdentifier>{a7e1c0d2-7f31-4c88-9b02-3d5e6f7a8b01}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\src\Engine\Theme">
+      <UniqueIdentifier>{a7e1c0d2-7f31-4c88-9b02-3d5e6f7a8b02}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Color">
+      <UniqueIdentifier>{f6a7b8c9-d0e1-2345-f012-456789012345}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Raw">
+      <UniqueIdentifier>{a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d}</UniqueIdentifier>
     </Filter>
     <Filter Include="Source Files\src\Engine\Tools\NetGame">
       <UniqueIdentifier>{b2c3d4e5-f6a7-8901-bcde-f12345678901}</UniqueIdentifier>
@@ -210,6 +249,12 @@
     </Filter>
     <Filter Include="Source Files\src\Engine\Sci\Llama">
       <UniqueIdentifier>{d4e5f6a7-b8c9-0123-def0-234567890123}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\Crash">
+      <UniqueIdentifier>{e5f6a7b8-c9d0-1234-ef01-345678901234}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\System">
+      <UniqueIdentifier>{2b95c714-8ae6-4f03-b1d8-70c6ea25419b}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -561,6 +606,21 @@
     <ClCompile Include="..\..\..\src\Engine\Libs\libpng\png.c">
       <Filter>Source Files\src\Engine\Libs\libpng</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\libpng\arm\arm_init.c">
+      <Filter>Source Files\src\Engine\Libs\libpng</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\libpng\arm\filter_neon_intrinsics.c">
+      <Filter>Source Files\src\Engine\Libs\libpng</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\libpng\arm\palette_neon_intrinsics.c">
+      <Filter>Source Files\src\Engine\Libs\libpng</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\libpng\intel\intel_init.c">
+      <Filter>Source Files\src\Engine\Libs\libpng</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\libpng\intel\filter_sse2_intrinsics.c">
+      <Filter>Source Files\src\Engine\Libs\libpng</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\Libs\libpng\pngerror.c">
       <Filter>Source Files\src\Engine\Libs\libpng</Filter>
     </ClCompile>
@@ -605,6 +665,9 @@
     </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\Libs\lodepng\lodepng.cpp">
       <Filter>Source Files\src\Engine\Libs\lodepng</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\nestegg\nestegg.c">
+      <Filter>Source Files\src\Engine\Libs\nestegg</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\Libs\mtrand\MTH_MTRand.cpp">
       <Filter>Source Files\src\Engine\Libs\mtrand</Filter>
@@ -670,6 +733,9 @@
       <Filter>Source Files\src.Windows</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\GUI\CGuiMain.cpp">
+      <Filter>Source Files\src\Engine\GUI</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\CMTNativeMenuBarImGui.cpp">
       <Filter>Source Files\src\Engine\GUI</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\GUI\COneTouchData.cpp">
@@ -807,6 +873,9 @@
     <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewTableWithFilterAndButtons.cpp">
       <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewSettings.cpp">
+      <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\GUI\Helpers\GUI_Debug.cpp">
       <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
     </ClCompile>
@@ -921,6 +990,27 @@
     <ClCompile Include="..\..\..\src\Engine\Core\CImageData.cpp">
       <Filter>Source Files\src\Engine\Core</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\CImageDataTIFF.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\CImageDataWebP.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\CImageDataHEIF.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\CImageDataHEIF_libheif.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\CImageDataAVIF.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\CImageDataRAW.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\CKTX2Loader.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\Core\CSlrAnimation.cpp">
       <Filter>Source Files\src\Engine\Core</Filter>
     </ClCompile>
@@ -984,7 +1074,7 @@
     <ClCompile Include="..\..\..\src\Engine\Sci\Llama\LLamaBackend_LlamaCpp.cpp">
       <Filter>Source Files\src\Engine\Sci\Llama</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\Engine\Sci\Llama\LLamaBackend_WinCudaPlugin.cpp">
+    <ClCompile Include="..\src.Windows\Llama\LLamaBackend_WinCudaPlugin.cpp">
       <Filter>Source Files\src\Engine\Sci\Llama</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\Core\CSlrResourceBase.cpp">
@@ -1000,6 +1090,9 @@
       <Filter>Source Files\src\Engine\Core</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\Core\MTH_FastMath.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\MTH_Geodesy.cpp">
       <Filter>Source Files\src\Engine\Core</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\Core\MTH_FixedPoint.cpp">
@@ -1026,6 +1119,12 @@
     <ClCompile Include="..\..\..\src\Engine\Core\SYS_Main.cpp">
       <Filter>Source Files\src\Engine\Core</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\SYS_PathValidate.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\SYS_FileBirthTime.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\Core\SYS_PauseResume.cpp">
       <Filter>Source Files\src\Engine\Core</Filter>
     </ClCompile>
@@ -1041,6 +1140,9 @@
     <ClCompile Include="..\src.Windows\SYS_Platform.cpp">
       <Filter>Source Files\src.Windows</Filter>
     </ClCompile>
+    <ClCompile Include="..\src.Windows\CMTNativeMenuBarWin32.cpp">
+      <Filter>Source Files\src.Windows</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\Libs\implot\implot.cpp">
       <Filter>Source Files\src\Engine\Libs\implot</Filter>
     </ClCompile>
@@ -1054,6 +1156,9 @@
       <Filter>Source Files\src\Engine\Libs\imgui</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\Libs\imgui\imgui_draw.cpp">
+      <Filter>Source Files\src\Engine\Libs\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\imgui\imgui_impl_dx11.cpp">
       <Filter>Source Files\src\Engine\Libs\imgui</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\Libs\imgui\imgui_impl_opengl3.cpp">
@@ -1085,6 +1190,15 @@
     </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CColorsTheme.cpp">
       <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\exif\CExifReader.cpp">
+      <Filter>Source Files\src\Engine\Libs\exif</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\exif\CExifBuilder.cpp">
+      <Filter>Source Files\src\Engine\Libs\exif</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\icc\ICC_SRGBProfile.cpp">
+      <Filter>Source Files\src\Engine\Libs\icc</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\Libs\hjson\hjson_decode.cpp">
       <Filter>Source Files\src\Engine\Libs\hjson</Filter>
@@ -1137,6 +1251,116 @@
     <ClCompile Include="..\..\..\src\Engine\Core\Render\CRenderBackend.cpp">
       <Filter>Source Files\src\Engine\Core\Render</Filter>
     </ClCompile>
+    <ClCompile Include="..\src.Windows\Render\CVideoYUVShaderD3D11.cpp">
+      <Filter>Source Files\src.Windows\Render</Filter>
+    </ClCompile>
+    <ClInclude Include="..\src.Windows\Render\CVideoYUVShaderD3D11.h">
+      <Filter>Source Files\src.Windows\Render</Filter>
+    </ClInclude>
+    <ClCompile Include="..\src.Windows\Render\CRenderShaderFlatColorD3D11.cpp">
+      <Filter>Source Files\src.Windows\Render</Filter>
+    </ClCompile>
+    <ClInclude Include="..\src.Windows\Render\CRenderShaderFlatColorD3D11.h">
+      <Filter>Source Files\src.Windows\Render</Filter>
+    </ClInclude>
+    <ClCompile Include="..\src.Windows\Render\CRenderBackendD3D11.cpp">
+      <Filter>Source Files\src.Windows\Render</Filter>
+    </ClCompile>
+    <ClInclude Include="..\src.Windows\Render\CRenderBackendD3D11.h">
+      <Filter>Source Files\src.Windows\Render</Filter>
+    </ClInclude>
+    <ClCompile Include="..\src.Windows\SYS_WindowsHdr.cpp">
+      <Filter>Source Files\src.Windows</Filter>
+    </ClCompile>
+    <ClInclude Include="..\src.Windows\Render\Generated\ResolveVSBytecode.h">
+      <Filter>Source Files\src.Windows\Render\Generated</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src.Windows\Render\Generated\ResolvePSBytecode.h">
+      <Filter>Source Files\src.Windows\Render\Generated</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src.Windows\Render\Generated\FlatColorPSBytecode.h">
+      <Filter>Source Files\src.Windows\Render\Generated</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src.Windows\Render\Generated\VideoYuvVSBytecode.h">
+      <Filter>Source Files\src.Windows\Render\Generated</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src.Windows\Render\Generated\VideoYuvPSBytecode.h">
+      <Filter>Source Files\src.Windows\Render\Generated</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\src.Windows\Render\Shaders\Resolve.hlsl">
+      <Filter>Source Files\src.Windows\Render\Shaders</Filter>
+    </None>
+    <None Include="..\src.Windows\Render\Shaders\FlatColor.hlsl">
+      <Filter>Source Files\src.Windows\Render\Shaders</Filter>
+    </None>
+    <None Include="..\src.Windows\Render\Shaders\VideoYUV.hlsl">
+      <Filter>Source Files\src.Windows\Render\Shaders</Filter>
+    </None>
+    <ClInclude Include="..\..\..\src\Engine\Core\MT_SrgbCurve.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestSurfaceEncoding.cpp">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClCompile>
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestSurfaceEncoding.h">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\Render\MT_SurfaceEncoding.h">
+      <Filter>Source Files\src\Engine\Core\Render</Filter>
+    </ClInclude>
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestScissorClamp.cpp">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClCompile>
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestScissorClamp.h">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClInclude>
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestResidentFunnel.cpp">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClCompile>
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestResidentFunnel.h">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\Render\ERenderTextureFormat.h">
+      <Filter>Source Files\src\Engine\Core\Render</Filter>
+    </ClInclude>
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestImageDataFloat.cpp">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClCompile>
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestImageDataFloat.h">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\Render\CMaskedTileBoundsQueue.h">
+      <Filter>Source Files\src\Engine\Core\Render</Filter>
+    </ClInclude>
+    <ClCompile Include="..\..\..\src\Engine\Tests\MT_ShaderProbe.cpp">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClCompile>
+    <ClInclude Include="..\..\..\src\Engine\Tests\MT_ShaderProbe.h">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClInclude>
+    <ClCompile Include="..\..\..\src\Engine\Tests\MT_CaptureHelpers.cpp">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClCompile>
+    <ClInclude Include="..\..\..\src\Engine\Tests\MT_CaptureHelpers.h">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClInclude>
+    <ClCompile Include="..\..\..\src\Engine\Core\Render\CRenderShaderFlatColorOpenGL4.cpp">
+      <Filter>Source Files\src\Engine\Core\Render</Filter>
+    </ClCompile>
+    <ClInclude Include="..\..\..\src\Engine\Core\Render\CRenderShaderFlatColorOpenGL4.h">
+      <Filter>Source Files\src\Engine\Core\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Video\CVideoYUVConverter.h">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\Render\CMaskedTileShader.h">
+      <Filter>Source Files\src\Engine\Core\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\Render\CRenderTarget.h">
+      <Filter>Source Files\src\Engine\Core\Render</Filter>
+    </ClInclude>
     <ClCompile Include="..\..\..\src\Engine\Core\Render\VID_Blits.cpp">
       <Filter>Source Files\src\Engine\Core\Render</Filter>
     </ClCompile>
@@ -1197,7 +1421,7 @@
     <ClCompile Include="..\..\..\src\Engine\Libs\implot\implot_items.cpp">
       <Filter>Source Files\src\Engine\Libs\imgui</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\Engine\Libs\imgui\imgui_impl_sdl2.cpp">
+    <ClCompile Include="..\..\..\src\Engine\Libs\imgui\imgui_impl_sdl3.cpp">
       <Filter>Source Files\src\Engine\Libs</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\Embedded\RES_Embedded.cpp">
@@ -1305,6 +1529,12 @@
     <ClCompile Include="..\..\..\src\Engine\Libs\basis_universal\zstd\zstd.c">
       <Filter>Source Files\src\Engine\Libs\basis_universal\zstd</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Crash\MT_CrashReporter.cpp">
+      <Filter>Source Files\src\Engine\Crash</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src.Windows\Crash\MT_CrashReporter_Windows.cpp">
+      <Filter>Source Files\src\Engine\Crash</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\Tools\CInterruptibleSleep.cpp">
       <Filter>Source Files\src\Engine\Tools</Filter>
     </ClCompile>
@@ -1317,10 +1547,103 @@
     <ClCompile Include="..\..\..\src\Engine\Tests\CImGuiTestEngine.cpp">
       <Filter>Source Files\src\Engine\Tests</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\imgui_test_engine\imgui_capture_tool.cpp">
+      <Filter>Source Files\src\Engine\Libs\imgui_test_engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\imgui_test_engine\imgui_te_context.cpp">
+      <Filter>Source Files\src\Engine\Libs\imgui_test_engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\imgui_test_engine\imgui_te_coroutine.cpp">
+      <Filter>Source Files\src\Engine\Libs\imgui_test_engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\imgui_test_engine\imgui_te_engine.cpp">
+      <Filter>Source Files\src\Engine\Libs\imgui_test_engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\imgui_test_engine\imgui_te_exporters.cpp">
+      <Filter>Source Files\src\Engine\Libs\imgui_test_engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\imgui_test_engine\imgui_te_perftool.cpp">
+      <Filter>Source Files\src\Engine\Libs\imgui_test_engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\imgui_test_engine\imgui_te_ui.cpp">
+      <Filter>Source Files\src\Engine\Libs\imgui_test_engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\imgui_test_engine\imgui_te_utils.cpp">
+      <Filter>Source Files\src\Engine\Libs\imgui_test_engine</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\Tests\CTest.cpp">
       <Filter>Source Files\src\Engine\Tests</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\Tests\CTestI18nEngine.cpp">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestExifEngine.cpp">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestExifMetadataReach.cpp">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tests\RawTestFixtures.cpp">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestRawPreview.cpp">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestThemeMath.cpp">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestVideoTransfer.cpp">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestThemeRamp.cpp">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestThemeApply.cpp">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\CImageDataPlatformDecode.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Core\CImageDataWIC_Windows.cpp">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Theme\MTH_OkLab.cpp">
+      <Filter>Source Files\src\Engine\Theme</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Theme\CMTThemeRamp.cpp">
+      <Filter>Source Files\src\Engine\Theme</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Theme\CMTTheme.cpp">
+      <Filter>Source Files\src\Engine\Theme</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Theme\MT_Theme.cpp">
+      <Filter>Source Files\src\Engine\Theme</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Theme\CMTThemeRegistry.cpp">
+      <Filter>Source Files\src\Engine\Theme</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestRawDecode.cpp">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tests\PC_DcpFixtureWriter.cpp">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestDcpParse.cpp">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Color\CDcpProfile.cpp">
+      <Filter>Source Files\src\Engine\Color</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Color\CDcpTemperature.cpp">
+      <Filter>Source Files\src\Engine\Color</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Color\CDcpApply.cpp">
+      <Filter>Source Files\src\Engine\Color</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestDcpApply.cpp">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestJpegMarkers.cpp">
       <Filter>Source Files\src\Engine\Tests</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\Tests\CTestRunner.cpp">
@@ -1328,6 +1651,33 @@
     </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\Tests\CTestSuite.cpp">
       <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestIccProfileCodec.cpp">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestIccExtract.cpp">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestDisplayProfile.cpp">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestCms.cpp">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Color\CCmsEngineFactory.cpp">
+      <Filter>Source Files\src\Engine\Color</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Raw\CRawDecoder.cpp">
+      <Filter>Source Files\src\Engine\Raw</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Color\CColorManager.cpp">
+      <Filter>Source Files\src\Engine\Color</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Color\CCmsWindows.cpp">
+      <Filter>Source Files\src\Engine\Color</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Color\CCmsLittleCMS.cpp">
+      <Filter>Source Files\src\Engine\Color</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\Tools\CProcessSpawner.cpp">
       <Filter>Source Files\src\Engine\Tools</Filter>
@@ -1421,6 +1771,54 @@
     </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\Tools\NetGame\CSnapshotStorage.cpp">
       <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Video\CVideoPlayer.cpp">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Video\CVideoSourceWebMVpx.cpp">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Video\CVideoSourceFFmpeg.cpp">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Video\CVideoDecoderHEVCVT.cpp">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Video\CVideoDecoderHEVCMF.cpp">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Video\CVideoDecoderWMVMF.cpp">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Video\CAudioDecoderWMAMF.cpp">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Video\CAudioDecoderAACApple.cpp">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Video\CAudioDecoderAACMF.cpp">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Video\AacAscParser.cpp">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Video\CVideoFrameExtractor.cpp">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Video\VideoFrameTransform.cpp">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Video\CVideoYUVShader.cpp">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Video\CVideoAudioChannel.cpp">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Video\CGLRenderTarget.cpp">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Video\CSlrImageExternalTexture.cpp">
+      <Filter>Source Files\src\Engine\Video</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1727,6 +2125,12 @@
     <ClInclude Include="..\..\..\src\Engine\GUI\CGuiMain.h">
       <Filter>Source Files\src\Engine\GUI</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\CMTNativeMenuBar.h">
+      <Filter>Source Files\src\Engine\GUI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\CMTNativeMenuBarImGui.h">
+      <Filter>Source Files\src\Engine\GUI</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\GUI\COneTouchData.h">
       <Filter>Source Files\src\Engine\GUI</Filter>
     </ClInclude>
@@ -1866,6 +2270,9 @@
       <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewTableWithFilterAndButtons.h">
+      <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\CGuiViewSettings.h">
       <Filter>Source Files\src\Engine\GUI\Helpers</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\GUI\Helpers\GUI_Debug.h">
@@ -2069,6 +2476,15 @@
     <ClInclude Include="..\..\..\src\Engine\Core\CImageData.h">
       <Filter>Source Files\src\Engine\Core</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\CKTX2Loader.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\bcdec.h">
+      <Filter>Source Files\src\Engine\Libs</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\etcdec.h">
+      <Filter>Source Files\src\Engine\Libs</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\Core\ConstantsAndMacros.h">
       <Filter>Source Files\src\Engine\Core</Filter>
     </ClInclude>
@@ -2135,7 +2551,7 @@
     <ClInclude Include="..\..\..\src\Engine\Sci\Llama\LLamaBackend_LlamaCpp.h">
       <Filter>Source Files\src\Engine\Sci\Llama</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\Engine\Sci\Llama\LLamaBackend_WinCudaPlugin.h">
+    <ClInclude Include="..\src.Windows\Llama\LLamaBackend_WinCudaPlugin.h">
       <Filter>Source Files\src\Engine\Sci\Llama</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\Core\CSlrResourceBase.h">
@@ -2154,6 +2570,9 @@
       <Filter>Source Files\src\Engine\Core</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\Core\MTH_FastMath.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\MTH_Geodesy.h">
       <Filter>Source Files\src\Engine\Core</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\Core\MTH_FastMathSinTab.h">
@@ -2189,11 +2608,29 @@
     <ClInclude Include="..\..\..\src\Engine\Core\SYS_Funct.h">
       <Filter>Source Files\src\Engine\Core</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\SYS_FileUtf8.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src.Windows\SYS_WindowsPathUtils.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\SYS_WindowsPathUtils.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\Core\SYS_KeyCodes.h">
       <Filter>Source Files\src\Engine\Core</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\Core\SYS_Main.h">
       <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\SYS_PathValidate.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\SYS_FileBirthTime.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\System\SYS_SecurityScopedAccess.h">
+      <Filter>Source Files\src\Engine\System</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\Core\SYS_PauseResume.h">
       <Filter>Source Files\src\Engine\Core</Filter>
@@ -2213,6 +2650,9 @@
     <ClInclude Include="..\src.Windows\SYS_Platform.h">
       <Filter>Source Files\src.Windows</Filter>
     </ClInclude>
+    <ClInclude Include="..\src.Windows\CMTNativeMenuBarWin32.h">
+      <Filter>Source Files\src.Windows</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\Libs\implot\implot.h">
       <Filter>Source Files\src\Engine\Libs\implot</Filter>
     </ClInclude>
@@ -2220,6 +2660,9 @@
       <Filter>Source Files\src\Engine\Libs\imgui</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\Libs\imgui\imgui.h">
+      <Filter>Source Files\src\Engine\Libs\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\imgui\imgui_impl_dx11.h">
       <Filter>Source Files\src\Engine\Libs\imgui</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\Libs\imgui\imgui_impl_opengl3.h">
@@ -2257,6 +2700,15 @@
     </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CColorsTheme.h">
       <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\exif\CExifReader.h">
+      <Filter>Source Files\src\Engine\Libs\exif</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\exif\CExifBuilder.h">
+      <Filter>Source Files\src\Engine\Libs\exif</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\icc\ICC_SRGBProfile.h">
+      <Filter>Source Files\src\Engine\Libs\icc</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\Libs\hjson\hjson.h">
       <Filter>Source Files\src\Engine\Libs\hjson</Filter>
@@ -2369,7 +2821,7 @@
     <ClInclude Include="..\..\..\src\Engine\Libs\implot\implot_internal.h">
       <Filter>Source Files\src\Engine\Libs\imgui</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\Engine\Libs\imgui\imgui_impl_sdl2.h">
+    <ClInclude Include="..\..\..\src\Engine\Libs\imgui\imgui_impl_sdl3.h">
       <Filter>Source Files\src\Engine\Libs</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\Embedded\console_inverted_plain_gfx.h">
@@ -2386,6 +2838,9 @@
     </ClInclude>
     <ClInclude Include="..\..\..\src\Embedded\RES_Embedded.h">
       <Filter>Source Files\src\Embedded</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Embedded\Fonts\MTEmbeddedFonts.h">
+      <Filter>Source Files\src\Embedded\Fonts</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\Libs\ENet\enet.h">
       <Filter>Source Files\src\Engine\Libs\ENet</Filter>
@@ -2501,6 +2956,9 @@
     <ClInclude Include="..\..\..\src\Engine\Libs\sgSHA256\sgSHA256.h">
       <Filter>Source Files\src\Engine\Libs\sgSHA256</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Crash\MT_CrashReporter.h">
+      <Filter>Source Files\src\Engine\Crash</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\Tools\CInterruptibleSleep.h">
       <Filter>Source Files\src\Engine\Tools</Filter>
     </ClInclude>
@@ -2519,11 +2977,101 @@
     <ClInclude Include="..\..\..\src\Engine\Tests\CTestI18nEngine.h">
       <Filter>Source Files\src\Engine\Tests</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestExifEngine.h">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestExifMetadataReach.h">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tests\RawTestFixtures.h">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestRawPreview.h">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestThemeMath.h">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestVideoTransfer.h">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestThemeRamp.h">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestThemeApply.h">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Theme\MTH_OkLab.h">
+      <Filter>Header Files\src\Engine\Theme</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Theme\CMTThemeSeed.h">
+      <Filter>Header Files\src\Engine\Theme</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Theme\CMTThemeRamp.h">
+      <Filter>Header Files\src\Engine\Theme</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Theme\CMTTheme.h">
+      <Filter>Header Files\src\Engine\Theme</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Theme\MT_Theme.h">
+      <Filter>Header Files\src\Engine\Theme</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Theme\CMTThemeRegistry.h">
+      <Filter>Header Files\src\Engine\Theme</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestRawDecode.h">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tests\PC_DcpFixtureWriter.h">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestDcpParse.h">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Color\CDcpProfile.h">
+      <Filter>Source Files\src\Engine\Color</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Color\CDcpTemperature.h">
+      <Filter>Source Files\src\Engine\Color</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Color\CDcpApply.h">
+      <Filter>Source Files\src\Engine\Color</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestDcpApply.h">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestJpegMarkers.h">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\Tests\CTestRunner.h">
       <Filter>Source Files\src\Engine\Tests</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\Tests\CTestSuite.h">
       <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestIccProfileCodec.h">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestIccExtract.h">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestDisplayProfile.h">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestCms.h">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestIccHelpers.h">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Color\ICmsEngine.h">
+      <Filter>Source Files\src\Engine\Color</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Raw\CRawDecoder.h">
+      <Filter>Source Files\src\Engine\Raw</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Color\CColorManager.h">
+      <Filter>Source Files\src\Engine\Color</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\Tests\ITestCallback.h">
       <Filter>Source Files\src\Engine\Tests</Filter>
@@ -2623,6 +3171,72 @@
     </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\Tools\NetGame\CSnapshotStorage.h">
       <Filter>Source Files\src\Engine\Tools\NetGame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Video\CVideoPlayer.h">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Video\IVideoSource.h">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Video\CVideoSourceWebMVpx.h">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Video\CVideoSourceFFmpeg.h">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Video\IVideoPacketDecoder.h">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Video\CVideoDecoderHEVCVT.h">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Video\CVideoDecoderHEVCMF.h">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Video\CAudioDecoderAACApple.h">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Video\CAudioDecoderAACMF.h">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Video\CAudioDecoderAACNative.h">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Video\CVideoDecoderWMVMF.h">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Video\CAudioDecoderWMAMF.h">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Video\CAudioDecoderWMANative.h">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Video\MFComThreadGuard.h">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Video\AacAscParser.h">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Video\CVideoFrameExtractor.h">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Video\CVideoTransferFunctions.h">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Video\VideoFrameTransform.h">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Video\CVideoYUVShader.h">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Video\CVideoAudioChannel.h">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Video\CGLRenderTarget.h">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Video\CSlrImageExternalTexture.h">
+      <Filter>Source Files\src\Engine\Video</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\Core\ILogSink.h">
       <Filter>Source Files\src\Engine\Core</Filter>

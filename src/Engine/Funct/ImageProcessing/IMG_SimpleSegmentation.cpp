@@ -14,7 +14,7 @@ std::vector<CSimpleSegmentedObject *> *IMG_SimpleSegmentation(CImageData *imageI
 	LOGD("IMG_SimpleSegmentation");
 	
 	// this is simple segmentation, will find a pixel which was not yet colored, and do a coloring using flood-fill
-	CImageData *imageOut = new CImageData(imageIn->width, imageIn->height, IMG_TYPE_LONG_INT);
+	CImageData *imageOut = new CImageData(imageIn->width, imageIn->height, IMG_TYPE_GRAYSCALE_32BIT);
 	imageOut->AllocImage(false, true);
 	
 //	for (int xx = 0; xx < imageIn->width; xx++)
@@ -37,7 +37,7 @@ std::vector<CSimpleSegmentedObject *> *IMG_SimpleSegmentation(CImageData *imageI
 	{
 		for (int x = 0; x < imageIn->width; x++)
 		{
-			unsigned long objectId = imageOut->GetPixelResultLong(x, y);
+			unsigned long objectId = imageOut->GetPixelResultGrayscale32Bit(x, y);
 			if (objectId != 0)
 				continue;
 			
@@ -74,7 +74,7 @@ std::vector<CSimpleSegmentedObject *> *IMG_SimpleSegmentation(CImageData *imageI
 				
 //				LOGD("..pop  %d %d", p.x, p.y);
 				
-				imageOut->SetPixelResultLong(p.x, p.y, countObject);
+				imageOut->SetPixelResultGrayscale32Bit(p.x, p.y, countObject);
 				volume++;
 				
 				minx = UMIN(p.x, minx);
@@ -86,7 +86,7 @@ std::vector<CSimpleSegmentedObject *> *IMG_SimpleSegmentation(CImageData *imageI
 				if (p.x < imageIn->width-1)
 				{
 					imageIn->GetPixelResultRGBA(p.x + 1, p.y, &r, &g, &b, &a);
-					if (a != 0 && imageOut->GetPixelResultLong(p.x + 1, p.y) == 0)
+					if (a != 0 && imageOut->GetPixelResultGrayscale32Bit(p.x + 1, p.y) == 0)
 					{
 						ivec2 pp;
 						pp.x = p.x + 1;
@@ -99,7 +99,7 @@ std::vector<CSimpleSegmentedObject *> *IMG_SimpleSegmentation(CImageData *imageI
 				if (p.x > 0)
 				{
 					imageIn->GetPixelResultRGBA(p.x - 1, p.y, &r, &g, &b, &a);
-					if (a != 0 && imageOut->GetPixelResultLong(p.x - 1, p.y) == 0)
+					if (a != 0 && imageOut->GetPixelResultGrayscale32Bit(p.x - 1, p.y) == 0)
 					{
 						ivec2 pp;
 						pp.x = p.x - 1;
@@ -112,7 +112,7 @@ std::vector<CSimpleSegmentedObject *> *IMG_SimpleSegmentation(CImageData *imageI
 				if (p.y < imageIn->height-1)
 				{
 					imageIn->GetPixelResultRGBA(p.x, p.y + 1, &r, &g, &b, &a);
-					if (a != 0 && imageOut->GetPixelResultLong(p.x, p.y + 1) == 0)
+					if (a != 0 && imageOut->GetPixelResultGrayscale32Bit(p.x, p.y + 1) == 0)
 					{
 						ivec2 pp;
 						pp.x = p.x;
@@ -125,7 +125,7 @@ std::vector<CSimpleSegmentedObject *> *IMG_SimpleSegmentation(CImageData *imageI
 				if (p.y > 0)
 				{
 					imageIn->GetPixelResultRGBA(p.x, p.y - 1, &r, &g, &b, &a);
-					if (a != 0 && imageOut->GetPixelResultLong(p.x, p.y - 1) == 0)
+					if (a != 0 && imageOut->GetPixelResultGrayscale32Bit(p.x, p.y - 1) == 0)
 					{
 						ivec2 pp;
 						pp.x = p.x;

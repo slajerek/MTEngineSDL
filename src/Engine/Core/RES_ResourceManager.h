@@ -75,6 +75,17 @@ void RES_Init(u16 destScreenWidth);
 void RES_SetMaxSystemMemory();
 void RES_SetMaxSystemMemory(u32 maxMemory);
 
+// Resolve a read-only resource directory by probing candidate roots and
+// returning the first in which `probeFileName` is readable:
+//   1) `relativeDir` as-is — the current working directory. Dev builds and the
+//      headless test runners are launched from the project root, so this hits.
+//   2) `gPathToResources` + `relativeDir` — the installed/bundled app's
+//      resources (on macOS, the .app's Contents/Resources).
+// Returns the cwd-relative candidate if none match, so a subsequent open logs a
+// clear "failed to open" error with a meaningful path. `relativeDir` should end
+// with a path separator. Generic — works for any asset dir + probe filename.
+string RES_ResolveResourceDir(const char *relativeDir, const char *probeFileName);
+
 void RES_AddResource(const char *resourceName, int resourceLevel, CSlrResourceBase *data);
 CSlrResourceBase *RES_GetResource(const char *resourceName);
 

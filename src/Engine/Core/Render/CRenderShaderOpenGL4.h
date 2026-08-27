@@ -30,7 +30,12 @@ public:
 	void DebugPrintUniforms();
 	
 protected:
-	GLuint shaderHandle;
+	GLuint shaderHandle = 0;
+
+	// Set when a compile/link has already failed, so UseShaderProgram() stops
+	// retrying it every frame. See CompileShaders() for why the isCompiled fix
+	// alone would have been a regression.
+	bool compileAttemptedAndFailed = false;
 	
 	GLint  attribLocationTex;       // Uniforms location
 	GLint  attribLocationProjMtx;

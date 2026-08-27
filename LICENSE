@@ -1,0 +1,119 @@
+MIT License
+
+Copyright (c) 2009-2026 Marcin Skoczylas
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+================================================================================
+WHAT THE MIT LICENSE ABOVE COVERS
+================================================================================
+
+The MIT license applies to MTEngineSDL's OWN code only:
+
+    src/Engine/                 -- except src/Engine/Libs/ (see below)
+    src/Embedded/
+    platform/MacOS/src.MacOS/
+    platform/Windows/src.Windows/
+    platform/Linux/src.Linux/
+    platform/MacOS/shaders/
+    tools/
+    tests/
+    cmake/, CMakeLists.txt
+    build-macos.sh, build-linux.sh, platform/*/build-*.sh, platform/*/build-*.ps1
+    docs/
+
+It does NOT apply to the bundled third-party components below. Those are the
+property of their respective authors and are distributed under their own
+licenses, which are reproduced inside their own directories.
+
+
+================================================================================
+THIRD-PARTY COMPONENTS
+================================================================================
+
+Third-party source lives in these locations, and NOTHING there is covered by
+the MIT license above:
+
+    src/Engine/Libs/            -- vendored libraries compiled into the engine
+    other/lib/                  -- vendored/submoduled dependency source trees
+    platform/MacOS/include/     -- SDL3 public headers
+    platform/Windows/include/   -- SDL3 public headers
+    platform/Windows/libs/      -- prebuilt third-party static archives
+
+Each component carries its own license text in its own directory. The list
+below names the ones whose terms are most likely to matter to you; it is a
+convenience, not a substitute for reading those files.
+
+  Component                       License
+  ------------------------------  --------------------------------------------
+  SDL2 / SDL3                     zlib
+    other/lib/SDL-release-3.4.14-static/LICENSE.txt
+    other/lib/SDL-release-2.32.10-static/LICENSE.txt
+  Dear ImGui                      MIT
+  Dear ImGui Test Engine          NOT OPEN SOURCE -- see the warning below
+    src/Engine/Libs/imgui_test_engine/LICENSE.txt
+  ImPlot                          MIT
+  pugixml                         MIT
+  libuv                           MIT           other/lib/libuv/LICENSE
+  FTXUI                           MIT           other/lib/ftxui/LICENSE
+  llama.cpp                       MIT           other/lib/llama.cpp/LICENSE
+  uSockets / uWebSockets          Apache-2.0    other/lib/uSockets/LICENSE
+  Basis Universal (transcoder)    Apache-2.0
+    src/Engine/Libs/basis_universal/VENDORED.md
+  Mbed TLS                        Apache-2.0 OR GPL-2.0-or-later
+    other/lib/mbedtls/LICENSE
+  FreeType                        FTL OR GPL-2.0
+    other/lib/freetype-2.10.4/docs/LICENSE.TXT
+  Graphite2                       LGPL-2.1
+    other/lib/graphite2-1.3.14/LICENSE
+  LibRaw (image codecs)           CDDL-1.0 / LGPL-2.1
+    fetched by platform/*/build-image_codecs.*; our patches are in
+    other/lib/image-codecs/patches/ and are published as CDDL-1.0 requires
+
+Not every component listed above is compiled into every build. MTEngineSDL is
+capability-gated: an application's mtengine.caps manifest decides which
+dependencies are fetched and linked at all. See docs/CAPABILITIES.md.
+
+
+--------------------------------------------------------------------------------
+IMPORTANT: Dear ImGui Test Engine is not open source
+--------------------------------------------------------------------------------
+
+src/Engine/Libs/imgui_test_engine/ is licensed by DISCO HELLO under the Dear
+ImGui Test Engine License, NOT under MIT and NOT under any OSI-approved license.
+It is free for you if you are a natural person, a non-profit, an educational
+user, a project released publicly under an open source license, or a company
+with under 2 million USD turnover in its last fiscal year. Otherwise it is a
+45-day trial followed by a paid subscription from DISCO HELLO.
+
+Read src/Engine/Libs/imgui_test_engine/LICENSE.txt before shipping a product
+that includes it. It is reachable only through the MT_CAP_TEST_ENGINE
+capability -- building with MT_CAP_TEST_ENGINE=0 excludes it entirely.
+
+
+--------------------------------------------------------------------------------
+Note on copyleft components
+--------------------------------------------------------------------------------
+
+FreeType, Graphite2, Mbed TLS and LibRaw offer copyleft licenses (GPL-2.0,
+LGPL-2.1, CDDL-1.0) either exclusively or as one arm of a dual license. If you
+link them statically into a closed-source product, the obligations are yours to
+satisfy. Where a permissive arm exists (FTL for FreeType, Apache-2.0 for
+Mbed TLS), choosing it is your decision to make and to record, not the engine's.

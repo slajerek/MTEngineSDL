@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Auto-imported by MSBuild for every project under platform/Windows.
+     MTExtraDefines is the build-script seam for mode defines (PhotoCruise's
+     build-windows.ps1 passes /p:MTExtraDefines=MT_COMMERCIAL_BUILD=1 when
+     COMMERCIAL=1, 2026-07-18 WMV spec). Empty (the default, and every IDE
+     build) appends nothing and compiles byte-identically to before this
+     file existed. -->
+<Project>
+
+  <!-- =====================================================================
+       CAPABILITIES
+
+       $(MTOutRoot) is the generated fragment's directory, produced by
+       tools/mtcaps and outside every checkout. It CANNOT be computed here:
+       the key contains an engine revision (a git rev-parse) and a capability
+       hash, and no MSBuild property function produces either. Property
+       functions are a whitelist of static .NET methods, and MSBuild cannot
+       execute a program during property evaluation at all.
+
+       So it is supplied by build-windows.ps1 as /p:MTOutRoot=..., and carried
+       across the ProjectReference from an app to this project by
+       AdditionalProperties. An IDE build supplies neither, Exists() is false,
+       nothing imports, and the guard below stops the build naming the wrapper.
+       That is the design rather than a degradation: the IDE is a
+       compile-and-debug tool here.
+
+       A BOOTSTRAP FILE WAS TRIED AND REJECTED. Having resolve write a
+       fixed-path gitignored MTOutRoot.props fails three ways: it puts a
+       generated file back inside a repository; it is a fixed per-app path
+       written by every resolve, so two matrix variants clobber each other's
+       root; and it makes an IDE build silently correct-LOOKING using whichever
+       variant wrote last.
+       ===================================================================== -->
+
+  <PropertyGroup>
+    <!-- MT_STANDALONE=1 is the third mode, beside the wrapper and app-IDE
+         paths: "clone the engine, open it, build it" must work for someone who
+         has never seen the four apps. It selects the standalone output root
+         EXPLICITLY rather than by omission, because a silent in-tree fallback
+         would be exactly the downgrade tier this design abolished. -->
+    <MTOutRoot Condition="'$(MTOutRoot)' == '' And '$(MT_STANDALONE)' == '1'">$(LOCALAPPDATA)\mtengine\_standalone\windows\$(Platform)\$(Configuration)\</MTOutRoot>
+  </PropertyGroup>
+  <Import Project="$(MTOutRoot)\MTEngineCaps.props"
+          Condition="'$(MTOutRoot)' != '' And Exists('$(MTOutRoot)\MTEngineCaps.props')" />
+
+  <!-- TWO conditions, not one. An earlier form tested only for an EMPTY
+       MTOutRoot, so "set but the fragment is missing" (a cleared cache, a stale
+       root carried across a ProjectReference, a hand-typed /p:) imported
+       nothing, errored nothing, and compiled with ZERO capability defines and no
+       include directory. That is the silent-wrong-build the three-layer design
+       exists to prevent, arriving through the guard itself. -->
+  <!-- The guard now covers ONE case: MTOutRoot SET but the fragment missing (a
+       cleared cache, a stale root carried across a ProjectReference, a hand-typed
+       /p:). Nothing imported, so without this the build would compile with zero
+       capability defines.
+
+       It deliberately does NOT fire on an EMPTY MTOutRoot any more. That is the
+       Visual Studio path, and Directory.Build.targets resolves it there with a
+       target that runs before ClCompile; see the long note in that file. This
+       guard runs BeforeTargets="PrepareForBuild", which is EARLIER, so leaving
+       the empty case here would kill every IDE build before the resolution it
+       now has a chance to do. -->
+  <Target Name="MTCapsGuard" BeforeTargets="PrepareForBuild"
+          Condition="'$(MTOutRoot)' != '' And !Exists('$(MTOutRoot)\MTEngineCaps.props')">
+    <Error Text="MTOutRoot is $(MTOutRoot) but MTEngineCaps.props is not there, so nothing was imported and this build has no capability defines. Re-run the app's build-windows.ps1 to regenerate it." />
+  </Target>
+
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <PreprocessorDefinitions Condition="'$(MTExtraDefines)' != ''">$(MTExtraDefines);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <!-- /utf-8 (2026-07-19): source AND execution charset are UTF-8 on the
+           MSVC (v143) toolset, matching what Clang (the default toolchain,
+           via build-windows.ps1), GCC, and Apple clang already do: raw
+           UTF-8 string literals mean the same bytes on every compiler.
+           clang-cl accepts the flag too (redundantly). All non-ASCII
+           sources in this repo were verified valid UTF-8 before enabling. -->
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+</Project>

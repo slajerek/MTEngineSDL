@@ -844,7 +844,7 @@ void fill(CImageData *image, int x, int y, unsigned short int newColor)
 	if (x < 1 || x >= image->width-1 || y < 1 || y >= image->height-1)
 		return;
 
-	unsigned short int oldColor = image->GetPixelResultShort(x, y);
+	unsigned short int oldColor = image->GetPixelResultGrayscale16Bit(x, y);
 	if(oldColor == newColor)
 		return;
 
@@ -866,32 +866,32 @@ void fill(CImageData *image, int x, int y, unsigned short int newColor)
 
         y1 = y;
 
-        while(image->GetPixelResultShort(x, y1) == oldColor && y1 >= 0)
+        while(image->GetPixelResultGrayscale16Bit(x, y1) == oldColor && y1 >= 0)
         	y1--;
 
         y1++;
         spanLeft = spanRight = 0;
-        while(image->GetPixelResultShort(x, y1) == oldColor && y1 < image->height)
+        while(image->GetPixelResultGrayscale16Bit(x, y1) == oldColor && y1 < image->height)
         {
-            image->SetPixelResultShort(x, y1, newColor);
-            if(!spanLeft && x > 0 && image->GetPixelResultShort(x - 1, y1) == oldColor)
+            image->SetPixelResultGrayscale16Bit(x, y1, newColor);
+            if(!spanLeft && x > 0 && image->GetPixelResultGrayscale16Bit(x - 1, y1) == oldColor)
             {
             	fillData = new CFillData(x - 1, y1);
             	pixelStack.push(fillData);
 
                 spanLeft = 1;
             }
-            else if(spanLeft && x > 0 && image->GetPixelResultShort(x - 1, y1) != oldColor)
+            else if(spanLeft && x > 0 && image->GetPixelResultGrayscale16Bit(x - 1, y1) != oldColor)
             {
                 spanLeft = 0;
             }
-            if(!spanRight && x < image->width-1 && image->GetPixelResultShort(x + 1, y1) == oldColor)
+            if(!spanRight && x < image->width-1 && image->GetPixelResultGrayscale16Bit(x + 1, y1) == oldColor)
             {
             	fillData = new CFillData(x + 1, y1);
             	pixelStack.push(fillData);
                 spanRight = 1;
             }
-            else if(spanRight && x < image->width-1 && image->GetPixelResultShort(x + 1, y1) != oldColor)
+            else if(spanRight && x < image->width-1 && image->GetPixelResultGrayscale16Bit(x + 1, y1) != oldColor)
             {
                 spanRight = 0;
             }
@@ -905,9 +905,9 @@ CImageData *IMG_SimpleSegmentation(CImageData *image)
 	if (image->getImageType() == IMG_TYPE_GRAYSCALE)
 	{
 		LOGD("IMG_SimpleSegmentation");
-		CImageData *result = new CImageData(image->width, image->height, IMG_TYPE_SHORT_INT);
+		CImageData *result = new CImageData(image->width, image->height, IMG_TYPE_GRAYSCALE_16BIT);
 		result->AllocImage(false, true);
-		unsigned short int *shortData = (unsigned short int *)result->getShortIntResultData();
+		unsigned short int *shortData = (unsigned short int *)result->getGrayscale16BitResultData();
 		u8 *byteData = (u8 *)image->getGrayscaleResultData();
 		for (int i = 0; i < image->width * image->height; i++)
 		{
@@ -916,13 +916,13 @@ CImageData *IMG_SimpleSegmentation(CImageData *image)
 
 		for (int y = 0; y < image->height; y++)
 		{
-			result->SetPixelResultShort(0, y, 0);
-			result->SetPixelResultShort(image->width-1, y, 0);
+			result->SetPixelResultGrayscale16Bit(0, y, 0);
+			result->SetPixelResultGrayscale16Bit(image->width-1, y, 0);
 		}
 		for (int x = 0; x < image->width; x++)
 		{
-			result->SetPixelResultShort(x, 0, 0);
-			result->SetPixelResultShort(x, image->height-1, 0);
+			result->SetPixelResultGrayscale16Bit(x, 0, 0);
+			result->SetPixelResultGrayscale16Bit(x, image->height-1, 0);
 		}
 
 		unsigned short int classNum = 0x0003;
@@ -930,7 +930,7 @@ CImageData *IMG_SimpleSegmentation(CImageData *image)
 		{
 			for (int x = 1; x < image->width-1; x++)
 			{
-				unsigned short int val = result->GetPixelResultShort(x, y);
+				unsigned short int val = result->GetPixelResultGrayscale16Bit(x, y);
 				if (val == SEGMENTATION_MARKER_OBJECT)
 				{
 					//LOGD("found MARKER_OBJECT at %d,%d fill classNum=%2.2x", x, y, classNum);

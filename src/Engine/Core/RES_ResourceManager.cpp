@@ -29,12 +29,47 @@
 #include "RES_Embedded.h"
 #include "CSlrFileFromOS.h"
 #include "CSlrString.h"
+#include "SYS_FileSystem.h"
 #include <algorithm>
+#include <fstream>
+#include <vector>
 
 #define LOGRD LOGR
 //#define LOGRD LOGD2
 
 #define DEFAULT_LOADER_THREAD_PRIORITY	1.0
+
+static bool RES_FileReadable(const string &path)
+{
+	std::ifstream f(path.c_str());
+	return f.good();
+}
+
+string RES_ResolveResourceDir(const char *relativeDir, const char *probeFileName)
+{
+	std::vector<string> candidates;
+
+	// 1) Relative to the current working directory (dev builds + headless test
+	//    runners, which launch the binary from the project root).
+	candidates.push_back(string(relativeDir));
+
+	// 2) The engine resources path (installed / bundled app — on macOS this is
+	//    the .app's Contents/Resources).
+	if (gPathToResources != NULL)
+		candidates.push_back(string(gPathToResources) + relativeDir);
+
+	for (const string &c : candidates)
+	{
+		if (RES_FileReadable(c + probeFileName))
+		{
+			LOGD("RES_ResolveResourceDir: resolved '%s' at '%s'", relativeDir, c.c_str());
+			return c;
+		}
+	}
+
+	LOGError("RES_ResolveResourceDir: '%s%s' not found in any candidate root", relativeDir, probeFileName);
+	return candidates.front();
+}
 
 // for debug purposes, will crash if trying to allocate
 //#define MAX_MEMORY_PER_RESOURCE	100  *1024*1024
@@ -529,10 +564,24 @@ CSlrImage *RES_LoadImageFromFileOS(const char *path, bool linearScaling)
 		delete file;
 		return NULL;
 	}
-	
-	CSlrImage *image = new CSlrImage(file, false);
-
 	delete file;
+
+	// NOT the CSlrFile* constructor. That one calls LoadImage(CSlrFile*),
+	// which reads the engine's OWN private preload binary format (checked
+	// against GFX_BYTE_MAGIC1) and SYS_FatalExit()s on anything else -- so it
+	// killed the process on every real image file (PNG, JPEG, ...) this
+	// function was ever handed. "...FromFileOS" means an arbitrary file the
+	// OS gave the app (e.g. a native Open dialog), which is exactly what the
+	// (const char *fileName, bool linearScaling) constructor decodes, via
+	// CImageData::Load()'s dispatch-by-extension across every still-image
+	// format the engine's codecs support. It fails soft on error
+	// (resourceState = RESOURCE_STATE_ERROR), never fatal-exits.
+	CSlrImage *image = new CSlrImage(path, linearScaling);
+	if (image->resourceState == RESOURCE_STATE_ERROR)
+	{
+		delete image;
+		return NULL;
+	}
 	return image;
 }
 

@@ -1,10 +1,16 @@
 #include "DBG_Log.h"
 #include "SYS_Platform.h"
 #include "SYS_Main.h"
-#include <SDL.h>
+#include <SDL3/SDL.h>
 #include <X11/X.h>
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
+// X11/X.h #defines None 0L, which collides with EExifColorHintSource::None
+// (CExifReader.h, pulled in transitively by CGuiMain.h below) and other
+// enumerators named None elsewhere in the engine/app headers.
+#undef None
+#include "CMTNativeMenuBarImGui.h"
+#include "CGuiMain.h"
 
 Display *dpy;
 Cursor cur;
@@ -106,5 +112,7 @@ void PLATFORM_SetThreadName(const char *name)
 
 void PLATFORM_UpdateMenus()
 {
+	CMTNativeMenuBarImGui *menuBar = new CMTNativeMenuBarImGui();
+	guiMain->SetNativeMenuBar(menuBar);
 }
 

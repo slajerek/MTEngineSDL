@@ -18,6 +18,57 @@
 #include "stb_image.h"
 #include "SYS_FileSystem.h"
 #include "VID_ImageBinding.h"
+#include "VID_Main.h"   // gRenderBackend, for the resident-format funnel
+
+ERenderTextureFormat SlrResidentFormatFor(u8 decodeType, bool backendSupportsFloat)
+{
+	if (decodeType == IMG_TYPE_RGBA_16F)
+		return backendSupportsFloat ? RENDER_TEXTURE_RGBA16F : RENDER_TEXTURE_RGBA8;
+	return RENDER_TEXTURE_RGBA8;
+}
+
+void CSlrImage::ApplyResidentFormat(CImageData *imageData)
+{
+	if (imageData == NULL || imageData->isCompressed)
+		return;
+
+	const bool backendSupportsFloat =
+		(gRenderBackend != NULL) &&
+		gRenderBackend->SupportsTextureFormat(RENDER_TEXTURE_RGBA16F);
+
+	const ERenderTextureFormat want =
+		SlrResidentFormatFor(imageData->getImageType(), backendSupportsFloat);
+
+	if (want == RENDER_TEXTURE_RGBA8)
+	{
+		// The GPU path is 8-bit here, so whatever extra the decode carried is
+		// given up HERE -- the one place that does it -- rather than at the
+		// decoder, so everything upstream of the texture still sees what the
+		// file actually contained.
+		if (imageData->getImageType() == IMG_TYPE_RGBA_16BIT)
+		{
+			imageData->ConvertRGBA16BitToRGBA8();
+		}
+		else if (imageData->getImageType() == IMG_TYPE_RGBA_16F)
+		{
+			// Live headroom, sampled at the moment of the map and never
+			// cached: macOS grants it lazily and then keeps moving it with
+			// display brightness. At 1.0 the curve is the identity on 0..1, so
+			// this is exactly today's picture.
+			const float headroom = (gRenderBackend != NULL)
+				? gRenderBackend->GetDisplayHdrHeadroom() : 1.0f;
+			imageData->ConvertRGBA16FToRGBA8(headroom, !imageData->floatIsSurfaceEncoded);
+		}
+	}
+
+	this->residentFormat = want;
+	// Only a FLOAT resident texture still holds above-white values. If the
+	// funnel just tone-mapped to 8 bits, the peak is gone with it, and carrying
+	// the old number forward would have the surface's HDR10 metadata describe
+	// range the texture no longer contains.
+	this->contentMaxComponent = (want == RENDER_TEXTURE_RGBA16F)
+		? imageData->contentMaxComponent : 0.0f;
+}
 
 CSlrImage::CSlrImage(CImageData *imageData)
 {
@@ -373,10 +424,19 @@ void CSlrImage::PreloadImage(const char *fileName, bool fromResources)
 //	LOGD("------------------------------------------------------ preload: loaded image data");
 //	RES_DebugPrintMemory();
 
-	if(imageData->getImageType() != IMG_TYPE_RGBA)
+	// The resident-format funnel: one decision, two answers.
+	ApplyResidentFormat(imageData);
+
+	// RGBA8 and RGBA16F are both legitimate resident formats (S-5) -- these
+	// two file-based entry points call the funnel above like the other four,
+	// so they must accept the same answers it can give. Anything else means
+	// a decoder produced a type the funnel never agreed to, which is still
+	// worth dying for.
+	if(imageData->getImageType() != IMG_TYPE_RGBA &&
+	   imageData->getImageType() != IMG_TYPE_RGBA_16F)
 	{
-		SYS_FatalExit("Image %s, type is %2.2x (should be %2.2x)",
-			buf, imageData->getImageType(), IMG_TYPE_RGBA);
+		SYS_FatalExit("Image %s, type is %2.2x (should be %2.2x or %2.2x)",
+				buf, imageData->getImageType(), IMG_TYPE_RGBA, IMG_TYPE_RGBA_16F);
 	}
 
 	this->loadImgWidth = imageData->width;
@@ -428,10 +488,19 @@ void CSlrImage::LoadImage(const char *fileName, const char *fileExt)
 		SYS_FatalExit("Correct image not found: %s", buf);
 	}
 
-	if(imageData->getImageType() != IMG_TYPE_RGBA)
+	// The resident-format funnel: one decision, two answers.
+	ApplyResidentFormat(imageData);
+
+	// RGBA8 and RGBA16F are both legitimate resident formats (S-5) -- these
+	// two file-based entry points call the funnel above like the other four,
+	// so they must accept the same answers it can give. Anything else means
+	// a decoder produced a type the funnel never agreed to, which is still
+	// worth dying for.
+	if(imageData->getImageType() != IMG_TYPE_RGBA &&
+	   imageData->getImageType() != IMG_TYPE_RGBA_16F)
 	{
-		SYS_FatalExit("Image %s, type is %2.2x (should be %2.2x)",
-			buf, imageData->getImageType(), IMG_TYPE_RGBA);
+		SYS_FatalExit("Image %s, type is %2.2x (should be %2.2x or %2.2x)",
+				buf, imageData->getImageType(), IMG_TYPE_RGBA, IMG_TYPE_RGBA_16F);
 	}
 	this->LoadImage(imageData, RESOURCE_PRIORITY_NORMAL);
 
@@ -556,10 +625,17 @@ void CSlrImage::LoadImage(CImageData *origImageData, u8 resourcePriority, bool f
 		return;
 	}
 
-	if(origImageData->getImageType() != IMG_TYPE_RGBA)
+	// The resident-format funnel: one decision, two answers.
+	ApplyResidentFormat(origImageData);
+
+	// RGBA8 and RGBA16F are both legitimate resident formats (S-5); anything
+	// else means a decoder produced a type the funnel never agreed to, which
+	// is still worth dying for.
+	if(origImageData->getImageType() != IMG_TYPE_RGBA &&
+	   origImageData->getImageType() != IMG_TYPE_RGBA_16F)
 	{
-		SYS_FatalExit("Image type is %2.2x (should be %2.2x)",
-				origImageData->getImageType(), IMG_TYPE_RGBA);
+		SYS_FatalExit("Image type is %2.2x (should be %2.2x or %2.2x)",
+				origImageData->getImageType(), IMG_TYPE_RGBA, IMG_TYPE_RGBA_16F);
 	}
 
 	this->loadImgWidth = origImageData->width;
@@ -578,14 +654,34 @@ void CSlrImage::LoadImage(CImageData *origImageData, u8 resourcePriority, bool f
 	this->defaultTexEndY = ((float)loadImgHeight / (float)rasterHeight);
 
 	shouldDeallocLoadImageData = true;
-	this->loadImageData = new CImageData(rasterWidth, rasterHeight, IMG_TYPE_RGBA);
+	// The POT repack must keep the SOURCE's type: allocating RGBA8 for a float
+	// image would give the buffer half the bytes it needs, and the upload --
+	// which reads 8 bytes per pixel because residentFormat says so -- would run
+	// off the end of it. (S-5: this is a fourth type-blind path, alongside the
+	// three SYS_FatalExit guards.)
+	const u8 srcImgType = origImageData->getImageType();
+	const size_t srcBytesPerPixel = (srcImgType == IMG_TYPE_RGBA_16F) ? 8 : 4;
+	this->loadImageData = new CImageData(rasterWidth, rasterHeight, srcImgType);
 	this->loadImageData->AllocImage(false, true);
+	this->loadImageData->floatIsSurfaceEncoded = origImageData->floatIsSurfaceEncoded;
 
 	u8 *imageData = (u8*)this->loadImageData->resultData;
 
 	if (rasterWidth == loadImgWidth && rasterHeight == loadImgHeight)
 	{
-		memcpy(this->loadImageData->resultData, origImageData->resultData, origImageData->width*origImageData->height*4);
+		memcpy(this->loadImageData->resultData, origImageData->resultData,
+			   (size_t)origImageData->width * origImageData->height * srcBytesPerPixel);
+	}
+	else if (srcImgType == IMG_TYPE_RGBA_16F)
+	{
+		// Row-wise, in the source's own units. The 8-bit branch below cannot
+		// serve here: its per-pixel accessors are RGBA8, so every above-white
+		// value would be clamped away by the very copy meant to preserve it.
+		const size_t srcRow = (size_t)origImageData->width * srcBytesPerPixel;
+		const size_t dstRow = (size_t)rasterWidth * srcBytesPerPixel;
+		for (u32 y = 0; y < loadImgHeight; y++)
+			memcpy(imageData + y * dstRow,
+				   (const u8 *)origImageData->resultData + y * srcRow, srcRow);
 	}
 	else
 	{
@@ -608,31 +704,29 @@ void CSlrImage::LoadImage(CImageData *origImageData, u8 resourcePriority, bool f
 		}
 	}
 
-	unsigned int w = (unsigned int)(rasterWidth*4);
+	// BYTES per row, and the swap below must walk BYTES for the same reason:
+	// indexing x*4 inside an 8-byte-per-pixel row flips only the first half of
+	// every row and leaves the rest, which is a garbled image rather than a
+	// failure.
+	unsigned int w = (unsigned int)(rasterWidth * srcBytesPerPixel);
 
 	if (flipImageVertically)
 	{
-			for (int y = 0; y < loadImgHeight/2; y++)
+		// Row-wise byte swap. The old loop indexed x*4 for x < rasterWidth,
+		// which is only the whole row when a pixel IS four bytes -- on an
+		// 8-byte float row it flipped the first half of every row and left the
+		// rest, producing a garbled image rather than an upside-down one.
+		for (int y = 0; y < loadImgHeight / 2; y++)
+		{
+			u8 *rowTop = imageData + (size_t)y * w;
+			u8 *rowBot = imageData + (size_t)(loadImgHeight - 1 - y) * w;
+			for (unsigned int b = 0; b < w; b++)
 			{
-					for (int x = 0; x < rasterWidth; x++)
-					{
-							u8 r = imageData[y*w + (x*4) + 0];
-							u8 g = imageData[y*w + (x*4) + 1];
-							u8 b = imageData[y*w + (x*4) + 2];
-							u8 a = imageData[y*w + (x*4) + 3];
-
-							imageData[y*w + (x*4) + 0] = imageData[(loadImgHeight-1-y)*w + (x*4) + 0];
-							imageData[y*w + (x*4) + 1] = imageData[(loadImgHeight-1-y)*w + (x*4) + 1];
-							imageData[y*w + (x*4) + 2] = imageData[(loadImgHeight-1-y)*w + (x*4) + 2];
-							imageData[y*w + (x*4) + 3] = imageData[(loadImgHeight-1-y)*w + (x*4) + 3];
-
-							imageData[(loadImgHeight-1-y)*w + (x*4) + 0] = r;
-							imageData[(loadImgHeight-1-y)*w + (x*4) + 1] = g;
-							imageData[(loadImgHeight-1-y)*w + (x*4) + 2] = b;
-							imageData[(loadImgHeight-1-y)*w + (x*4) + 3] = a;
-
-					}
+				const u8 tmp = rowTop[b];
+				rowTop[b] = rowBot[b];
+				rowBot[b] = tmp;
 			}
+		}
 	}
 
 	this->widthD2 = this->width/2.0;
@@ -672,10 +766,17 @@ void CSlrImage::LoadImageForRebinding(CImageData *origImageData, u8 resourcePrio
 		return;
 	}
 
-	if(origImageData->getImageType() != IMG_TYPE_RGBA)
+	// The resident-format funnel: one decision, two answers.
+	ApplyResidentFormat(origImageData);
+
+	// RGBA8 and RGBA16F are both legitimate resident formats (S-5); anything
+	// else means a decoder produced a type the funnel never agreed to, which
+	// is still worth dying for.
+	if(origImageData->getImageType() != IMG_TYPE_RGBA &&
+	   origImageData->getImageType() != IMG_TYPE_RGBA_16F)
 	{
-		SYS_FatalExit("Image type is %2.2x (should be %2.2x)",
-					  origImageData->getImageType(), IMG_TYPE_RGBA);
+		SYS_FatalExit("Image type is %2.2x (should be %2.2x or %2.2x)",
+				origImageData->getImageType(), IMG_TYPE_RGBA, IMG_TYPE_RGBA_16F);
 	}
 
 	if (shouldDeallocLoadImageData && this->loadImageData != NULL)
@@ -692,24 +793,25 @@ void CSlrImage::LoadImageForRebinding(CImageData *origImageData, u8 resourcePrio
 	this->width = loadImgWidth;
 	this->height = loadImgHeight;
 	
+	// The caller supplies the raw decoded buffer at original pixel dimensions
+	// (not padded to POT). CreateTexture will upload at loadImageData->width/height,
+	// so UV coords cover the full [0,1] range.
 	this->defaultTexStartX = 0.0f;
-	this->defaultTexEndX = ((float)loadImgWidth / (float)rasterWidth);
+	this->defaultTexEndX = 1.0f;
 	this->defaultTexStartY = 0.0f;
-	this->defaultTexEndY = ((float)loadImgHeight / (float)rasterHeight);
-		
+	this->defaultTexEndY = 1.0f;
+
 	this->widthD2 = this->width/2.0;
 	this->heightD2 = this->height/2.0;
 	this->widthM2 = this->width*2.0;
 	this->heightM2 = this->height*2.0;
-	
-	// debug pause
-	//SYS_Sleep(100);
-	
-	//LOGR("image width=%3.2f height=%3.2f", width, height);
-	
+
 	this->resourcePriority = resourcePriority;
-	this->resourceLoadingSize = rasterWidth * rasterHeight * 4 * 2;
-	this->resourceIdleSize = rasterWidth * rasterHeight * 4;
+	// A float image really does cost twice the bytes; saying otherwise here
+	// under-reports it to the resource manager.
+	const int bppHint = (origImageData->getImageType() == IMG_TYPE_RGBA_16F) ? 8 : 4;
+	this->resourceLoadingSize = loadImgWidth * loadImgHeight * bppHint * 2;
+	this->resourceIdleSize = loadImgWidth * loadImgHeight * bppHint;
 	
 	this->resourceIsActive = false;
 	this->resourceState = RESOURCE_STATE_PRELOADING;
@@ -728,10 +830,17 @@ void CSlrImage::RefreshImageParameters(CImageData *origImageData, u8 resourcePri
 		return;
 	}
 
-	if(origImageData->getImageType() != IMG_TYPE_RGBA)
+	// The resident-format funnel: one decision, two answers.
+	ApplyResidentFormat(origImageData);
+
+	// RGBA8 and RGBA16F are both legitimate resident formats (S-5); anything
+	// else means a decoder produced a type the funnel never agreed to, which
+	// is still worth dying for.
+	if(origImageData->getImageType() != IMG_TYPE_RGBA &&
+	   origImageData->getImageType() != IMG_TYPE_RGBA_16F)
 	{
-		SYS_FatalExit("Image type is %2.2x (should be %2.2x)",
-				origImageData->getImageType(), IMG_TYPE_RGBA);
+		SYS_FatalExit("Image type is %2.2x (should be %2.2x or %2.2x)",
+				origImageData->getImageType(), IMG_TYPE_RGBA, IMG_TYPE_RGBA_16F);
 	}
 
 	this->loadImgWidth = origImageData->width;
@@ -749,8 +858,17 @@ void CSlrImage::RefreshImageParameters(CImageData *origImageData, u8 resourcePri
 	this->defaultTexEndY = ((float)loadImgHeight / (float)rasterHeight);
 
 	this->shouldDeallocLoadImageData = true;
-	this->loadImageData = new CImageData(rasterWidth, rasterHeight, IMG_TYPE_RGBA);
+	// The SOURCE's type, not a hardcoded RGBA8. This entry point calls the
+	// funnel above, so residentFormat may already say RGBA16F -- and allocating
+	// a 4 bytes/px buffer for it would have the upload read 8 bytes/px straight
+	// past the end of it. Latent while every caller passes RGBA8, which is
+	// exactly how it would have survived to bite the first one that did not.
+	const u8 refreshType = origImageData->getImageType();
+	const int refreshBpp = (refreshType == IMG_TYPE_RGBA_16F) ? 8 : 4;
+	this->loadImageData = new CImageData(rasterWidth, rasterHeight, refreshType);
 	this->loadImageData->AllocImage(false, true);
+	this->loadImageData->floatIsSurfaceEncoded = origImageData->floatIsSurfaceEncoded;
+	this->loadImageData->contentMaxComponent = origImageData->contentMaxComponent;
 
 	this->widthD2 = this->width/2.0;
 	this->heightD2 = this->height/2.0;
@@ -758,8 +876,8 @@ void CSlrImage::RefreshImageParameters(CImageData *origImageData, u8 resourcePri
 	this->heightM2 = this->height*2.0;
 
 	this->resourcePriority = resourcePriority;
-	this->resourceLoadingSize = rasterWidth * rasterHeight * 4 * 2;
-	this->resourceIdleSize = rasterWidth * rasterHeight * 4;
+	this->resourceLoadingSize = rasterWidth * rasterHeight * refreshBpp * 2;
+	this->resourceIdleSize = rasterWidth * rasterHeight * refreshBpp;
 
 	this->resourceIsActive = false;
 	this->resourceState = RESOURCE_STATE_PRELOADING;
@@ -776,6 +894,12 @@ void CSlrImage::SetLoadImageData(CImageData *imageData)
 void CSlrImage::ReBindImageData(CImageData *imageData)
 {
 	VID_LockImageBindingMutex();
+	// THE SIXTH ENTRY POINT, and the reason the funnel is one helper rather
+	// than five copies: this one swapped loadImageData and rebound without ever
+	// looking at the image type, so a 16-bit or float CImageData handed to it
+	// reached upload unconverted. c64d calls this live
+	// (CViewC64GoatTracker.cpp:119).
+	this->ApplyResidentFormat(imageData);
 	this->SetLoadImageData(imageData);
 	this->ReBindImage();
 	VID_UnlockImageBindingMutex();
@@ -851,11 +975,51 @@ void CSlrImage::LoadImage(CSlrFile *imgFile)
 		SYS_FatalExit("LoadImage: imgFile NULL");
 	}
 
+	// Peek the first byte, then rewind -- neither branch below may consume it
+	// before this decides which one it is. GFX_BYTE_MAGIC1 ('g') is our own
+	// preload binary format; nothing else starts a file with it (PNG 0x89,
+	// JPEG 0xFF, BMP 'B', GIF 'G' uppercase, TIFF 'I'/'M').
 	u8 magic = imgFile->ReadByte();
+	imgFile->Seek(0);
+
 	if (magic != GFX_BYTE_MAGIC1)
 	{
-		SYS_FatalExit("LoadImage '%s': bad magic %2.2x", imgFile->fileName, magic);
+		// Not our own format: decode as an ordinary still image via
+		// stb_image's own content sniffing (PNG/JPEG/BMP/GIF/TGA/PSD/...),
+		// streamed straight off imgFile through the SAME CSlrFile callback
+		// adapter (jpegRead/jpegSkip/jpegEof) the .gfx container's embedded-
+		// JPEG payload already uses below (GFX_COMPRESSION_TYPE_JPEG*) --
+		// imgFile may be memory- or zlib-backed with no real filesystem path,
+		// so this cannot go through CImageData's path-based Load().
+		stbi_io_callbacks callbacks;
+		callbacks.read = &jpegRead;
+		callbacks.skip = &jpegSkip;
+		callbacks.eof  = &jpegEof;
+
+		int w = 0, h = 0, channels = 0;
+		u8 *pixels = stbi_load_from_callbacks(&callbacks, imgFile, &w, &h, &channels, STBI_rgb_alpha);
+		if (pixels == NULL)
+		{
+			SYS_FatalExit("LoadImage '%s': not a recognized image (magic %2.2x) -- %s",
+						  imgFile->fileName, magic, stbi_failure_reason());
+		}
+
+		// Hand the decoded RGBA off through the SAME path/CImageData-based
+		// LoadImage() below uses (LoadImage(CImageData*, u8)) -- one place
+		// does the power-of-two padding, resident-format funnel and copy, for
+		// every entry point that produces plain decoded RGBA.
+		CImageData *imageData = new CImageData(w, h);
+		memcpy(imageData->resultData, pixels, (size_t)w * (size_t)h * 4);
+		stbi_image_free(pixels);
+
+		this->LoadImage(imageData, RESOURCE_PRIORITY_NORMAL);
+		delete imageData;
+		return;
 	}
+
+	// Our own format: re-consume the magic byte the peek above rewound past,
+	// then parse exactly as before.
+	imgFile->ReadByte();
 
 	u16 version = imgFile->ReadUnsignedShort();
 	if (version > GFX_FILE_VERSION)

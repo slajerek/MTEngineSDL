@@ -11,7 +11,11 @@
 namespace {
     // Bounce errors to the object
     void libjpeg_error_exit(j_common_ptr cinfo) {
-        assert(cinfo->is_decompressor && cinfo->client_data);
+        // NOTE: this asserted is_decompressor (inverted) until 2026-07-20.
+        // In a debug build that made every libjpeg WRITE error abort instead
+        // of throwing -- compare libjpeg_output_message below, which had it
+        // right. Any negative test of the writer depends on this fix.
+        assert(!cinfo->is_decompressor && cinfo->client_data);
         ((JPEGWriter*) cinfo->client_data)->error_exit();
     }
     
@@ -22,7 +26,11 @@ namespace {
 }
 
 JPEGWriter::JPEGWriter() {
-    
+
+    outFile     = NULL;
+    compressing = false;
+    rowsStarted = false;
+
     // Error handling first, in case the initialization fails.
     cinfo.err = jpeg_std_error(&jerr);
     jerr.error_exit = libjpeg_error_exit;
@@ -37,6 +45,9 @@ JPEGWriter::JPEGWriter() {
 
 JPEGWriter::~JPEGWriter() {
     assert(cinfo.client_data == this);
+    // Backstop for an abandoned split write: if the caller threw between
+    // beginWrite() and endWrite(), this is what stops the descriptor leaking.
+    closeFile();
     jpeg_destroy_compress(&cinfo);
 }
 

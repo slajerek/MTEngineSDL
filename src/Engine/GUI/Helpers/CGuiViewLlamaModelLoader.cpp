@@ -6,6 +6,7 @@
 #include "Sci/Llama/llama_cpp_version.h"
 
 #include <algorithm>
+#include <cstdlib>
 
 // ─── Constructors ─────────────────────────────────────────────────────────────
 
@@ -147,7 +148,7 @@ void CGuiViewLlamaModelLoader::SystemDialogFileOpenSelected(CSlrString *path)
 	if (!path)
 		return;
 
-	char *c = path->GetStdASCII();
+	char *c = path->GetUTF8();
 	if (c)
 	{
 		std::string modelPath = c;
@@ -177,8 +178,6 @@ void CGuiViewLlamaModelLoader::SystemDialogFileOpenSelected(CSlrString *path)
 		modelManager->AddCustomModel(cm);
 		SwitchToModelId(newId);
 	}
-
-	delete path;
 }
 
 void CGuiViewLlamaModelLoader::SystemDialogFileOpenCancelled()
@@ -190,7 +189,7 @@ void CGuiViewLlamaModelLoader::SystemDialogPickFolderSelected(CSlrString *path)
 {
 	if (!path)
 		return;
-	char *c = path->GetStdASCII();
+	char *c = path->GetUTF8();
 	if (c)
 	{
 		std::string folderPath = c;
@@ -208,7 +207,6 @@ void CGuiViewLlamaModelLoader::SystemDialogPickFolderSelected(CSlrString *path)
 		}
 	}
 	folderPickTarget = FolderPickTarget::None;
-	delete path;
 }
 
 void CGuiViewLlamaModelLoader::SystemDialogPickFolderCancelled()

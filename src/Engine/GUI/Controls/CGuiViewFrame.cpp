@@ -4,6 +4,7 @@
 #include "CGuiViewFrame.h"
 #include "CSlrString.h"
 #include "CGuiMain.h"
+#include "MT_UiScale.h"
 #include "CGuiWindow.h"
 #include "CGuiViewToolBox.h"
 #include "RES_ResourceManager.h"
@@ -68,7 +69,7 @@ void CGuiViewFrame::Initialize(CGuiView *view, CSlrString *barTitle, u32 mode)
 	barTextColorB = 147.0f/255.0f;
 	barTextColorA = 1.0f;
 	
-	fontSize = 1.5f;
+	fontSize = MT_UiScaled(1.5f);
 	
 	barFont = guiMain->fntEngineDefault;
 	

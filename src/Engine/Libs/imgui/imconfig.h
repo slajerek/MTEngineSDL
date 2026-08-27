@@ -43,17 +43,20 @@
 //#define IMGUI_DISABLE_WIN32_DEFAULT_IME_FUNCTIONS         // [Win32] [Default with non-Visual Studio compilers] Don't implement default IME handler (won't require imm32.lib/.a)
 //#define IMGUI_DISABLE_WIN32_FUNCTIONS                     // [Win32] Won't use and link with any Win32 function (clipboard, IME).
 //#define IMGUI_ENABLE_OSX_DEFAULT_CLIPBOARD_FUNCTIONS      // [OSX] Implement default OSX clipboard handler (need to link with '-framework ApplicationServices', this is why this is not the default).
+//#define IMGUI_DISABLE_TIME_FUNCTIONS                      // Don't setup default platform_io.Platform_SessionDate value using time(), localtime_r().
 //#define IMGUI_DISABLE_DEFAULT_SHELL_FUNCTIONS             // Don't implement default platform_io.Platform_OpenInShellFn() handler (Win32: ShellExecute(), require shell32.lib/.a, Mac/Linux: use system("")).
 //#define IMGUI_DISABLE_DEFAULT_FORMAT_FUNCTIONS            // Don't implement ImFormatString/ImFormatStringV so you can implement them yourself (e.g. if you don't want to link with vsnprintf)
 //#define IMGUI_DISABLE_DEFAULT_MATH_FUNCTIONS              // Don't implement ImFabs/ImSqrt/ImPow/ImFmod/ImCos/ImSin/ImAcos/ImAtan2 so you can implement them yourself.
 //#define IMGUI_DISABLE_FILE_FUNCTIONS                      // Don't implement ImFileOpen/ImFileClose/ImFileRead/ImFileWrite and ImFileHandle at all (replace them with dummies)
 //#define IMGUI_DISABLE_DEFAULT_FILE_FUNCTIONS              // Don't implement ImFileOpen/ImFileClose/ImFileRead/ImFileWrite and ImFileHandle so you can implement them yourself if you don't want to link with fopen/fclose/fread/fwrite. This will also disable the LogToTTY() function.
 //#define IMGUI_DISABLE_DEFAULT_ALLOCATORS                  // Don't implement default allocators calling malloc()/free() to avoid linking with them. You will need to call ImGui::SetAllocatorFunctions().
-//#define IMGUI_DISABLE_DEFAULT_FONT                        // Disable default embedded fonts (ProggyClean/ProggyVector), remove ~9 KB + ~17 KB from output binary. AddFontDefaultXXX() functions will assert.
+//#define IMGUI_DISABLE_DEFAULT_FONT                        // Disable default embedded fonts (ProggyClean + ProggyForever). Remove ~9 KB + ~14 KB from output binary. AddFontDefaultXXX() functions will assert.
+//#define IMGUI_DISABLE_DEFAULT_FONT_BITMAP                 // Disable default embedded bitmap font (ProggyClean). Remove ~9 KB from output binary. AddFontDefaultBitmap() will assert.
+//#define IMGUI_DISABLE_DEFAULT_FONT_VECTOR                 // Disable default embedded vector font (ProggyForever), Remove ~14 KB from output binary. AddFontDefaultVector() will assert.
 //#define IMGUI_DISABLE_SSE                                 // Disable use of SSE intrinsics even if available
 
 //---- Enable Test Engine / Automation features.
-//#define IMGUI_ENABLE_TEST_ENGINE                          // Enable imgui_test_engine hooks. Generally set automatically by include "imgui_te_config.h", see Test Engine for details.
+//#define IMGUI_ENABLE_TEST_ENGINE                          // Enable imgui_test_engine hooks. Generally set automatically by include "imgui_te_imconfig.h", see Test Engine for details.
 
 //---- Include imgui_user.h at the end of imgui.h as a convenience
 // May be convenient for some users to only explicitly include vanilla imgui.h and have extra stuff included.
@@ -80,7 +83,9 @@
 
 //---- Use stb_sprintf.h for a faster implementation of vsnprintf instead of the one from libc (unless IMGUI_DISABLE_DEFAULT_FORMAT_FUNCTIONS is defined)
 // Compatibility checks of arguments and formats done by clang and GCC will be disabled in order to support the extra formats provided by stb_sprintf.h.
+// [MTENGINE-PATCH: config-stb-sprintf] faster, locale-independent formatting; stb_sprintf is already vendored
 #define IMGUI_USE_STB_SPRINTF
+// [/MTENGINE-PATCH: config-stb-sprintf]
 
 //---- Use FreeType to build and rasterize the font atlas (instead of stb_truetype which is embedded by default in Dear ImGui)
 // Requires FreeType headers to be available in the include path. Requires program to be compiled with 'misc/freetype/imgui_freetype.cpp' (in this repository) + the FreeType library (not provided).
@@ -118,7 +123,9 @@
 // Your renderer backend will need to support it (most example renderer backends support both 16/32-bit indices).
 // Another way to allow large meshes while keeping 16-bit indices is to handle ImDrawCmd::VtxOffset in your renderer.
 // Read about ImGuiBackendFlags_RendererHasVtxOffset for details.
+// [MTENGINE-PATCH: config-drawidx-32] 16-bit indices overflow on dense UI (filmstrip draws hundreds of rects/frame)
 #define ImDrawIdx unsigned int
+// [/MTENGINE-PATCH: config-drawidx-32]
 
 //---- Override ImDrawCallback signature (will need to modify renderer backends accordingly)
 //struct ImDrawList;
@@ -138,11 +145,24 @@
 //---- Debug Tools: Enable slower asserts
 //#define IMGUI_DEBUG_PARANOID
 
+// [MTENGINE-PATCH: config-test-engine] couples to the sibling vendored src/Engine/Libs/imgui_test_engine
 //---- Enable imgui_test_engine hooks (opt-in via build define)
-#ifdef ENABLE_IMGUI_TEST_ENGINE
+#if MT_ENABLE_IMGUI_TEST_ENGINE
 #define IMGUI_ENABLE_TEST_ENGINE
 #define IMGUI_TEST_ENGINE_ENABLE_COROUTINE_STDTHREAD_IMPL 1
+// Enable framebuffer screen capture (PNG via imstb_image_write) so automated
+// UI tests can read back rendered pixels through ImGuiTestEngineIO::ScreenCaptureFunc.
+#define IMGUI_TEST_ENGINE_ENABLE_CAPTURE 1
 #endif
+// [/MTENGINE-PATCH: config-test-engine]
+
+// [MTENGINE-PATCH: config-math-operators] MOVED HERE from imgui.h line 1 during the
+// 1.92.6 -> 1.93.0 upgrade. imconfig.h is the sanctioned extension point and imgui.h
+// includes it long before its own #ifdef IMGUI_DEFINE_MATH_OPERATORS block, so this
+// has identical effect while surviving a wholesale file replacement -- which the old
+// line-1 injection did NOT (it was destroyed by the copy, exactly as predicted).
+#define IMGUI_DEFINE_MATH_OPERATORS
+// [/MTENGINE-PATCH: config-math-operators]
 
 //---- Tip: You can add extra functions within the ImGui:: namespace from anywhere (e.g. your own sources/header files)
 /*

@@ -3,11 +3,12 @@
 
 #include "SYS_Defs.h"
 #include "CSlrFile.h"
+#include <string>
 
 class CSlrFileFromDocuments : public CSlrFile
 {
 public:
-	char osFileName[768];
+	std::string osFileName;
 	bool isAbsolutePath;
 
 	CSlrFileFromDocuments(const char *fileName);

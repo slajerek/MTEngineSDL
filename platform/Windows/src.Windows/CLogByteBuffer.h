@@ -1,8 +1,10 @@
 #ifndef CLOGBYTEBUFFER_H_
 #define CLOGBYTEBUFFER_H_
 
+#ifndef _WIN32
 #ifndef byte
 #define byte unsigned char
+#endif
 #endif
 
 #include <vector>

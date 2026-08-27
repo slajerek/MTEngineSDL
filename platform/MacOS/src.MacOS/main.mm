@@ -10,7 +10,7 @@
 
 #include <iostream>
 #include <string>
-#include <SDL.h>
+#include <SDL3/SDL.h>
 #include <sys/types.h>
 #include <sys/sysctl.h>
 #include "SYS_FileSystem.h"

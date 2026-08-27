@@ -3,7 +3,7 @@
 #include "CGuiMain.h"
 #include "SYS_KeyCodes.h"
 #include "SYS_Platform.h"
-#include <SDL.h>
+#include <SDL3/SDL.h>
 
 CGuiViewProgressBarWindow::CGuiViewProgressBarWindow(const char *name, float posX, float posY, float posZ, float sizeX, float sizeY, CGuiViewProgressBarWindowCallback *callback)
 : CGuiView(name, posX, posY, posZ, sizeX, sizeY)

@@ -1,13 +1,19 @@
 param(
     [ValidateSet('Debug','Release','RelWithDebInfo','MinSizeRel')]
-    [string]$Config = 'Release',
+    [string]$Configuration = 'Release',
     [ValidateSet('x64','ARM64')]
     [string]$Platform = 'x64',
     [ValidateSet('Clang','MSVC')]
-    [string]$Compiler = 'Clang'
+    [string]$Compiler = 'Clang',
+
+    # Where this script stages its archive. Supplied by build-deps.ps1 or by an
+    # app wrapper, both from the single mtcaps resolve they already do.
+    [string]$OutLibDir
 )
 
 $ErrorActionPreference = 'Stop'
+
+. "$PSScriptRoot\mt-build-common.ps1"
 
 function Require-Command([string]$name) {
     if (-not (Get-Command $name -ErrorAction SilentlyContinue)) {
@@ -22,7 +28,12 @@ function Require-Path([string]$path, [string]$what) {
 }
 
 $repoRoot = (Resolve-Path "$PSScriptRoot\..\..").Path
-$outDir   = Join-Path $repoRoot "platform\Windows\libs\$Platform\$Config"
+# REQUIRED, not defaulted. The caller decides where archives go; the only
+# fallback in the system lives in build-deps.ps1, so the old
+# platform\Windows\libs path cannot creep back in here -- that directory holds
+# 25 TRACKED prebuilts and a build must not write into it.
+if (-not $OutLibDir) { throw "-OutLibDir is required. Run this through build-deps.ps1, which resolves it." }
+$outDir = $OutLibDir
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 
 $outLib   = Join-Path $outDir 'mbedtls_bundle.lib'
@@ -38,7 +49,7 @@ if ($env:MT_ENABLE_MBEDTLS -eq '0') {
     Require-Command lib
     Require-Command cl
 
-    $stampValue = "disabled`:$scriptSha`:$Config`:$Platform"
+    $stampValue = "disabled`:$scriptSha`:$Configuration`:$Platform"
     if ((Test-Path $outLib) -and (Test-Path $stamp)) {
         if ((Get-Content $stamp -Raw).Trim() -eq $stampValue) {
             exit 0
@@ -75,31 +86,49 @@ try {
     $mbedSha = (git -C $mbedSrc rev-parse --short HEAD).Trim()
 } catch {}
 
-$stampValue = "$mbedSha`:$scriptSha`:$Config`:$Platform"
+$stampValue = "$mbedSha`:$scriptSha`:$Configuration`:$Platform"
 if ((Test-Path $outLib) -and (Test-Path $stamp)) {
     if ((Get-Content $stamp -Raw).Trim() -eq $stampValue) {
         exit 0
     }
 }
 
-$cmakeToolset = if ($Compiler -eq 'Clang') { @('-T', 'ClangCL') } else { @() }
+$cmakeToolsetName = if ($Compiler -eq 'Clang') { 'ClangCL' } else { '' }
+$cmakeToolset = if ($cmakeToolsetName) { @('-T', $cmakeToolsetName) } else { @() }
 
 Write-Host "Configuring mbedTLS in $buildDir"
-# Auto-detect the default Visual Studio CMake generator for the installed VS
-# (handles 'Visual Studio 17 2022', 'Visual Studio 18 2026', ... without hardcoding).
-$genMatch = cmake --help | Select-String -Pattern '^\*\s+(Visual Studio \d+ \d+)'
-if (-not $genMatch) { throw "Could not detect the default Visual Studio CMake generator from 'cmake --help'." }
-$generator = $genMatch.Matches[0].Groups[1].Value
+$generator = Get-MTVSGenerator
 Write-Host "Using CMake generator: $generator"
 
-cmake -S $mbedSrc -B $buildDir -G $generator -A $Platform @cmakeToolset `
-    -DBUILD_SHARED_LIBS=OFF `
-    -DENABLE_TESTING=OFF `
-    -DENABLE_PROGRAMS=OFF `
-    -DCMAKE_MSVC_RUNTIME_LIBRARY="MultiThreaded$<$<CONFIG:Debug>:Debug>"
+# The directory is already keyed by architecture, but a Visual Studio upgrade
+# or a -Compiler switch leaves a cache CMake will refuse to reconfigure.
+$null = Reset-MTStaleCMakeCache -BuildDir $buildDir -Platform $Platform -Generator $generator `
+    -Toolset $cmakeToolsetName -SourceDir $mbedSrc -Label 'mbedTLS'
 
-Write-Host "Building mbedTLS libs ($Config)"
-cmake --build $buildDir --config $Config --target mbedcrypto mbedx509 mbedtls
+# RELAX $ErrorActionPreference AROUND THESE TWO NATIVE CALLS, same issue and
+# same fix as build-llama_cpp_cpu.ps1's Build-CMake / build-image_codecs.ps1:
+# PowerShell 5.1 wraps ANY stderr line from a native command into a
+# terminating NativeCommandError under 'Stop', regardless of exit code -- so a
+# benign "CMake Deprecation Warning: cmake_minimum_required" from mbedTLS's own
+# (third-party, unmaintained-by-us) CMakeLists.txt on an otherwise-successful
+# configure aborted this script outright. $LASTEXITCODE below is the real,
+# sufficient success/failure signal.
+$savedEap = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'
+try {
+    cmake -S $mbedSrc -B $buildDir -G $generator -A $Platform @cmakeToolset `
+        -DBUILD_SHARED_LIBS=OFF `
+        -DENABLE_TESTING=OFF `
+        -DENABLE_PROGRAMS=OFF `
+        -DCMAKE_MSVC_RUNTIME_LIBRARY="MultiThreaded$<$<CONFIG:Debug>:Debug>"
+    if ($LASTEXITCODE -ne 0) { throw "CMake configure failed for mbedTLS" }
+
+    Write-Host "Building mbedTLS libs ($Configuration)"
+    cmake --build $buildDir --config $Configuration --target mbedcrypto mbedx509 mbedtls
+    if ($LASTEXITCODE -ne 0) { throw "CMake build failed for mbedTLS" }
+} finally {
+    $ErrorActionPreference = $savedEap
+}
 
 function Find-Lib([string]$name) {
     $hits = Get-ChildItem -Path $buildDir -Recurse -File -Filter $name | Select-Object -First 1

@@ -133,11 +133,20 @@ void SYS_InitFileSystem()
 	gUTFPathToDocuments = FUN_ConvertNSStringToCSlrString(gOSPathToDocuments);
 	gStdPathToDocuments = std::string([gOSPathToDocuments UTF8String]);
 	
-	const char *pathResources = (const char *)[gOSPathToDocuments UTF8String];
-	gCPathToResources = strdup(path);
-	gPathToResources = gCPathToDocuments;
-	gUTFPathToResources = FUN_ConvertNSStringToCSlrString(gOSPathToDocuments);
-	gStdPathToResources = std::string([gOSPathToDocuments UTF8String]);
+	// Read-only resources live inside the app bundle (Contents/Resources), where
+	// the app's Copy Bundle Resources build phase stages them. This is distinct
+	// from the writable Documents/Settings folders above. Fall back to Documents
+	// when there is no bundle (e.g. a plain command-line tool with no .app).
+	NSString *bundleResources = [[NSBundle mainBundle] resourcePath];
+	if (bundleResources != nil)
+		gOSPathToResources = [[NSString alloc] initWithFormat:@"%@/", bundleResources];
+	else
+		gOSPathToResources = gOSPathToDocuments;
+	const char *pathResources = (const char *)[gOSPathToResources UTF8String];
+	gCPathToResources = strdup(pathResources);
+	gPathToResources = gCPathToResources;
+	gUTFPathToResources = FUN_ConvertNSStringToCSlrString(gOSPathToResources);
+	gStdPathToResources = std::string([gOSPathToResources UTF8String]);
 
 	const char *pathTemp = (const char *)[gOSPathToTemp UTF8String];
 	gCPathToTemp = strdup(pathTemp);
@@ -199,6 +208,21 @@ void SYS_DeleteFile(CSlrString *filePath)
 //	[str release];
 	
 	LOGD("SYS_DeleteFile done");
+}
+
+bool SYS_FileDeleteToTrash(const char *path, std::string *outTrashPath, std::string *outError)
+{
+	NSURL *url = [NSURL fileURLWithPath:@(path)];
+	NSURL *resultingURL = nil;
+	NSError *error = nil;
+	BOOL ok = [[NSFileManager defaultManager] trashItemAtURL:url
+	                                        resultingItemURL:&resultingURL
+	                                                   error:&error];
+	if (ok && outTrashPath && resultingURL != nil && resultingURL.path != nil)
+		*outTrashPath = resultingURL.path.UTF8String;
+	if (!ok && outError)
+		*outError = error.localizedDescription.UTF8String;
+	return (bool)ok;
 }
 
 CFileItem::CFileItem(char *name, char *fullPath, char *modDate, bool isDir)

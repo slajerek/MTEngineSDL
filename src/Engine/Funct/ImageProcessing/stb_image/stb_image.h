@@ -1205,10 +1205,66 @@ static void stbi__float_postprocess(float *result, int *x, int *y, int *comp, in
 
 #ifndef STBI_NO_STDIO
 
+// MTEngineSDL: filenames handed to stb are UTF-8 (the engine-wide convention;
+// native on macOS/Linux). fopen/fopen_s decode a char* using the process ANSI
+// code page, so on a CP1252/CP1250/CP932 Windows every non-ASCII name failed to
+// open -- an image under e.g. "Chrzaszczozewoszyce/", or with CJK, emoji or
+// macOS NFD accents, reported "can't fopen" for a file that was plainly there.
+// This is upstream stb's STBI_WINDOWS_UTF8 branch, made unconditional (the
+// engine has no non-UTF-8 callers) and given a heap buffer instead of upstream's
+// fixed wchar_t[1024], so long paths convert instead of silently failing.
+// Deliberately plain C with no engine includes: this header is compiled as C
+// from stb_image.c. See src/Engine/Core/SYS_FileUtf8.h for the C++ equivalent.
+#if defined(_WIN32)
+#include <wchar.h>
+
+// Declared rather than #include <windows.h>: this is upstream stb's approach
+// and it keeps windows.h's macros (min/max/near/far/small/boolean) out of a
+// header that other translation units include.
+extern __declspec(dllimport) int __stdcall MultiByteToWideChar(
+	unsigned int cp, unsigned long flags, const char *str, int cbmb,
+	wchar_t *widestr, int cchwide);
+
+#define STBI__CP_UTF8 65001
+
+static wchar_t *stbi__utf8_to_wide(char const *utf8)
+{
+	int len;
+	wchar_t *wide;
+	if (utf8 == NULL)
+		return NULL;
+	len = MultiByteToWideChar(STBI__CP_UTF8, 0, utf8, -1, NULL, 0);
+	if (len <= 0)
+		return NULL;
+	wide = (wchar_t *)STBI_MALLOC((size_t)len * sizeof(wchar_t));
+	if (wide == NULL)
+		return NULL;
+	if (MultiByteToWideChar(STBI__CP_UTF8, 0, utf8, -1, wide, len) == 0) {
+		STBI_FREE(wide);
+		return NULL;
+	}
+	return wide;
+}
+#endif
+
 static FILE *stbi__fopen(char const *filename, char const *mode)
 {
 	FILE *f;
+#if defined(_WIN32)
+	wchar_t *wFilename = stbi__utf8_to_wide(filename);
+	wchar_t *wMode     = stbi__utf8_to_wide(mode);
+	f = 0;
+	if (wFilename != NULL && wMode != NULL) {
 #if defined(_MSC_VER) && _MSC_VER >= 1400
+		if (0 != _wfopen_s(&f, wFilename, wMode))
+			f = 0;
+#else
+		f = _wfopen(wFilename, wMode);
+#endif
+	}
+	if (wFilename != NULL) STBI_FREE(wFilename);
+	if (wMode != NULL)     STBI_FREE(wMode);
+#elif defined(_MSC_VER) && _MSC_VER >= 1400
 	if (0 != fopen_s(&f, filename, mode))
 		f = 0;
 #else

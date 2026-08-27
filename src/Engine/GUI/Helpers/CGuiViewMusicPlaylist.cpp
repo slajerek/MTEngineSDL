@@ -7,6 +7,7 @@
 #include <cctype>
 #include <cinttypes>
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 
@@ -482,11 +483,11 @@ void CGuiViewMusicPlaylist::SystemDialogFileOpenSelected(CSlrString *path)
 	if (path == NULL)
 		return;
 
-	char *cPath = path->GetStdASCII();
+	char *cPath = path->GetUTF8();
 	if (cPath == nullptr)
 		return;
 	std::string selectedPath = cPath;
-	delete[] cPath;
+	free(cPath);
 
 	if (playlistDialogMode == PlaylistDialogMode::LoadPlaylist)
 	{
@@ -518,13 +519,13 @@ void CGuiViewMusicPlaylist::SystemDialogFilesOpenSelected(std::vector<CSlrString
 	{
 		if (!path)
 			continue;
-		char *cPath = path->GetStdASCII();
+		char *cPath = path->GetUTF8();
 		if (!cPath)
 			continue;
 
 		playlistController.AddTrack(cPath);
 		playlistController.SetLastOpenFolder(GetFolderFromPath(cPath));
-		delete[] cPath;
+		free(cPath);
 	}
 
 	playlistDialogMode = PlaylistDialogMode::None;
@@ -544,7 +545,7 @@ void CGuiViewMusicPlaylist::SystemDialogFileSaveSelected(CSlrString *path)
 		return;
 	}
 
-	char *cPath = path->GetStdASCII();
+	char *cPath = path->GetUTF8();
 	if (cPath == nullptr)
 	{
 		playlistDialogMode = PlaylistDialogMode::None;
@@ -552,7 +553,7 @@ void CGuiViewMusicPlaylist::SystemDialogFileSaveSelected(CSlrString *path)
 	}
 
 	std::string savePath = cPath;
-	delete[] cPath;
+	free(cPath);
 	playlistDialogMode = PlaylistDialogMode::None;
 	SavePlaylistAs(savePath, pendingSaveAsPathMode);
 }

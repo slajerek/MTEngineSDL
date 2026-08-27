@@ -80,6 +80,13 @@ void SYS_CreateFolder(CSlrString *path);
 
 bool SYS_FileExists(const char *path);
 bool SYS_FileExists(CSlrString *path);
+
+// Move the file at `path` to the OS trash/recycle bin.
+// Returns true on success; on failure sets *outError (if non-null).
+// On success, if the platform reports where the file landed, *outTrashPath is set
+// to that location (used to support undo/restore); left untouched otherwise.
+// Never silently deletes permanently.
+bool SYS_FileDeleteToTrash(const char *path, std::string *outTrashPath, std::string *outError);
 bool SYS_FileDirExists(const char *path);
 bool SYS_FileDirExists(CSlrString *path);
 

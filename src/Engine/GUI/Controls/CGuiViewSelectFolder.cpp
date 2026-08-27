@@ -13,6 +13,7 @@
 #include "CGuiFolderFavorite.h"
 #include "SYS_KeyCodes.h"
 #include "CSlrString.h"
+#include "MT_UiScale.h"
 
 #define TOP_LABEL_FONT_SIZE	1.5
 #define TOP_LABEL_SIZEY		(TOP_LABEL_FONT_SIZE)+5
@@ -41,8 +42,8 @@ CGuiViewSelectFolder::CGuiViewSelectFolder(float posX, float posY, float posZ, f
 									  this);
 	this->AddGuiElement(this->listBoxFiles);
 
-	const int buttonSizeX = 60;
-	const int buttonSizeY = 25;
+	const int buttonSizeX = (int)MT_UiScaled(60);
+	const int buttonSizeY = (int)MT_UiScaled(25);
 	
 	btnDone = new CGuiButton("SELECT", posEndX - (guiButtonSizeX + guiButtonGapX),
 							   posEndY - (buttonSizeY + guiButtonGapY), posZ + 0.04,

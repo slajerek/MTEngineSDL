@@ -76,9 +76,53 @@ void BlitAtlAlpha(CSlrImage *image, float destX, float destY, float z, float siz
 void BlitCheckAtlAlpha(CSlrImage *image, float destX, float destY, float z, float sizeX, float sizeY, float alpha);
 void BlitCheckAtlFlipHorizontal(CSlrImage *image, float destX, float destY, float z, float sizeX, float sizeY);
 
-void Blit(CSlrImage *image, float destX, float destY, float z, float sizeX, float sizeY, 
+void Blit(CSlrImage *image, float destX, float destY, float z, float sizeX, float sizeY,
 		  float texStartX, float texStartY,
 		  float texEndX, float texEndY);
+
+// Maps a NORMALIZED display-space UV (0..1 across the DISPLAYED image, the way
+// the user sees it) back to a normalized texture-space UV, for a display
+// rotated q CLOCKWISE quarter turns relative to the texture. Convention check:
+// q=1 sends display top-right (1,0) to texture (0,0) -- the texture's top-left
+// corner appears at the displayed top-right, i.e. the image turned clockwise.
+// NORMALIZED ONLY -- for real texel UVs use VID_RotateQuarterUVInRect below.
+inline void VID_RotateQuarterUV(int q, float du, float dv, float &outU, float &outV)
+{
+	switch (q & 3)
+	{
+		default: outU = du;        outV = dv;        break;
+		case 1:  outU = dv;        outV = 1.0f - du; break;   // 90 CW
+		case 2:  outU = 1.0f - du; outV = 1.0f - dv; break;   // 180
+		case 3:  outU = 1.0f - dv; outV = du;        break;   // 270 CW (= 90 CCW)
+	}
+}
+
+// Rotation for UVs living inside the image's ACTUAL texel rect
+// [sx0..sx1]x[sy0..sy1] (CSlrImage::defaultTex* -- a POT-padded SUB-rect of
+// [0,1] for images uploaded via LoadImage). Normalizes (u,v) to display
+// fractions of that rect, rotates, and maps back into the same rect, so
+// rotated sampling can never leave the image and hit padding. Degenerate
+// rects (zero extent) clamp to the rect origin instead of dividing by zero.
+inline void VID_RotateQuarterUVInRect(int q, float u, float v,
+									  float sx0, float sy0, float sx1, float sy1,
+									  float &outU, float &outV)
+{
+	float du = (sx1 > sx0) ? (u - sx0) / (sx1 - sx0) : 0.0f;
+	float dv = (sy1 > sy0) ? (v - sy0) / (sy1 - sy0) : 0.0f;
+	float nu, nv;
+	VID_RotateQuarterUV(q, du, dv, nu, nv);
+	outU = sx0 + nu * (sx1 - sx0);
+	outV = sy0 + nv * (sy1 - sy0);
+}
+
+// Blit rotated by CLOCKWISE quarter turns. quarterTurns==0 delegates to the
+// UV-rect Blit above, so the default path is byte-identical to today. The
+// incoming texStart/texEnd are DISPLAY-space UVs inside image->defaultTex*
+// (that is what the moving pane computes once pane space is display-oriented).
+void BlitQuarterTurns(CSlrImage *image, float destX, float destY, float z,
+					  float sizeX, float sizeY,
+					  float texStartX, float texStartY, float texEndX, float texEndY,
+					  int quarterTurns);
 
 void BlitFlipVertical(CSlrImage *image, float destX, float destY, float z, float sizeX, float sizeY,
 		  float texStartX, float texStartY, float texEndX, float texEndY);

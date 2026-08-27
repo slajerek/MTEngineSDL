@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project>
+  <!-- ===================================================================
+       THE VISUAL STUDIO IDE CHANNEL.
+
+       WHY A TARGET AND NOT AN IMPORT.
+
+       MSBuild evaluates <Import> during project EVALUATION, which completes
+       strictly before any target executes. So a Visual Studio build - which
+       passes no /p:MTOutRoot - cannot import the generated .props for the build
+       it is in, and the design originally accepted that: the IDE stopped at a
+       guard naming build-windows.ps1, and only that script could produce a
+       capability-correct binary.
+
+       The way around it is not to import at all. A TARGET running
+       BeforeTargets="ClCompile" can modify ClCompile ITEM METADATA, because
+       those items are read by the ClCompile task at EXECUTION time, long after
+       evaluation is over. That sidesteps the constraint entirely rather than
+       working around it, and it makes F5 and a Release build from inside Visual
+       Studio produce the same binary build-windows.ps1 does.
+
+       WHY IT READS A FLAT FILE.
+
+       MSBuild property functions are a whitelist of static .NET methods.
+       File::ReadAllText is on it; parsing XML is not. So mtcaps writes
+       ide-defines-{app,engine}.txt - semicolon-separated, exactly what goes into
+       <PreprocessorDefinitions>, nothing to parse.
+
+       WHICH APP.
+
+       $(MTCapsApp) crosses the ProjectReference through <AdditionalProperties>,
+       which is a PROJECT-FILE mechanism and therefore works in an IDE build too
+       - unlike a command-line setting. The app's manifest is then found at the
+       sibling layout the whole programme already assumes.
+
+       UNVERIFIED. Nothing here has been executed: there is no MSBuild on the
+       machine this was written on. It is reasoned from documented behaviour, and
+       spike #2.1 in claude/WINDOWS-HANDOVER.md is what confirms or refutes it.
+       =================================================================== -->
+
+  <Target Name="MTCapsResolveForIDE"
+          BeforeTargets="ClCompile"
+          Condition="'$(MTOutRoot)' == '' And '$(MT_STANDALONE)' != '1'">
+
+    <!-- The engine is built as a ProjectReference from an app's solution, so the
+         app's identity arrives in $(MTCapsApp) and its repo is a sibling of this
+         one. Without an app there is nothing to resolve - that is a bare engine
+         build, which is what MT_STANDALONE=1 is for. -->
+    <Error Condition="'$(MTCapsApp)' == ''"
+           Text="This engine build has no app context: neither /p:MTOutRoot nor MTCapsApp is set, so there is no manifest to resolve. Build the app's project (which references this one), run its build-windows.ps1, or pass /p:MT_STANDALONE=1 for a bare engine build." />
+
+    <PropertyGroup>
+      <MTCapsEngineDir>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..'))</MTCapsEngineDir>
+      <MTCapsAppDir>$([System.IO.Path]::GetFullPath('$(MTCapsEngineDir)\..\$(MTCapsApp)'))</MTCapsAppDir>
+      <MTCapsManifest>$(MTCapsAppDir)\mtengine.caps</MTCapsManifest>
+    </PropertyGroup>
+
+    <Error Condition="!Exists('$(MTCapsManifest)')"
+           Text="No manifest at $(MTCapsManifest) for MTCapsApp=$(MTCapsApp). The four apps are expected as siblings of the engine checkout." />
+
+    <!-- `py -3` where it exists, `python` otherwise. Never a bare guess: the
+         interpreter rule is the same one the build scripts follow, and cmd.exe's
+         && / || is the shortest way to express it in one Exec. -->
+    <!-- The llama.cpp backend, as an ENGINE OPTION rather than a capability.
+         MT_LLAMA_CUDA selects a materially different archive under an identical
+         capability set, which is exactly what resolve.backend_hash exists for,
+         and the backend component keys both $MT_OUT and the dependency
+         directory. The command line has -SkipCuda to read; the IDE has only
+         $(Platform), and ARM64 never gets CUDA, which is the same rule
+         build-deps.ps1 already writes as
+         -SkipCuda:($SkipCuda -or ($Platform -eq 'ARM64')).
+
+         IT MUST MATCH WHAT build-windows.ps1 PASSES. An IDE build that disagrees
+         with the command line on the backend resolves a different directory and
+         links archives no phase of that build wrote.
+
+         (No double hyphen appears in this comment on purpose: XML forbids one
+         inside a comment, and the first draft of this block was not well formed
+         because it spelled the option flags out.) -->
+    <PropertyGroup>
+      <MTCapsCuda Condition="'$(Platform)' == 'ARM64'">OFF</MTCapsCuda>
+      <MTCapsCuda Condition="'$(MTCapsCuda)' == ''">ON</MTCapsCuda>
+      <MTCapsResolveArgs>--manifest &quot;$(MTCapsManifest)&quot; --app $(MTCapsApp) --platform windows --arch $(Platform) --config $(Configuration) --engine-dir &quot;$(MTCapsEngineDir)&quot; --engine-option MT_LLAMA_CUDA=$(MTCapsCuda)</MTCapsResolveArgs>
+    </PropertyGroup>
+
+    <Exec Command="where py &gt;nul 2&gt;&amp;1 &amp;&amp; (py -3 -B &quot;$(MTCapsEngineDir)\tools\mtcaps\mtcaps.py&quot; resolve $(MTCapsResolveArgs) --print out-dir) || (python -B &quot;$(MTCapsEngineDir)\tools\mtcaps\mtcaps.py&quot; resolve $(MTCapsResolveArgs) --print out-dir)"
+          ConsoleToMSBuild="true"
+          StandardOutputImportance="low">
+      <Output TaskParameter="ConsoleOutput" PropertyName="MTCapsResolvedRoot" />
+    </Exec>
+
+    <Error Condition="'$(MTCapsResolvedRoot)' == ''"
+           Text="mtcaps resolve produced no output root for $(MTCapsManifest)." />
+
+    <!-- The dependency-archive directory. A SECOND resolve invocation asking for
+         one bare value, rather than a parse of the multi-line form, because
+         MSBuild joins a task's whole stdout into one ';'-separated property.
+         That is why the one-bare-value print mode exists at all. Identical
+         arguments, so the two invocations cannot disagree on the backend. -->
+    <Exec Command="where py &gt;nul 2&gt;&amp;1 &amp;&amp; (py -3 -B &quot;$(MTCapsEngineDir)\tools\mtcaps\mtcaps.py&quot; resolve $(MTCapsResolveArgs) --print deps-dir) || (python -B &quot;$(MTCapsEngineDir)\tools\mtcaps\mtcaps.py&quot; resolve $(MTCapsResolveArgs) --print deps-dir)"
+          ConsoleToMSBuild="true"
+          StandardOutputImportance="low">
+      <Output TaskParameter="ConsoleOutput" PropertyName="MTCapsLibsDir" />
+    </Exec>
+
+    <Error Condition="'$(MTCapsLibsDir)' == ''"
+           Text="mtcaps resolve produced no dependency directory for $(MTCapsManifest)." />
+
+    <PropertyGroup>
+      <MTCapsDefinesFile>$(MTCapsResolvedRoot)\ide-defines-engine.txt</MTCapsDefinesFile>
+    </PropertyGroup>
+
+    <Error Condition="!Exists('$(MTCapsDefinesFile)')"
+           Text="mtcaps resolve reported $(MTCapsResolvedRoot) but wrote no ide-defines-engine.txt there." />
+
+    <PropertyGroup>
+      <MTCapsIdeDefines>$([System.IO.File]::ReadAllText('$(MTCapsDefinesFile)').Trim())</MTCapsIdeDefines>
+      <MTCapsIncludeDir>$(MTCapsResolvedRoot)\include</MTCapsIncludeDir>
+    </PropertyGroup>
+
+    <Message Importance="high"
+             Text="Capabilities (IDE): $(MTCapsApp) -&gt; $(MTCapsResolvedRoot)" />
+    <Message Importance="high"
+             Text="Dependencies (IDE): $(MTCapsLibsDir)" />
+
+    <!-- The point of the whole file. Modifying ClCompile metadata inside a
+         target that runs before the ClCompile task DOES reach the compiler. -->
+    <ItemGroup>
+      <ClCompile>
+        <PreprocessorDefinitions>$(MTCapsIdeDefines);%(ClCompile.PreprocessorDefinitions)</PreprocessorDefinitions>
+        <AdditionalIncludeDirectories>$(MTCapsIncludeDir);%(ClCompile.AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      </ClCompile>
+      <!-- The keyed directory goes FIRST, ahead of the tracked prebuilts, so a
+           freshly built archive wins over any same-named file left in
+           platform\Windows\libs from before the archives moved out of it. -->
+      <Link>
+        <AdditionalLibraryDirectories>$(MTCapsLibsDir);%(Link.AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      </Link>
+    </ItemGroup>
+  </Target>
+</Project>
