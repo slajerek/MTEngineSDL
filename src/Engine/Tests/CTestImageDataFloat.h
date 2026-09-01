@@ -8,7 +8,7 @@
 // test. Anything that needs a live texture upload belongs in the ImGui suite
 // (S-5 Task 2's rule); anything that is maths stays here.
 //
-// Registered in PhotoCruise's suite: an unregistered CTest compiles and never
+// Registered in the photo app's suite: an unregistered CTest compiles and never
 // runs, which looks exactly like a pass.
 class CTestImageDataFloat : public CTest
 {

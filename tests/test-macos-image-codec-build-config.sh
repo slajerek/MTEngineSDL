@@ -2,10 +2,18 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-LIGHTHEROES_DIR="$(cd "$ROOT_DIR/../LightHeroes" && pwd)"
+# The app half of this test needs a PRIVATE sibling checkout. A public
+# clone of the engine does not have it -- SKIP that half cleanly instead of
+# failing for every third party (unification plan, Phase 6).
+if [[ ! -d "$ROOT_DIR/../the game app" ]]; then
+  echo "SKIP: no ../the game app checkout -- the app-project half of this test is private"
+  LIGHTHEROES_DIR=""
+else
+  LIGHTHEROES_DIR="$(cd "$ROOT_DIR/../the game app" && pwd)"
+fi
 
 ENGINE_PROJECT="$ROOT_DIR/platform/MacOS/MTEngineSDL.xcodeproj/project.pbxproj"
-LIGHTHEROES_PROJECT="$LIGHTHEROES_DIR/platform/MacOS/LightHeroes.xcodeproj/project.pbxproj"
+LIGHTHEROES_PROJECT="$LIGHTHEROES_DIR/platform/MacOS/the game app.xcodeproj/project.pbxproj"
 
 check_file_exists() {
   local file="$1"
@@ -76,10 +84,10 @@ check_file_contains "$ENGINE_PROJECT" '"$(PROJECT_DIR)/build-image_codecs.sh"'
 check_file_contains "$ENGINE_PROJECT" '"$(MT_CAPS_LIBS_DIR)/libmt_image_codecs.a"'
 check_file_contains "$ENGINE_PROJECT" '"$(MT_CAPS_LIBS_DIR)/libmt_image_codecs.stamp"'
 # install/include, not include: the acquisition script installs the upstream
-# headers into other/lib/image-codecs/install/ and the project has pointed there
+# headers into the keyed deps dir (Phase 2 relocation) and the project points there
 # for some time. This assertion still named the pre-install path and had been
 # failing on its own -- it is not part of the archive relocation.
-check_file_contains "$ENGINE_PROJECT" '"$(PROJECT_DIR)/../../other/lib/image-codecs/install/include"'
+check_file_contains "$ENGINE_PROJECT" '"$(MT_CAPS_LIBS_DIR)/image-codecs/include"'
 
 check_file_not_contains "$ENGINE_PROJECT" '"-ltiff"'
 check_file_not_contains "$ENGINE_PROJECT" '"-lwebp"'
@@ -96,9 +104,9 @@ check_file_not_contains "$ENGINE_PROJECT" '"-lraw"'
 # the reference became -lmt_image_codecs resolved against $(MT_CAPS_LIBS_DIR),
 # and ordering is no longer expressible (nor needed -- ld resolves -l archives
 # after the object files regardless of flag order).
-check_file_contains "$LIGHTHEROES_PROJECT" '"-lmt_image_codecs"'
-check_file_contains "$LIGHTHEROES_PROJECT" '"$(MT_CAPS_LIBS_DIR)"'
-check_file_not_contains "$LIGHTHEROES_PROJECT" "MTEngineSDL/platform/MacOS/libs"
+if [[ -n "$LIGHTHEROES_DIR" ]]; then check_file_contains "$LIGHTHEROES_PROJECT" '"-lmt_image_codecs"'; fi
+if [[ -n "$LIGHTHEROES_DIR" ]]; then check_file_contains "$LIGHTHEROES_PROJECT" '"$(MT_CAPS_LIBS_DIR)"'; fi
+if [[ -n "$LIGHTHEROES_DIR" ]]; then check_file_not_contains "$LIGHTHEROES_PROJECT" "MTEngineSDL/platform/MacOS/libs"; fi
 
 git -C "$ROOT_DIR" check-ignore -q "other/lib/image-codecs/src/probe"
 git -C "$ROOT_DIR" check-ignore -q "other/lib/image-codecs/build/probe"

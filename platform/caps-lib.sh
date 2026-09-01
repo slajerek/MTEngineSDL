@@ -34,6 +34,9 @@ mt_caps_read_flags() {
         *.cmake)
             normalised="$(mktemp -t mtcapsflags.XXXXXX)"
             sed -n 's/^set(\(MT_[A-Z0-9_]*\) \([01]\))$/\1 = \2/p' "$fragment" > "$normalised"
+            # The one string-valued mode line (Phase 2): set(MT_FFMPEG_BUILD_MODE "full")
+            sed -n 's/^set(MT_FFMPEG_BUILD_MODE "\(full\|commercial\)")$/MT_FFMPEG_BUILD_MODE = \1/p' \
+                "$fragment" >> "$normalised"
             ;;
     esac
 
@@ -48,6 +51,11 @@ mt_caps_read_flags() {
                 case "$value" in
                     0|1) export "$key=$value"; found=$((found + 1)) ;;
                 esac
+                ;;
+            "MT_FFMPEG_BUILD_MODE = full"|"MT_FFMPEG_BUILD_MODE = commercial")
+                # The resolved decoder-set mode (Phase 2, 2026-08-31) -- the
+                # acquisition scripts prefer it over the legacy COMMERCIAL env.
+                export MT_FFMPEG_BUILD_MODE="${line##*= }"; found=$((found + 1))
                 ;;
         esac
     done < "$normalised"
@@ -139,6 +147,24 @@ mt_caps_init_submodules() {
 # idioms. Stubs are cheaper, uniform, and they preserve the symbol proof -- a
 # stub carries no library symbols, so `nm` still distinguishes on from off.
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# mt_caps_work_dir <name>
+#
+# The dependency WORK root (downloads, sources, intermediate build trees,
+# install prefixes) -- outside every checkout, shared across apps and caps
+# sets because its contents are keyed by upstream version, not by capability.
+# Phase 2 of the unification plan moved the codec caches here from
+# other/lib/{image,video}-codecs, which was a permanent-rule violation the
+# archive relocation had left behind.
+# ---------------------------------------------------------------------------
+mt_caps_work_dir() {
+    local name="$1"
+    local root="${MTENGINE_BUILD_ROOT:-${XDG_CACHE_HOME:-$HOME/.cache}/mtengine}"
+    local dir="$root/_deps/work/$name"
+    mkdir -p "$dir"
+    printf '%s\n' "$dir"
+}
+
 mt_caps_stub_archive() {
     local out_lib="$1"
     local prefix="$2"

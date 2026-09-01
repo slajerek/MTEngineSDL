@@ -56,7 +56,7 @@ install has and which runs under emulation on an ARM64 host. Calling it twice is
 harmless — it will not stack duplicate entries on `PATH`.
 
 App scripts that build dependencies call it right after they put MSBuild on
-`PATH`: c64d, PhotoCruise and MTEngineSDLDummyApp all do. LightHeroes does not
+`PATH`: c64d, the photo app and MTEngineSDLDummyApp all do. the game app does not
 build dependencies, so it does not call it.
 
 ## 2. Build directories are keyed by architecture

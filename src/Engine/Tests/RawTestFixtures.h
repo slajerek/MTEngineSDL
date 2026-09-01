@@ -113,7 +113,7 @@ struct SSyntheticDngSpec
 							  -0.0587f, 0.1316f, 0.5452f };
 	int calibrationIlluminant1 = 21;          // EXIF LightSource: 21 = D65
 	float asShotNeutral[3] = { 0.6f, 1.0f, 0.7f };
-	const char *uniqueCameraModel = "PhotoCruise Synthetic";
+	const char *uniqueCameraModel = "MTEngine Synthetic";
 
 	// Optional tags; the 'has' flags gate emission.
 	bool hasColorMatrix2 = false;
@@ -154,7 +154,7 @@ struct SSyntheticDngSpec
 	// Arbitrary extra IFD0 tags, appended verbatim (RD-D #8.1: the DCP
 	// fixture writer injects embedded-profile tags through this). `value`
 	// is the little-endian packed value bytes; the builder handles the
-	// inline-vs-offset split. See PC_DcpFixtureWriter for packers.
+	// inline-vs-offset split. See MT_DcpFixtureWriter for packers.
 	std::vector<SDngRawTag> extraIfd0Tags;
 };
 

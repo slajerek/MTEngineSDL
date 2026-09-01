@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Build mbedTLS static libs via CMake, then package into a single libmbedtls_bundle.a.
-# Used by LightHeroes/MTEngineSDL to enable HTTPS downloads (cpp-httplib + mbedTLS).
+# Used by the game app/MTEngineSDL to enable HTTPS downloads (cpp-httplib + mbedTLS).
 
 export PATH="/opt/local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 
@@ -80,7 +80,8 @@ if [[ -f "$OUT_LIB" && -f "$STAMP_FILE" ]]; then
   fi
 fi
 
-BUILD_DIR="$ROOT_DIR/other/lib/mbedtls.macos"
+# Phase 5: the build tree lives OUTSIDE the checkout, in the shared work root.
+BUILD_DIR="$(mt_caps_work_dir mbedtls)/build-macos"
 
 cmake -S "$MBEDTLS_SRC_DIR" -B "$BUILD_DIR" \
   -DCMAKE_BUILD_TYPE=Release \

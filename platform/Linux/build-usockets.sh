@@ -74,10 +74,16 @@ if [[ -f "$OUT_LIB" && -f "$STAMP_FILE" ]]; then
 fi
 
 echo "Building uSockets"
-cd "$USOCKETS_DIR"
-make -j"$(nproc)"
+# Phase 5: `make` in the vendored tree was the last in-checkout build write.
+# Build in a disposable copy under the work root instead; the vendored tree
+# stays pristine and the stamp still hashes IT, not the copy.
+USOCKETS_WORK="$(mt_caps_work_dir uSockets)/src-linux"
+rm -rf "$USOCKETS_WORK"
+mkdir -p "$USOCKETS_WORK"
+cp -R "$USOCKETS_DIR/." "$USOCKETS_WORK/"
+make -C "$USOCKETS_WORK" -j"$(nproc)"
 
-cp -f "$USOCKETS_DIR/uSockets.a" "$OUT_LIB"
+cp -f "$USOCKETS_WORK/uSockets.a" "$OUT_LIB"
 echo -n "$STAMP_VALUE" > "$STAMP_FILE"
 
 echo "uSockets built: $OUT_LIB"

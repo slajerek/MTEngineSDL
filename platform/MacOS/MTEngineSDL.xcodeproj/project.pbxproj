@@ -748,7 +748,7 @@
 		DDC0000000000000000000B1 /* CDcpTemperature.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DDC0000000000000000000B2 /* CDcpTemperature.cpp */; };
 		DDC0000000000000000000B4 /* CDcpApply.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DDC0000000000000000000B5 /* CDcpApply.cpp */; };
 		DDC0000000000000000000B7 /* CTestDcpApply.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DDC0000000000000000000B8 /* CTestDcpApply.cpp */; };
-		DDC0000000000000000000A4 /* PC_DcpFixtureWriter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DDC0000000000000000000A5 /* PC_DcpFixtureWriter.cpp */; };
+		DDC0000000000000000000A4 /* MT_DcpFixtureWriter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DDC0000000000000000000A5 /* MT_DcpFixtureWriter.cpp */; };
 		DDC0000000000000000000A7 /* CTestDcpParse.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DDC0000000000000000000A8 /* CTestDcpParse.cpp */; };
 		B0E1FA0000000000000000B3 /* CRawDecoder.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B0E1FA0000000000000000B1 /* CRawDecoder.cpp */; };
 		DC00000000000000000000B1 /* DevelopMath.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DC00000000000000000000B2 /* DevelopMath.cpp */; };
@@ -1824,8 +1824,8 @@
 		DDC0000000000000000000B6 /* CDcpApply.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CDcpApply.h; path = ../../src/Engine/Color/CDcpApply.h; sourceTree = SOURCE_ROOT; };
 		DDC0000000000000000000B8 /* CTestDcpApply.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CTestDcpApply.cpp; path = ../../src/Engine/Tests/CTestDcpApply.cpp; sourceTree = SOURCE_ROOT; };
 		DDC0000000000000000000B9 /* CTestDcpApply.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CTestDcpApply.h; path = ../../src/Engine/Tests/CTestDcpApply.h; sourceTree = SOURCE_ROOT; };
-		DDC0000000000000000000A5 /* PC_DcpFixtureWriter.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = PC_DcpFixtureWriter.cpp; path = ../../src/Engine/Tests/PC_DcpFixtureWriter.cpp; sourceTree = SOURCE_ROOT; };
-		DDC0000000000000000000A6 /* PC_DcpFixtureWriter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = PC_DcpFixtureWriter.h; path = ../../src/Engine/Tests/PC_DcpFixtureWriter.h; sourceTree = SOURCE_ROOT; };
+		DDC0000000000000000000A5 /* MT_DcpFixtureWriter.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = MT_DcpFixtureWriter.cpp; path = ../../src/Engine/Tests/MT_DcpFixtureWriter.cpp; sourceTree = SOURCE_ROOT; };
+		DDC0000000000000000000A6 /* MT_DcpFixtureWriter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = MT_DcpFixtureWriter.h; path = ../../src/Engine/Tests/MT_DcpFixtureWriter.h; sourceTree = SOURCE_ROOT; };
 		DDC0000000000000000000A8 /* CTestDcpParse.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CTestDcpParse.cpp; path = ../../src/Engine/Tests/CTestDcpParse.cpp; sourceTree = SOURCE_ROOT; };
 		DDC0000000000000000000A9 /* CTestDcpParse.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CTestDcpParse.h; path = ../../src/Engine/Tests/CTestDcpParse.h; sourceTree = SOURCE_ROOT; };
 		B0E1FA0000000000000000B1 /* CRawDecoder.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CRawDecoder.cpp; path = ../../src/Engine/Raw/CRawDecoder.cpp; sourceTree = SOURCE_ROOT; };
@@ -3847,8 +3847,8 @@
 				A0E1F00000000000000000FB /* CTestExifMetadataReach.cpp */,
 				A0E1F00000000000000000FC /* CTestExifMetadataReach.h */,
 				B0E1FA0000000000000000A1 /* RawTestFixtures.cpp */,
-				DDC0000000000000000000A5 /* PC_DcpFixtureWriter.cpp */,
-				DDC0000000000000000000A6 /* PC_DcpFixtureWriter.h */,
+				DDC0000000000000000000A5 /* MT_DcpFixtureWriter.cpp */,
+				DDC0000000000000000000A6 /* MT_DcpFixtureWriter.h */,
 				DDC0000000000000000000A8 /* CTestDcpParse.cpp */,
 				DDC0000000000000000000B8 /* CTestDcpApply.cpp */,
 				DDC0000000000000000000B9 /* CTestDcpApply.h */,
@@ -4592,7 +4592,7 @@
 				DDC0000000000000000000B1 /* CDcpTemperature.cpp in Sources */,
 				DDC0000000000000000000B4 /* CDcpApply.cpp in Sources */,
 				DDC0000000000000000000B7 /* CTestDcpApply.cpp in Sources */,
-				DDC0000000000000000000A4 /* PC_DcpFixtureWriter.cpp in Sources */,
+				DDC0000000000000000000A4 /* MT_DcpFixtureWriter.cpp in Sources */,
 				DDC0000000000000000000A7 /* CTestDcpParse.cpp in Sources */,
 				B0E1FA0000000000000000B3 /* CRawDecoder.cpp in Sources */,
 				DC00000000000000000000B1 /* DevelopMath.cpp in Sources */,
@@ -5056,10 +5056,10 @@
 					"$(PROJECT_DIR)/../../other/lib/ftxui/include",
 					"$(PROJECT_DIR)/../../src/Engine/Libs/basis_universal/transcoder",
 					"$(PROJECT_DIR)/../../src/Engine/Libs/basis_universal/zstd",
-					"$(PROJECT_DIR)/../../other/lib/image-codecs/install/include",
+					"$(MT_CAPS_LIBS_DIR)/image-codecs/include",
 					"$(PROJECT_DIR)/../../src/Engine/Video",
 					"$(PROJECT_DIR)/../../src/Engine/Libs/nestegg",
-					"$(PROJECT_DIR)/../../other/lib/video-codecs/install/include",
+					"$(MT_CAPS_LIBS_DIR)/ffmpeg/include",
 					/opt/homebrew/include,
 				);
 				LIBRARY_SEARCH_PATHS = (
@@ -5119,10 +5119,10 @@
 					"$(PROJECT_DIR)/../../other/lib/ftxui/include",
 					"$(PROJECT_DIR)/../../src/Engine/Libs/basis_universal/transcoder",
 					"$(PROJECT_DIR)/../../src/Engine/Libs/basis_universal/zstd",
-					"$(PROJECT_DIR)/../../other/lib/image-codecs/install/include",
+					"$(MT_CAPS_LIBS_DIR)/image-codecs/include",
 					"$(PROJECT_DIR)/../../src/Engine/Video",
 					"$(PROJECT_DIR)/../../src/Engine/Libs/nestegg",
-					"$(PROJECT_DIR)/../../other/lib/video-codecs/install/include",
+					"$(MT_CAPS_LIBS_DIR)/ffmpeg/include",
 					/opt/homebrew/include,
 				);
 				LIBRARY_SEARCH_PATHS = (

@@ -331,7 +331,7 @@ CImageData *CVideoFrameExtractor::DecodeFrameRGBA(const char *path,
 	// EOF-before-target (see Seek()'s marginCandidates loop, Task 1), and the
 	// while() loop below decodes forward from wherever Seek() lands until it
 	// reaches `rel`, independent of how close the seek landed. Empirically
-	// (h264_longgop.mp4 fixture, PhotoCruise CTestVideoExtractor -- a 4s clip
+	// (h264_longgop.mp4 fixture, the photo app CTestVideoExtractor -- a 4s clip
 	// with its only keyframe at t=0): every seekTarget in [0, duration]
 	// lands on that same sole keyframe regardless of kMarginSeconds's value,
 	// so widening the margin here can never change where Seek() lands or how

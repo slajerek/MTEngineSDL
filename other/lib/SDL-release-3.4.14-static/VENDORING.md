@@ -1,7 +1,7 @@
 # Vendored SDL 3.4.14 — what was changed and why
 
 Vendored 2026-08-18 for the S-2 SDL3 upgrade
-(`PhotoCruise/specs/superpowers/plans/2026-08-17-s2-sdl-3.4.14-upgrade.md`).
+(`the photo app/specs/superpowers/plans/2026-08-17-s2-sdl-3.4.14-upgrade.md`).
 
 ## Provenance
 

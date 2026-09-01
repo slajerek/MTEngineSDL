@@ -273,7 +273,7 @@ bool        VID_IsRenderBackendAvailable(const char *name);
 int         VID_GetAvailableRenderBackends(const char **outNames, int maxNames);
 
 // The human label for a SELECTION name -- "OpenGL", "Metal", "Direct3D 11".
-// For UI with no i18n of its own (c64d's and LightHeroes' menus). PhotoCruise
+// For UI with no i18n of its own (c64d's and the game app's menus). the photo app
 // translates instead, via settings.appearance.renderer.<name>.
 const char *VID_GetRenderBackendDisplayName(const char *name);
 

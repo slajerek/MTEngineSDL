@@ -300,7 +300,7 @@ private:
 	// Caller holds h->mutex. The per-thread map is keyed by thread id and its
 	// entries used to live as long as the cache entry did, so every distinct
 	// thread that ever converted through this pair left one live HTRANSFORM
-	// behind -- and PhotoCruise spawns a first-frame worker per clip, so the
+	// behind -- and the photo app spawns a first-frame worker per clip, so the
 	// ids keep changing (programme review, engine finding 1). Pruning is
 	// bounded work, only above a threshold, and only for threads proven dead.
 	void PruneDeadThreadTransforms(WinTransformHandle *h)

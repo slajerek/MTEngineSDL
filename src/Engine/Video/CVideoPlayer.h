@@ -51,7 +51,7 @@ enum class EVideoPlayerState
 // place where "where would this step have landed, before clamping?" is knowable
 // without racing the decode thread. The stored target is clamped to
 // [0, duration] either way -- the outcome is purely a report, so a caller
-// (PhotoCruise's video controller) can turn a step off the end of the clip into
+// (the photo app's video controller) can turn a step off the end of the clip into
 // "advance to the next clip" without re-deriving it from a time read that the
 // decode thread may already have re-based underneath it.
 enum class ESeekRequestOutcome
@@ -207,7 +207,7 @@ public:
 	//
 	// The stored target is always clamped to [0, duration]; the return value
 	// reports whether the UNCLAMPED accumulation left the clip, so the caller can
-	// cross a clip boundary (PhotoCruise: step into the next/previous photo)
+	// cross a clip boundary (the photo app: step into the next/previous photo)
 	// without re-deriving it from a racy time read. Returns InRange for a player
 	// with no source / in Error (nothing was submitted).
 	//
@@ -353,7 +353,7 @@ public:
 	// S-5 Phase 5: HDR playback policy, pushed down from the app.
 	//
 	// The ENGINE cannot decide this. Whether HDR is on is
-	// PC_HdrSessionGateOpen(), which lives in PhotoCruise
+	// PC_HdrSessionGateOpen(), which lives in the photo app
 	// (src/Decode/PC_ResidentFormat.cpp) and is latched once per session from
 	// the app's own setting and the display snapshot; the engine has no
 	// business reaching into that. So the app resolves it and hands the answer
@@ -369,7 +369,7 @@ public:
 	int GetColorSpace() const { return vpxColorSpace; }
 	int GetColorRange() const { return vpxColorRange; }
 	// CM-E: raw AVCOL_PRI_* / AVCOL_TRC_* (2 = unspecified). Trc 16 (PQ) and
-	// 18 (HLG) are the HDR pair PhotoCruise's LUT gate keys on. Container-
+	// 18 (HLG) are the HDR pair the photo app's LUT gate keys on. Container-
 	// level values are available right after Open(); frame-level tags refine
 	// them per decoded frame.
 	int GetColorPrimaries() const { return colorPrimaries; }

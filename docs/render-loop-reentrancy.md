@@ -31,7 +31,7 @@ imgui.cpp: (g.FrameCount == 0 || g.FrameCountEnded == g.FrameCount) &&
 In debug builds that is an assert dialog; in release the assert is compiled out
 and ImGui simply runs with inconsistent frame state.
 
-Found via PhotoCruise: choosing an entry from the Language menu rebuilt the
+Found via the photo app: choosing an entry from the Language menu rebuilt the
 native Win32 menu bar from inside `MT_Render()` and asserted 100% of the time.
 macOS was unaffected — an NSMenu lives in the system menu bar, so rebuilding it
 never resizes the app window.
@@ -50,5 +50,5 @@ can defer OS-window work instead of relying on the backstop.
 
 The guard is a safety net, not a licence. Keep mutation of OS window state —
 native menu bars especially — **out of the ImGui frame**: do it from
-`MT_PostRenderEndFrame()`, which runs after `ImGui::Render()`. PhotoCruise's
+`MT_PostRenderEndFrame()`, which runs after `ImGui::Render()`. the photo app's
 `specs/claude/architecture/native-menu.md` documents that pattern.

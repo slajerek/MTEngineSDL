@@ -20,7 +20,7 @@ set -euo pipefail
 # CCameraMacOS) for years -- and leaving it on has two real costs:
 #   1. It drags AVCaptureDevice/AVCaptureSession symbols into every app, so
 #      every app must link AVFoundation whether or not it has a camera feature.
-#      That is how this was discovered: PhotoCruise failed to link.
+#      That is how this was discovered: the photo app failed to link.
 #   2. These are STORE-SHIPPED apps. A camera-capable binary invites
 #      NSCameraUsageDescription and a privacy declaration for a capability the
 #      product does not have. Shipping an unused camera surface in a photo
@@ -84,7 +84,8 @@ if [[ -f "$OUT_LIB" && -f "$STAMP_FILE" ]]; then
   fi
 fi
 
-BUILD_DIR="$SDL3_SRC_DIR/build-macos"
+# Phase 5: the build tree lives OUTSIDE the checkout, in the shared work root.
+BUILD_DIR="$(mt_caps_work_dir sdl3)/build-macos"
 
 cmake -S "$SDL3_SRC_DIR" -B "$BUILD_DIR" \
   -DCMAKE_BUILD_TYPE=Release \

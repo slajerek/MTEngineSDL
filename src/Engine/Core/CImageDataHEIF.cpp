@@ -56,7 +56,7 @@ bool CImageData::LoadHEIF(const char *fileName)
 //    (CGuiView::SetImGuiTitleTranslateFunc, and CGuiViewVideoPlayer::
 //    SetTranslateLabelFunc for the same reason). An engine returning an
 //    English sentence forces every localized host to pattern-match on it.
-//    PhotoCruise already does that to one engine marker string; it is not a
+//    the photo app already does that to one engine marker string; it is not a
 //    habit worth spreading.
 //
 // 2. A SYSTEM QUESTION, ASKED ONCE -- NOT A PER-FILE ONE. "This machine cannot

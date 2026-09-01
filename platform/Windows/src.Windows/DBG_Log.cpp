@@ -215,15 +215,61 @@ void LOG_Init(void)
 	}
 	else
 	{
-		sprintf(logBuf, "./log/MTEngine-%04d%02d%02d-%02d%02d%02d-%d.txt", tmeCurrent.wYear, tmeCurrent.wMonth, tmeCurrent.wDay,
-			tmeCurrent.wHour, tmeCurrent.wMinute, tmeCurrent.wSecond, processId);
+		// NO --log-dir. Two candidates, and NEITHER of them is the bare current
+		// directory any more.
+		//
+		// It used to be `.\log\` with a fallback to the CWD, and since nothing
+		// ever CREATED `.\log\` (the --log-dir branch above calls
+		// CreateDirectoryA; this one never did), the fallback is what actually
+		// ran, every time. So the log landed in whatever directory the process
+		// happened to start in -- which for a build agent, or for F5 in Visual
+		// Studio, is INSIDE THE CHECKOUT. `log/` is gitignored in every app;
+		// a bare MTEngine-*.txt in the repo root is not. That is where the
+		// stray log dumps in the app repos came from (one host app had six at
+		// its repo root and three more beside its .vcxproj).
+		//
+		// `.\log\` is still honoured when it EXISTS, because that is the
+		// documented behaviour and creating the directory is a clear opt-in.
+		// Otherwise the log goes to %TEMP%\MTEngine\, which is the right home
+		// for a file nobody asked for by name.
+		DWORD logDirAttrs = GetFileAttributesA(".\\log");
+		if (logDirAttrs != INVALID_FILE_ATTRIBUTES && (logDirAttrs & FILE_ATTRIBUTE_DIRECTORY))
+		{
+			sprintf(logBuf, "./log/MTEngine-%04d%02d%02d-%02d%02d%02d-%d.txt", tmeCurrent.wYear, tmeCurrent.wMonth, tmeCurrent.wDay,
+				tmeCurrent.wHour, tmeCurrent.wMinute, tmeCurrent.wSecond, processId);
+		}
+		else
+		{
+			char tempPath[MAX_PATH];
+			DWORD tempLen = GetTempPathA(MAX_PATH, tempPath);
+			if (tempLen > 0 && tempLen < MAX_PATH)
+			{
+				// GetTempPathA always ends with a backslash.
+				sprintf(logBuf, "%sMTEngine", tempPath);
+				CreateDirectoryA(logBuf, NULL);
+				sprintf(logBuf, "%sMTEngine\\MTEngine-%04d%02d%02d-%02d%02d%02d-%d.txt", tempPath,
+					tmeCurrent.wYear, tmeCurrent.wMonth, tmeCurrent.wDay,
+					tmeCurrent.wHour, tmeCurrent.wMinute, tmeCurrent.wSecond, processId);
+			}
+			else
+			{
+				// No TEMP at all. Create .\log\ rather than spray the CWD.
+				CreateDirectoryA(".\\log", NULL);
+				sprintf(logBuf, "./log/MTEngine-%04d%02d%02d-%02d%02d%02d-%d.txt", tmeCurrent.wYear, tmeCurrent.wMonth, tmeCurrent.wDay,
+					tmeCurrent.wHour, tmeCurrent.wMinute, tmeCurrent.wSecond, processId);
+			}
+		}
 	}
 
 	fpLog = SYS_OpenFile(logBuf, "wb");
 
 	if (fpLog == NULL)
 	{
-		sprintf(logBuf, "MTEngine-%04d%02d%02d-%02d%02d%02d-%d.txt", tmeCurrent.wYear, tmeCurrent.wMonth, tmeCurrent.wDay,
+		// Last resort. Still not the CWD: create the directory the chosen path
+		// wanted and retry there, so a missing directory cannot silently
+		// redirect the log into a source tree.
+		CreateDirectoryA(".\\log", NULL);
+		sprintf(logBuf, "./log/MTEngine-%04d%02d%02d-%02d%02d%02d-%d.txt", tmeCurrent.wYear, tmeCurrent.wMonth, tmeCurrent.wDay,
 			tmeCurrent.wHour, tmeCurrent.wMinute, tmeCurrent.wSecond, processId);
 
 		fpLog = SYS_OpenFile(logBuf, "wb");

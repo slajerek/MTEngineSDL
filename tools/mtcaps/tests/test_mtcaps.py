@@ -75,6 +75,108 @@ class Base(unittest.TestCase):
                 return line[len("deps_dir="):]
         self.fail("no `deps_dir=` line in:\n%s\n%s" % (proc.stdout, proc.stderr))
 
+    def build_of(self, proc):
+        for line in proc.stdout.splitlines():
+            if line.startswith("build_dir="):
+                return line[len("build_dir="):]
+        self.fail("no `build_dir=` line in:\n%s\n%s" % (proc.stdout, proc.stderr))
+
+
+class TestCommercialModeSemantics(Base):
+    """Decision 0.1/0.2/0.5 of the 2026-08-31 unification plan: commercial
+    effects applied at resolve, the commercial_safe deny-list, and the
+    MT_RELEASE_SYMBOLS mode key."""
+
+    STORE = ("--set", "MT_COMMERCIAL_BUILD=1", "--set", "MT_PRIVATE_BUILD=0")
+
+    def test_capability_off_effect_applies_at_commercial(self):
+        """MT_CAP_TEST_ENGINE=1 + MT_COMMERCIAL_BUILD=1 auto-disables the
+        capability -- no error, and the resolved string shows the post-effect
+        set, so fragments/LICENSES/hash cannot disagree."""
+        m = self.manifest("MT_CAP_TEST_ENGINE=1\n")
+        proc = self.resolve(m, *self.STORE)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn("MT_CAP_TEST_ENGINE=0", self.resolved_of(proc))
+
+    def test_capability_stays_on_without_commercial(self):
+        m = self.manifest("MT_CAP_TEST_ENGINE=1\n")
+        proc = self.resolve(m)
+        self.assertIn("MT_CAP_TEST_ENGINE=1", self.resolved_of(proc))
+
+    def test_deny_list_fires_only_for_enabled_unsafe_dep(self):
+        """Planted commercial_safe:false on an enabled dep must abort a
+        commercial resolve with an error naming dep, licence and capability
+        -- and must NOT fire when the capability is off."""
+        import json
+        with open(V.default_vocabulary_path(), encoding="utf-8") as f:
+            data = json.load(f)
+        # Plant: FTXUI (effect none, single dep) becomes commercial-unsafe.
+        data["capabilities"]["MT_CAP_FTXUI"]["dependencies"][0]["commercial_safe"] = False
+        planted = os.path.join(self.tmp, "planted.json")
+        with open(planted, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+
+        m = self.manifest("MT_CAP_FTXUI=1\n")
+        proc = self.resolve(m, "--vocabulary", planted, *self.STORE)
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("FTXUI", proc.stderr)
+        self.assertIn("commercial_safe", proc.stderr)
+
+        m2 = self.manifest("MT_CAP_FTXUI=0\n", "off.caps")
+        proc2 = self.resolve(m2, "--vocabulary", planted, *self.STORE)
+        self.assertEqual(proc2.returncode, 0, proc2.stderr)
+
+    def test_deny_list_respects_dep_level_flag_gate(self):
+        """libheif carries commercial_safe:false + flag MT_ENABLE_LIBHEIF, and
+        that flag is FORCED 0 outside private builds -- so a commercial build
+        with MT_CAP_PHOTO_CODECS=1 must NOT error (TIFF/WebP/AVIF are not
+        collateral damage)."""
+        m = self.manifest("MT_CAP_PHOTO_CODECS=1\nMT_CAP_RAW=1\n")
+        proc = self.resolve(m, *self.STORE)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+
+    def test_symbols_default_on_and_forced_off_by_commercial(self):
+        m = self.manifest("MT_CAP_LLM=0\n")
+        self.assertIn("MT_RELEASE_SYMBOLS=1",
+                      self.resolved_of(self.resolve(m)))
+        self.assertIn("MT_RELEASE_SYMBOLS=0",
+                      self.resolved_of(self.resolve(m, *self.STORE)))
+
+    def test_symbols_forcing_beats_manifest_but_not_explicit_set(self):
+        """A manifest line is exactly the accident the forcing exists to stop;
+        only a per-invocation --set (the deliberate UAT build) escapes."""
+        m = self.manifest("MT_RELEASE_SYMBOLS=1\n")
+        self.assertIn("MT_RELEASE_SYMBOLS=0",
+                      self.resolved_of(self.resolve(m, *self.STORE)))
+        self.assertIn("MT_RELEASE_SYMBOLS=1",
+                      self.resolved_of(self.resolve(
+                          m, *self.STORE, "--set", "MT_RELEASE_SYMBOLS=1")))
+
+    def test_symbols_key_changes_out_dir_but_not_deps_dir(self):
+        """A UAT and a store artifact must never share one $MT_OUT (out hash
+        covers the key), while the archives are byte-identical either way
+        (deps hash excludes it)."""
+        m = self.manifest("MT_CAP_LLM=0\n")
+        a = self.resolve(m, *self.STORE)
+        b = self.resolve(m, *self.STORE, "--set", "MT_RELEASE_SYMBOLS=1")
+        self.assertNotEqual(self.out_of(a), self.out_of(b))
+        self.assertEqual(self.deps_of(a), self.deps_of(b))
+
+    def test_ffmpeg_mode_line_derives_from_private_not_commercial(self):
+        """`full` only for a never-distributed build: patents attach to
+        distribution, not payment, so the public/free (0,0) tier gets the
+        restricted set exactly like the store tier."""
+        def mode_of(proc):
+            for line in proc.stdout.splitlines():
+                if line.startswith("ffmpeg_mode="):
+                    return line.split("=", 1)[1]
+            self.fail("no ffmpeg_mode= line")
+        m = self.manifest("MT_CAP_LLM=0\n")
+        self.assertEqual(mode_of(self.resolve(m)), "commercial")          # (0,0)
+        self.assertEqual(mode_of(self.resolve(m, *self.STORE)), "commercial")
+        self.assertEqual(
+            mode_of(self.resolve(m, "--set", "MT_PRIVATE_BUILD=1")), "full")
+
 
 class TestVocabulary(Base):
     def test_ships_valid(self):
@@ -268,11 +370,11 @@ class TestCanonicalForm(Base):
         m = self.manifest("MT_CAP_LLM=0\n")
         values, _ = R.resolve(self.vocab, m, "macos")
         s = R.canonical_form(self.vocab, values)
-        # +2, not +1: every capability, plus BOTH mode keys
-        # (MT_COMMERCIAL_BUILD and MT_PRIVATE_BUILD). Each is carried as 0/1
-        # rather than by presence, because the agreement check has to tell
-        # "off" from "unset" for a mode flag.
-        self.assertEqual(len(s.split(";")), len(self.vocab.keys) + 2)
+        # +3: every capability, plus the THREE mode keys (MT_COMMERCIAL_BUILD,
+        # MT_PRIVATE_BUILD, MT_RELEASE_SYMBOLS -- decision 0.5). Each is
+        # carried as 0/1 rather than by presence, because the agreement check
+        # has to tell "off" from "unset" for a mode flag.
+        self.assertEqual(len(s.split(";")), len(self.vocab.keys) + 3)
 
     def test_os_suffixes_are_resolved_away(self):
         m = self.manifest("MT_CAP_PHOTO_CODECS__LINUX=0\n")
@@ -451,8 +553,14 @@ class TestOutputRootKey(Base):
 
     def test_default_root_is_outside_every_checkout(self):
         root = R.default_build_root()
-        for repo in ("MTEngineSDL", "MTEngineSDLDummyApp", "c64d", "PhotoCruise",
-                     "LightHeroes"):
+        # Against the REAL siblings of this engine checkout -- whatever repos
+        # actually live next to it on this machine -- rather than a literal
+        # roster typed here (Phase 6: the public tree names no private apps).
+        parent = os.path.dirname(ENGINE)
+        siblings = [d for d in os.listdir(parent)
+                    if os.path.isdir(os.path.join(parent, d, ".git"))]
+        self.assertIn(os.path.basename(ENGINE), siblings)
+        for repo in siblings:
             self.assertNotIn(os.sep + repo + os.sep, root + os.sep)
         self.assertNotIn("mtengine/mtengine", root.replace("\\", "/"),
                          "the default already ends in /mtengine; do not append it twice")
@@ -464,9 +572,15 @@ class TestEmittedFragments(Base):
         self.m = self.manifest("MT_CAP_LLM=0\nMT_CAP_HTTPS=0\n")
         self.p = self.resolve(self.m)
         self.out = self.out_of(self.p)
+        # L9: the generated include/ lives under the REV-FREE build dir.
+        self.build = self.build_of(self.p)
 
     def read(self, *parts):
         with open(os.path.join(self.out, *parts), encoding="utf-8") as f:
+            return f.read()
+
+    def read_build(self, *parts):
+        with open(os.path.join(self.build, *parts), encoding="utf-8") as f:
             return f.read()
 
     def read_at(self, out, *parts):
@@ -479,7 +593,7 @@ class TestEmittedFragments(Base):
         for name in ("MTEngineCapabilities.cmake", "MTEngineCaps.xcconfig",
                      "MTEngineCaps.props", "resolved.stamp"):
             self.assertTrue(os.path.isfile(os.path.join(self.out, name)), name)
-        self.assertTrue(os.path.isfile(os.path.join(self.out, "include",
+        self.assertTrue(os.path.isfile(os.path.join(self.build, "include",
                                                     "MT_Capabilities.h")))
 
     def test_nothing_is_written_inside_any_checkout(self):
@@ -491,7 +605,7 @@ class TestEmittedFragments(Base):
         every guard on this flag is presence-style, so a `#define ... 0` would take
         all 30 sites down the COMMERCIAL branch -- including the licence-audit
         tests written to catch that."""
-        self.assertNotIn("define MT_COMMERCIAL_BUILD", self.read("include",
+        self.assertNotIn("define MT_COMMERCIAL_BUILD", self.read_build("include",
                                                                 "MT_Capabilities.h"))
 
     def test_commercial_define_is_ABSENT_when_off_and_present_when_on(self):
@@ -557,7 +671,7 @@ class TestEmittedFragments(Base):
         """Same hazard as the commercial flag, same assertion. The canonical
         string literal inside MT_GetCapabilityManifest() legitimately CONTAINS
         the text, so this checks for a #define specifically."""
-        self.assertNotIn("define MT_PRIVATE_BUILD", self.read("include",
+        self.assertNotIn("define MT_PRIVATE_BUILD", self.read_build("include",
                                                               "MT_Capabilities.h"))
 
     def test_private_only_library_needs_the_private_tier(self):
@@ -687,7 +801,7 @@ class TestEmittedFragments(Base):
                     ' MT_GetCapabilityManifest()); return 0; }\n')
         exe = os.path.join(self.tmp, "link")
         proc = subprocess.run([clang, "-std=c++20", "-Wall", "-Wextra",
-                               "-I", os.path.join(self.out, "include"), src, "-o", exe],
+                               "-I", os.path.join(self.build, "include"), src, "-o", exe],
                               capture_output=True, text=True)
         self.assertEqual(proc.returncode, 0, proc.stderr)
         self.assertEqual(proc.stderr.strip(), "", "no new warnings")
@@ -732,7 +846,7 @@ class TestEmittedFragments(Base):
         with open(src, "w") as f:
             f.write('#include "MT_Capabilities.h"\nMT_REQUIRE_CAP(MT_CAP_LLM);\n')
         proc = subprocess.run([clang, "-std=c++20", "-fsyntax-only",
-                               "-I", os.path.join(self.out, "include"), src],
+                               "-I", os.path.join(self.build, "include"), src],
                               capture_output=True, text=True)
         self.assertNotEqual(proc.returncode, 0)
         self.assertIn("is required by this host", proc.stderr)
@@ -762,12 +876,21 @@ class TestDepsDir(Base):
 
     def test_caps_hash_is_the_documented_sha_prefix(self):
         """Byte-identical to what the retired mt_caps_deps_key produced, or every
-        existing cache is orphaned by a formatting change."""
+        existing cache is orphaned by a formatting change. Since decision 0.5
+        the DEPS hash comes from deps_form() -- the canonical string minus
+        MT_RELEASE_SYMBOLS -- which is deliberately byte-identical to the
+        pre-0.5 canonical, so the existing buckets stay valid."""
         import hashlib
         proc = self.resolve(self.manifest(self.CAPS))
-        expected = hashlib.sha256(
-            self.resolved_of(proc).encode("utf-8")).hexdigest()[:12]
+        resolved = self.resolved_of(proc)
+        deps_str = ";".join(kv for kv in resolved.split(";")
+                            if not kv.startswith("MT_RELEASE_SYMBOLS="))
+        expected = hashlib.sha256(deps_str.encode("utf-8")).hexdigest()[:12]
         self.assertEqual(self.deps_of(proc).split(os.sep)[-2], expected)
+        # And the OUT dir hash keeps the full canonical -- the two differ.
+        self.assertEqual(
+            self.out_of(proc).split(os.sep)[-1],
+            hashlib.sha256(resolved.encode("utf-8")).hexdigest()[:12])
 
     def test_capability_set_discriminates(self):
         a = self.deps_of(self.resolve(self.manifest("MT_CAP_LLM=1\n")))
@@ -831,6 +954,17 @@ class TestDepsDir(Base):
         lines = proc.stdout.strip().splitlines()
         self.assertEqual(len(lines), 1, proc.stdout)
         self.assertTrue(lines[0].endswith("libs"), lines[0])
+
+    def test_print_build_dir_gives_one_bare_rev_free_line(self):
+        """--print build-dir must be an ACCEPTED choice (the handler existed
+        while argparse rejected the flag -- Directory.Build.targets' IDE
+        resolve is its only caller, so nothing on macOS ever hit it), and
+        the value is the rev-free _build path."""
+        proc = self.resolve(self.manifest(self.CAPS), "--print", "build-dir")
+        lines = proc.stdout.strip().splitlines()
+        self.assertEqual(len(lines), 1, proc.stdout)
+        self.assertIn(os.sep + "_build" + os.sep, lines[0])
+        self.assertNotIn(R.engine_rev(ENGINE), lines[0])
 
     def test_existing_print_modes_still_give_one_bare_line(self):
         """The third contract line must not leak into --print."""

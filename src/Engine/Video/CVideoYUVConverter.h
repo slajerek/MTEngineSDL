@@ -24,7 +24,7 @@ enum class EYUVShaderMode
 // How an HDR clip's colour is finished off, once the shader has applied the
 // EOTF and the BT.2020 -> sRGB primaries change (S-5 Phase 5).
 //
-// This mirrors PhotoCruise's PC_EncodeForSurface, which is what the POSTER
+// This mirrors the photo app's PC_EncodeForSurface, which is what the POSTER
 // lane goes through -- and matching it is not a nicety, it IS the acceptance
 // criterion for the phase: a clip must look the same playing as it does as a
 // poster. The poster's own float product is LINEAR (CVideoFrameExtractor sets
@@ -86,7 +86,7 @@ public:
 	// this default rather than leaving whatever RenderToTarget() last set. GL
 	// uniforms are program state that survives between draws -- the existing
 	// `useLut = 0` line here exists for precisely that reason -- and this entry
-	// point is shared with other applications (LightHeroes' cutscenes), so a
+	// point is shared with other applications (the game app's cutscenes), so a
 	// leaked PQ EOTF would apply itself to somebody else's SDR video.
 	virtual void Render(void *texY, void *texU, void *texV, void *texA,
 						bool hasAlpha, float alpha,

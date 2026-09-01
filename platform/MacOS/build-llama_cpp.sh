@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Build llama.cpp static libs via CMake, then package into a single libllama_cpp.a.
-# This is used by LightHeroes/MTEngineSDL macOS builds.
+# This is used by the game app/MTEngineSDL macOS builds.
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
@@ -28,7 +28,7 @@ mkdir -p "$OUT_LIB_DIR"
 if [[ "${1:-}" == "clean" ]]; then
   echo "Cleaning llama.cpp build artifacts..."
   rm -f "$OUT_LIB" "$STAMP_FILE"
-  rm -rf "$LLAMA_SRC_DIR/build-macos"
+  rm -rf "$(mt_caps_work_dir llama.cpp)/build-macos"
   echo "Done. Run without 'clean' to rebuild."
   exit 0
 fi
@@ -88,7 +88,8 @@ if [[ -f "$OUT_LIB" && -f "$STAMP_FILE" ]]; then
   fi
 fi
 
-BUILD_DIR="$LLAMA_SRC_DIR/build-macos"
+# Phase 5: the build tree lives OUTSIDE the checkout, in the shared work root.
+BUILD_DIR="$(mt_caps_work_dir llama.cpp)/build-macos"
 
 cmake -S "$LLAMA_SRC_DIR" -B "$BUILD_DIR" \
   -DCMAKE_BUILD_TYPE=Release \

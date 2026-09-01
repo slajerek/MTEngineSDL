@@ -79,7 +79,7 @@ Require-Command lib
 $mbedSrc  = Join-Path $repoRoot 'other\lib\mbedtls'
 Require-Path $mbedSrc 'mbedtls submodule (run: git submodule update --init --recursive)'
 
-$buildDir = Join-Path $repoRoot "other\lib\mbedtls.windows-$Platform"
+$buildDir = Join-Path (Get-MTCapsWorkDir 'mbedtls') "build-windows-$Platform"
 
 $mbedSha = 'unknown'
 try {
@@ -120,6 +120,7 @@ try {
         -DBUILD_SHARED_LIBS=OFF `
         -DENABLE_TESTING=OFF `
         -DENABLE_PROGRAMS=OFF `
+        -DCMAKE_POLICY_DEFAULT_CMP0091=NEW `
         -DCMAKE_MSVC_RUNTIME_LIBRARY="MultiThreaded$<$<CONFIG:Debug>:Debug>"
     if ($LASTEXITCODE -ne 0) { throw "CMake configure failed for mbedTLS" }
 
@@ -130,10 +131,33 @@ try {
     $ErrorActionPreference = $savedEap
 }
 
+# The Visual Studio generator is MULTI-CONFIG: $buildDir holds BOTH
+# library\Debug\ and library\Release\. A bare -Recurse search returns whichever
+# the enumeration reaches first -- and "Debug" sorts before "Release" -- so a
+# Release bundle was silently packed from the DEBUG libraries, dragging msvcrtd
+# (the non-redistributable debug CRT) and unoptimized, assert-enabled code into
+# a shipped release. The stamp still recorded ":Release:", so the mismatch
+# never self-corrected. Match the requested configuration explicitly.
+$mtKnownConfigs = @("Debug", "Release", "RelWithDebInfo", "MinSizeRel")
+
 function Find-Lib([string]$name) {
-    $hits = Get-ChildItem -Path $buildDir -Recurse -File -Filter $name | Select-Object -First 1
-    if (-not $hits) { throw "Expected library not found: $name" }
-    return $hits.FullName
+    $all = @(Get-ChildItem -Path $buildDir -Recurse -File -Filter $name)
+    if ($all.Count -eq 0) { throw "Expected library not found: $name" }
+
+    $sep = [System.IO.Path]::DirectorySeparatorChar
+    $inConfig = @($all | Where-Object { $_.DirectoryName.Split($sep) -contains $Configuration })
+    if ($inConfig.Count -gt 0) { return $inConfig[0].FullName }
+
+    # Single-config generator: no per-config subdirectory exists at all. Accept
+    # that, but never silently fall back to a DIFFERENT configuration's output.
+    $otherConfigs = @($mtKnownConfigs | Where-Object { $_ -ne $Configuration })
+    $neutral = @($all | Where-Object {
+        $parts = $_.DirectoryName.Split($sep)
+        @($parts | Where-Object { $otherConfigs -contains $_ }).Count -eq 0
+    })
+    if ($neutral.Count -gt 0) { return $neutral[0].FullName }
+
+    throw "No '$name' built for configuration '$Configuration' (found: $($all.FullName -join ', '))"
 }
 
 $crypto = Find-Lib 'mbedcrypto.lib'

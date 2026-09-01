@@ -63,7 +63,7 @@ std::string PC_RawFixtureDir()
 	// Relative to the working directory, never an absolute path: tests run from
 	// the project root (tests/run_test.sh cds there), and hardcoding a path is
 	// forbidden outright. Apps without such a directory get "" exactly as
-	// before, so this is inert for c64d and LightHeroes.
+	// before, so this is inert for c64d and the game app.
 	const fs::path fallback = fs::path("tests") / "raws";
 	if (fs::is_directory(fallback, ec))
 		return fallback.string();
@@ -420,7 +420,7 @@ std::vector<unsigned char> PC_BuildSyntheticDng(const SSyntheticDngSpec &spec)
 	ifd0.push_back(ShortEntry(258, { 16 }));                  // BitsPerSample
 	ifd0.push_back(ShortEntry(259, { 1 }));                   // Compression: none
 	ifd0.push_back(ShortEntry(262, { 32803 }));               // Photometric: CFA
-	ifd0.push_back(AsciiEntry(271, "PhotoCruise"));           // Make
+	ifd0.push_back(AsciiEntry(271, "MTEngine"));           // Make
 	ifd0.push_back(AsciiEntry(272, "SyntheticDNG"));          // Model
 	ifd0.push_back(LongEntry(273, 0));                        // StripOffsets (patched)
 	const size_t stripOffsetsIndex = ifd0.size() - 1;

@@ -2,10 +2,18 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-LIGHTHEROES_DIR="$(cd "$ROOT_DIR/../LightHeroes" && pwd)"
+# The app half of this test needs a PRIVATE sibling checkout. A public
+# clone of the engine does not have it -- SKIP that half cleanly instead of
+# failing for every third party (unification plan, Phase 6).
+if [[ ! -d "$ROOT_DIR/../the game app" ]]; then
+  echo "SKIP: no ../the game app checkout -- the app-project half of this test is private"
+  LIGHTHEROES_DIR=""
+else
+  LIGHTHEROES_DIR="$(cd "$ROOT_DIR/../the game app" && pwd)"
+fi
 
 ENGINE_PROJECT="$ROOT_DIR/platform/MacOS/MTEngineSDL.xcodeproj/project.pbxproj"
-LIGHTHEROES_PROJECT="$LIGHTHEROES_DIR/platform/MacOS/LightHeroes.xcodeproj/project.pbxproj"
+LIGHTHEROES_PROJECT="$LIGHTHEROES_DIR/platform/MacOS/the game app.xcodeproj/project.pbxproj"
 
 check_file_exists() {
   local file="$1"
@@ -79,14 +87,14 @@ check_file_contains "$ENGINE_PROJECT" '"$(MT_CAPS_LIBS_DIR)/libmt_video_codecs.s
 
 # Linked through the search path rather than a file reference -- see the same
 # note in test-macos-image-codec-build-config.sh.
-check_file_contains "$LIGHTHEROES_PROJECT" '"-lmt_video_codecs"'
-check_file_contains "$LIGHTHEROES_PROJECT" '"$(MT_CAPS_LIBS_DIR)"'
-check_file_not_contains "$LIGHTHEROES_PROJECT" "MTEngineSDL/platform/MacOS/libs"
+if [[ -n "$LIGHTHEROES_DIR" ]]; then check_file_contains "$LIGHTHEROES_PROJECT" '"-lmt_video_codecs"'; fi
+if [[ -n "$LIGHTHEROES_DIR" ]]; then check_file_contains "$LIGHTHEROES_PROJECT" '"$(MT_CAPS_LIBS_DIR)"'; fi
+if [[ -n "$LIGHTHEROES_DIR" ]]; then check_file_not_contains "$LIGHTHEROES_PROJECT" "MTEngineSDL/platform/MacOS/libs"; fi
 
-check_file_not_contains "$LIGHTHEROES_PROJECT" "../../../MTEngineSDL/other/lib/libvpx/macos-arm64/libvpx.a"
-check_file_not_contains "$LIGHTHEROES_PROJECT" "../../../MTEngineSDL/other/lib/libopus/macos-arm64/libopus.a"
-check_file_not_contains "$LIGHTHEROES_PROJECT" "MTEngineSDL/other/lib/libvpx/macos-arm64"
-check_file_not_contains "$LIGHTHEROES_PROJECT" "MTEngineSDL/other/lib/libopus/macos-arm64"
+if [[ -n "$LIGHTHEROES_DIR" ]]; then check_file_not_contains "$LIGHTHEROES_PROJECT" "../../../MTEngineSDL/other/lib/libvpx/macos-arm64/libvpx.a"; fi
+if [[ -n "$LIGHTHEROES_DIR" ]]; then check_file_not_contains "$LIGHTHEROES_PROJECT" "../../../MTEngineSDL/other/lib/libopus/macos-arm64/libopus.a"; fi
+if [[ -n "$LIGHTHEROES_DIR" ]]; then check_file_not_contains "$LIGHTHEROES_PROJECT" "MTEngineSDL/other/lib/libvpx/macos-arm64"; fi
+if [[ -n "$LIGHTHEROES_DIR" ]]; then check_file_not_contains "$LIGHTHEROES_PROJECT" "MTEngineSDL/other/lib/libopus/macos-arm64"; fi
 
 git -C "$ROOT_DIR" check-ignore -q "other/lib/video-codecs/src/probe"
 git -C "$ROOT_DIR" check-ignore -q "other/lib/video-codecs/build/probe"

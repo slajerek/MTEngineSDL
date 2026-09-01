@@ -16,7 +16,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 # shellcheck source=../caps-lib.sh
 . "$ROOT_DIR/platform/caps-lib.sh"
 mt_caps_strip_host_build_env
-CACHE_DIR="$ROOT_DIR/other/lib/video-codecs"
+CACHE_DIR="$(mt_caps_work_dir video-codecs)"
 DOWNLOAD_DIR="$CACHE_DIR/downloads"
 SRC_DIR="$CACHE_DIR/src"
 BUILD_DIR="$CACHE_DIR/build"
@@ -40,7 +40,7 @@ JOBS="${MT_BUILD_JOBS:-8}"
 # HEVC/AAC/EAC3 software fallbacks (2026-07-19 codec-superset spec) for
 # non-store internal builds.
 # COMMERCIAL is a PARAMETER now, not a file read. The engine used to track a
-# platform/BUILD_MODE_DEFAULT and PhotoCruise tracked a root-level file of the
+# platform/BUILD_MODE_DEFAULT and the photo app tracked a root-level file of the
 # same name -- two files, two owners, one name, and neither reconciled with
 # MT_COMMERCIAL_BUILD. All three are retired: the licence mode lives in the app's
 # mtengine.caps and reaches acquisition, compilation and LICENSES.txt through one
@@ -52,10 +52,24 @@ case "$COMMERCIAL" in
   0|1) ;;
   *) echo "ERROR: COMMERCIAL must be 0 or 1 (got '$COMMERCIAL')" >&2; exit 1 ;;
 esac
-if [[ "$COMMERCIAL" == "1" ]]; then
-  FFMPEG_BUILD_MODE="commercial"
+# The RESOLVED mode wins when present (unification plan Phase 2, 2026-08-31):
+# mtcaps emits MT_FFMPEG_BUILD_MODE into every fragment, derived as `full` only
+# for MT_PRIVATE_BUILD=1 -- the withheld decoders are patent-encumbered and
+# patents attach to DISTRIBUTION, so the public/free tier gets the restricted
+# set exactly like the store tier. The COMMERCIAL env var stays as the legacy
+# channel for direct/standalone runs (engine dev = private use, so its default
+# maps to `full`).
+if [[ -n "${MT_FFMPEG_BUILD_MODE:-}" ]]; then
+  case "$MT_FFMPEG_BUILD_MODE" in
+    full|commercial) FFMPEG_BUILD_MODE="$MT_FFMPEG_BUILD_MODE" ;;
+    *) echo "ERROR: MT_FFMPEG_BUILD_MODE must be full or commercial (got '$MT_FFMPEG_BUILD_MODE')" >&2; exit 1 ;;
+  esac
 else
-  FFMPEG_BUILD_MODE="full"
+  if [[ "$COMMERCIAL" == "1" ]]; then
+    FFMPEG_BUILD_MODE="commercial"
+  else
+    FFMPEG_BUILD_MODE="full"
+  fi
 fi
 
 VPX_VERSION="1.15.2"
@@ -94,7 +108,10 @@ fi
 #
 # Absent means ON, so a bare engine build still builds everything, and this comes
 # before any download.
-if [[ "${MT_ENABLE_FFMPEG:-1}" == "0" ]]; then
+# WEBM_VPX is the archive's own flag (the vpx/opus/nestegg lane); FFMPEG kept
+# as fallback for a fragment older than 2026-08-31. Both derive from
+# MT_CAP_VIDEO_PLAYBACK today, so the values agree.
+if [[ "${MT_ENABLE_WEBM_VPX:-${MT_ENABLE_FFMPEG:-1}}" == "0" ]]; then
   STUB_STAMP="disabled:${script_sha}"
   if [[ -f "$OUT_LIB" && -f "$STAMP_FILE" && "$(cat "$STAMP_FILE" 2>/dev/null)" == "$STUB_STAMP" ]]; then
     exit 0
@@ -113,6 +130,14 @@ if [[ -f "$OUT_LIB" && -f "$STAMP_FILE" \
       && -f "$PREFIX_DIR/lib/libavcodec.dylib" \
       && -f "$OUT_LIB_DIR/libavcodec.dylib" ]]; then
   if [[ "$(cat "$STAMP_FILE")" == "$stamp_value" ]]; then
+    # Stamp hit: make sure the header/marker staging (Phase 2) is present in
+    # this keyed bucket too -- a bucket stamped before the relocation has the
+    # dylibs but not the staged include tree.
+    if [[ ! -d "$OUT_LIB_DIR/ffmpeg/include" && -d "$PREFIX_DIR/include" ]]; then
+      mkdir -p "$OUT_LIB_DIR/ffmpeg"
+      cp -R "$PREFIX_DIR/include" "$OUT_LIB_DIR/ffmpeg/include"
+    fi
+    [[ -f "$OUT_LIB_DIR/.ffmpeg-build-mode" ]] || echo -n "$FFMPEG_BUILD_MODE" > "$OUT_LIB_DIR/.ffmpeg-build-mode"
     exit 0
   fi
 fi
@@ -703,7 +728,7 @@ require_symbol "_opus_strerror"
 # link has to still be there to reach the real file. Copying it as a second
 # regular file would work but would double what an app embeds.
 #
-# install/lib keeps its copies -- PhotoCruise still reads them from there.
+# install/lib keeps its copies -- the photo app still reads them from there.
 echo "Staging FFmpeg dylibs to $OUT_LIB_DIR"
 for ff_lib in libavutil libavcodec libavformat libswscale libswresample; do
   for f in "$PREFIX_DIR/lib/$ff_lib".*.dylib "$PREFIX_DIR/lib/$ff_lib.dylib"; do
@@ -714,4 +739,13 @@ done
 
 echo -n "$stamp_value" > "$STAMP_FILE"
 echo "Video codec bundle built: $OUT_LIB"
+# The mode marker travels WITH the staged dylibs (Phase 2, 2026-08-31): a
+# guard reading the in-checkout prefix reads a path the relocation will
+# delete, and a stale tree there could answer for the wrong mode.
+echo -n "$FFMPEG_BUILD_MODE" > "$OUT_LIB_DIR/.ffmpeg-build-mode"
+# FFmpeg headers travel with the dylibs too (Phase 2) -- the projects used to
+# read other/lib/video-codecs/install/include from inside the checkout.
+rm -rf "$OUT_LIB_DIR/ffmpeg/include"
+mkdir -p "$OUT_LIB_DIR/ffmpeg"
+cp -R "$PREFIX_DIR/include" "$OUT_LIB_DIR/ffmpeg/include"
 echo "FFmpeg LGPL decode dylibs built: $PREFIX_DIR/lib, staged to $OUT_LIB_DIR (avutil/avcodec/avformat/swscale/swresample)"

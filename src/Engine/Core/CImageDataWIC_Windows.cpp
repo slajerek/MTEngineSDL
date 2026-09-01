@@ -15,7 +15,7 @@
 #pragma comment(lib, "windowscodecs.lib")
 #pragma comment(lib, "ole32.lib")
 
-// RAII for the COM apartment. PhotoCruise's decode workers are ordinary
+// RAII for the COM apartment. the photo app's decode workers are ordinary
 // threads that never called CoInitialize, but the main thread may have -- and
 // a second initialise on an already-initialised thread returns S_FALSE (or
 // RPC_E_CHANGED_MODE for a different model). Both are survivable: only

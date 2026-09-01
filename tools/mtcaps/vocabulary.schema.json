@@ -10,7 +10,7 @@
   "$defs": {
     "dependency": {
       "type": "object",
-      "required": ["name", "licence", "version", "provenance"],
+      "required": ["name", "licence", "version", "provenance", "commercial_safe"],
       "properties": {
         "name": { "type": "string", "minLength": 1 },
         "licence": {
@@ -23,6 +23,15 @@
           "type": "string",
           "minLength": 1,
           "description": "submodule / downloaded tarball / git clone / vendored source / committed prebuilt / system package. The third mode -- committed prebuilt -- is otherwise invisible to the model, and the clean-clone proof would not know it was expected."
+        },
+        "commercial_safe": {
+          "type": "boolean",
+          "description": "Decision 0.2 (2026-08-31): resolve refuses a MT_COMMERCIAL_BUILD=1 build that would enable a dependency with this false. Explicit, never parsed out of the licence prose. Required -- vocab.py enforces it; a row without it would silently sit outside the guard."
+        },
+        "flag": {
+          "type": "string",
+          "pattern": "^MT_(ENABLE|CAMERA)_[A-Z0-9_]*$",
+          "description": "Optional: the single MT_ENABLE_* flag that gates this dependency, for capabilities that enable several flags (the image-codec bundle). Must be in the owning capability's `enables`. Absent means the capability itself is the gate. The commercial_safe deny-list consults it so a flag forced 0 (libheif outside private builds) never errors."
         },
         "size_mb": { "type": "number" },
         "system_package": { "type": "object" }

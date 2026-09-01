@@ -38,7 +38,7 @@ USAGE
 e.g.
     tools/sdl3-success-tests.py \
         other/lib/SDL-release-3.4.14-static/include/SDL3 \
-        ~/develop/MTEngineSDL ~/develop/PhotoCruise ~/develop/c64d ~/develop/LightHeroes
+        . ../<each-sibling-app-checkout>
 
 Exit status is 0 always -- this is a report, not a gate. The gate is a human
 reading the NOW-BOOL rows.

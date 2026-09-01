@@ -166,7 +166,7 @@ inline int _LOGGER_S(unsigned int level, const char *fileName, unsigned int line
 // statement instead of becoming a stray sibling. GLOBAL_DEBUG_OFF defaults
 // to OFF (commented out) on macOS, so this branch is currently dormant
 // here, but it is live by default on Linux, where this exact "{}"-style
-// shape (there: a bare ';') broke PhotoCruise's CViewPhotoCruiseMain.cpp
+// shape (there: a bare ';') broke the photo app's CViewthe photo appMain.cpp
 // font loader with "error: 'else' without a previous 'if'". Fixed on all
 // three platforms' DBG_Log.h for consistency, since GLOBAL_DEBUG_OFF is a
 // supported toggle on each.

@@ -1,4 +1,5 @@
 #include "CRegistryServer.h"
+#include "MT_NetGameAuthDomains.h"
 #include "NET_Main.h"
 #include "SYS_Funct.h"
 #include "SYS_Crypto.h"
@@ -1162,8 +1163,10 @@ void CRegistryServer::SetAdminSecret(const string &adminSecret)
 		mutex->Unlock();
 		return;
 	}
-	// Use HMAC-SHA256 with a domain separator to produce the hash
-	const char *domainKey = "LightHeroes.AdminSecret.v1";
+	// Use HMAC-SHA256 with a domain separator to produce the hash. The
+	// separator is app-registered (MT_SetNetGameAuthDomains) -- see
+	// MT_NetGameAuthDomains.h for why it left this file.
+	const char *domainKey = MTNetGameAdminDomainRef();
 	auto digest = SYS_HmacSha256(
 		(const uint8_t *)domainKey, strlen(domainKey),
 		(const uint8_t *)adminSecret.data(), adminSecret.size());
@@ -1586,7 +1589,7 @@ void CRegistryServer::RecordCrashReport(const string &nodeId, const string &role
 void CRegistryServer::HandleAdminAuth(CNetClientData *clientData, json &j)
 {
 	// { "action": "admin_auth", "secretHash": [byte array] }
-	// The client computes HMAC-SHA256("LightHeroes.AdminSecret.v1", rawSecret) and sends the hash.
+	// The client computes HMAC-SHA256("the game app.AdminSecret.v1", rawSecret) and sends the hash.
 
 	mutex->Lock();
 	bool hasAdminSecret = !adminSecretHash.empty();

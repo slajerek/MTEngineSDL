@@ -153,7 +153,7 @@ void DBG_LogTime();
 // empty statement outside the if, leaving 'else' with no 'if' to attach
 // to. GLOBAL_DEBUG_OFF defaults to OFF (commented out) on Windows, so this
 // branch is currently dormant here, but it is live by default on Linux,
-// where this exact shape broke PhotoCruise's CViewPhotoCruiseMain.cpp font
+// where this exact shape broke the photo app's CViewthe photo appMain.cpp font
 // loader with "error: 'else' without a previous 'if'". Fixed on all three
 // platforms' DBG_Log.h for consistency, since GLOBAL_DEBUG_OFF is a
 // supported toggle on each.

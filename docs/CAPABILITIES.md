@@ -29,7 +29,7 @@ within two capabilities, which is why this one is not hand-written.
 | `MT_CAP_TERMINAL` | 1 | engine-compiled | — | `MT_ENABLE_LIBTMT` | no |
 | `MT_CAP_TEST_ENGINE` | 1 | engine-compiled | — | `MT_ENABLE_IMGUI_TEST_ENGINE` | yes |
 | `MT_CAP_UNDO` | 1 | engine-compiled | — | `MT_ENABLE_UNDO` | no |
-| `MT_CAP_VIDEO_PLAYBACK` | 1 | engine-compiled | — | `MT_ENABLE_FFMPEG` | yes |
+| `MT_CAP_VIDEO_PLAYBACK` | 1 | engine-compiled | — | `MT_ENABLE_FFMPEG`, `MT_ENABLE_WEBM_VPX` | yes |
 | `MT_CAP_WEBSOCKETS` | 1 | dependency-only | — | `MT_ENABLE_UWEBSOCKETS` | no |
 
 ## What each capability costs
@@ -51,7 +51,7 @@ within two capabilities, which is why this one is not hand-written.
 | `MT_CAP_PHOTO_CODECS` | libgav1 | Apache-2.0 | see build-image_codecs | git clone (call sites Linux:293, MacOS:396, Windows:258) |
 | `MT_CAP_PHOTO_CODECS` | libjxl | BSD-3-Clause | see build-image_codecs | git clone + its own submodules highway/brotli/skcms (Linux:296, MacOS:398, Windows:399/:401) |
 | `MT_CAP_PHOTO_CODECS` | libheif | LGPL-3.0 (container); its HEVC decoder is the licence question | system package on Linux today; vendored in #5.5a | pkg_check_modules on Linux, ImageIO on macOS, absent on Windows |
-| `MT_CAP_RAW` | LibRaw | CDDL-1.0 or LGPL-2.1 (dual; the CDDL option is what makes a commercial build possible -- see PhotoCruise's 2026-08-19 jpegxl-dng licence spike) | see build-image_codecs | downloaded tarball |
+| `MT_CAP_RAW` | LibRaw | CDDL-1.0 or LGPL-2.1 (dual; the CDDL option is what makes a commercial build possible) | see build-image_codecs | downloaded tarball |
 | `MT_CAP_TERMINAL` | libtmt | BSD-2-Clause | vendored | vendored source |
 | `MT_CAP_TEST_ENGINE` | imgui_test_engine | Dear ImGui Test Engine licence (free for open source; commercial use requires a licence from Omar Cornut) | vendored | vendored source |
 | `MT_CAP_VIDEO_PLAYBACK` | FFmpeg | LGPL-2.1 (GPL components excluded) | see platform/*/build-video_codecs.* | downloaded tarball |
@@ -154,8 +154,8 @@ legally incomplete SBOM while looking complete.
 | zlib | Zlib | vendored | compiled straight into the engine, CMakeLists.txt:899-913 |
 | ALSA | LGPL-2.1 | system | system package, find_package(ALSA REQUIRED) at CMakeLists.txt:147 (Linux) |
 | GTK3 | LGPL-2.1 | system | system package, pkg_check_modules(GTK3 REQUIRED) (Linux) |
-| freetype | FTL or GPL-2.0 | committed prebuilt | committed prebuilt, platform/Windows/libs |
-| libuv | MIT | committed prebuilt | committed prebuilt, platform/Windows/libs |
+| freetype | FTL or GPL-2.0 | 2.10.4 (vendored) | vendored source (other/lib/freetype-2.10.4), built by build-freetype.ps1 on Windows; tracked prebuilt as fallback |
+| libuv | MIT | vendored | vendored source (other/lib/libuv), built by build-libuv.ps1 on Windows; tracked prebuilt as fallback |
 | libicc / sRGB profile | see src/Engine/Libs/icc | vendored | core: on the render path, no third-party dependency. NOT the same thing as MT_CAP_COLOR_MANAGEMENT, which is Color/ and lcms2 |
 | EXIF reader | engine source | vendored | core: Core/CImageData.cpp:21 includes CExifReader.h unconditionally, no third-party dependency |
 | i18n | engine source | n/a | core by decision 4 -- c64d is due to be localised |
@@ -168,10 +168,39 @@ legally incomplete SBOM while looking complete.
 (the capability stays **on** and a subset of its libraries or decoders is
 withheld) — `variant` is the common case.
 
+Since 2026-08-31 (unification plan, decisions 0.1/0.2/0.5) the mode is
+**applied at resolve time**, in a fixed order: (1) the manifest resolves;
+(2) at `MT_COMMERCIAL_BUILD=1` every `capability-off` effect turns its
+capability off **in the resolved set itself**, so the fragments, the
+out-dir hash and `LICENSES.txt` all see the post-effect state and cannot
+disagree; (3) only then does the `commercial_safe` deny-list run — a
+commercial resolve that would still enable a dependency marked
+`commercial_safe: false` in the vocabulary is a hard error naming the
+dependency, its licence and the capability that pulled it in. A
+dependency whose gating flag ended 0 (libheif under
+`MT_CAP_PHOTO_CODECS=1`) is not enabled and never errors.
+
+Two further mode rules ride along:
+
+- **`MT_RELEASE_SYMBOLS`** (debug symbols in Release builds) is a
+  build-settings mode key, never a C define. Default 1;
+  `MT_COMMERCIAL_BUILD=1` forces it to 0 unless the invocation
+  explicitly `--set`s it back — the deliberate UAT case. It joins the
+  canonical form and the out-dir hash (a UAT and a store artifact never
+  share one `$MT_OUT`) but not the deps hash (archives are
+  byte-identical either way).
+- **The FFmpeg decoder set follows distribution, not payment**: the
+  resolve emits `ffmpeg_mode=` (and `MT_FFMPEG_BUILD_MODE` in every
+  fragment) as `full` only when `MT_PRIVATE_BUILD=1`. The public/free
+  tier (`0,0`) gets the same restricted set the store tier does,
+  because the withheld decoders are patent-encumbered and patents
+  attach to distribution.
+
 | Capability | Effect | Withheld in a commercial build |
 |---|---|---|
 | `MT_CAP_PHOTO_CODECS` | variant | heif |
-| `MT_CAP_VIDEO_PLAYBACK` | variant | hevc, wmv1, wmv2, wmv3, vc1, wmav1, wmav2, aac, eac3 |
+| `MT_CAP_TEST_ENGINE` | capability-off | — |
+| `MT_CAP_VIDEO_PLAYBACK` | variant | hevc, wmv1, wmv2, wmv3, vc1, wmav1, wmav2, wmapro, msmpeg4v1, msmpeg4v2, msmpeg4v3, aac, eac3 |
 
 ## Distribution tiers
 
@@ -239,7 +268,7 @@ RAW development maths and pipeline (Develop/).
 
 Terminal UI toolkit, linked and used directly by the app.
 
-*LightHeroes guards on MT_ENABLE_FTXUI in six of its own sites, and in the `#if X` style -- so on Linux and Windows, where the flag is defined nowhere, its admin dashboard is OFF today and a value-style normalisation would turn it ON.*
+*One host app guards on MT_ENABLE_FTXUI in six of its own sites, and in the `#if X` style -- so on a platform where the flag is defined nowhere the guarded feature is OFF, and a value-style normalisation turns it ON.*
 
 *It keeps the library name deliberately. A dependency-only capability has no engine feature to abstract -- no engine source includes ftxui, verified zero hits in src/ -- so the app links ftxui's API directly and the library name IS the feature name. Renaming it MT_CAP_TERMINAL_UI would also collide with MT_CAP_TERMINAL, a different capability.*
 
@@ -279,7 +308,7 @@ MIDI input and output via rtmidi.
 
 ### `MT_CAP_MUSIC_PLAYER`
 
-Music player and playlists. LightHeroes only.
+Music player and playlists. Used by one host app today.
 
 *It does NOT imply an AUDIO capability: audio is CORE and has no vocabulary key, so an implication onto it would make mtcaps exit 2 on an unknown key. The coupling is real and is stated here as prose: the music player needs the core audio path, which is always present.*
 
@@ -297,13 +326,13 @@ Reliable UDP transport (ENet) and Core/Net.
 
 Still-image codecs beyond the core set: TIFF, WebP, AVIF and HEIF.
 
-*PhotoCruise guards on MT_ENABLE_LIBTIFF, MT_ENABLE_LIBWEBP (x2), MT_ENABLE_LIBAVIF and MT_ENABLE_LIBHEIF in its own src/Tests/CTestFormatSupport.cpp. Decision E was reversed on this measurement.*
+*one host app guards on MT_ENABLE_LIBTIFF, MT_ENABLE_LIBWEBP (x2), MT_ENABLE_LIBAVIF and MT_ENABLE_LIBHEIF in its own format-support test. Decision E was reversed on this measurement.*
 
 ### `MT_CAP_RAW`
 
 Camera RAW decoding via LibRaw.
 
-*Measured: MT_ENABLE_LIBRAW appears in the four app trees only inside a COMMENT (PhotoCruise/src/PhotoCruiseInit.cpp:352) saying the opposite. It joins the app-visible set if and when a grep finds a real guard.*
+*Measured: MT_ENABLE_LIBRAW appears in the four app trees only inside a COMMENT in one host app's init code saying the opposite. It joins the app-visible set if and when a grep finds a real guard.*
 
 ### `MT_CAP_TERMINAL`
 
@@ -313,11 +342,11 @@ Embedded terminal emulator: libtmt and GUI/Controls/CGuiViewTerminal. A differen
 
 imgui_test_engine UI-automation harness.
 
-*Appears in three headers app TUs include, and all four apps' src/Tests/ guard on it. Renamed from ENABLE_IMGUI_TEST_ENGINE in Phase 1 -- do not emit both spellings.*
+*Appears in three headers app TUs include, and all four apps' src/Tests/ guard on it. Renamed from ENABLE_IMGUI_TEST_ENGINE in Phase 1 -- do not emit both spellings. GUARD WITH #if, NEVER #ifdef: this flag is emitted as =0 rather than absent, and #ifdef is true for a macro defined as 0, so an #ifdef guard compiles app code in while the engine has compiled its half out. DummyApp (6 sites) and c64d (9) both had that defect until 2026-08-28. The eight vendored src/Engine/Libs/imgui_test_engine/*.cpp are guarded the same way and registered in that directory's MTENGINE_PATCHES.md -- without those guards MT_CAP_TEST_ENGINE=0 does not build at all, because imconfig.h has already removed the hooks they need.*
 
 ### `MT_CAP_UNDO`
 
-Undo/redo framework (Tools/Undo). LightHeroes only.
+Undo/redo framework (Tools/Undo). Used by one host app today.
 
 *No third-party dependency, so this is a CODE-SIZE capability rather than an acquisition one -- which makes it the cheapest place to prove the guard machinery without any acquisition change.*
 
@@ -325,7 +354,7 @@ Undo/redo framework (Tools/Undo). LightHeroes only.
 
 Video decoding and playback: FFmpeg, libvpx, opus, nestegg, and the platform hardware decoders.
 
-*MT_ENABLE_FFMPEG appears in Video/CVideoSourceFFmpeg.h:10, a header app TUs include, AND PhotoCruise guards on it 40 times in its own src/. Both routes to app-visible are exercised by this one flag.*
+*MT_ENABLE_FFMPEG appears in Video/CVideoSourceFFmpeg.h:10, a header app TUs include, AND one host app guards on it 40 times in its own src/. Both routes to app-visible are exercised by this one flag. MT_ENABLE_WEBM_VPX (added 2026-08-31, unification plan Phase 2) gates the legacy nestegg/vpx/opus lane -- CVideoSourceWebMVpx compiled unconditionally before, which made MT_CAP_VIDEO_PLAYBACK=0 an engine-blocked configuration: the link died on opus_*/vpx_* against the stub archive.*
 
 ### `MT_CAP_WEBSOCKETS`
 

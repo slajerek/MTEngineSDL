@@ -41,7 +41,7 @@
 // LINK INPUTS LIVE IN THE SOURCE, NOT IN THE PROJECT, and that is deliberate.
 // MTEngineSDL is a StaticLibrary, so its own <Link><AdditionalDependencies> is
 // inert -- every app re-lists the engine's dependencies itself. The factory arm
-// in VID_Main.cpp drags this object into PhotoCruise, LightHeroes AND c64d, all
+// in VID_Main.cpp drags this object into the photo app, the game app AND c64d, all
 // three of which would otherwise fail to link with no D3D code of their own.
 // A #pragma here is honoured by MSVC and by the ClangCL toolset the engine
 // actually builds with, and it cannot be forgotten in a fourth app later.
@@ -75,7 +75,7 @@
 //     CreatePlaneTexture/Update/Delete, CreateLutTexture3D/Update/Delete.
 //
 //   DELIBERATELY LEFT ON THE DEFAULT
-//     CreateMaskedTileShader -> NULL. It serves c64d and LightHeroes, which
+//     CreateMaskedTileShader -> NULL. It serves c64d and the game app, which
 //       keep working on OpenGL, and every caller already draws its unshaded
 //       fallback rather than dereferencing. Porting more HLSL blind is what
 //       would make this stage unfinishable.
@@ -1177,7 +1177,7 @@ bool CRenderBackendD3D11::GetSurfaceIsLinearColorSpace()
 	// reading: CVideoPlayer copies it into SVideoHdrOutput.surfaceIsLinear, on
 	// which both YUV shaders SKIP the surface encode and write linear light;
 	// PC_ResidentFormat copies it into PCSurfaceEncoding.isLinear, on which
-	// PhotoCruise's photo transform becomes the identity.
+	// the photo app's photo transform becomes the identity.
 	//
 	// Every one of those producers draws into the OFFSCREEN target, which is
 	// extended-sRGB-ENCODED exactly like the macOS layer, and Resolve.hlsl

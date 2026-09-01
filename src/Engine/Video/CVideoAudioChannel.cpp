@@ -384,7 +384,7 @@ void CVideoAudioChannel::MixIn(int *mixBuffer, u32 numSamples, int numAudioChann
 	// TEST-ONLY (null in production): the window a Reset() has to race is exactly
 	// from the entry load above to the CAS below, and it is a handful of
 	// instructions wide on the silent path. See SetDebugMixInPreCasHook() --
-	// unlike the setter, this call site is NOT PC_TEST_STAT_COUNTER-guarded
+	// unlike the setter, this call site is NOT MT_TEST_STAT_COUNTER-guarded
 	// (see the member comment in the header for why: it is a single relaxed
 	// load of a member that always exists, at negligible cost).
 	void (*hook)(void *) = debugPreCasHook.load(std::memory_order_acquire);
@@ -476,7 +476,7 @@ void CVideoAudioChannel::Reset()
 }
 
 // SetDebugMixInPreCasHook() is defined inline in the header (guarded by
-// PC_TEST_STAT_COUNTER) -- see there for why it does not have an out-of-line
+// MT_TEST_STAT_COUNTER) -- see there for why it does not have an out-of-line
 // definition here.
 
 // TEST-ONLY, quiescent-only -- see the declaration.

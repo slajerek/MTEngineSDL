@@ -2,11 +2,11 @@
 
 // RD-A: full RAW decode -- 16-bit linear camera-space pixels plus the
 // metadata needed to interpret them (design doc:
-// PhotoCruise/specs/superpowers/specs/2026-08-06-rd-a-engine-foundation-design.md).
+// the photo app/specs/superpowers/specs/2026-08-06-rd-a-engine-foundation-design.md).
 //
 // THIS HEADER IS UNCONDITIONAL -- no MT_ENABLE_LIBRAW anywhere in it (#5.0).
 // That define is engine-PRIVATE in all three build systems, so a guarded
-// header would be an EMPTY FILE for PhotoCruise: a silently missing
+// header would be an EMPTY FILE for the photo app: a silently missing
 // declaration, the worst failure shape available. Only CRawDecoder.cpp is
 // guarded (with an #else stub), the CImageDataRAW.cpp / CCmsEngineFactory
 // pattern. Callers branch on IsAvailable(), never on the define.
@@ -185,7 +185,7 @@ public:
 	static void FreeResult(SRawDecodeResult *result);
 
 	// Compile-time answer, delivered at runtime, because MT_ENABLE_LIBRAW is
-	// not visible to PhotoCruise (#5.0). Callers and tests branch on this;
+	// not visible to the photo app (#5.0). Callers and tests branch on this;
 	// false is "unavailable in this build", never an error.
 	static bool IsAvailable();
 

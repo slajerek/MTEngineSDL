@@ -82,7 +82,7 @@ void CTestI18nEngine::Run(ITestCallback *callback)
 
 	CI18nManager *mgr = CI18nManager::Instance();
 
-	// The locales should already be registered by CLightHeroesI18n::Init()
+	// The locales should already be registered by Cthe game appI18n::Init()
 	// Verify they exist
 	ASSERT_TRUE(mgr->GetLocale("en") != NULL, "English locale registered");
 	ASSERT_TRUE(mgr->GetLocale("pl") != NULL, "Polish locale registered");

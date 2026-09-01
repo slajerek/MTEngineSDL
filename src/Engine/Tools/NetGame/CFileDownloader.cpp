@@ -1,4 +1,5 @@
 #include "CFileDownloader.h"
+#include "MT_API.h"
 
 #include "SYS_FileSystem.h"
 
@@ -225,7 +226,9 @@ void CFileDownloader::WorkerThreadMain(std::string u, std::string dst, std::stri
 		cli.set_connection_timeout(connectionTimeoutSec, 0);
 
 		httplib::Headers headers;
-		headers.emplace("User-Agent", "LightHeroes");
+		// The HOST's identity, from the existing MT_API contract -- the engine
+		// used to send one commercial app's name for every host (Phase 6).
+		headers.emplace("User-Agent", MT_GetSettingsFolderName());
 		if (!authHeader.empty())
 			headers.emplace("Authorization", authHeader);
 		if (useRange && startFrom > 0)

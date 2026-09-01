@@ -653,7 +653,7 @@ void CVideoYUVShaderMetal::Render(void *texY, void *texU, void *texV, void *texA
 		// EVERY HDR uniform reset, from the caller's value (default-constructed
 		// unless a caller deliberately opts in). GL uniforms are program state
 		// that survives between draws and this entry point is shared with other
-		// applications -- LightHeroes draws its cutscenes through it -- so a PQ
+		// applications -- the game app draws its cutscenes through it -- so a PQ
 		// EOTF left set by the last RenderToTarget() would apply itself to
 		// somebody else's SDR video. Metal re-uploads the whole struct each
 		// draw so it cannot leak the same way, but the two backends must agree

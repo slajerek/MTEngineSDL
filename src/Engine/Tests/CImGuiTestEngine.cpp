@@ -105,15 +105,15 @@ void CImGuiTestEngine::Init()
 	// ConfigLogToTTY defaults to false, which means a failing ImGui test
 	// records WHY it failed into its own in-memory log and then throws it away:
 	// the run reports "0/7 passed" and not one line saying what went wrong.
-	// That is precisely why LightHeroes' 0/7 sat unexplained across several
+	// That is precisely why the game app's 0/7 sat unexplained across several
 	// stages -- the information was never emitted, so nobody could act on it.
 	//
 	// Gated on the command line rather than always-on because an interactive
 	// session that opens the Test Engine UI has its own log window and does not
 	// want the terminal flooded. Checked here rather than via gHeadlessMode
 	// because that flag is not set yet for every app at Init() time, and
-	// LightHeroes calls Init() unconditionally rather than only under
-	// --run-tests as PhotoCruise does.
+	// the game app calls Init() unconditionally rather than only under
+	// --run-tests as the photo app does.
 	bool isCliTestRun = false;
 	for (int i = 0; i < (int)sysCommandLineArguments.size(); i++)
 	{

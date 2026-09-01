@@ -29,7 +29,7 @@ struct SVideoInfo
 	// i.e. of the track this source actually decodes and displays. Exposed so a
 	// container WRITER can CHECK that the track it is about to patch is the one
 	// the engine displays, rather than trusting two selection rules to agree
-	// forever (PhotoCruise fu-e5 #4.2). 0 when unknown or not applicable --
+	// forever (the photo app fu-e5 #4.2). 0 when unknown or not applicable --
 	// only the mov/mp4 demuxer assigns AVStream::id from a track id.
 	int videoTrackId = 0;
 	bool hasAlpha = false;
@@ -48,7 +48,7 @@ struct SVideoInfo
 	                                     // sources never set these two -- they stay "unspecified")
 	int colorTrc = 2;                   // raw AVCOL_TRC_* value; 2 = unspecified.
 	                                     // 16 = SMPTE 2084 (PQ), 18 = ARIB STD-B67 (HLG) -- the
-	                                     // HDR pair PhotoCruise's CM-E LUT gate keys on.
+	                                     // HDR pair the photo app's CM-E LUT gate keys on.
 };
 
 // CM-E: normalize an FFmpeg AVColorSpace value into the engine's VPX_CS_*

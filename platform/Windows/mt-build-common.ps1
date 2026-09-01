@@ -317,6 +317,46 @@ function Get-MTLlamaBackendOption {
     return @('--engine-option', "MT_LLAMA_CUDA=$cuda")
 }
 
+function Get-MTBuildRoot {
+    <#
+    .SYNOPSIS
+        THE build root, and the only place PowerShell spells its default.
+
+    .DESCRIPTION
+        The PowerShell mirror of tools\mtcaps\resolve.py default_build_root().
+        Keep the two in step: when they disagree, the resolve puts artifacts
+        under one root and the dependency scripts put theirs under another,
+        with no diagnostic -- which is exactly what happened between
+        2026-09-01 and 2026-09-02, when the LOCALAPPDATA -> .cache decision
+        was applied to resolve.py and to the props but NOT to the four
+        PowerShell fallbacks. The dependency WORK trees kept building under
+        %LOCALAPPDATA%\mtengine, so the orphan cache that item 16(b) deleted
+        came straight back, and mtengine-gc.py -- which only ever walks the
+        CURRENT root -- could not see it.
+
+        %USERPROFILE%\.cache\mtengine and NOT %LOCALAPPDATA%: MSBuild's
+        FileTracker drops read/write tracking under LOCALAPPDATA, which
+        disables incremental builds outright. That applies to the dependency
+        build trees this root also holds, not just to the engine's objects.
+    #>
+    if ($env:MTENGINE_BUILD_ROOT) { return $env:MTENGINE_BUILD_ROOT }
+    $home_ = if ($env:USERPROFILE) { $env:USERPROFILE } else { [Environment]::GetFolderPath('UserProfile') }
+    return (Join-Path $home_ '.cache\mtengine')
+}
+
+function Get-MTCapsWorkDir {
+    <#
+    .SYNOPSIS
+        The dependency WORK root (downloads/sources/build trees/installs) for
+        one dependency family -- outside every checkout. Phase 2 moved the
+        codec caches here from other\lib\{image,video}-codecs.
+    #>
+    param([Parameter(Mandatory)][string]$Name)
+    $dir = Join-Path (Get-MTBuildRoot) "_deps\work\$Name"
+    New-Item -ItemType Directory -Force -Path $dir | Out-Null
+    return $dir
+}
+
 function Import-MTCapsEnvironment {
     <#
     .SYNOPSIS
@@ -359,6 +399,12 @@ function Import-MTCapsEnvironment {
         if ($line -match '^\s*(MT_ENABLE_[A-Z0-9_]+)\s*=\s*([01])\s*$') {
             Set-Item -Path "env:$($Matches[1])" -Value $Matches[2]
             $count++
+        }
+        # The resolved FFmpeg mode (Phase 2, 2026-08-31): a string, not 0/1,
+        # so it needs its own line. build-video_codecs.ps1 prefers it over the
+        # legacy COMMERCIAL env channel.
+        elseif ($line -match '^\s*MT_FFMPEG_BUILD_MODE\s*=\s*(full|commercial)\s*$') {
+            $env:MT_FFMPEG_BUILD_MODE = $Matches[1]
         }
     }
 
@@ -421,4 +467,184 @@ function New-MTCapsStubArchive {
     if (Test-Path $tmpDir) { Remove-Item -Recurse -Force $tmpDir }
 
     Write-Host "$Symbol is disabled by the capability set; wrote stub $OutLib"
+}
+
+# ============================================================================
+# Shared helpers for the dependency scripts that build a single static archive
+# from a vendored source tree (SDL3, libuv, freetype, uSockets).
+# ============================================================================
+
+function Invoke-MTNative {
+    <#
+    .SYNOPSIS
+        Run a native command and fail only on a non-zero exit code.
+
+    .DESCRIPTION
+        With the script-global $ErrorActionPreference = 'Stop', PowerShell 5.1
+        turns ANY stderr line written by a native command into a terminating
+        NativeCommandError -- regardless of the exit code, and with no explicit
+        2>&1 redirection. A benign "CMake Deprecation Warning" from a
+        third-party CMakeLists.txt on an otherwise-successful configure was
+        enough to abort build-mbedtls.ps1 and build-video_codecs.ps1 outright,
+        which is why both carry the same relaxation inline. $LASTEXITCODE is
+        the real, sufficient success/failure signal.
+    #>
+    param(
+        [Parameter(Mandatory = $true)] [scriptblock] $Action,
+        [Parameter(Mandatory = $true)] [string] $What
+    )
+
+    $savedEap = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        & $Action
+        if ($LASTEXITCODE -ne 0) { throw "$What failed (exit $LASTEXITCODE)" }
+    } finally {
+        $ErrorActionPreference = $savedEap
+    }
+}
+
+function Find-MTConfigLib {
+    <#
+    .SYNOPSIS
+        Locate the archive built for a specific configuration.
+
+    .DESCRIPTION
+        The Visual Studio generator is multi-config: one build tree holds both
+        Debug\ and Release\ outputs. A bare `Get-ChildItem -Recurse | Select
+        -First 1` returns whichever the enumeration reaches first, and "Debug"
+        sorts before "Release" -- so a Release bundle silently gets packed from
+        the DEBUG libraries. That is not hypothetical: it shipped debug mbedTLS,
+        and with it msvcrtd (the non-redistributable debug CRT), inside a
+        Release build, while the stamp still recorded ":Release:".
+
+        Falls back to a configuration-neutral hit for single-config generators,
+        but never to a DIFFERENT configuration's output.
+    #>
+    param(
+        [Parameter(Mandatory = $true)] [string] $BuildDir,
+        [Parameter(Mandatory = $true)] [string] $Name,
+        [Parameter(Mandatory = $true)] [string] $Configuration
+    )
+
+    $knownConfigs = @('Debug', 'Release', 'RelWithDebInfo', 'MinSizeRel')
+
+    $all = @(Get-ChildItem -Path $BuildDir -Recurse -File -Filter $Name -ErrorAction SilentlyContinue)
+    if ($all.Count -eq 0) { throw "Expected library not found under ${BuildDir}: $Name" }
+
+    $sep = [System.IO.Path]::DirectorySeparatorChar
+
+    $inConfig = @($all | Where-Object { $_.DirectoryName.Split($sep) -contains $Configuration })
+    if ($inConfig.Count -gt 0) { return $inConfig[0].FullName }
+
+    $otherConfigs = @($knownConfigs | Where-Object { $_ -ne $Configuration })
+    $neutral = @($all | Where-Object {
+        $parts = $_.DirectoryName.Split($sep)
+        @($parts | Where-Object { $otherConfigs -contains $_ }).Count -eq 0
+    })
+    if ($neutral.Count -gt 0) { return $neutral[0].FullName }
+
+    throw "No '$Name' built for configuration '$Configuration' (found: $($all.FullName -join ', '))"
+}
+
+function Get-MTCrtCMakeArgs {
+    <#
+    .SYNOPSIS
+        CMake arguments that pin a dependency to the engine's CRT.
+
+    .DESCRIPTION
+        Every dependency staged into the caps libs directory is linked into the
+        same image as the engine and the app, which build /MT (MultiThreaded)
+        in Release and /MTd in Debug. CMP0091 must be NEW or
+        CMAKE_MSVC_RUNTIME_LIBRARY is ignored outright and CMake falls back to
+        its /MD default -- putting two CRTs, and so two heaps, in one binary
+        and raising LNK4098.
+
+        Note that a project can still overwrite CMAKE_MSVC_RUNTIME_LIBRARY from
+        its own option after this is passed: opus does exactly that from
+        OPUS_STATIC_RUNTIME. Where that happens the project's own option has to
+        be set too.
+    #>
+    param([Parameter(Mandatory = $true)] [string] $Configuration)
+
+    $crtLib = if ($Configuration -eq 'Debug') { 'MultiThreadedDebug' } else { 'MultiThreaded' }
+    return @(
+        "-DCMAKE_POLICY_DEFAULT_CMP0091=NEW",
+        "-DCMAKE_MSVC_RUNTIME_LIBRARY=$crtLib"
+    )
+}
+
+function Import-MTVCEnvironment {
+    <#
+    .SYNOPSIS
+        Import a full VS developer environment (INCLUDE, LIB, LIBPATH, PATH)
+        for the given target architecture. Returns $true if the environment is
+        usable afterwards.
+
+    .DESCRIPTION
+        Add-MTVCToolsToPath puts cl.exe and lib.exe on PATH, which is enough to
+        LAUNCH the compiler but not to COMPILE with it: the Windows SDK headers
+        and import libraries are found through the INCLUDE and LIB environment
+        variables, which only a "Developer PowerShell for VS 2022" or
+        vcvarsall.bat sets. A build started from an ordinary shell, or through
+        build-windows.sh, otherwise dies on the first #include with
+
+            fatal error C1083: Cannot open include file: 'winsock2.h'
+
+        The CMake-driven dependency scripts do not need this -- CMake locates
+        the SDK itself -- so only the scripts that shell out to cl/lib directly
+        do (build-usockets.ps1, and build-mbedtls.ps1's disabled-capability
+        stub).
+
+        No-ops when INCLUDE already names a Windows Kits directory, so running
+        inside a real Developer prompt costs nothing and cannot be clobbered.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)][ValidateSet('x64', 'ARM64')][string]$Platform,
+        [string]$HostArch
+    )
+
+    if ($env:INCLUDE -and ($env:INCLUDE -match 'Windows Kits')) { return $true }
+
+    if (-not $HostArch) { $HostArch = Get-MTHostArch }
+
+    $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+    if (-not (Test-Path $vswhere)) { return $false }
+    $vsInstall = & $vswhere -latest -property installationPath 2>$null | Select-Object -First 1
+    if (-not $vsInstall) { return $false }
+
+    $vcvarsall = Join-Path $vsInstall 'VC\Auxiliary\Build\vcvarsall.bat'
+    if (-not (Test-Path $vcvarsall)) { return $false }
+
+    # vcvarsall takes <host>_<target>, collapsing to a single token when they
+    # match. Same host/target reasoning as Add-MTVCToolsToPath.
+    $hostTok = $HostArch.ToLowerInvariant()
+    $targetTok = $Platform.ToLowerInvariant()
+    $archArg = if ($hostTok -eq $targetTok) { $targetTok } else { "${hostTok}_${targetTok}" }
+
+    $savedEap = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $lines = & cmd.exe /c "call `"$vcvarsall`" $archArg >nul 2>&1 && set" 2>$null
+        if ($LASTEXITCODE -ne 0 -and $hostTok -ne 'x64') {
+            # An ARM64 host without native tools falls back to the emulated
+            # x64-hosted cross compiler, exactly as Add-MTVCToolsToPath does.
+            $archArg = "x64_$targetTok"
+            $lines = & cmd.exe /c "call `"$vcvarsall`" $archArg >nul 2>&1 && set" 2>$null
+        }
+    } finally {
+        $ErrorActionPreference = $savedEap
+    }
+
+    if (-not $lines) { return $false }
+
+    foreach ($line in $lines) {
+        if ($line -match '^(INCLUDE|LIB|LIBPATH|PATH)=(.*)$') {
+            Set-Item -Path "env:$($Matches[1])" -Value $Matches[2]
+        }
+    }
+
+    Write-Host "Imported VC environment: vcvarsall $archArg"
+    return ($env:INCLUDE -and ($env:INCLUDE -match 'Windows Kits'))
 }

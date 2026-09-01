@@ -82,18 +82,20 @@ class compareFiles
 {
 	// simple comparison function
 public:
-	bool operator()(const CFileItem *f1, const CFileItem *f2)
+	bool operator()(const CFileItem *f1, const CFileItem *f2) const
 	{
-		if (f1->isDir && !f2->isDir)
-		{
-			return -1;
-		}
-		if (!f1->isDir && f2->isDir)
-		{
-			return 1;
-		}
-		
-		return 0;
+		// Directories sort before files.
+		//
+		// This MUST be a strict weak ordering. The previous body returned
+		// -1 / 1 / 0 out of a bool function: -1 and 1 BOTH convert to true,
+		// so dir-vs-file and file-vs-dir each reported "less than" and every
+		// such pair compared less than the other. std::sort is undefined
+		// behaviour on a comparator like that -- it can misorder the listing
+		// or run past the end of the sequence on a large enough folder.
+		if (f1->isDir != f2->isDir)
+			return f1->isDir;
+
+		return false;
 	}
 };
 

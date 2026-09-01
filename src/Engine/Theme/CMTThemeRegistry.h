@@ -30,7 +30,7 @@ public:
 	// Governs ONLY whether legacy ImGuiStyleType values appear in
 	// EnumerateEntries. Default Show, so a host that never calls this sees
 	// every style listed -- costless future-proofing, and unobservable to
-	// c64d and LightHeroes today because neither consumes an enumeration.
+	// c64d and the game app today because neither consumes an enumeration.
 	void                SetLegacyStylePolicy(MTLegacyStylePolicy policy);
 	MTLegacyStylePolicy GetLegacyStylePolicy() const;
 

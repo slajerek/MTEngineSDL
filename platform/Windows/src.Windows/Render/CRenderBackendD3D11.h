@@ -122,7 +122,7 @@ public:
 	virtual CVideoYUVConverter *CreateVideoYUVConverter() override;
 
 	// CreateMaskedTileShader() is deliberately NOT overridden: it serves c64d
-	// and LightHeroes, which keep working on OpenGL, and every caller already
+	// and the game app, which keep working on OpenGL, and every caller already
 	// tolerates NULL by drawing its unshaded fallback. Porting more HLSL blind
 	// is what would make this stage unfinishable.
 

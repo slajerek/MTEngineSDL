@@ -60,7 +60,8 @@ if [[ -f "$OUT_LIB" && -f "$STAMP_FILE" ]]; then
   fi
 fi
 
-BUILD_DIR="$SDL3_SRC_DIR/build-linux"
+# Phase 5: the build tree lives OUTSIDE the checkout, in the shared work root.
+BUILD_DIR="$(mt_caps_work_dir sdl3)/build-linux"
 
 # -DSDL_STATIC=ON -DSDL_SHARED=OFF are NOT optional: SDL3's CMake defaults to
 # building the shared library ONLY when BUILD_SHARED_LIBS is undefined

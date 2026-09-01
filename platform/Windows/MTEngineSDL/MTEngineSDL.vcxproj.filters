@@ -1625,7 +1625,7 @@
     <ClCompile Include="..\..\..\src\Engine\Tests\CTestRawDecode.cpp">
       <Filter>Source Files\src\Engine\Tests</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\Engine\Tests\PC_DcpFixtureWriter.cpp">
+    <ClCompile Include="..\..\..\src\Engine\Tests\MT_DcpFixtureWriter.cpp">
       <Filter>Source Files\src\Engine\Tests</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\Tests\CTestDcpParse.cpp">
@@ -3022,7 +3022,7 @@
     <ClInclude Include="..\..\..\src\Engine\Tests\CTestRawDecode.h">
       <Filter>Source Files\src\Engine\Tests</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\Engine\Tests\PC_DcpFixtureWriter.h">
+    <ClInclude Include="..\..\..\src\Engine\Tests\MT_DcpFixtureWriter.h">
       <Filter>Source Files\src\Engine\Tests</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\Tests\CTestDcpParse.h">

@@ -74,13 +74,19 @@ IVideoSource *CVideoPlayer::CreateAndOpenSource(const char *filePath, std::strin
 	// Same routing Open() has always done: the legacy nestegg/vpx source
 	// only for alpha-channel VP9 webm (the only path decoding the alpha
 	// plane), FFmpeg for everything else, legacy-only without FFmpeg.
-#if MT_ENABLE_FFMPEG
+#if MT_ENABLE_FFMPEG && MT_ENABLE_WEBM_VPX
 	if (CVideoSourceFFmpeg::ProbeIsAlphaVP9WebM(filePath))
 		src = new CVideoSourceWebMVpx();
 	else
 		src = new CVideoSourceFFmpeg();
-#else
+#elif MT_ENABLE_FFMPEG
+	src = new CVideoSourceFFmpeg();
+#elif MT_ENABLE_WEBM_VPX
 	src = new CVideoSourceWebMVpx();
+#else
+	// MT_CAP_VIDEO_PLAYBACK=0: no source exists. Fail the open, do not crash.
+	outErrorReason = "video playback is not compiled into this build";
+	return nullptr;
 #endif
 	if (!src->Open(filePath))
 	{
@@ -178,7 +184,7 @@ bool CVideoPlayer::Open(const char *filePath)
 	// fresh-clip values until below (shouldStop is still TRUE here, left raised by
 	// the Close() above -- a predicate installed before the open would abort it
 	// instantly). Interruptible OPEN is a separate problem, solved upstream by
-	// PhotoCruise's async open + dataless-file detection.
+	// the photo app's async open + dataless-file detection.
 	source->SetAbortPredicate([this] { return ShouldAbortDecode(); });
 
 	// Copy source metadata into our existing fields (public API unchanged)
@@ -2447,7 +2453,7 @@ void CVideoPlayer::StoreDecodedFrame(const SDecodedVideoFrame &decoded)
 void CVideoPlayer::CreateGPUTextures(int width, int height)
 {
 	// Routed through the backend rather than glGenTextures, so the direct
-	// YUV-plane draw path (CGuiViewVideoPlayer, and LightHeroes' cutscenes)
+	// YUV-plane draw path (CGuiViewVideoPlayer, and the game app's cutscenes)
 	// works on Metal too. This used to be gated on VideoGpuPathAvailable(),
 	// i.e. SupportsOpenGLShaders() -- which under Metal meant the planes were
 	// never created and cutscenes rendered nothing at all.

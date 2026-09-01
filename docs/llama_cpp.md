@@ -46,7 +46,7 @@ auto *view = new CGuiViewLlamaModelLoader("LlamaLoader", x, y, z, w, h);
 
 **Externally-provided** (caller owns `CLlamaService`, optionally `CLlamaModelManager`):
 ```cpp
-// LightHeroes example — service lives in CLlamaService member of the app
+// the game app example — service lives in CLlamaService member of the app
 CLlamaService *svc = myApp->llamaService;
 auto *view = new CGuiViewLlamaModelLoader("LlamaLoader", x, y, z, w, h,
                                           svc /*, optionalModelManager */);

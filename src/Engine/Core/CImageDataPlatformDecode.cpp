@@ -7,7 +7,7 @@
 // stb_image is strict by design -- it aborts on the first bad symbol and has
 // no error recovery at all. The platform decoders do: ImageIO and WIC decode
 // up to the corruption and keep what they got, which is why a photo that
-// PhotoCruise called "unsupported or corrupt" opens in Preview or in Explorer's
+// the photo app called "unsupported or corrupt" opens in Preview or in Explorer's
 // preview pane without complaint. To a photographer that reads as OUR bug,
 // because from where they are standing it is one.
 //

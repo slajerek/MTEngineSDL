@@ -1,4 +1,5 @@
 #include "CRegistryClient.h"
+#include "MT_NetGameAuthDomains.h"
 #include "CNetGameServer.h"
 #include "CNetPacket.h"
 #include "CNetClientData.h"
@@ -157,7 +158,7 @@ void CRegistryClient::Update()
 
 void CRegistryClient::AdminAuthenticate(const string &adminSecret)
 {
-	const char *domainKey = "LightHeroes.AdminSecret.v1";
+	const char *domainKey = MTNetGameAdminDomainRef();
 	auto digest = SYS_HmacSha256((const uint8_t *)domainKey, strlen(domainKey),
 							 (const uint8_t *)adminSecret.data(), adminSecret.size());
 	vector<u8> hash(digest.begin(), digest.end());

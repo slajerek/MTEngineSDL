@@ -22,8 +22,8 @@ namespace
     // that is legal on macOS but unopenable on Windows would make the library
     // non-portable, and these files travel between machines.
     //
-    // Ported verbatim from PhotoCruise/src/FileOps/CRenameOperator.cpp (the
-    // kReserved set and IsReservedDeviceName()) so PhotoCruise's later
+    // Ported verbatim from the photo app/src/FileOps/CRenameOperator.cpp (the
+    // kReserved set and IsReservedDeviceName()) so the photo app's later
     // delegation to this engine primitive is behaviour-preserving.
     bool IsReservedDeviceName(const std::string &basename)
     {

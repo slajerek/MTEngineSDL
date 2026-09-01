@@ -91,6 +91,17 @@ if [[ -n "$MANIFEST" || -n "$APP_NAME" ]]; then
     *)             MT_ENGINE_OPTION="MT_GGML_NATIVE=ON" ;;
   esac
 
+  if [[ -n "${MTENGINE_PRERESOLVED_OUT:-}" ]]; then
+    # PRE-RESOLVED (Phase 3): the app-build driver already ran the ONE mtcaps
+    # resolve and hands its outputs down; a second resolve here would re-open
+    # the exactly-one-resolve criterion. The driver exports MT_CAPS_LIBS_DIR.
+    MT_OUT="$MTENGINE_PRERESOLVED_OUT"
+    [[ -f "$MT_OUT/MTEngineCapabilities.cmake" ]] || { echo "ERROR: MTENGINE_PRERESOLVED_OUT has no MTEngineCapabilities.cmake: $MT_OUT" >&2; exit 2; }
+    [[ -n "${MT_CAPS_LIBS_DIR:-}" ]] || { echo "ERROR: MTENGINE_PRERESOLVED_OUT requires MT_CAPS_LIBS_DIR in the environment." >&2; exit 2; }
+    MTCAPS_OUTPUT="resolved=$(sed -n 's/^set(MT_CAPS_RESOLVED "\(.*\)")$/\1/p' "$MT_OUT/MTEngineCapabilities.cmake")
+out_dir=$MT_OUT
+deps_dir=$MT_CAPS_LIBS_DIR"
+  else
   MTCAPS_OUTPUT="$("$PYTHON3" -B "$SCRIPT_DIR/tools/mtcaps/mtcaps.py" resolve \
       --manifest "$MANIFEST" --app "$APP_NAME" \
       --platform linux --arch "$(uname -m)" --config Release \
@@ -98,6 +109,7 @@ if [[ -n "$MANIFEST" || -n "$APP_NAME" ]]; then
     echo "ERROR: mtcaps resolve failed for $MANIFEST" >&2
     exit 2
   }
+  fi
   MT_OUT="$(printf '%s\n' "$MTCAPS_OUTPUT" | sed -n 's/^out_dir=//p')"
   [[ -n "$MT_OUT" ]] || { echo "ERROR: mtcaps resolve produced no out_dir" >&2; exit 2; }
 
@@ -106,6 +118,7 @@ if [[ -n "$MANIFEST" || -n "$APP_NAME" ]]; then
   # deliberately not $MT_OUT.
   MT_CAPS_LIBS_DIR="$(printf '%s\n' "$MTCAPS_OUTPUT" | sed -n 's/^deps_dir=//p')"
   [[ -n "$MT_CAPS_LIBS_DIR" ]] || { echo "ERROR: mtcaps resolve produced no deps_dir" >&2; exit 2; }
+  export MT_CAPS_LIBS_DIR
 
   if [[ "$PRINT_OUT_DIR" == "true" ]]; then
     printf '%s\n' "$MT_OUT"
@@ -179,7 +192,13 @@ echo -e "\e[94mDependencies: $MT_CAPS_LIBS_DIR\e[0m"
 # unsafe however well the archives are keyed.
 if [[ -z "$BUILD_DIR" ]]; then
   if [[ -n "$MT_OUT" ]]; then
-    BUILD_DIR="$MT_OUT/engine-build"
+    # L9 (2026-09-01): the engine's compiled tree lives under the REV-FREE
+    # build dir -- a new engine rev must not force a from-scratch rebuild;
+    # CMake's own dependency scan owns incremental correctness, exactly as
+    # in any in-checkout build. The path comes from the fragment of the
+    # SAME resolve.
+    MT_CAPS_BUILD_DIR="$(sed -n 's/^set(MT_CAPS_BUILD_DIR "\(.*\)")$/\1/p' "$MT_OUT/MTEngineCapabilities.cmake")"
+    BUILD_DIR="${MT_CAPS_BUILD_DIR:-$MT_OUT}/engine-build"
   else
     BUILD_DIR="${MTENGINE_BUILD_ROOT:-${XDG_CACHE_HOME:-$HOME/.cache}/mtengine}/_standalone/linux/$(uname -m)/Release/engine-build"
   fi
@@ -280,8 +299,8 @@ esac
 
 # ${CMAKE_EXTRA_ARGS:-}, not ${CMAKE_EXTRA_ARGS}. This script runs under
 # `set -u`, so a bare expansion ABORTS THE BUILD with "unbound variable" for
-# anyone who did not export the variable first. PhotoCruise's build-linux.sh
-# exports it defensively and says so in a comment; LightHeroes' does not, and
+# anyone who did not export the variable first. the photo app's build-linux.sh
+# exports it defensively and says so in a comment; the game app's does not, and
 # neither does running this script directly -- which is its documented usage.
 # Making the caller responsible for a variable this script invented is the wrong
 # way round.

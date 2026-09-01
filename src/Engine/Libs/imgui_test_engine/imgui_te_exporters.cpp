@@ -1,3 +1,11 @@
+// [MTENGINE-PATCH: capability-gate] MT_CAP_TEST_ENGINE=0 must yield an EMPTY TU.
+// imconfig.h gates IMGUI_ENABLE_TEST_ENGINE on this same expression, so with the
+// capability off imgui carries no test-engine hooks and this file cannot compile
+// (ImGuiItemStatusFlags_Openable and friends simply do not exist). The build
+// systems cannot drop the file instead -- a PBXBuildFile takes no condition, so
+// an exclusion would be MSBuild/CMake-only and macOS would silently diverge.
+// Same guard, same reason, as src/Engine/Tests/CImGuiTestEngine.cpp.
+#if MT_ENABLE_IMGUI_TEST_ENGINE
 // dear imgui test engine
 // (result exporters)
 // Read https://github.com/ocornut/imgui_test_engine/wiki/Exporting-Results
@@ -316,3 +324,6 @@ void ImGuiTestEngine_ExportJUnitXml(ImGuiTestEngine* engine, const char* output_
     fclose(fp);
     fprintf(stdout, "Saved test results to '%s' successfully.\n", output_file);
 }
+
+#endif // MT_ENABLE_IMGUI_TEST_ENGINE
+// [/MTENGINE-PATCH: capability-gate]

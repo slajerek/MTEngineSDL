@@ -9,7 +9,7 @@ Adobe DNG SDK "regardless of flags or use_dngsdk value". We do not ship the
 Adobe DNG SDK (a bespoke non-OSI agreement that also drags in the XMP Toolkit),
 so a DNG produced by Adobe DNG Converter's "Lossy" option under DNG 1.7+
 compatibility could not be opened at all. See
-PhotoCruise/specs/superpowers/specs/2026-08-19-jpegxl-dng-*.md.
+the photo app/specs/superpowers/specs/2026-08-19-jpegxl-dng-*.md.
 
 WHY A SCRIPT AND NOT A .patch
 A context diff against a specific LibRaw tarball rots silently: a version bump
@@ -19,7 +19,7 @@ message otherwise, so a LibRaw upgrade fails loudly at build time and points at
 the anchor that moved. Idempotent: re-running on a patched tree is a no-op.
 
 LICENSING
-LibRaw is distributed by PhotoCruise under its CDDL 1.0 option. CDDL 3.2 makes
+LibRaw is distributed by the photo app under its CDDL 1.0 option. CDDL 3.2 makes
 this modification itself CDDL; 3.3 requires each modified file to carry a
 notice identifying the contributor (the inserted code does); 3.1 requires the
 modified source to be available, which this script and the built tree satisfy.
@@ -35,7 +35,7 @@ DECODER = r'''
 // ---------------------------------------------------------------------------
 // MTEngineSDL JPEG XL DNG decoder (Compression 52546)
 //
-// MODIFICATION by the MTEngineSDL / PhotoCruise project, 2026-08-19, added
+// MODIFICATION by the MTEngineSDL / the photo app project, 2026-08-19, added
 // under LibRaw's CDDL 1.0 option (CDDL 3.3 contributor notice).
 //
 // Modelled line for line on lossy_dng_load_raw() below, which is LibRaw's own

@@ -553,7 +553,7 @@ void CVideoSourceFFmpeg::FillInfo()
 	AVCodecParameters *vp = vstream->codecpar;
 
 	// mov_read_tkhd assigns st->id from the `tkhd` track_id, so for mp4/mov this
-	// IS the container's track id (PhotoCruise fu-e5 #4.2). Other demuxers leave
+	// IS the container's track id (the photo app fu-e5 #4.2). Other demuxers leave
 	// it at their own numbering or -1; a consumer that cares must know which
 	// container it is looking at, which is why this is documented as 0-when-
 	// unknown rather than "the stream index".

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Auto-imported by MSBuild for every project under platform/Windows.
-     MTExtraDefines is the build-script seam for mode defines (PhotoCruise's
+     MTExtraDefines is the build-script seam for mode defines (the photo app's
      build-windows.ps1 passes /p:MTExtraDefines=MT_COMMERCIAL_BUILD=1 when
      COMMERCIAL=1, 2026-07-18 WMV spec). Empty (the default, and every IDE
      build) appends nothing and compiles byte-identically to before this
@@ -38,7 +38,28 @@
          has never seen the four apps. It selects the standalone output root
          EXPLICITLY rather than by omission, because a silent in-tree fallback
          would be exactly the downgrade tier this design abolished. -->
-    <MTOutRoot Condition="'$(MTOutRoot)' == '' And '$(MT_STANDALONE)' == '1'">$(LOCALAPPDATA)\mtengine\_standalone\windows\$(Platform)\$(Configuration)\</MTOutRoot>
+    <!-- The cache root. $(USERPROFILE)\.cache\mtengine, NOT $(LOCALAPPDATA):
+         MSBuild's FileTracker drops read/write tracking under LOCALAPPDATA,
+         which silently disabled incremental builds (519/519 TUs on a no-change
+         pass; measured 2026-09-01, HANDOVER item 11; maintainer decision the
+         same day). Must match tools/mtcaps/resolve.py default_build_root(). -->
+    <MTCacheRoot>$(MTENGINE_BUILD_ROOT)</MTCacheRoot>
+    <MTCacheRoot Condition="'$(MTCacheRoot)' == ''">$(USERPROFILE)\.cache\mtengine</MTCacheRoot>
+    <MTOutRoot Condition="'$(MTOutRoot)' == '' And '$(MT_STANDALONE)' == '1'">$(MTCacheRoot)\_standalone\windows\$(Platform)\$(Configuration)\</MTOutRoot>
+    <!-- L9: compiled objects live under the REV-FREE build root; the
+         standalone fallback keeps them beside the standalone out root. -->
+    <MTBuildRoot Condition="'$(MTBuildRoot)' == '' And '$(MT_STANDALONE)' == '1'">$(MTCacheRoot)\_standalone\windows\$(Platform)\$(Configuration)\</MTBuildRoot>
+    <!-- The IDE path (HANDOVER item 13). IntDir/OutDir are EVALUATED long
+         before any target runs, so MTCapsResolveForIDE cannot feed them; with
+         an empty MTBuildRoot they went project-relative and wrote objects into
+         the engine checkout, the permanent rule's one forbidden thing (31
+         stray files, caught by the residual gate). This static evaluation-time
+         fallback keeps IDE objects out of the tree. It carries no caps-hash on
+         purpose: a caps-keyed path needs the resolve, which only targets can
+         run; the IDE is a convenience path, the command-line driver stays
+         canonical. The target-time resolve still overrides MTBuildRoot for
+         MTCapsIncludeDir, so headers come from the real caps-keyed build dir. -->
+    <MTBuildRoot Condition="'$(MTBuildRoot)' == ''">$(MTCacheRoot)\_ide\$(MSBuildProjectName)\$(Platform)\$(Configuration)\</MTBuildRoot>
   </PropertyGroup>
   <Import Project="$(MTOutRoot)\MTEngineCaps.props"
           Condition="'$(MTOutRoot)' != '' And Exists('$(MTOutRoot)\MTEngineCaps.props')" />

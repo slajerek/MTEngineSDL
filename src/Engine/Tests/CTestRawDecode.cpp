@@ -685,7 +685,7 @@ void CTestRawCalibrationProvenance::Run(ITestCallback *callback)
 			  && fabsf(r.dngAsShotNeutral[1] - 1.0f) < tol
 			  && fabsf(r.dngAsShotNeutral[2] - 0.7f) < tol,
 			  "AsShotNeutral surfaced (NOT cam_mul)");
-	RD_ASSERT(strcmp(r.uniqueCameraModel, "PhotoCruise Synthetic") == 0,
+	RD_ASSERT(strcmp(r.uniqueCameraModel, "MTEngine Synthetic") == 0,
 			  "UniqueCameraModel surfaced -- the DCP match key");
 	CRawDecoder::FreeResult(&r);
 

@@ -71,6 +71,10 @@ def _int_kv(pairs, what):
 def _resolve_common(args, overrides):
     vocab = V.load(args.vocabulary)
     values, provenance = R.resolve(vocab, args.manifest, args.platform, overrides)
+    # The commercial_safe deny-list (decision 0.2) runs on every resolve AND
+    # every check -- same code path, so the agreement check cannot pass a
+    # configuration the resolve would refuse.
+    R.check_commercial_safe(vocab, values, args.platform)
     canonical = R.canonical_form(vocab, values)
     return vocab, values, provenance, canonical
 
@@ -83,13 +87,20 @@ def _compute_out(args, vocab, values, canonical, engine_options):
     chash = R.caps_hash(canonical)
     out = R.out_dir(root, args.app, rev, args.platform, args.arch, args.config,
                     mode, backend, chash)
+    build = R.build_dir(root, args.app, args.platform, args.arch, args.config,
+                        mode, backend, chash)
     # Third-party archives are keyed differently and deliberately: no app, no
     # engine revision, no licence mode of its own (MT_COMMERCIAL_BUILD is already
-    # inside the capability hash). See R.deps_dir.
+    # inside the capability hash) -- and no MT_RELEASE_SYMBOLS either, which is
+    # why the deps hash comes from deps_form(): the archives are byte-identical
+    # whatever the symbols key says, and deps_form is byte-identical to the
+    # pre-0.5 canonical, so existing buckets stay valid. See R.deps_dir.
     deps = R.deps_dir(root, args.platform, args.arch,
-                      R.deps_config(args.platform, args.config), backend, chash)
+                      R.deps_config(args.platform, args.config), backend,
+                      R.caps_hash(R.deps_form(vocab, values)))
     return out, dict(rev=rev, mode=mode, backend=backend, caps_hash=chash,
-                     root=root, deps_dir=deps)
+                     root=root, deps_dir=deps, build_dir=build,
+                     ffmpeg_mode=R.ffmpeg_mode(values))
 
 
 # ---------------------------------------------------------------------------
@@ -100,7 +111,9 @@ def cmd_resolve(args):
 
     vocab, values, provenance, canonical = _resolve_common(args, overrides)
     out, key = _compute_out(args, vocab, values, canonical, engine_options)
-    include_dir = os.path.join(out, "include")
+    # L9: the generated header lives under the REV-FREE build dir -- a stable
+    # path, so a new engine rev does not change every consumer's command line.
+    include_dir = os.path.join(key["build_dir"], "include")
 
     meta = {
         "manifest": os.path.abspath(args.manifest),
@@ -131,6 +144,8 @@ def cmd_resolve(args):
             print(canonical)
         elif args.print_ == "deps-dir":
             print(key["deps_dir"])
+        elif args.print_ == "build-dir":
+            print(key["build_dir"])
         else:
             print(out)
         return EXIT_OK
@@ -142,6 +157,12 @@ def cmd_resolve(args):
     print("resolved=%s" % canonical)
     print("out_dir=%s" % out)
     print("deps_dir=%s" % key["deps_dir"])
+    # Fourth pinned line (decision 0.2, hardened): which FFmpeg decoder set
+    # this build gets. The codec scripts and wrappers consume the fragment's
+    # MT_FFMPEG_BUILD_MODE instead of deriving a mode from COMMERCIAL alone.
+    print("ffmpeg_mode=%s" % key["ffmpeg_mode"])
+    # Fifth pinned line (L9): the rev-free build root for compiled objects.
+    print("build_dir=%s" % key["build_dir"])
     return EXIT_OK
 
 
@@ -247,6 +268,101 @@ def _render_docs(vocab):
             A("| `%s` | %s | %s | %s | %s |" % (
                 key, dep["name"], dep["licence"], dep["version"], dep["provenance"]))
     A("")
+    # ------------------------------------------------------------------
+    # Hand-written prose, emitted from HERE rather than pasted into the file.
+    #
+    # It WAS pasted straight into docs/CAPABILITIES.md, by d75df6b3 and
+    # 44c0dab9, under a banner reading "do not edit by hand" -- so the next
+    # `emit-docs` would have silently deleted all 79 lines. Found 2026-08-28 by
+    # running the generator and diffing its output against the tracked file.
+    #
+    # The banner's second line -- "CI regenerates this to a temp path and fails
+    # on any diff" -- was aspirational: no such job exists in .github/workflows,
+    # which is why the drift survived two commits unnoticed.
+    #
+    # Prose tied to a capability belongs in vocabulary.json. This describes the
+    # MECHANISM rather than any one capability, so it has nowhere else to live,
+    # and it goes here so the generated file stays genuinely generated.
+    # ------------------------------------------------------------------
+    A('## How a switched-off dependency is actually skipped')
+    A('')
+    A('A capability set to 0 does two things: it defines `MT_ENABLE_<DEP>=0` for the')
+    A('compiler, which compiles the calling code out, and it must stop the dependency')
+    A('from being **built** at all. The second half is the expensive one -- the image')
+    A('codec bundle alone is 541 MB of source and build tree -- and it works differently')
+    A('on each platform.')
+    A('')
+    A('Every dependency script gates itself on `$MT_ENABLE_<DEP>` / `$env:MT_ENABLE_<DEP>`')
+    A('and, when off, writes a **stub archive** instead of building. The stub carries one')
+    A('dummy symbol and no library symbols, because the engine and app projects name')
+    A('these archives on the link line unconditionally -- an absent file is a link error,')
+    A('not a saving. Anything that still calls into the dependency fails at link time,')
+    A('which is the intended outcome: that code should have been compiled out by the')
+    A('matching `MT_ENABLE_*` define.')
+    A('')
+    A('**The gate must come before the submodule check.** With the capability off, an')
+    A("app's build script never fetches the submodule -- that is the point of selective")
+    A('acquisition -- so a missing-submodule error ahead of the gate turns the saving')
+    A('into a build failure on any clean clone.')
+    A('')
+    A('**Absent means ON.** A flag missing from the resolved fragment is treated as 1')
+    A('(`${MT_ENABLE_FTXUI:-1}` on macOS, the same rule in `Import-MTCapsEnvironment` on')
+    A('Windows), so a bare engine build with no manifest still builds everything.')
+    A('')
+    A('**Both paths must stamp.** A script that stamps only the stub leaves that stamp')
+    A('beside a real archive after the capability is switched back on; the next off build')
+    A('then matches the stamp, skips, and keeps the real archive while believing it wrote')
+    A('a stub.')
+    A('')
+    A('### Where the flags come from')
+    A('')
+    A('| platform | mechanism |')
+    A('|---|---|')
+    A('| macOS | Dependency builds are Xcode **script phases**. Xcode exports every build setting from the resolved `MTEngineCaps.xcconfig` into the phase environment automatically, so the scripts just read `$MT_ENABLE_*`. |')
+    A("| Windows | Nothing does this for free. `build-deps.ps1` takes `-CapsFile` (the same `MTEngineCaps.xcconfig`) and calls `Import-MTCapsEnvironment`, which publishes the `MT_ENABLE_*` lines into the process environment before any library script runs. An app's build script must pass it. |")
+    A('')
+    A('Linux publishes them the same way Windows now does, from `build-linux.sh` via')
+    A('`mt_caps_read_flags`; that half was always there.')
+    A('')
+    A('### Coverage')
+    A('')
+    A('Every acquisition script gates itself. As of 2026-08-27:')
+    A('')
+    A('| dependency | macOS | Linux | Windows |')
+    A('|---|---|---|---|')
+    A('| mbedTLS | gate | gate | gate |')
+    A('| FTXUI | gate | gate | gate |')
+    A('| llama.cpp | gate | n/a (not built) | gate |')
+    A('| image codecs | gate | gate | gate |')
+    A('| video codecs | gate | gate | gate |')
+    A('| SDL2/SDL3, uSockets | core -- no capability, never gated | | |')
+    A('')
+    A('Before that date the picture was far patchier, and it is worth recording what was')
+    A('wrong because the failure was silent in every case -- a dependency that builds')
+    A('when it should not produces a working binary, just a much more expensive one.')
+    A('')
+    A('**Windows could not read the flags at all.** MSBuild properties are not')
+    A('environment variables, and nothing converted the resolved fragment into either.')
+    A('The one gate that existed (`build-mbedtls.ps1`) therefore could never fire, and')
+    A('`build-deps.ps1` built llama.cpp, FTXUI, mbedTLS and the image codecs on every')
+    A('build whatever the manifest said. `build-ftxui.ps1`, `build-llama-cpp.ps1` and')
+    A('`build-image_codecs.ps1` had no gate at all.')
+    A('')
+    A('**Linux had the plumbing but two missing gates**: `build-ftxui.sh` and')
+    A('`build-image_codecs.sh`.')
+    A('')
+    A('**Two bundles had no gate on any platform.** The image codecs -- TIFF, WebP, AVIF,')
+    A('libgav1, LibRaw, libjxl, lcms2 -- which is why a C64 debugger with `MT_CAP_RAW=0`')
+    A('still compiled LibRaw; and the video codecs -- FFmpeg, libvpx, opus -- built even')
+    A('with `MT_CAP_VIDEO_PLAYBACK=0`.')
+    A('')
+    A('Because that bundle is one archive serving six flags, it is skipped only when')
+    A('`MT_ENABLE_LIBTIFF`, `MT_ENABLE_LIBWEBP`, `MT_ENABLE_LIBAVIF`, `MT_ENABLE_LIBHEIF`,')
+    A('`MT_ENABLE_LIBRAW` and `MT_ENABLE_LCMS2` are all 0 -- any one of them still wanted')
+    A('means building it, as there is no per-codec archive to stub. `libjxl` has no')
+    A('capability of its own: it decodes JPEG XL DNGs, a RAW concern, so it travels with')
+    A('`MT_ENABLE_LIBRAW`.')
+    A('')
     A("## Core dependencies")
     A("")
     A("Always-on, belonging to no capability. **A `LICENSES.txt` derived from the")
@@ -265,6 +381,34 @@ def _render_docs(vocab):
     A("`none`, `capability-off` (the whole capability is withheld) and `variant`")
     A("(the capability stays **on** and a subset of its libraries or decoders is")
     A("withheld) — `variant` is the common case.")
+    A("")
+    A("Since 2026-08-31 (unification plan, decisions 0.1/0.2/0.5) the mode is")
+    A("**applied at resolve time**, in a fixed order: (1) the manifest resolves;")
+    A("(2) at `MT_COMMERCIAL_BUILD=1` every `capability-off` effect turns its")
+    A("capability off **in the resolved set itself**, so the fragments, the")
+    A("out-dir hash and `LICENSES.txt` all see the post-effect state and cannot")
+    A("disagree; (3) only then does the `commercial_safe` deny-list run — a")
+    A("commercial resolve that would still enable a dependency marked")
+    A("`commercial_safe: false` in the vocabulary is a hard error naming the")
+    A("dependency, its licence and the capability that pulled it in. A")
+    A("dependency whose gating flag ended 0 (libheif under")
+    A("`MT_CAP_PHOTO_CODECS=1`) is not enabled and never errors.")
+    A("")
+    A("Two further mode rules ride along:")
+    A("")
+    A("- **`MT_RELEASE_SYMBOLS`** (debug symbols in Release builds) is a")
+    A("  build-settings mode key, never a C define. Default 1;")
+    A("  `MT_COMMERCIAL_BUILD=1` forces it to 0 unless the invocation")
+    A("  explicitly `--set`s it back — the deliberate UAT case. It joins the")
+    A("  canonical form and the out-dir hash (a UAT and a store artifact never")
+    A("  share one `$MT_OUT`) but not the deps hash (archives are")
+    A("  byte-identical either way).")
+    A("- **The FFmpeg decoder set follows distribution, not payment**: the")
+    A("  resolve emits `ffmpeg_mode=` (and `MT_FFMPEG_BUILD_MODE` in every")
+    A("  fragment) as `full` only when `MT_PRIVATE_BUILD=1`. The public/free")
+    A("  tier (`0,0`) gets the same restricted set the store tier does,")
+    A("  because the withheld decoders are patent-encumbered and patents")
+    A("  attach to distribution.")
     A("")
     A("| Capability | Effect | Withheld in a commercial build |")
     A("|---|---|---|")
@@ -354,7 +498,7 @@ def build_parser():
     r.add_argument("--out-dir", dest="out_dir",
                    help="the output ROOT the key hangs under, not the leaf.")
     r.add_argument("--print", dest="print_",
-                   choices=("resolved", "out-dir", "deps-dir"),
+                   choices=("resolved", "out-dir", "deps-dir", "build-dir"),
                    help="print ONE bare value instead of the two pinned lines. For "
                         "MSBuild, which joins a task's whole stdout into one property.")
     r.set_defaults(func=cmd_resolve)

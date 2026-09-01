@@ -31,7 +31,7 @@ $llamaSrc = Join-Path $repoRoot 'other\lib\llama.cpp'
 # Keyed by architecture for the same reason as the CPU bundle: a build
 # directory belongs to one configuration, and CMake aborts rather than
 # reconfigure when a cache from another one is sitting in it.
-$buildDir = Join-Path $llamaSrc "build-windows-cuda-$Platform"
+$buildDir = Join-Path (Get-MTCapsWorkDir 'llama.cpp') "build-windows-cuda-$Platform"
 
 $legacyBuildDir = Join-Path $llamaSrc 'build-windows-cuda'
 if (Test-Path -LiteralPath $legacyBuildDir) {
@@ -45,6 +45,21 @@ if (Test-Path -LiteralPath $legacyBuildDir) {
 if (-not $OutLibDir) { throw "-OutLibDir is required. Run this through build-deps.ps1, which resolves it." }
 $outDir = $OutLibDir
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+
+# Self-skip (L11): keyed like the CPU leg; the marker lib for the check is
+# ggml-cuda.lib, the leg's defining output.
+$selfStamp = Join-Path $outDir 'llama_cpp_cuda.stamp'
+$scriptSha = 'unknown'
+try { $scriptSha = (Get-FileHash -Algorithm SHA256 -Path $PSCommandPath).Hash.ToLowerInvariant() } catch {}
+$srcSha = 'unknown'
+try { $srcSha = (git -C $llamaSrc rev-parse --short HEAD).Trim() } catch {}
+$selfStampValue = "$srcSha`:$scriptSha`:$Configuration`:$Platform"
+if ((Test-Path (Join-Path $outDir 'ggml-cuda.lib')) -and (Test-Path $selfStamp)) {
+    if ((Get-Content $selfStamp -Raw).Trim() -eq $selfStampValue) {
+        Write-Host "llama.cpp (CUDA) is up to date in $outDir"
+        exit 0
+    }
+}
 
 Write-Host "Configuring llama.cpp (CUDA) in $buildDir"
 $generator = Get-MTVSGenerator
@@ -99,6 +114,7 @@ foreach ($p in $copyList) {
     Copy-Item -Force $p $outDir
 }
 
+Set-Content -NoNewline -Path (Join-Path $outDir 'llama_cpp_cuda.stamp') -Value $selfStampValue
 Write-Host "Done. Copied CUDA libs into: $outDir"
 
 # Generate version header from git tag
@@ -118,7 +134,9 @@ try {
 # path. mtcaps writes a placeholder there first, so the header exists even when
 # this script never runs.
 $mtGenInclude = if ($env:MTCapsOut) { $env:MTCapsOut } elseif ($env:MTOutRoot) { $env:MTOutRoot } else {
-    Join-Path $env:LOCALAPPDATA 'mtengine\_standalone'
+    # The SAME spelling Directory.Build.props gives MTOutRoot/MTBuildRoot under
+    # MT_STANDALONE=1 -- see build-llama_cpp_cpu.ps1 for why the bare form was wrong.
+    Join-Path (Get-MTBuildRoot) "_standalone\windows\$Platform\$Configuration"
 }
 $versionHeader = Join-Path $mtGenInclude 'include\Sci\Llama\llama_cpp_version.h'
 New-Item -ItemType Directory -Force -Path (Split-Path -Parent $versionHeader) | Out-Null

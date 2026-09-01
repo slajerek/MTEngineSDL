@@ -6,7 +6,7 @@ import re
 import subprocess
 
 from errors import ManifestError
-from vocab import COMMERCIAL_KEY, PLATFORMS, PRIVATE_KEY
+from vocab import COMMERCIAL_KEY, PLATFORMS, PRIVATE_KEY, SYMBOLS_KEY
 
 # bash `source` is the binding constraint on key spelling and it is stricter than
 # PowerShell's ConvertFrom-StringData or CMake's file(STRINGS). A key must be a
@@ -89,7 +89,7 @@ def resolve(vocab, manifest_path, platform, overrides=None):
     overrides = dict(overrides or {})
     entries = parse_manifest(manifest_path)
 
-    known = set(vocab.keys) | {COMMERCIAL_KEY, PRIVATE_KEY}
+    known = set(vocab.keys) | {COMMERCIAL_KEY, PRIVATE_KEY, SYMBOLS_KEY}
 
     # --- rung 2: explicit manifest keys, suffixed beating unsuffixed -----------
     explicit = {}
@@ -117,6 +117,10 @@ def resolve(vocab, manifest_path, platform, overrides=None):
     # that never mentions the key gets the RESTRICTED treatment, so forgetting
     # to declare a tier can never widen what ships.
     values[PRIVATE_KEY] = 0
+    # Debug symbols in Release: default ON (open-source and dev builds want
+    # them; decision 0.5) -- the COMMERCIAL forcing below is what protects the
+    # store artifact, not this default.
+    values[SYMBOLS_KEY] = 1
     provenance = {key: "default" for key in values}
 
     for key, value in resolved_explicit.items():
@@ -178,7 +182,70 @@ def resolve(vocab, manifest_path, platform, overrides=None):
             % (manifest_path, COMMERCIAL_KEY, PRIVATE_KEY,
                PRIVATE_KEY, COMMERCIAL_KEY))
 
+    # --- symbols forcing (decision 0.5) ----------------------------------------
+    #
+    # A store artifact must never carry debug symbols by accident. At
+    # MT_COMMERCIAL_BUILD=1 the key is FORCED to 0 -- overriding even an
+    # explicit manifest line, because a manifest default is exactly the
+    # accident this exists to prevent. Only rung 1 (--set on THIS invocation,
+    # the deliberate UAT build) escapes, and the escape is visible in the
+    # resolved string.
+    if values[COMMERCIAL_KEY] == 1 and values[SYMBOLS_KEY] == 1 \
+            and provenance.get(SYMBOLS_KEY) != "override":
+        values[SYMBOLS_KEY] = 0
+        provenance[SYMBOLS_KEY] = "forced by %s=1" % COMMERCIAL_KEY
+
+    # --- commercial effects, applied AT RESOLVE (decision 0.1) -----------------
+    #
+    # Precedence, fixed by the unification plan: (1) the rungs above resolve
+    # the manifest; (2) at MT_COMMERCIAL_BUILD=1 each capability's
+    # `commercial` effect is applied -- `capability-off` turns the capability
+    # off HERE, so fragments, LICENSES.txt and the out_dir hash all see the
+    # post-effect set and cannot disagree; (3) only then does the
+    # commercial_safe deny-list run (check_commercial_safe below), so a dep
+    # an effect just turned off never errors. `variant` stays a build-time
+    # concern of the codec scripts (forbidden decoder subsets), not a flag
+    # change. Historically resolve deliberately did NOT do this ("MT_COMMERCIAL_BUILD
+    # is deliberately NOT here"); that note described the flag SET, and the
+    # deliberate part -- no =0 emission for the mode keys -- still holds.
+    if values[COMMERCIAL_KEY] == 1:
+        for key in vocab.keys:
+            if values[key] == 1 and vocab.get(key)["commercial"]["effect"] == "capability-off":
+                values[key] = 0
+                provenance[key] = "commercial: capability-off"
+
     return values, provenance
+
+
+def check_commercial_safe(vocab, values, platform=None):
+    """The deny-list (decision 0.2): a MT_COMMERCIAL_BUILD=1 resolve must make
+    it impossible to compile in a dependency that is not commercial-safe.
+
+    Runs over the FINAL state -- after commercial effects and after the
+    PLATFORM_UNAVAILABLE/PRIVATE_ONLY forcing inside enabled_flags() -- so a
+    dependency whose capability or gating flag ended 0 is not "enabled" and
+    must not error (libheif under MT_CAP_PHOTO_CODECS=1 is the canonical
+    case). A dep row may name its gating MT_ENABLE_* in `flag`; absent means
+    the capability itself is the gate."""
+    if values[COMMERCIAL_KEY] != 1:
+        return
+    flags = enabled_flags(vocab, values, platform)
+    for key in vocab.keys:
+        if values[key] != 1:
+            continue
+        for dep in vocab.get(key)["dependencies"]:
+            if dep["commercial_safe"]:
+                continue
+            gate = dep.get("flag")
+            if gate is not None and flags.get(gate, 0) != 1:
+                continue
+            raise ManifestError(
+                "MT_COMMERCIAL_BUILD=1 would enable %r (licence: %s), which is "
+                "marked commercial_safe: false in the vocabulary. It is pulled "
+                "in by %s%s. Turn that capability off for the store build, or "
+                "-- after settling the licence -- flip the vocabulary field."
+                % (dep["name"], dep["licence"], key,
+                   "" if gate is None else " via %s" % gate))
 
 
 def canonical_form(vocab, values):
@@ -196,10 +263,37 @@ def canonical_form(vocab, values):
         one would silently reuse the other's archives;
       * KEY=VALUE, the same spelling as the manifest;
       * values 1 or 0 only, OS suffixes already resolved away;
-      * sorted by byte value (C locale), joined by `;`, NO trailing separator.
+      * sorted by byte value (C locale), joined by `;`, NO trailing separator;
+      * MT_RELEASE_SYMBOLS included since 2026-08-31 (decision 0.5) -- the
+        agreement check must cover it, and a UAT and a store artifact must
+        never share one $MT_OUT.
     """
+    keys = sorted(list(vocab.keys) + [COMMERCIAL_KEY, PRIVATE_KEY, SYMBOLS_KEY])
+    return ";".join("%s=%d" % (k, values[k]) for k in keys)
+
+
+def deps_form(vocab, values):
+    """The canonical form MINUS the symbols key, for the deps-dir hash only.
+
+    A third-party archive is byte-identical whatever MT_RELEASE_SYMBOLS says
+    -- the key drives APP build settings -- so keying the archives on it
+    would rebuild SDL3, FFmpeg and llama.cpp to produce identical bytes.
+    Deliberately byte-identical to the PRE-0.5 canonical form, so every
+    existing keyed deps bucket stays valid."""
     keys = sorted(list(vocab.keys) + [COMMERCIAL_KEY, PRIVATE_KEY])
     return ";".join("%s=%d" % (k, values[k]) for k in keys)
+
+
+def ffmpeg_mode(values):
+    """Which FFmpeg decoder set this build gets (decision 0.2, hardened).
+
+    `full` ONLY for a private, never-distributed build. The withheld decoders
+    (HEVC, AAC, the WMV/WMA family, VC-1, EAC3) are PATENT-encumbered, and
+    patents attach to distribution, not payment -- so the public/free tier
+    (COMMERCIAL=0, PRIVATE=0) gets the same restricted set the store build
+    does. Before this, COMMERCIAL=0 alone selected `full`, which handed the
+    encumbered set to every publicly distributed free build."""
+    return "full" if values.get(PRIVATE_KEY, 0) == 1 else "commercial"
 
 
 def caps_hash(canonical):
@@ -320,18 +414,22 @@ def engine_rev(engine_dir):
     engine is right for CI and unusable for the people writing the engine, which is
     everyone reading this."""
     def git(*args):
+        # BYTES, not text: `git diff HEAD` includes binary file content when a
+        # binary is staged (measured 2026-08-31: the staged deletion of 1226
+        # vendored SDL2 files crashed the utf-8 decode at byte 0xb5), and the
+        # output is only ever hashed, never read.
         return subprocess.run(
             ("git", "-C", engine_dir) + args,
-            capture_output=True, text=True, check=False).stdout
+            capture_output=True, check=False).stdout
 
-    head = git("rev-parse", "--short", "HEAD").strip()
+    head = git("rev-parse", "--short", "HEAD").decode("ascii", "replace").strip()
     if not head:
         raise ManifestError("--engine-dir %s is not a git checkout" % engine_dir)
 
     status = git("status", "--porcelain", "--untracked-files=no")
     if status.strip():
         diff = git("diff", "HEAD")
-        digest = hashlib.sha256((status + diff).encode("utf-8")).hexdigest()[:8]
+        digest = hashlib.sha256(status + diff).hexdigest()[:8]
         return "%s-dirty-%s" % (head, digest)
     return head
 
@@ -363,14 +461,42 @@ def default_build_root():
     if root:
         return root
     if os.name == "nt":
-        local = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
-        return os.path.join(local, "mtengine")
+        # %USERPROFILE%\.cache\mtengine, NOT %LOCALAPPDATA%: MSBuild's
+        # FileTracker drops read/write tracking for paths under LOCALAPPDATA,
+        # which killed incremental builds outright -- 519/519 TUs recompiled on
+        # a no-change pass, tlogs with zero object entries (measured on Windows
+        # 2026-09-01, HANDOVER item 11; maintainer decided the new default the
+        # same day). The .cache form also mirrors the Unix default below.
+        home = os.environ.get("USERPROFILE") or os.path.expanduser("~")
+        return os.path.join(home, ".cache", "mtengine")
     cache = os.environ.get("XDG_CACHE_HOME") or os.path.join(os.path.expanduser("~"), ".cache")
     return os.path.join(cache, "mtengine")
 
 
 def out_dir(root, app, rev, platform, arch, config, mode, backend, chash):
     return os.path.join(root, app, rev, platform, arch, config, mode, backend, chash)
+
+
+def build_dir(root, app, platform, arch, config, mode, backend, chash):
+    """The REV-FREE build root (L9, 2026-09-01): compiled objects and the
+    generated include/ live here, NOT under the rev-keyed out_dir.
+
+    WHY: the rev key exists for artifacts whose staleness nothing else
+    guards. Compiled objects have a guard -- MSBuild's tracker and CMake's
+    dependency scan, the same machinery every normal in-checkout build
+    trusts -- so keying them by engine rev bought correctness the build
+    system already provides, at the price of a FULL engine rebuild per
+    commit (and per dirty edit) on Windows and Linux, plus unbounded disk
+    growth. The generated include/ moves too, because its CONTENT depends
+    only on the resolved set and the vocabulary, while its PATH changing
+    per rev invalidated every consumer's command line -- the tracker
+    rebuilds on command-line change, so even untouched TUs recompiled.
+
+    Everything that stays under out_dir (fragments, stamps, symbols,
+    LICENSES) is either regenerated on every resolve or genuinely
+    per-revision."""
+    return os.path.join(root, app, "_build", platform, arch, config, mode,
+                        backend, chash)
 
 
 def deps_config(platform, config):

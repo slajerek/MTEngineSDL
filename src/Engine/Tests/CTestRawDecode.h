@@ -3,7 +3,7 @@
 #include "CTest.h"
 
 // RD-A tasks 4-7: CRawDecoder tests. All classes here are registered
-// unconditionally in the PhotoCruise suite (a guarded registration would be
+// unconditionally in the the photo app suite (a guarded registration would be
 // always-false there, design #9) and skip-report at run time when
 // CRawDecoder::IsAvailable() is false.
 //

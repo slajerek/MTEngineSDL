@@ -141,7 +141,7 @@ fi
 #
 # The agreement check below CANNOT catch this. It compares MT_CAPS_RESOLVED
 # against MT_CAPS_OUT's stamp, and a foreign file supplies BOTH -- so the pair
-# is internally consistent and passes. MEASURED: fed a real LightHeroes pair, it
+# is internally consistent and passes. MEASURED: fed a real app's pair, it
 # exits 0.
 #
 # What does differ is where the products land: a cross-project engine target

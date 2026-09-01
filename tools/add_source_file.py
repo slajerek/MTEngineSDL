@@ -6,7 +6,7 @@ MTEngineSDL has THREE explicit file lists with no auto-discovery -- CMakeLists.t
 platform/Windows/MTEngineSDL/MTEngineSDL.vcxproj plus its .filters -- and the
 repo's Definition of Done requires all of them to be updated in the SAME commit
 whenever a file is added. Doing that by hand is four edits per file and an easy
-thing to half-finish; PhotoCruise has had specs/claude/tools/add_source_file.py
+thing to half-finish; the photo app has had specs/claude/tools/add_source_file.py
 for exactly this reason and the engine did not, which is why this exists.
 
 Usage (from the MTEngineSDL repo root):

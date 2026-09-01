@@ -4,7 +4,7 @@ MTEngineSDL builds VPX and Opus video playback dependencies into one macOS stati
 
 ## Why This Exists
 
-LightHeroes currently compiles MTEngineSDL video sources directly from `src/Engine/Video/`. Those sources use libvpx for VP9 decode and libopus for Opus audio decode.
+the game app currently compiles MTEngineSDL video sources directly from `src/Engine/Video/`. Those sources use libvpx for VP9 decode and libopus for Opus audio decode.
 
 The previous macOS app project linked arm64-only archives from `other/lib/libvpx/macos-arm64/` and `other/lib/libopus/macos-arm64/`. That works for arm64 but fails for `x86_64` because the linker ignores the arm64 objects and leaves VPX/Opus symbols unresolved.
 
@@ -61,7 +61,7 @@ The script verifies the final archive is universal `arm64` + `x86_64` and contai
 
 ## Headers
 
-LightHeroes and engine video sources continue to include the checked-in headers from:
+the game app and engine video sources continue to include the checked-in headers from:
 
 - `src/Engine/Libs/libvpx/`
 - `src/Engine/Libs/libopus/`

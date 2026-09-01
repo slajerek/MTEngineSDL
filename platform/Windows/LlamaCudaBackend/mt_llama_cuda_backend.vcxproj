@@ -37,8 +37,12 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
 
   <PropertyGroup>
-    <OutDir>$(ProjectDir)..\bin\$(Platform)\$(Configuration)\</OutDir>
-    <IntDir>$(Configuration)\</IntDir>
+    <!-- R0.3 (Phase 3): route output under $(MTOutRoot), like the main engine
+         project. The old $(ProjectDir)..\bin and a bare $(Configuration)
+         IntDir wrote inside the engine checkout. The standalone fallback in
+         Directory.Build.props supplies MTOutRoot when no wrapper is driving. -->
+    <OutDir>$(MTBuildRoot)bin\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(MTBuildRoot)obj\LlamaCudaBackend\$(Platform)\$(Configuration)\</IntDir>
     <TargetName>mt_llama_cuda_backend</TargetName>
   </PropertyGroup>
 

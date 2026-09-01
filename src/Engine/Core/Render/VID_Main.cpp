@@ -1320,7 +1320,7 @@ bool VID_IsRenderBackendAvailable(const char *name)
 // persisted choice if this platform can run it, else "opengl".
 //
 // Exists because THREE user interfaces need exactly this and each wrote its own
-// version of it -- PhotoCruise's Settings radios, c64d's menu and LightHeroes'
+// version of it -- the photo app's Settings radios, c64d's menu and the game app's
 // menu. Two of the three then got it wrong in the same way: they ticked the
 // item whose name equalled the persisted string and had no answer at all when
 // the persisted string named a backend this build does not have, so a
@@ -1434,7 +1434,7 @@ const char *VID_GetDefaultRenderBackend()
 const char *VID_GetPreferredRenderBackend()
 {
 	// The command line is checked BEFORE the config, for two reasons. One:
-	// PhotoCruise's headless runs deliberately wipe the settings directory to
+	// the photo app's headless runs deliberately wipe the settings directory to
 	// start from factory defaults, so a config-only setting can never be seen by
 	// an automated test -- which left the Metal backend with no test coverage at
 	// all. Two: an operator debugging a rendering problem should be able to
@@ -2328,7 +2328,7 @@ static void VID_RefreshSystemVisualState()
 {
 	// The OS-appearance poll used to be gated on gRequestedImGuiStyle ==
 	// IMGUI_STYLE_SYSTEM. That gate breaks the moment a host stops writing
-	// uiImGuiStyle (which PhotoCruise does in TS-2): gRequestedImGuiStyle then
+	// uiImGuiStyle (which the photo app does in TS-2): gRequestedImGuiStyle then
 	// holds whatever stale value VID_Init read, the poll never fires, and
 	// "Follow System" silently stops following. Poll whenever the style is
 	// SYSTEM **or** a theme is active -- the second condition is new and is

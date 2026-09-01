@@ -2,19 +2,24 @@
 set -euo pipefail
 export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-CACHE_DIR="$ROOT_DIR/other/lib/image-codecs"
-DOWNLOAD_DIR="$CACHE_DIR/downloads"
-SRC_DIR="$CACHE_DIR/src"
-BUILD_DIR="$CACHE_DIR/build-linux"
-PREFIX_DIR="$CACHE_DIR/install-linux"
 # OUTSIDE the checkout, and keyed by the resolved capability set -- see
 # mt_caps_lib_dir in ../caps-lib.sh and resolve.deps_dir for why this is a
 # correctness change and not tidiness. One flat platform/Linux/libs served all
 # four apps, and a capability being off writes a STUB over the real archive.
+# Sourced BEFORE any use of mt_caps_work_dir/mt_caps_lib_dir below -- this
+# script runs as its own `bash` child process (app-build-linux.sh -> the
+# engine's build-linux.sh -> `bash build-image_codecs.sh`), so nothing a
+# caller sourced is inherited here.
 if ! declare -f mt_caps_lib_dir >/dev/null 2>&1; then
   # shellcheck source=../caps-lib.sh
   . "$ROOT_DIR/platform/caps-lib.sh"
 fi
+CACHE_DIR="$(mt_caps_work_dir image-codecs)"
+PATCHES_DIR="$ROOT_DIR/other/lib/image-codecs/patches"
+DOWNLOAD_DIR="$CACHE_DIR/downloads"
+SRC_DIR="$CACHE_DIR/src"
+BUILD_DIR="$CACHE_DIR/build-linux"
+PREFIX_DIR="$CACHE_DIR/install-linux"
 OUT_LIB_DIR="$(mt_caps_lib_dir)"
 OUT_LIB="$OUT_LIB_DIR/libmt_image_codecs.a"
 STAMP_FILE="$OUT_LIB_DIR/libmt_image_codecs.stamp"
@@ -102,6 +107,11 @@ fi
 stamp_value="${script_sha}:tiff-${TIFF_VERSION}:webp-${WEBP_VERSION}:avif-${AVIF_VERSION}:libgav1-${LIBGAV1_VERSION}:libraw-${LIBRAW_VERSION}:libjxl-${LIBJXL_VERSION}:lcms2-${LCMS2_VERSION}:linux"
 if [[ -f "$OUT_LIB" && -f "$STAMP_FILE" ]]; then
   if [[ "$(cat "$STAMP_FILE")" == "$stamp_value" ]]; then
+    # Stamp hit: backfill the Phase 2 header staging into this keyed bucket.
+    if [[ ! -d "$OUT_LIB_DIR/image-codecs/include" && -d "$PREFIX_DIR/include" ]]; then
+      mkdir -p "$OUT_LIB_DIR/image-codecs"
+      cp -R "$PREFIX_DIR/include" "$OUT_LIB_DIR/image-codecs/include"
+    fi
     echo "Image codec bundle is up to date: $OUT_LIB"
     exit 0
   fi
@@ -252,7 +262,7 @@ checkout_libjxl() {
 
 patch_libraw_jxl() {
   # Idempotent, and fails loudly if a LibRaw bump moves its anchors.
-  python3 "$CACHE_DIR/patches/apply_libraw_jxl.py" "$SRC_DIR/LibRaw-${LIBRAW_VERSION}"
+  python3 "$PATCHES_DIR/apply_libraw_jxl.py" "$SRC_DIR/LibRaw-${LIBRAW_VERSION}"
 }
 
 build_libraw() {
@@ -493,5 +503,9 @@ require_symbol "JxlDecoderCreate"
 # artifact, not on a Makefile.
 require_symbol "LibRaw::jxl_dng_load_raw()"
 
+# Headers travel WITH the archive (Phase 2).
+rm -rf "$OUT_LIB_DIR/image-codecs/include"
+mkdir -p "$OUT_LIB_DIR/image-codecs"
+cp -R "$PREFIX_DIR/include" "$OUT_LIB_DIR/image-codecs/include"
 echo -n "$stamp_value" > "$STAMP_FILE"
-echo "Image codec bundle built: $OUT_LIB"
+echo "Image codec bundle built: $OUT_LIB (headers staged to $OUT_LIB_DIR/image-codecs/include)"

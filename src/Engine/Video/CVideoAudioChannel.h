@@ -7,7 +7,7 @@
 #include <cstdint>
 
 // Interpolation used when resampling video audio to the engine sample rate.
-// Values are persisted by hosts (PhotoCruise setting) -- do not renumber.
+// Values are persisted by hosts (the host app setting) -- do not renumber.
 enum class EVideoAudioInterpolation : int
 {
 	Nearest = 0,
@@ -78,7 +78,7 @@ public:
 	//   epochBase <= readPos <= writePos  &&  writePos - readPos <= ringBufferCapacity.
 	// Only meaningful when QUIESCENT (no MixIn()/PushSamples()/Reset() in
 	// flight): Reset() re-bases three separate atomics, so a concurrent observer
-	// can legitimately catch a torn intermediate state. Used by PhotoCruise's
+	// can legitimately catch a torn intermediate state. Used by the host app's
 	// CTestVideoSeek to prove that a Reset() racing a MixIn() quantum can never
 	// leave a stale readPos standing against a re-based writePos.
 	bool DebugRingInvariantHolds() const;
@@ -86,36 +86,36 @@ public:
 	// TEST-ONLY stall hook. When set, MixIn() calls it once per quantum in the
 	// window a decode-thread Reset() has to race: AFTER the entry load of
 	// readPos/writePos and the mix/drain, and immediately BEFORE the publishing
-	// CAS. PhotoCruise's CTestVideoSeek uses it to make that interleaving
+	// CAS. the host app's CTestVideoSeek uses it to make that interleaving
 	// DETERMINISTIC (the epoch-boundary case is a handful of instructions wide;
 	// a spin loop reproduces it only by luck).
 	//
-	// Guarded by PC_TEST_STAT_COUNTER -- PhotoCruise's own build-local
+	// Guarded by MT_TEST_STAT_COUNTER -- the host app's own build-local
 	// test-seam macro (see that repo's CMakeLists.txt PC_ENABLE_TEST_SEAMS
 	// option and its Xcode/VS Debug configs) -- so this setter carries NO
-	// symbol at all in a store-shipped PhotoCruise build: a public setter
+	// symbol at all in a store-shipped the host app build: a public setter
 	// that installs a callback invoked on the audio mixer thread has no
 	// business existing in a commercial, App-Store-shipped binary.
 	//
 	// Defined INLINE, right here, rather than declared here and defined
 	// out-of-line in the .cpp: this engine is built ONCE, separately, as a
 	// prebuilt static library, and the engine's own build never defines
-	// PC_TEST_STAT_COUNTER (that macro belongs to PhotoCruise's build, not
+	// MT_TEST_STAT_COUNTER (that macro belongs to the host app's build, not
 	// this one). An out-of-line definition guarded the same way would either
 	// always be compiled out of the engine .a regardless of which
-	// PhotoCruise config later links against it (defeating the point of a
+	// the host app config later links against it (defeating the point of a
 	// test build ever having it), or -- if some other engine TU could
 	// somehow see it differently -- an ODR mismatch between what the
-	// prebuilt .a contains and what a PhotoCruise TU's header view expects.
+	// prebuilt .a contains and what a the host app TU's header view expects.
 	// Living entirely inline sidesteps that: the code exists only in
-	// whichever PhotoCruise TUs compile it, matching PhotoCruise's own
-	// PC_TEST_STAT_COUNTER state, never the engine's.
+	// whichever the host app TUs compile it, matching the host app's own
+	// MT_TEST_STAT_COUNTER state, never the engine's.
 	//
 	// debugPreCasHook/debugPreCasHookArg below, and the MixIn() call site,
 	// stay UNCONDITIONAL (not similarly guarded) -- see the member comment
 	// for why gating those would hit the same cross-build hazard, but for
 	// class layout instead of a function symbol.
-#ifdef PC_TEST_STAT_COUNTER
+#ifdef MT_TEST_STAT_COUNTER
 	void SetDebugMixInPreCasHook(void (*fn)(void *userData), void *userData)
 	{
 		if (fn)
@@ -223,11 +223,11 @@ private:
 	std::atomic<bool> seekPending{false};
 
 	// TEST-ONLY payload for SetDebugMixInPreCasHook() above (guarded there by
-	// PC_TEST_STAT_COUNTER). Null in production. UNCONDITIONAL on purpose,
+	// MT_TEST_STAT_COUNTER). Null in production. UNCONDITIONAL on purpose,
 	// unlike the setter: gating these would make this class's layout depend
 	// on whether the TU compiling this header is the engine's own build
-	// (which never defines PC_TEST_STAT_COUNTER) or a PhotoCruise TU that
-	// does -- i.e. the engine's prebuilt .a and a PhotoCruise test TU could
+	// (which never defines MT_TEST_STAT_COUNTER) or a the host app TU that
+	// does -- i.e. the engine's prebuilt .a and a the host app test TU could
 	// disagree on sizeof(CVideoAudioChannel), corrupting anything laid out
 	// after these members. Two atomics and a null check in MixIn() is a
 	// negligible, already-accepted cost (see the call site) -- not worth

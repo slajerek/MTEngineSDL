@@ -32,7 +32,7 @@ $llamaSrc = Join-Path $repoRoot 'other\lib\llama.cpp'
 # one's CMakeCache.txt and CMake refused outright:
 #     "generator platform: x64 Does not match the platform used previously: ARM64"
 # A build directory is per-configuration; the name now says so.
-$buildDir = Join-Path $llamaSrc "build-windows-cpu-$Platform"
+$buildDir = Join-Path (Get-MTCapsWorkDir 'llama.cpp') "build-windows-cpu-$Platform"
 
 # The unkeyed directory this replaced holds whichever architecture happened to
 # configure it last. Nothing reads it any more, and it is not small.
@@ -48,6 +48,23 @@ if (Test-Path -LiteralPath $legacyBuildDir) {
 if (-not $OutLibDir) { throw "-OutLibDir is required. Run this through build-deps.ps1, which resolves it." }
 $outDir = $OutLibDir
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+
+# Self-skip (L11): same contract as build-libuv.ps1 -- source rev + script
+# hash + configuration; a real git checkout here (submodule), so rev-parse
+# inside it is correct, unlike vendored libuv.
+$outLib = Join-Path $outDir 'llama_cpp.lib'
+$selfStamp = Join-Path $outDir 'llama_cpp_cpu.stamp'
+$scriptSha = 'unknown'
+try { $scriptSha = (Get-FileHash -Algorithm SHA256 -Path $PSCommandPath).Hash.ToLowerInvariant() } catch {}
+$srcSha = 'unknown'
+try { $srcSha = (git -C $llamaSrc rev-parse --short HEAD).Trim() } catch {}
+$selfStampValue = "$srcSha`:$scriptSha`:$Configuration`:$Platform`:$Compiler"
+if ((Test-Path $outLib) -and (Test-Path $selfStamp)) {
+    if ((Get-Content $selfStamp -Raw).Trim() -eq $selfStampValue) {
+        Write-Host "llama.cpp (CPU) is up to date: $outLib"
+        exit 0
+    }
+}
 
 $cmakeToolsetName = if ($Compiler -eq 'Clang') { 'ClangCL' } else { '' }
 $cmakeToolset = if ($cmakeToolsetName) { @('-T', $cmakeToolsetName) } else { @() }
@@ -111,7 +128,6 @@ foreach ($p in $libs) {
     }
 }
 
-$outLib = Join-Path $outDir 'llama_cpp.lib'
 Write-Host "Packing into $outLib"
 if (Test-Path $outLib) { Remove-Item -Force $outLib }
 lib /nologo /OUT:$outLib $libs
@@ -123,6 +139,7 @@ lib /nologo /OUT:$outLib $libs
 $stamp = Join-Path $outDir 'llama_cpp.stamp'
 if (Test-Path $stamp) { Remove-Item -Force $stamp }
 
+Set-Content -NoNewline -Path $selfStamp -Value $selfStampValue
 Write-Host "Done. Output: $outLib"
 
 # Generate version header from git tag
@@ -142,7 +159,11 @@ try {
 # path. mtcaps writes a placeholder there first, so the header exists even when
 # this script never runs.
 $mtGenInclude = if ($env:MTCapsOut) { $env:MTCapsOut } elseif ($env:MTOutRoot) { $env:MTOutRoot } else {
-    Join-Path $env:LOCALAPPDATA 'mtengine\_standalone'
+    # The SAME spelling Directory.Build.props gives MTOutRoot/MTBuildRoot under
+    # MT_STANDALONE=1. It used to be a bare `mtengine\_standalone`, so in the one
+    # case this fallback exists for, the header landed two directory levels above
+    # where MSBuild's include path looks for it.
+    Join-Path (Get-MTBuildRoot) "_standalone\windows\$Platform\$Configuration"
 }
 $versionHeader = Join-Path $mtGenInclude 'include\Sci\Llama\llama_cpp_version.h'
 New-Item -ItemType Directory -Force -Path (Split-Path -Parent $versionHeader) | Out-Null

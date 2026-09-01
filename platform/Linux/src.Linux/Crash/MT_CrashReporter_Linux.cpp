@@ -1,4 +1,5 @@
 #include "MT_CrashReporter.h"
+#include "MT_API.h"
 
 #if defined(__linux__)
 
@@ -77,15 +78,16 @@ void MT_CrashReporter_ShowDialog(const char *reportPath)
     {
         char cmd[512]{};
         snprintf(cmd, sizeof(cmd),
-                 "zenity --text-info --title='PhotoCruise crashed' --filename='%s' "
+                 "zenity --text-info --title='%s crashed' --filename='%s' "
                  "--width=600 --height=400 2>/dev/null",
-                 reportPath);
+                 MT_GetSettingsFolderName(), reportPath);
         system(cmd);
     }
     else
     {
         // Always print to stderr so the report is visible even without a GUI.
-        fprintf(stderr, "\n[PhotoCruise] Crash report written to: %s\n", reportPath);
+        fprintf(stderr, "\n[%s] Crash report written to: %s\n",
+                MT_GetSettingsFolderName(), reportPath);
         fprintf(stderr, "%s\n", reportText);
 
         // Try kdialog (KDE) as secondary fallback.
@@ -93,9 +95,10 @@ void MT_CrashReporter_ShowDialog(const char *reportPath)
         {
             char cmd[512]{};
             snprintf(cmd, sizeof(cmd),
-                     "kdialog --title 'PhotoCruise crashed' "
-                     "--detailedsorry 'PhotoCruise crashed. See report.' "
+                     "kdialog --title '%s crashed' "
+                     "--detailedsorry '%s crashed. See report.' "
                      "'%s' 2>/dev/null",
+                     MT_GetSettingsFolderName(), MT_GetSettingsFolderName(),
                      reportPath);
             system(cmd);
         }

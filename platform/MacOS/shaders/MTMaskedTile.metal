@@ -50,7 +50,7 @@ fragment half4 mtFragmentMain(MTVertexOut in [[stage_in]],
 	// [[position]] twice -- once in the stage_in struct and once as a parameter
 	// -- is a hard MSL compile error, and it is the reason this shader silently
 	// never built before the shaders were compiled at BUILD time: the failure
-	// was a log line at first use, and LightHeroes drew the hex grid unmasked
+	// was a log line at first use, and the game app drew the hex grid unmasked
 	// instead. After rasterisation in.position holds the framebuffer coordinate,
 	// which is what gl_FragCoord gives the GLSL original.
 	float2 maskUV = (in.position.xy - tile.tilePos) / tile.tileSize;

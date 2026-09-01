@@ -1,6 +1,6 @@
 #include "CTestDcpParse.h"
 #include "CDcpProfile.h"
-#include "PC_DcpFixtureWriter.h"
+#include "MT_DcpFixtureWriter.h"
 #include "RawTestFixtures.h"
 #include "DBG_Log.h"
 
@@ -63,8 +63,8 @@ static SDcpWriterSpec FullSpec()
 	s.hueSatMapEncoding = 0;
 	s.toneCurve = { { 0.f, 0.f }, { 0.25f, 0.31f }, { 0.5f, 0.62f },
 	                { 0.75f, 0.86f }, { 1.f, 1.f } };
-	s.calibrationSignature = "com.photocruise.test";
-	s.copyright = "PhotoCruise test fixture";
+	s.calibrationSignature = "org.mtengine.test";
+	s.copyright = "MTEngine test fixture";
 	s.embedPolicy = 3;
 	s.hasBaselineExposureOffset = true;
 	s.baselineExposureOffset = 0.35f;
@@ -109,9 +109,9 @@ void CTestDcpParse::Run(ITestCallback *callback)
 		           && full.toneCurve[2].second == 0.62f,
 		           "tone curve round-trips");
 		DCP_ASSERT(full.profileName == "PC Synthetic Profile"
-		           && full.uniqueCameraModel == "PhotoCruise Synthetic"
-		           && full.calibrationSignature == "com.photocruise.test"
-		           && full.copyright == "PhotoCruise test fixture",
+		           && full.uniqueCameraModel == "MTEngine Synthetic"
+		           && full.calibrationSignature == "org.mtengine.test"
+		           && full.copyright == "MTEngine test fixture",
 		           "strings round-trip");
 		DCP_ASSERT(full.embedPolicy == 3
 		           && full.hasBaselineExposureOffset
@@ -258,7 +258,7 @@ void CTestDcpParse::Run(ITestCallback *callback)
 		SDcpWriterSpec s = FullSpec();
 		PC_AppendDcpProfileTags(s, &dng.extraIfd0Tags);
 		dng.extraIfd0Tags.push_back(
-			PC_DngAsciiTag(0xC6F3, "com.photocruise.test"));    // file 0xC6F3
+			PC_DngAsciiTag(0xC6F3, "org.mtengine.test"));    // file 0xC6F3
 		dng.extraIfd0Tags.push_back(
 			PC_DngAsciiTag(0xC6F6, "PC Synthetic Profile"));    // AsShotProfileName
 		std::vector<unsigned char> bytes = PC_BuildSyntheticDng(dng);
@@ -266,7 +266,7 @@ void CTestDcpParse::Run(ITestCallback *callback)
 
 		CDcpProfile::SFileTags ft;
 		bool ok = CDcpProfile::ReadFileTagsFromBytes(bytes.data(), bytes.size(), &ft);
-		DCP_ASSERT(ok && ft.cameraCalibrationSignature == "com.photocruise.test"
+		DCP_ASSERT(ok && ft.cameraCalibrationSignature == "org.mtengine.test"
 		           && ft.asShotProfileName == "PC Synthetic Profile"
 		           && ft.profileName == "PC Synthetic Profile",
 		           "file tags read off the DNG (0xC6F3 route)");

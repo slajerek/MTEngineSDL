@@ -447,7 +447,7 @@ bool CVideoYUVShader::Compile()
 // CALLED FROM BOTH PATHS, ALWAYS -- including the screen-space Render(), which
 // passes a default-constructed SVideoHdrOutput. GL uniforms are PROGRAM STATE
 // that survives between draws, and this program is shared with other
-// applications (LightHeroes draws its cutscenes through Render()), so a
+// applications (the game app draws its cutscenes through Render()), so a
 // uColorTrc left set by the last RenderToTarget() would apply a PQ EOTF to
 // somebody else's SDR video. The existing `glUniform1i(locUseLut, 0)` line in
 // Render() exists for exactly this reason; these are the same hazard.
@@ -600,7 +600,7 @@ void CVideoYUVShader::RenderToTarget(EYUVShaderMode mode, void *texYp, void *tex
 	// top) shows the video upside-down. Inverting the quad's Y here makes
 	// the target texture top-down (row 0 = visual top) for ALL uRotation
 	// values uniformly, matching VideoFrameTransform::RotateRGBA's CPU
-	// output row order (guarded by PhotoCruise's CTestVideoRenderSmoke
+	// output row order (guarded by the photo app's CTestVideoRenderSmoke
 	// orientation step against h264_topred.mp4).
 	glUniform4f(locTransform, -1.0f, 1.0f, 2.0f, -2.0f);
 	glUniform1i(locMode, (int)mode);

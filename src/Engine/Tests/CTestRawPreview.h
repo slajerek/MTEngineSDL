@@ -4,7 +4,7 @@
 
 // RD-A task 2: the RAW preview safety net (design #3).
 //
-// LoadRAWPreview is the only path by which PhotoCruise displays a RAW today,
+// LoadRAWPreview is the only path by which the photo app displays a RAW today,
 // and it had no test coverage anywhere before this class. It must be
 // recorded green on BOTH sides of the USE_JPEG flip (RD-A task 3), because
 // that flag changes unpack_thumb()'s behaviour (design #4.3) and a test

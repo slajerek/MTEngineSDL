@@ -145,19 +145,41 @@ if [[ -n "$MANIFEST" || -n "$APP_NAME" ]]; then
         *)             ENGINE_OPTIONS+=(--engine-option MT_GGML_NATIVE=ON) ;;
     esac
 
-    MTCAPS_OUTPUT="$("$PYTHON3" -B "$SCRIPT_DIR/tools/mtcaps/mtcaps.py" resolve \
-        --manifest "$MANIFEST" --app "$APP_NAME" \
-        --platform macos --arch "$RESOLVE_ARCH" --config "$CONFIGURATION" \
-        --engine-dir "$SCRIPT_DIR" "${ENGINE_OPTIONS[@]}")" || {
-        echo "ERROR: mtcaps resolve failed for $MANIFEST" >&2
-        exit 2
-    }
+    if [[ -n "${MTENGINE_PRERESOLVED_OUT:-}" ]]; then
+        # PRE-RESOLVED (Phase 3): the app-build driver already ran the ONE
+        # mtcaps resolve for this build and hands its outputs down -- running
+        # a second resolve here would re-open the exactly-one-resolve
+        # acceptance criterion the driver exists to close. The fragments in
+        # $MTENGINE_PRERESOLVED_OUT are that resolve's own artefacts.
+        MT_OUT="$MTENGINE_PRERESOLVED_OUT"
+        if [[ ! -f "$MT_OUT/MTEngineCaps.xcconfig" ]]; then
+            echo "ERROR: MTENGINE_PRERESOLVED_OUT has no MTEngineCaps.xcconfig: $MT_OUT" >&2
+            exit 2
+        fi
+        if [[ -z "${MT_CAPS_LIBS_DIR:-}" ]]; then
+            echo "ERROR: MTENGINE_PRERESOLVED_OUT requires MT_CAPS_LIBS_DIR in the environment (the driver exports it)." >&2
+            exit 2
+        fi
+        MT_CAPS_RESOLVED="$(sed -n 's/^MT_CAPS_RESOLVED = //p' "$MT_OUT/MTEngineCaps.xcconfig")"
+        if [[ -z "$MT_CAPS_RESOLVED" ]]; then
+            echo "ERROR: no MT_CAPS_RESOLVED line in $MT_OUT/MTEngineCaps.xcconfig" >&2
+            exit 2
+        fi
+    else
+        MTCAPS_OUTPUT="$("$PYTHON3" -B "$SCRIPT_DIR/tools/mtcaps/mtcaps.py" resolve \
+            --manifest "$MANIFEST" --app "$APP_NAME" \
+            --platform macos --arch "$RESOLVE_ARCH" --config "$CONFIGURATION" \
+            --engine-dir "$SCRIPT_DIR" "${ENGINE_OPTIONS[@]}")" || {
+            echo "ERROR: mtcaps resolve failed for $MANIFEST" >&2
+            exit 2
+        }
 
-    MT_CAPS_RESOLVED="$(printf '%s\n' "$MTCAPS_OUTPUT" | sed -n 's/^resolved=//p')"
-    MT_OUT="$(printf '%s\n' "$MTCAPS_OUTPUT" | sed -n 's/^out_dir=//p')"
-    if [[ -z "$MT_OUT" || -z "$MT_CAPS_RESOLVED" ]]; then
-        echo "ERROR: mtcaps resolve produced no out_dir/resolved line" >&2
-        exit 2
+        MT_CAPS_RESOLVED="$(printf '%s\n' "$MTCAPS_OUTPUT" | sed -n 's/^resolved=//p')"
+        MT_OUT="$(printf '%s\n' "$MTCAPS_OUTPUT" | sed -n 's/^out_dir=//p')"
+        if [[ -z "$MT_OUT" || -z "$MT_CAPS_RESOLVED" ]]; then
+            echo "ERROR: mtcaps resolve produced no out_dir/resolved line" >&2
+            exit 2
+        fi
     fi
 
     # The dependency-archive directory, read from the SAME resolve that produced
@@ -170,10 +192,12 @@ if [[ -n "$MANIFEST" || -n "$APP_NAME" ]]; then
         # shellcheck source=platform/caps-lib.sh
         source "$SCRIPT_DIR/platform/caps-lib.sh"
     fi
-    MT_CAPS_LIBS_DIR="$(printf '%s\n' "$MTCAPS_OUTPUT" | sed -n 's/^deps_dir=//p')"
-    if [[ -z "$MT_CAPS_LIBS_DIR" ]]; then
-        echo "ERROR: mtcaps resolve produced no deps_dir line" >&2
-        exit 2
+    if [[ -z "${MTENGINE_PRERESOLVED_OUT:-}" ]]; then
+        MT_CAPS_LIBS_DIR="$(printf '%s\n' "$MTCAPS_OUTPUT" | sed -n 's/^deps_dir=//p')"
+        if [[ -z "$MT_CAPS_LIBS_DIR" ]]; then
+            echo "ERROR: mtcaps resolve produced no deps_dir line" >&2
+            exit 2
+        fi
     fi
     export MT_CAPS_LIBS_DIR
 
@@ -202,10 +226,16 @@ if [[ -n "$MANIFEST" || -n "$APP_NAME" ]]; then
         "MT_CAPS_APP=$APP_NAME"
         "MT_CAPS_DEFINES=$(caps_value MT_CAPS_DEFINES)"
         "MT_CAPS_DEFINES_ENGINE=$(caps_value MT_CAPS_DEFINES_ENGINE)"
-        "HEADER_SEARCH_PATHS=\$(inherited) \"$MT_OUT/include\""
+        "HEADER_SEARCH_PATHS=\$(inherited) \"$(caps_value MT_CAPS_INCLUDE_DIR)\""
         "MT_CAPS_OUT=$MT_OUT"
         "MT_CAPS_LIBS_DIR=$MT_CAPS_LIBS_DIR"
         "MT_CAPS_RESOLVED=$MT_CAPS_RESOLVED"
+        # Build-settings mode values (Phase 2, 2026-08-31). Strings/values, not
+        # flags, so the numeric filter above skips them; script phases read
+        # $MT_FFMPEG_BUILD_MODE for the decoder set, and Phase 3's plumbing
+        # reads MT_RELEASE_SYMBOLS for the strip decision.
+        "MT_FFMPEG_BUILD_MODE=$(caps_value MT_FFMPEG_BUILD_MODE)"
+        "MT_RELEASE_SYMBOLS=$(caps_value MT_RELEASE_SYMBOLS)"
     )
     if [[ ${#MTCAPS_FLAG_SETTINGS[@]} -gt 0 ]]; then
         MTCAPS_SETTINGS+=("${MTCAPS_FLAG_SETTINGS[@]}")
@@ -320,14 +350,17 @@ if [[ -x "$MT_LOCK" ]]; then
 fi
 
 echo "Building uSockets"
-( cd "$USOCKETS_DIR" && make -j"$(sysctl -n hw.ncpu)" )
-# OUTSIDE the checkout. This `cp` and the `make` above it were the last two
-# writes an app's build made inside the engine repository, and the reason the
-# build lock had to cover the whole dependency step rather than one file.
 . "$SCRIPT_DIR/platform/caps-lib.sh"
+# Phase 5: build in a disposable WORK COPY -- the in-tree `make` was the last
+# build write inside this checkout on macOS. The vendored tree stays pristine.
+USOCKETS_WORK="$(mt_caps_work_dir uSockets)/src-macos"
+rm -rf "$USOCKETS_WORK"
+mkdir -p "$USOCKETS_WORK"
+cp -R "$USOCKETS_DIR/." "$USOCKETS_WORK/"
+( cd "$USOCKETS_WORK" && make -j"$(sysctl -n hw.ncpu)" )
 LIBS_DIR="$(mt_caps_lib_dir)"
 mkdir -p "$LIBS_DIR"
-cp -f "$USOCKETS_DIR/uSockets.a" "$LIBS_DIR/"
+cp -f "$USOCKETS_WORK/uSockets.a" "$LIBS_DIR/"
 
 if [[ "$DEPS_ONLY" == "true" ]]; then
     echo ""

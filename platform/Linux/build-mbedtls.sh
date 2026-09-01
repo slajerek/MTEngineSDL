@@ -73,7 +73,8 @@ if [[ -f "$OUT_LIB" && -f "$STAMP_FILE" ]]; then
   fi
 fi
 
-BUILD_DIR="$ROOT_DIR/other/lib/mbedtls.linux"
+# Phase 5: the build tree lives OUTSIDE the checkout, in the shared work root.
+BUILD_DIR="$(mt_caps_work_dir mbedtls)/build-linux"
 
 cmake -S "$MBEDTLS_SRC_DIR" -B "$BUILD_DIR" \
   -DCMAKE_BUILD_TYPE=Release \

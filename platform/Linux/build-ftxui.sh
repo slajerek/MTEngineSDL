@@ -65,7 +65,8 @@ if [[ -f "$OUT_LIB" && -f "$STAMP_FILE" ]]; then
   fi
 fi
 
-BUILD_DIR="$FTXUI_SRC_DIR/build-linux"
+# Phase 5: the build tree lives OUTSIDE the checkout, in the shared work root.
+BUILD_DIR="$(mt_caps_work_dir ftxui)/build-linux"
 
 echo "Configuring FTXUI in $BUILD_DIR"
 cmake -S "$FTXUI_SRC_DIR" -B "$BUILD_DIR" \

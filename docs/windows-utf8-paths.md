@@ -104,6 +104,6 @@ When touching such code, prefer `SYS_FileUtf8.h`.
   prefix (a different problem: MAX_PATH, not encoding).
 - Windows file dialogs use the wide common-dialog APIs and return UTF-8 through
   `CSlrString`; read them with `CSlrString::GetUTF8()` and `free()` the result.
-- PhotoCruise's `src/Core/PC_PathUtf8.h` is the app-side equivalent of
+- the photo app's `src/Core/PC_PathUtf8.h` is the app-side equivalent of
   `SYS_Utf8ToFsPath`/`SYS_FsPathToUtf8`, and `CTestUtf8Paths` there is the
   end-to-end regression guard for both layers.

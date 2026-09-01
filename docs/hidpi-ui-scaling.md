@@ -178,7 +178,7 @@ policy and app-specific formats; RetroDebugger's are in `C64DUiScale.h` and
 
 ### A config trap that is NOT there -- and how a bad test invented one
 
-PhotoCruise pairs its read with a `SetFloatSkipConfigSave("ui.guiScale", ...)`
+the photo app pairs its read with a `SetFloatSkipConfigSave("ui.guiScale", ...)`
 registration in `Save()`, which looks like it must be load-bearing. **It is not,
 for this purpose.** Two guesses about why it might be were both tested and both
 are false:

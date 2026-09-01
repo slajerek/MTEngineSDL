@@ -99,7 +99,7 @@ public:
 	void GenerateConnectionTokens(CServerGame *game);
 
 	// --- Virtual factory for in-process game servers ---
-	// Subclass creates the game-specific server (e.g., CLightHeroesGameServer with CGameState)
+	// Subclass creates the game-specific server (e.g., Cthe game appGameServer with CGameState)
 	virtual CNetGameServer *CreateInProcessGameServer(CServerGame *game, json &serverConfig) = 0;
 
 	// Called after server is created and basic setup done; subclass adds game-specific setup

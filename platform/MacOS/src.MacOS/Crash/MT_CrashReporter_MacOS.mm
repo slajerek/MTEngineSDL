@@ -1,6 +1,7 @@
 // MT_CrashReporter_MacOS.mm
 // macOS platform implementation: POSIX signal handlers + NSAlert dialog.
 #import <Cocoa/Cocoa.h>
+#include "MT_API.h"
 #import <Foundation/Foundation.h>
 #include "MT_CrashReporter.h"
 #include "DBG_Log.h"
@@ -71,7 +72,9 @@ void MT_CrashReporter_ShowDialog(const char *reportPath)
         displayText = [[displayText substringToIndex:2000] stringByAppendingString:@"\n…(truncated)"];
 
     NSAlert *alert = [[NSAlert alloc] init];
-    alert.messageText = @"PhotoCruise crashed";
+    // The HOST's name (MT_API contract) -- this used to say one commercial
+    // app's name in every host (Phase 6).
+    alert.messageText = [NSString stringWithFormat:@"%s crashed", MT_GetSettingsFolderName()];
     alert.informativeText = displayText;
     alert.alertStyle = NSAlertStyleCritical;
 

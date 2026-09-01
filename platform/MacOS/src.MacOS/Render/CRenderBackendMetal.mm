@@ -1260,7 +1260,7 @@ public:
 		//
 		// Metal keeping it alive for in-flight COMMAND BUFFERS is not enough:
 		// GetTexture() hands the raw pointer out to consumers that cache it --
-		// CSlrImageExternalTexture holds it across frames, and PhotoCruise's
+		// CSlrImageExternalTexture holds it across frames, and the photo app's
 		// video controller only re-points when the handle or size CHANGES. So a
 		// resize (Create() calls Destroy() first) would release a texture that
 		// an adapter is still about to draw with. On OpenGL that was harmless,

@@ -6,7 +6,7 @@
 // the malformed set (truncation sweep, wrong magic incl. TIFF's 42, absurd
 // dims, offsets past EOF), load-time normalisations (F1/F2), the
 // DNG-embedded path + file tags (0xC6F3 route, F12), and fingerprint
-// stability/difference pins (F10). Registered in the PhotoCruise suite
+// stability/difference pins (F10). Registered in the the photo app suite
 // (the A0 rule: engine tests register there or never run).
 class CTestDcpParse : public CTest
 {

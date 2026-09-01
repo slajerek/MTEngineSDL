@@ -52,6 +52,6 @@ bool SYS_PathIsWithin(const std::string &root, const std::string &candidate);
 // existing ancestor before the syscall, so a not-yet-created destination
 // reports its parent's volume (spec #9.0) -- exact, not a heuristic. POSIX:
 // stat().st_dev of the ancestors. Windows: GetVolumePathNameW of the ancestors.
-// Relocated from PhotoCruise CActionLibrary.cpp:124 (was file-local, misreported
+// Relocated from the photo app CActionLibrary.cpp:124 (was file-local, misreported
 // every macro destination as cross-volume).
 bool SYS_SameVolume(const std::string &pathA, const std::string &pathB);

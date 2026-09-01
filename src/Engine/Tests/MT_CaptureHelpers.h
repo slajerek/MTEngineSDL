@@ -5,8 +5,8 @@
 // tests.
 //
 // The engine already registers MT_ScreenCaptureFunc for every host, so the
-// plumbing was always shared -- but PhotoCruise grew its analysis helpers inline
-// in its own test file while c64d and LightHeroes had no capture sites at all.
+// plumbing was always shared -- but the photo app grew its analysis helpers inline
+// in its own test file while c64d and the game app had no capture sites at all.
 // These live here so the other two apps get the same measurements without a
 // third and fourth copy, and so the S-4 shader ports can assert on PIXELS rather
 // than settling for "it compiled".
@@ -32,7 +32,7 @@ bool MT_CaptureWindowRGBA(ImGuiTestContext *ctx, const char *windowName,
 // Both measures are load-bearing and neither replaces the other. A window that
 // renders nothing has a fraction near zero; a window that renders the WRONG
 // uniform colour has a fraction near one but only a single distinct colour.
-// PhotoCruise's all-grey-filmstrip bug was exactly the second kind.
+// the photo app's all-grey-filmstrip bug was exactly the second kind.
 float MT_NonBackgroundFraction(const std::vector<unsigned int> &pixels, unsigned int bgColor,
 							   int tolerance, int *outDistinctColors);
 

@@ -339,7 +339,7 @@ void CTestThemeRegistry::Run(ITestCallback *cb)
 
 	// Snapshot whatever the host has active, and restore it in Teardown().
 	// THIS TEST MUST NOT ASSERT "no theme is active by default": from TS-2
-	// onward PhotoCruise activates a theme in MT_PostInit, which runs BEFORE
+	// onward the photo app activates a theme in MT_PostInit, which runs BEFORE
 	// the suite. An absolute no-theme assertion is true today and becomes a
 	// guaranteed failure one stage later.
 	hadTheme = reg->HasActiveTheme();

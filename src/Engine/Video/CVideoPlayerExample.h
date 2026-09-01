@@ -22,7 +22,7 @@
 
 #include <functional>
 
-class CViewLightHeroesMain;
+class CViewYourAppMain;   // your app's main view class
 
 namespace VideoPlayerExample
 {
@@ -56,10 +56,10 @@ inline void StopCutscene();
 // ============================================================================
 
 // These headers are needed only for the implementation:
-#include "CViewLightHeroesMain.h"
+#include "CViewYourAppMain.h"   // your app's main view header
 #include "CViewCutscene.h"
 
-extern CViewLightHeroesMain *viewMain;
+extern CViewYourAppMain *viewMain;   // your app's global main-view pointer
 
 namespace VideoPlayerExample
 {

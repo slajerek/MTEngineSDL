@@ -151,7 +151,7 @@ void DBG_LogTime();
 // the call site's own trailing ';' becomes a SECOND, sibling empty statement
 // outside the if, leaving 'else' with no 'if' to attach to. Found on Linux
 // (the only platform where GLOBAL_DEBUG_OFF is on by default) building
-// PhotoCruise: CViewPhotoCruiseMain.cpp's font loader hit exactly this shape
+// the photo app: CViewthe photo appMain.cpp's font loader hit exactly this shape
 // and failed with "error: 'else' without a previous 'if'". do{}while(0) is
 // a single statement either way, so it is safe in every if/else/for shape,
 // including as a macro argument list with commas.

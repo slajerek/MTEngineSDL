@@ -44,7 +44,7 @@ COMMERCIAL_KEY = "MT_COMMERCIAL_BUILD"
 #   commercial     sold / app-store. Strictest.
 #
 # MT_COMMERCIAL_BUILD=0 conflates the first two, and they are genuinely
-# different: PhotoCruise's non-commercial build is private (its author's own
+# different: one commercial app's non-commercial build is private (its author's own
 # dev/test build, not shipped), while c64d's non-commercial build is
 # published to the world. Same flag value, opposite eligibility.
 #
@@ -54,10 +54,21 @@ COMMERCIAL_KEY = "MT_COMMERCIAL_BUILD"
 # more likely to be shipping something than not.
 PRIVATE_KEY = "MT_PRIVATE_BUILD"
 
+# Debug symbols in Release builds (unification plan, decision 0.5). A
+# build-settings knob, NOT a capability and NOT a C define -- it must never be
+# guardable in code, so emit.py writes its VALUE into the fragments and no
+# define anywhere. MT_COMMERCIAL_BUILD=1 forces it to 0 unless the invocation
+# explicitly `--set`s it back (the UAT case); see resolve.resolve(). It joins
+# the canonical form (a UAT and a store artifact must never share one $MT_OUT)
+# but NOT the deps hash (an archive is byte-identical either way); see
+# resolve.deps_form().
+
 REQUIRED_CAP_FIELDS = (
     "short", "description", "default", "kind", "implies", "enables",
     "app_visible", "dependencies", "commercial", "symbols",
 )
+SYMBOLS_KEY = "MT_RELEASE_SYMBOLS"
+
 REQUIRED_DEP_FIELDS = ("name", "licence", "version", "provenance")
 
 
@@ -121,7 +132,7 @@ def _err(path, where, rule):
     raise VocabError("%s: %s: %s" % (path, where, rule))
 
 
-def _validate_dependency(path, where, dep):
+def _validate_dependency(path, where, dep, owner_enables=None):
     if not isinstance(dep, dict):
         _err(path, where, "a dependency must be an object")
     for field in REQUIRED_DEP_FIELDS:
@@ -130,6 +141,27 @@ def _validate_dependency(path, where, dep):
                  "required, and a non-empty string. LICENSES.txt is generated from "
                  "these fields; a missing licence ships a legally incomplete SBOM "
                  "that looks complete")
+    # The commercial deny-list input (unification plan, decision 0.2). An
+    # EXPLICIT boolean, never parsed out of the licence prose: prose is for
+    # humans, and a guard that greps prose is a guard that rots.
+    if "commercial_safe" not in dep or not isinstance(dep["commercial_safe"], bool):
+        _err(path, "%s.commercial_safe" % where,
+             "required, and a boolean. resolve refuses a MT_COMMERCIAL_BUILD=1 "
+             "build that would enable a dependency with commercial_safe false; "
+             "a row without the field would silently sit outside that guard")
+    # Optional: the single MT_ENABLE_* flag that gates this dependency, for
+    # capabilities that enable several flags (the image-codec bundle). Absent
+    # means "gated by the capability itself".
+    if "flag" in dep:
+        flag = dep["flag"]
+        if not isinstance(flag, str) or not FLAG_RE.match(flag):
+            _err(path, "%s.flag" % where,
+                 "must be an MT_(ENABLE|CAMERA)_* flag name")
+        if owner_enables is not None and flag not in owner_enables:
+            _err(path, "%s.flag" % where,
+                 "%r is not in the owning capability's `enables` list -- the "
+                 "deny-list evaluates dependencies against the final flag set, "
+                 "and a flag the capability does not emit is never in it" % flag)
 
 
 def _validate(data, path):
@@ -172,6 +204,11 @@ def _validate(data, path):
                  "MT_PRIVATE_BUILD is not a capability. It is an orthogonal "
                  "distribution-tier input; see `private_only` on a dependency")
 
+        if key == SYMBOLS_KEY:
+            _err(path, key,
+                 "MT_RELEASE_SYMBOLS is not a capability. It is a build-settings "
+                 "mode key (unification plan, decision 0.5)")
+
         cap = caps[key]
         if not isinstance(cap, dict):
             _err(path, key, "must be an object")
@@ -210,7 +247,8 @@ def _validate(data, path):
                      "%r must match ^MT_(ENABLE|CAMERA)_[A-Z0-9_]*$" % flag)
 
         for i, dep in enumerate(cap["dependencies"]):
-            _validate_dependency(path, "%s.dependencies[%d]" % (key, i), dep)
+            _validate_dependency(path, "%s.dependencies[%d]" % (key, i), dep,
+                                 owner_enables=cap["enables"])
 
         for group in ("acquisition", "artefacts"):
             table = cap.get(group, {})

@@ -2,7 +2,7 @@
 
 #include "CTest.h"
 
-// Generic EXIF engine test: CExifReader parsing (ported from PhotoCruise's
+// Generic EXIF engine test: CExifReader parsing (ported from the photo app's
 // CTestExif) plus CExifBuilder construction and round-trip.
 //
 // The builder is validated against the reader rather than against expected

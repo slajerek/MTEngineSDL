@@ -18535,7 +18535,7 @@ void ImGui::DockContextBuildAddWindowsToNodes(ImGuiContext* ctx, ImGuiID root_id
             continue;
 
         ImGuiDockNode* node = DockContextFindNodeByID(ctx, window->DockId);
-        // [MTENGINE-PATCH: docking-stale-layout-recovery] 1 of 2 -- was IM_ASSERT(node != NULL); a stale .ini DockId must float the window, not abort
+        // [MTENGINE-PATCH: docking-stale-layout-recovery] 1 of 3 -- was IM_ASSERT(node != NULL); a stale .ini DockId must float the window, not abort
         if (node == NULL)
         {
             // Node no longer exists -- INI has a stale DockId (e.g. from a layout rebuild that
@@ -19441,7 +19441,20 @@ static void ImGui::DockNodeUpdate(ImGuiDockNode* node)
     if (node->IsDockSpace())
     {
         // [Explicit root dockspace node]
-        IM_ASSERT(node->HostWindow);
+        // [MTENGINE-PATCH: docking-stale-layout-recovery] 3 of 3 -- was IM_ASSERT(node->HostWindow)
+        if (node->HostWindow == NULL)
+        {
+            // A dockspace node is only bound to a host window when DockSpace() is submitted
+            // for it during the frame. A stale workspace .ini can carry a dockspace node whose
+            // DockSpace() no longer runs -- the hosting view was removed or renamed between
+            // builds, or its Begin() was skipped -- and HostWindow is still NULL by the time
+            // the node is updated. Skip the node for this frame rather than aborting: leaving
+            // LastFrameActive stale lets upstream's prune pass retire it, and it re-binds
+            // normally the moment a matching DockSpace() is submitted again.
+            node->State = ImGuiDockNodeState_Unknown;
+            return;
+        }
+        // [/MTENGINE-PATCH: docking-stale-layout-recovery]
         host_window = node->HostWindow;
     }
     else
@@ -19517,7 +19530,7 @@ static void ImGui::DockNodeUpdate(ImGuiDockNode* node)
     node->RefViewportId = 0; // Clear when we have a host window
 
     // Update focused node (the one whose title bar is highlight) within a node tree
-    // [MTENGINE-PATCH: docking-stale-layout-recovery] 2 of 2 -- was IM_ASSERT(node->TabBar == NULL) for split nodes
+    // [MTENGINE-PATCH: docking-stale-layout-recovery] 2 of 3 -- was IM_ASSERT(node->TabBar == NULL) for split nodes
     if (node->IsSplitNode() && node->TabBar != NULL)
     {
         // Split node should not have a TabBar -- this can happen when loading stale

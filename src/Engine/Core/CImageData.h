@@ -552,7 +552,7 @@ public:
 	// (TIFF tag 700 for DNG/TIFF-based RAWs; CR3 uuid box; RAF) WITHOUT a
 	// decode. Declared UNCONDITIONALLY, following LoadRAWPreview:
 	// MT_ENABLE_LIBRAW is a PRIVATE engine define invisible to the app, so a
-	// guarded declaration would be uncallable from PhotoCruise. The
+	// guarded declaration would be uncallable from the photo app. The
 	// implementation is guarded with an #else stub returning false.
 	// Returns true when a packet was found; outXmp gets the packet text
 	// (strnlen-bounded -- xmplen is NOT trustworthy across LibRaw's three

@@ -63,7 +63,8 @@ $Platform = Resolve-MTPlatform $Platform
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $rootDir = Resolve-Path "$scriptDir\..\.."
-$cacheDir = "$rootDir\other\lib\image-codecs"
+$cacheDir = Get-MTCapsWorkDir 'image-codecs'
+$patchesDir = "$rootDir\other\lib\image-codecs\patches"
 $downloadDir = "$cacheDir\downloads"
 $srcDir = "$cacheDir\src"
 $buildDir = "$cacheDir\build-win-$Platform"
@@ -86,7 +87,7 @@ $librawVersion  = "0.22.1"
 # libjxl decodes JPEG XL DNGs (Compression 52546), which current Adobe DNG
 # Converter writes from its plain "lossy compression" option. Pinned by
 # REVISION, with each submodule revision asserted -- see the macOS script and
-# PhotoCruise specs/superpowers/specs/2026-08-19-jpegxl-dng-*.md.
+# the photo app specs/superpowers/specs/2026-08-19-jpegxl-dng-*.md.
 $libjxlVersion  = "0.11.2"
 $libjxlGitUrl   = "https://github.com/libjxl/libjxl"
 $libjxlGitRev   = "332feb17d17311c748445f7ee75c4fb55cc38530"
@@ -162,6 +163,13 @@ if (-not $anyCodecWanted) {
 if ((Test-Path $outLib) -and (Test-Path $stampFile)) {
     $existingStamp = Get-Content $stampFile -Raw
     if ($existingStamp.Trim() -eq $stampValue) {
+        # Stamp hit: backfill the Phase 2 header staging into this keyed bucket.
+        $stagedInc = Join-Path $outLibDir 'image-codecs\include'
+        $prefixInc = Join-Path $cacheDir "$prefixDirLabel\include"
+        if (-not (Test-Path $stagedInc) -and (Test-Path $prefixInc)) {
+            New-Item -ItemType Directory -Force -Path (Split-Path $stagedInc) | Out-Null
+            Copy-Item -Recurse -Force $prefixInc $stagedInc
+        }
         Write-Host "Image codec bundle is up to date: $outLib" -ForegroundColor Green
         exit 0
     }
@@ -514,7 +522,7 @@ try {
 if (-not $pythonExe) {
     throw "Python 3 is required to patch LibRaw for JPEG XL DNG support. Install it from python.org or the Microsoft Store, or run: winget install Python.Python.3"
 }
-$patcher = Join-Path $cacheDir "patches\apply_libraw_jxl.py"
+$patcher = Join-Path $patchesDir "apply_libraw_jxl.py"
 Write-Host "Patching LibRaw for JPEG XL..."
 $savedEap = $ErrorActionPreference
 $ErrorActionPreference = 'Continue'
@@ -559,7 +567,7 @@ include_directories(
 # harmless on Linux/macOS (generate_export_header emits visibility attributes
 # there, not import/export), but on Windows it left dng.obj expecting an
 # import library for JxlDecoderCreate et al. that a static .lib does not
-# provide (LNK2001 unresolved __imp_Jxl* at PhotoCruise link time).
+# provide (LNK2001 unresolved __imp_Jxl* at the photo app link time).
 add_definitions(-DLIBRAW_NODLL -DLIBRAW_BUILDLIB -DUSE_JPEG -DUSE_ZLIB -DUSE_JXL -DJXL_STATIC_DEFINE)
 add_library(raw STATIC `${LIBRAW_SOURCES})
 install(TARGETS raw ARCHIVE DESTINATION lib)
@@ -608,7 +616,7 @@ $allFoundLibs = Get-ChildItem -Path $libDir -Recurse -Filter "*.lib" -ErrorActio
 # tiff.lib in Release) that the other libs here don't (confirmed empirically: none of the
 # rest gain a "d" suffix in Debug) -- match both forms for tiff specifically so Debug
 # doesn't silently drop it from the combined archive (confirmed: it always had, since this
-# script's first Debug run on any machine -- LNK2019 on every TIFF symbol at PhotoCruise
+# script's first Debug run on any machine -- LNK2019 on every TIFF symbol at the photo app
 # link time, with no warning from this script because the "not found" check only fires
 # for names ALREADY in $inputLibs, never for a name the regex never matched at all).
 $wantedLibs = @("tiff", "libwebp", "libwebpdemux", "libsharpyuv", "avif", "raw", "gav1", "lcms2", "jpeg", "zlib",
@@ -662,4 +670,9 @@ if ($dumpbin) {
     Write-Warning "dumpbin not on PATH -- skipped the JPEG XL symbol check"
 }
 
+# Headers travel WITH the archive (Phase 2).
+$stagedInc = Join-Path $outLibDir 'image-codecs\include'
+if (Test-Path $stagedInc) { Remove-Item -Recurse -Force $stagedInc }
+New-Item -ItemType Directory -Force -Path (Split-Path $stagedInc) | Out-Null
+Copy-Item -Recurse -Force (Join-Path $cacheDir "$prefixDirLabel\include") $stagedInc
 $stampValue | Out-File -FilePath $stampFile -Encoding ASCII -NoNewline

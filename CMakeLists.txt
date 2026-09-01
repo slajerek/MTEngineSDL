@@ -156,7 +156,9 @@ find_package(PkgConfig REQUIRED)
 # The combo lib bundles TIFF, WebP, AVIF, LibRaw, and libgav1 as static archives.
 # Run: bash platform/Linux/build-image_codecs.sh (produces ${MT_CAPS_LIBS_DIR}/libmt_image_codecs.a)
 set(MT_IMAGE_CODECS_LIB "${MT_CAPS_LIBS_DIR}/libmt_image_codecs.a")
-set(MT_IMAGE_CODECS_INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/other/lib/image-codecs/install-linux/include")
+# Headers come from the keyed deps dir the codec build stages them into
+# (Phase 2) -- never from inside this checkout.
+set(MT_IMAGE_CODECS_INCLUDE "${MT_CAPS_LIBS_DIR}/image-codecs/include")
 
 # Merged into ONE message deliberately: the remedy used to be a second
 # message(), and FATAL_ERROR halts on the first, so a naive in-place conversion
@@ -194,7 +196,7 @@ if(MT_ENABLE_LIBHEIF AND NOT APPLE)
             # APP is configured by a SEPARATE cmake process that includes the
             # same fragment and never runs this pkg_check_modules, so the app's
             # TUs would keep MT_ENABLE_LIBHEIF=1 while the engine's had 0.
-            # PhotoCruise guards on that flag in its own src/, so the two sides
+            # the photo app guards on that flag in its own src/, so the two sides
             # would disagree about a feature -- the ODR shape, one flag over.
             #
             # A silent divergence is worse than a stopped build, so under a
@@ -246,6 +248,10 @@ endif()
 # itself derived from "present". The manifest states it; the option() default
 # below is what a standalone build gets.
 option(MT_ENABLE_FFMPEG "Enable bundled-FFmpeg video decode" ON)
+# The legacy WebM (nestegg/vpx/opus) lane, same contract. Until 2026-08-31 it
+# had no flag at all, so MT_CAP_VIDEO_PLAYBACK=0 still compiled
+# CVideoSourceWebMVpx and the link died on opus_*/vpx_* against the stub.
+option(MT_ENABLE_WEBM_VPX "Enable legacy WebM/VP9/Opus video decode" ON)
 
 # Merged into one message for the same reason as the image codecs above.
 if(MT_ENABLE_FFMPEG AND NOT MT_FFMPEG_AVAILABLE)
@@ -788,7 +794,7 @@ add_library(MTEngineSDL STATIC
     # md4c: imgui_md.cpp's markdown parser dependency. Listed in the Xcode
     # project (macOS) but never added here -- Linux never had a Markdown-view
     # translation unit compiled far enough to hit the missing symbols until
-    # now (LightHeroes' CRenderHelpers.cpp, first Linux build attempt).
+    # now (the game app's CRenderHelpers.cpp, first Linux build attempt).
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/md4c/md4c.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/md4c/md4c-entity.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/md4c/md4c-html.c"
@@ -822,7 +828,7 @@ add_library(MTEngineSDL STATIC
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Tests/CTestDisplayProfile.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Tests/CTestCms.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Tests/RawTestFixtures.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Tests/PC_DcpFixtureWriter.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Tests/MT_DcpFixtureWriter.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Tests/CTestDcpParse.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Tests/CTestDcpApply.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Tests/CTestRawPreview.cpp"
@@ -1176,7 +1182,7 @@ endif()
 # Linked via the unversioned dev .so symlinks; the linker records each lib's
 # baked-in SONAME (e.g. libavcodec.so.61) as the runtime NEEDED entry, so the
 # app's $ORIGIN rpath + a copy of the versioned .so files beside the binary
-# is what actually resolves them at runtime (see PhotoCruise/CMakeLists.txt).
+# is what actually resolves them at runtime (see the photo app/CMakeLists.txt).
 if(MT_ENABLE_FFMPEG)
     target_include_directories(MTEngineSDL PRIVATE "${MT_FFMPEG_INSTALL_DIR}/include")
     target_compile_definitions(MTEngineSDL PUBLIC MT_ENABLE_FFMPEG=1)
@@ -1185,7 +1191,7 @@ endif()
 # Commercial/store build (2026-07-18 WMV spec, guard #4): compiles in the
 # edition-unsupported refusal for WMV/VC-1/WMA software decode in
 # CVideoSourceFFmpeg. Forwarded as -DMT_COMMERCIAL_BUILD=1 by the app build
-# scripts (PhotoCruise build-linux.sh) when COMMERCIAL=1.
+# scripts (the photo app build-linux.sh) when COMMERCIAL=1.
 if(MT_COMMERCIAL_BUILD)
     target_compile_definitions(MTEngineSDL PUBLIC MT_COMMERCIAL_BUILD=1)
 endif()

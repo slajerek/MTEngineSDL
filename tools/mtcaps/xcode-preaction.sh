@@ -70,6 +70,17 @@ APP_NAME="${2:?usage: xcode-preaction.sh <app-repo-dir> <app-name>}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENGINE_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+# MANDATORY SHORT-CIRCUIT for driver builds (Phase 3): the app-build driver
+# already ran the ONE resolve for this build and passes every setting on the
+# xcodebuild command line -- "exactly one resolve per build" is an acceptance
+# criterion, so a second resolve here is not a redundancy, it is a defect.
+# On the IDE path (no driver) MT_CAPS_WRAPPER is unset and the pre-action's
+# resolve IS the one resolve, exactly as before.
+if [[ "${MT_CAPS_WRAPPER:-0}" == "1" ]]; then
+    echo "mtcaps pre-action: driver build (MT_CAPS_WRAPPER=1) -- settings ride the command line, skipping the IDE resolve."
+    exit 0
+fi
+
 MANIFEST="$APP_DIR/mtengine.caps"
 
 # THE BUILD LOCK, taken before anything else this build does.

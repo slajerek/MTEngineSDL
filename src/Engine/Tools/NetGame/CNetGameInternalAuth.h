@@ -1,6 +1,7 @@
 #pragma once
 
 #include "SYS_Defs.h"
+#include "MT_NetGameAuthDomains.h"
 #include "SYS_Crypto.h"
 
 #include <string>
@@ -15,7 +16,8 @@ static inline std::vector<u8> NetGameInternalSecretToHash(const std::string &sec
 		return {};
 
 	// Use HMAC-SHA256 with a domain separator key to prevent cross-protocol hash confusion.
-	const char *domainKey = "LightHeroes.InternalSecret.v1";
+	// App-registered (MT_SetNetGameAuthDomains); see MT_NetGameAuthDomains.h.
+	const char *domainKey = MTNetGameInternalDomainRef();
 	auto digest = SYS_HmacSha256(
 		(const uint8_t *)domainKey, strlen(domainKey),
 		(const uint8_t *)secret.data(), secret.size());

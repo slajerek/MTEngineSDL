@@ -23,7 +23,7 @@ function Require-Command([string]$name) {
 
 $repoRoot = (Resolve-Path "$PSScriptRoot\..\..").Path
 $ftxuiSrc = Join-Path $repoRoot 'other\lib\ftxui'
-$buildDir = Join-Path $ftxuiSrc "build-windows-$Platform"
+$buildDir = Join-Path (Get-MTCapsWorkDir 'ftxui') "build-windows-$Platform"
 
 # REQUIRED, not defaulted. The caller decides where archives go; the only
 # fallback in the system lives in build-deps.ps1, so the old
@@ -55,6 +55,19 @@ if ($env:MT_ENABLE_FTXUI -eq '0') {
     New-MTCapsStubArchive -OutLib $outLib -Stamp $stamp -Symbol 'ftxui' `
                           -StampValue "disabled`:$scriptSha`:$Configuration`:$Platform"
     exit 0
+}
+
+# Self-skip (L11): same contract as build-libuv.ps1 -- source rev + script
+# hash + configuration; a real git checkout here (submodule), so rev-parse
+# inside it is correct, unlike vendored libuv.
+$srcSha = 'unknown'
+try { $srcSha = (git -C $ftxuiSrc rev-parse --short HEAD).Trim() } catch {}
+$stampValue = "enabled`:$srcSha`:$scriptSha`:$Configuration`:$Platform`:$Compiler"
+if ((Test-Path $outLib) -and (Test-Path $stamp)) {
+    if ((Get-Content $stamp -Raw).Trim() -eq $stampValue) {
+        Write-Host "ftxui is up to date: $outLib"
+        exit 0
+    }
 }
 
 Require-Command cmake
@@ -91,7 +104,7 @@ try {
     # carry. This script was the only one that did not, so CMake used its own
     # default (MultiThreadedDLL) and ftxui.lib came out /MDd while the engine and
     # every app compile /MTd. Nothing linked ftxui.lib on Windows until
-    # LightHeroes did, and then the link failed with LNK2038 mismatch detected
+    # the game app did, and then the link failed with LNK2038 mismatch detected
     # for 'RuntimeLibrary'.
     #
     # CMP0091 HAS TO COME WITH IT. FTXUI declares cmake_minimum_required(VERSION
@@ -141,6 +154,6 @@ lib /nologo /OUT:$outLib $libs
 # from a previous capability-off build survives beside the real ftxui.lib, and
 # the next off build finds stamp and archive both present, matches, and keeps the
 # REAL archive while believing it wrote a stub.
-Set-Content -NoNewline -Path $stamp -Value "enabled`:$scriptSha`:$Configuration`:$Platform"
+Set-Content -NoNewline -Path $stamp -Value $stampValue
 
 Write-Host "Done. Output: $outLib"

@@ -27,21 +27,24 @@ set -euo pipefail
 export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-CACHE_DIR="$ROOT_DIR/other/lib/video-codecs"
+# OUTSIDE the checkout, and keyed by the resolved capability set -- see
+# mt_caps_lib_dir in ../caps-lib.sh and resolve.deps_dir for why this is a
+# correctness change and not tidiness. One flat platform/Linux/libs served all
+# four apps, and a capability being off writes a STUB over the real archive.
+# Sourced BEFORE any use of mt_caps_work_dir/mt_caps_lib_dir below -- this
+# script runs as its own `bash` child process (app-build-linux.sh -> the
+# engine's build-linux.sh -> `bash build-video_codecs.sh`), so nothing a
+# caller sourced is inherited here.
+if ! declare -f mt_caps_lib_dir >/dev/null 2>&1; then
+  # shellcheck source=../caps-lib.sh
+  . "$ROOT_DIR/platform/caps-lib.sh"
+fi
+CACHE_DIR="$(mt_caps_work_dir video-codecs)"
 DOWNLOAD_DIR="$CACHE_DIR/downloads"
 SRC_DIR="$CACHE_DIR/src"
 
 ARCH="$(uname -m)"
 BUILD_DIR="$CACHE_DIR/build-linux-$ARCH"
-
-# OUTSIDE the checkout, and keyed by the resolved capability set -- see
-# mt_caps_lib_dir in ../caps-lib.sh and resolve.deps_dir for why this is a
-# correctness change and not tidiness. One flat platform/Linux/libs served all
-# four apps, and a capability being off writes a STUB over the real archive.
-if ! declare -f mt_caps_lib_dir >/dev/null 2>&1; then
-  # shellcheck source=../caps-lib.sh
-  . "$ROOT_DIR/platform/caps-lib.sh"
-fi
 OUT_LIB_DIR="$(mt_caps_lib_dir)"
 
 # Single native-arch install prefix. FFmpeg's shared libs/headers AND vpx's/
@@ -81,7 +84,7 @@ JOBS="${MT_BUILD_JOBS:-$(nproc)}"
 # ("full") additionally enables WMV/WMA/HEVC/AAC/EAC3 software
 # decode for non-store builds.
 # COMMERCIAL is a PARAMETER now, not a file read. The engine used to track a
-# platform/BUILD_MODE_DEFAULT and PhotoCruise tracked a root-level file of the
+# platform/BUILD_MODE_DEFAULT and the photo app tracked a root-level file of the
 # same name -- two files, two owners, one name, and neither reconciled with
 # MT_COMMERCIAL_BUILD. All three are retired: the licence mode lives in the app's
 # mtengine.caps and reaches acquisition, compilation and LICENSES.txt through one
@@ -93,10 +96,24 @@ case "$COMMERCIAL" in
   0|1) ;;
   *) echo "ERROR: COMMERCIAL must be 0 or 1 (got '$COMMERCIAL')" >&2; exit 1 ;;
 esac
-if [[ "$COMMERCIAL" == "1" ]]; then
-  FFMPEG_BUILD_MODE="commercial"
+# The RESOLVED mode wins when present (unification plan Phase 2, 2026-08-31):
+# mtcaps emits MT_FFMPEG_BUILD_MODE into every fragment, derived as `full` only
+# for MT_PRIVATE_BUILD=1 -- the withheld decoders are patent-encumbered and
+# patents attach to DISTRIBUTION, so the public/free tier gets the restricted
+# set exactly like the store tier. The COMMERCIAL env var stays as the legacy
+# channel for direct/standalone runs (engine dev = private use, so its default
+# maps to `full`).
+if [[ -n "${MT_FFMPEG_BUILD_MODE:-}" ]]; then
+  case "$MT_FFMPEG_BUILD_MODE" in
+    full|commercial) FFMPEG_BUILD_MODE="$MT_FFMPEG_BUILD_MODE" ;;
+    *) echo "ERROR: MT_FFMPEG_BUILD_MODE must be full or commercial (got '$MT_FFMPEG_BUILD_MODE')" >&2; exit 1 ;;
+  esac
 else
-  FFMPEG_BUILD_MODE="full"
+  if [[ "$COMMERCIAL" == "1" ]]; then
+    FFMPEG_BUILD_MODE="commercial"
+  else
+    FFMPEG_BUILD_MODE="full"
+  fi
 fi
 
 VPX_VERSION="1.15.2"
@@ -156,7 +173,9 @@ fi
 #
 # Absent means ON, so a bare engine build still builds everything, and this comes
 # before any download.
-if [[ "${MT_ENABLE_FFMPEG:-1}" == "0" ]]; then
+# WEBM_VPX is the archive's own flag (the vpx/opus/nestegg lane); FFMPEG kept
+# as fallback for a fragment older than 2026-08-31.
+if [[ "${MT_ENABLE_WEBM_VPX:-${MT_ENABLE_FFMPEG:-1}}" == "0" ]]; then
   STUB_STAMP="disabled:${script_sha}"
   if [[ -f "$OUT_LIB" && -f "$STAMP_FILE" && "$(cat "$STAMP_FILE" 2>/dev/null)" == "$STUB_STAMP" ]]; then
     exit 0
@@ -319,7 +338,7 @@ build_opus() {
   # on a native single-arch Linux build) and CC is pinned to the detected
   # cc/gcc instead of clang. --with-pic is added (Linux-only, mirroring
   # vpx's --enable-pic): a static-only libtool build does not default to
-  # -fPIC, and these objects are linked into the PIE PhotoCruise executable.
+  # -fPIC, and these objects are linked into the PIE the photo app executable.
   "$SRC_DIR/opus-${OPUS_VERSION}/configure" \
     --prefix="$prefix" \
     --disable-shared \

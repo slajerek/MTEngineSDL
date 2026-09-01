@@ -16,7 +16,10 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 # shellcheck source=../caps-lib.sh
 . "$ROOT_DIR/platform/caps-lib.sh"
 mt_caps_strip_host_build_env
-CACHE_DIR="$ROOT_DIR/other/lib/image-codecs"
+# The WORK root moved outside the checkout (Phase 2). The PATCHES stay in the
+# repo -- they are tracked source, not build state.
+CACHE_DIR="$(mt_caps_work_dir image-codecs)"
+PATCHES_DIR="$ROOT_DIR/other/lib/image-codecs/patches"
 DOWNLOAD_DIR="$CACHE_DIR/downloads"
 SRC_DIR="$CACHE_DIR/src"
 BUILD_DIR="$CACHE_DIR/build"
@@ -41,7 +44,7 @@ LIBGAV1_VERSION="0.20.0"
 LIBRAW_VERSION="0.22.1"
 # libjxl and the three dependencies a DECODER-ONLY build actually links. Pinned
 # by git revision, not tag, so an upstream re-tag cannot change what we ship.
-# Licences (all permissive, verified 2026-08-19 -- see PhotoCruise
+# Licences (all permissive, verified 2026-08-19 -- see the photo app
 # specs/superpowers/specs/2026-08-19-jpegxl-dng-licence-spike.md):
 #   libjxl  BSD-3-Clause + a royalty-free Google patent grant (PATENTS)
 #   highway Apache-2.0 OR BSD-3-Clause  (we take BSD-3)
@@ -117,6 +120,11 @@ fi
 stamp_value="${script_sha}:tiff-${TIFF_VERSION}:webp-${WEBP_VERSION}:avif-${AVIF_VERSION}:libgav1-${LIBGAV1_VERSION}:libraw-${LIBRAW_VERSION}:libjxl-${LIBJXL_VERSION}:${DEPLOYMENT_TARGET}"
 if [[ -f "$OUT_LIB" && -f "$STAMP_FILE" ]]; then
   if [[ "$(cat "$STAMP_FILE")" == "$stamp_value" ]]; then
+    # Stamp hit: backfill the Phase 2 header staging into this keyed bucket.
+    if [[ ! -d "$OUT_LIB_DIR/image-codecs/include" && -d "$PREFIX_DIR/include" ]]; then
+      mkdir -p "$OUT_LIB_DIR/image-codecs"
+      cp -R "$PREFIX_DIR/include" "$OUT_LIB_DIR/image-codecs/include"
+    fi
     exit 0
   fi
 fi
@@ -255,7 +263,7 @@ patch_libraw_jxl() {
   # Adds a real JPEG XL DNG decoder in place of LibRaw's throwing placeholder.
   # Idempotent, and it FAILS LOUDLY if a LibRaw bump moves its anchors -- see
   # the script's own header for why this is not a context diff.
-  python3 "$CACHE_DIR/patches/apply_libraw_jxl.py" "$SRC_DIR/LibRaw-${LIBRAW_VERSION}"
+  python3 "$PATCHES_DIR/apply_libraw_jxl.py" "$SRC_DIR/LibRaw-${LIBRAW_VERSION}"
 }
 
 build_cmake() {
@@ -613,4 +621,9 @@ require_symbol "_JxlDecoderCreate"
 require_symbol "LibRaw::jxl_dng_load_raw()"
 
 echo -n "$stamp_value" > "$STAMP_FILE"
-echo "Image codec bundle built: $OUT_LIB"
+# Headers travel WITH the archive (Phase 2): every project used to read them
+# from the in-checkout install tree this relocation retired.
+rm -rf "$OUT_LIB_DIR/image-codecs/include"
+mkdir -p "$OUT_LIB_DIR/image-codecs"
+cp -R "$PREFIX_DIR/include" "$OUT_LIB_DIR/image-codecs/include"
+echo "Image codec bundle built: $OUT_LIB (headers staged to $OUT_LIB_DIR/image-codecs/include)"

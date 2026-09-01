@@ -46,6 +46,44 @@
          app's identity arrives in $(MTCapsApp) and its repo is a sibling of this
          one. Without an app there is nothing to resolve - that is a bare engine
          build, which is what MT_STANDALONE=1 is for. -->
+    <!-- BUILD SOLUTION, not just Build Project. An app .sln lists
+         MTEngineSDL.vcxproj as a solution project too, so Visual Studio builds
+         it once standalone (no AdditionalProperties, hence no MTCapsApp) as
+         well as through the app's ProjectReference. The standalone pass used to
+         hit the guard below and fail the whole solution build.
+
+         The solution itself carries the missing context: every app keeps its
+         .sln at <app>\platform\Windows\, so $(SolutionDir)..\.. is the app repo
+         and its mtengine-app.conf names the app. Reading it here is what makes
+         Build Solution work. When the app arrives normally (ProjectReference,
+         or the command-line driver) MTCapsApp is already set and none of this
+         runs; when the ENGINE's own solution is built, that conf does not
+         exist, the guard still fires, and MT_STANDALONE=1 is still the answer
+         for a bare engine build.
+
+         ReadLinesFromFile and not a Regex property function: parsing XML or
+         chaining a Match through .Groups is outside what MSBuild's property
+         functions do reliably, and this file already learned that lesson with
+         ide-defines-*.txt. -->
+    <PropertyGroup Condition="'$(MTCapsApp)' == '' And '$(SolutionDir)' != ''">
+      <MTCapsSolutionAppDir>$([System.IO.Path]::GetFullPath('$(SolutionDir)..\..'))</MTCapsSolutionAppDir>
+      <MTCapsSolutionConf>$(MTCapsSolutionAppDir)\mtengine-app.conf</MTCapsSolutionConf>
+    </PropertyGroup>
+    <ReadLinesFromFile File="$(MTCapsSolutionConf)"
+                       Condition="'$(MTCapsSolutionConf)' != '' And Exists('$(MTCapsSolutionConf)')">
+      <Output TaskParameter="Lines" ItemName="MTCapsConfLine" />
+    </ReadLinesFromFile>
+    <ItemGroup>
+      <MTCapsAppNameLine Include="@(MTCapsConfLine)"
+                         Condition="$([System.String]::Copy('%(Identity)').StartsWith('MT_APP_NAME='))" />
+    </ItemGroup>
+    <PropertyGroup>
+      <MTCapsAppNameRaw>@(MTCapsAppNameLine)</MTCapsAppNameRaw>
+      <MTCapsApp Condition="'$(MTCapsApp)' == '' And '$(MTCapsAppNameRaw)' != ''">$(MTCapsAppNameRaw.Substring(12).Trim())</MTCapsApp>
+    </PropertyGroup>
+    <Message Condition="'$(MTCapsSolutionAppDir)' != '' And '$(MTCapsApp)' != ''"
+             Importance="high"
+             Text="Capabilities (IDE): app taken from the solution -&gt; $(MTCapsApp)" />
     <Error Condition="'$(MTCapsApp)' == ''"
            Text="This engine build has no app context: neither /p:MTOutRoot nor MTCapsApp is set, so there is no manifest to resolve. Build the app's project (which references this one), run its build-windows.ps1, or pass /p:MT_STANDALONE=1 for a bare engine build." />
 
@@ -106,6 +144,17 @@
     <Error Condition="'$(MTCapsLibsDir)' == ''"
            Text="mtcaps resolve produced no dependency directory for $(MTCapsManifest)." />
 
+    <!-- L9: the rev-free build root for compiled objects. Same
+         one-bare-value pattern, same arguments. -->
+    <Exec Command="where py &gt;nul 2&gt;&amp;1 &amp;&amp; (py -3 -B &quot;$(MTCapsEngineDir)\tools\mtcaps\mtcaps.py&quot; resolve $(MTCapsResolveArgs) --print build-dir) || (python -B &quot;$(MTCapsEngineDir)\tools\mtcaps\mtcaps.py&quot; resolve $(MTCapsResolveArgs) --print build-dir)"
+          ConsoleToMSBuild="true"
+          StandardOutputImportance="low">
+      <Output TaskParameter="ConsoleOutput" PropertyName="MTBuildRoot" />
+    </Exec>
+    <PropertyGroup>
+      <MTBuildRoot Condition="'$(MTBuildRoot)' != '' And !HasTrailingSlash('$(MTBuildRoot)')">$(MTBuildRoot)\</MTBuildRoot>
+    </PropertyGroup>
+
     <PropertyGroup>
       <MTCapsDefinesFile>$(MTCapsResolvedRoot)\ide-defines-engine.txt</MTCapsDefinesFile>
     </PropertyGroup>
@@ -115,7 +164,14 @@
 
     <PropertyGroup>
       <MTCapsIdeDefines>$([System.IO.File]::ReadAllText('$(MTCapsDefinesFile)').Trim())</MTCapsIdeDefines>
-      <MTCapsIncludeDir>$(MTCapsResolvedRoot)\include</MTCapsIncludeDir>
+      <!-- L9: the generated headers (MT_Capabilities.h, Sci/) live under the
+           REV-FREE build root, not the rev-keyed out root. MTBuildRoot is
+           already resolved by the third Exec above; naming MTCapsResolvedRoot
+           here pointed at a directory that does not exist, so an IDE build got
+           no MT_Capabilities.h. The second line keeps the old value as a
+           fallback if that Exec produced nothing. -->
+      <MTCapsIncludeDir Condition="'$(MTBuildRoot)' != ''">$(MTBuildRoot)include</MTCapsIncludeDir>
+      <MTCapsIncludeDir Condition="'$(MTCapsIncludeDir)' == ''">$(MTCapsResolvedRoot)\include</MTCapsIncludeDir>
     </PropertyGroup>
 
     <Message Importance="high"
@@ -127,12 +183,31 @@
          target that runs before the ClCompile task DOES reach the compiler. -->
     <ItemGroup>
       <ClCompile>
-        <PreprocessorDefinitions>$(MTCapsIdeDefines);%(ClCompile.PreprocessorDefinitions)</PreprocessorDefinitions>
-        <AdditionalIncludeDirectories>$(MTCapsIncludeDir);%(ClCompile.AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+        <!-- APPENDED, not prepended, and the order is the whole point. The
+             .vcxproj hardcodes a legacy set of BARE defines
+             (MT_ENABLE_LIBTIFF;MT_ENABLE_LIBWEBP;MT_ENABLE_LIBAVIF;
+             MT_ENABLE_LIBRAW;MT_ENABLE_FFMPEG;MT_ENABLE_LCMS2;...), and a bare
+             /D NAME means 1. On the command line the caps come from
+             MTEngineCaps.props, which is imported BEFORE the .vcxproj body, so
+             the .vcxproj's own group lands first and the caps last, and the
+             caps win. Prepending here inverted that: the command line read
+             '/D MT_ENABLE_LIBTIFF=0 ... /D MT_ENABLE_LIBTIFF', the last one
+             wins, and an IDE build compiled codec sources the manifest had
+             switched OFF (it then failed on tiffio.h / webp/decode.h, which is
+             how this was found). Appending reproduces the command-line order. -->
+        <PreprocessorDefinitions>%(ClCompile.PreprocessorDefinitions);$(MTCapsIdeDefines)</PreprocessorDefinitions>
+        <!-- The dependency headers too. The .vcxproj names the image-codecs and
+             ffmpeg include dirs off $(MTCapsLibsDir) in an ItemDefinitionGroup,
+             which MSBuild evaluates BEFORE any target runs, and on the IDE path
+             that property is still empty there, so both entries evaluated to
+             bogus relative paths and an IDE build failed on tiffio.h and
+             webp/decode.h. Re-add them here, where the property has a value. -->
+        <AdditionalIncludeDirectories>$(MTCapsIncludeDir);$(MTCapsLibsDir)\image-codecs\include;$(MTCapsLibsDir)\ffmpeg\include;%(ClCompile.AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       </ClCompile>
-      <!-- The keyed directory goes FIRST, ahead of the tracked prebuilts, so a
-           freshly built archive wins over any same-named file left in
-           platform\Windows\libs from before the archives moved out of it. -->
+      <!-- The keyed directory goes FIRST. It used to matter because
+           platform\Windows\libs still held tracked prebuilts that could shadow
+           a freshly built archive; those are deleted (item 9, 2026-09-02) and
+           this is now simply the only bucket a link should ever read. -->
       <Link>
         <AdditionalLibraryDirectories>$(MTCapsLibsDir);%(Link.AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       </Link>

@@ -159,5 +159,5 @@ enum class MTLegacyStylePolicy
 {
 	Show,      // default -- hosts that never call the registry are unaffected
 	DevOnly,   // visible in development builds only
-	Hidden     // PhotoCruise release
+	Hidden     // the photo app release
 };

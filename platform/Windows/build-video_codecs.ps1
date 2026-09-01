@@ -123,7 +123,7 @@ $Platform = Resolve-MTPlatform $Platform
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $rootDir = Resolve-Path "$scriptDir\..\.."
-$cacheDir = "$rootDir\other\lib\video-codecs"
+$cacheDir = Get-MTCapsWorkDir 'video-codecs'
 $downloadDir = "$cacheDir\downloads"
 $srcDir = "$cacheDir\src"
 
@@ -143,7 +143,7 @@ $stampFile = "$outLibDir\MTVideoCodecs.stamp"
 # THE PREFIX LIVES WITH THE ARCHIVE, keyed identically, and that is a
 # CORRECTNESS requirement rather than tidiness. It used to be
 # other\lib\video-codecs\install-win-<Platform> inside the checkout: one shared
-# directory that PhotoCruise both links out of and copies runtime DLLs from. The
+# directory that the photo app both links out of and copies runtime DLLs from. The
 # skip check below tests for lib\, bin\ and the stamp in that prefix, so a keyed
 # stamp over a SHARED prefix lets app A (full) fill it, app B (commercial)
 # overwrite it, and app A then skip on its own valid stamp and link the
@@ -173,23 +173,36 @@ New-Item -ItemType Directory -Force -Path $downloadDir, $srcDir, $outLibDir | Ou
 #      WMV/WMA software decode plus the HEVC/AAC/EAC3 software fallbacks
 #      (2026-07-19 codec-superset spec) for non-store internal builds).
 #      COMMERCIAL is a PARAMETER now, not a file read. The engine used to track
-#      platform\BUILD_MODE_DEFAULT and PhotoCruise tracked a root-level file of
+#      platform\BUILD_MODE_DEFAULT and the photo app tracked a root-level file of
 #      the same name -- two files, two owners, one name, neither reconciled with
 #      MT_COMMERCIAL_BUILD. All three are retired: the licence mode lives in the
 #      app's mtengine.caps and reaches acquisition, compilation and LICENSES.txt
 #      through one channel. Identical semantics to the macOS/Linux scripts. ----
 
-$commercial = $env:COMMERCIAL
-if ([string]::IsNullOrEmpty($commercial)) {
-    # A direct run defaults to non-commercial, the safer default: it only ever
-    # includes more, never less than a licence permits.
-    $commercial = "0"
+# The RESOLVED mode wins when present (unification plan Phase 2, 2026-08-31):
+# mtcaps derives `full` only for MT_PRIVATE_BUILD=1 -- the withheld decoders
+# are patent-encumbered, and patents attach to DISTRIBUTION, so public/free
+# gets the restricted set like the store tier. COMMERCIAL stays as the legacy
+# channel for direct/standalone runs.
+if ($env:MT_FFMPEG_BUILD_MODE) {
+    if ($env:MT_FFMPEG_BUILD_MODE -notin @('full', 'commercial')) {
+        throw "MT_FFMPEG_BUILD_MODE must be full or commercial (got '$($env:MT_FFMPEG_BUILD_MODE)')"
+    }
+    $ffmpegBuildMode = $env:MT_FFMPEG_BUILD_MODE
+    Write-Host "FFmpeg build mode: $ffmpegBuildMode (from resolved MT_FFMPEG_BUILD_MODE)"
+} else {
+    $commercial = $env:COMMERCIAL
+    if ([string]::IsNullOrEmpty($commercial)) {
+        # A direct run defaults to non-commercial, the safer default: it only
+        # ever includes more, never less than a licence permits.
+        $commercial = "0"
+    }
+    if ($commercial -ne "0" -and $commercial -ne "1") {
+        throw "COMMERCIAL must be 0 or 1 (got '$commercial')"
+    }
+    $ffmpegBuildMode = if ($commercial -eq "1") { "commercial" } else { "full" }
+    Write-Host "FFmpeg build mode: $ffmpegBuildMode (COMMERCIAL=$commercial)"
 }
-if ($commercial -ne "0" -and $commercial -ne "1") {
-    throw "COMMERCIAL must be 0 or 1 (got '$commercial')"
-}
-$ffmpegBuildMode = if ($commercial -eq "1") { "commercial" } else { "full" }
-Write-Host "FFmpeg build mode: $ffmpegBuildMode (COMMERCIAL=$commercial)"
 
 # ---- pinned versions / URLs / hashes -- copied verbatim from
 #      platform/MacOS/build-video_codecs.sh; never re-derive from memory ----
@@ -267,7 +280,11 @@ $scriptHash = (Get-FileHash -Path $MyInvocation.MyCommand.Path -Algorithm SHA256
 # Nothing in the automatic Windows build calls this script today -- build-deps.ps1
 # does not -- so this gate is for parity and for anyone running it by hand with a
 # capability set published. Absent means ON.
-if ($env:MT_ENABLE_FFMPEG -eq '0') {
+# WEBM_VPX is the archive's own flag; FFMPEG kept as fallback for a fragment
+# older than 2026-08-31.
+$webmVpx = if ($null -ne $env:MT_ENABLE_WEBM_VPX) { $env:MT_ENABLE_WEBM_VPX }
+           else { $env:MT_ENABLE_FFMPEG }
+if ($webmVpx -eq '0') {
     if (-not (Get-Command cl -ErrorAction SilentlyContinue) -or
         -not (Get-Command lib -ErrorAction SilentlyContinue)) {
         throw "Video codecs are disabled by the capability set, but cl/lib are needed to write the stub archive. Run from 'Developer PowerShell for VS 2022'."
@@ -910,7 +927,15 @@ Build-CMake `
     @(
         "-DOPUS_BUILD_SHARED_LIBRARY=OFF",
         "-DOPUS_BUILD_TESTING=OFF",
-        "-DOPUS_BUILD_PROGRAMS=OFF"
+        "-DOPUS_BUILD_PROGRAMS=OFF",
+        # opus-1.5.2/CMakeLists.txt:274-279 OVERWRITES CMAKE_MSVC_RUNTIME_LIBRARY
+        # from its own OPUS_STATIC_RUNTIME option, which defaults to OFF -- so
+        # Build-CMake's -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded was silently
+        # discarded and opus.lib came out /MD while the engine and every app
+        # link /MT. That mismatch put two CRTs (two heaps) in one image and
+        # raised LNK4098 "LIBCMT conflicts with use of other libs". Setting the
+        # option opus actually reads is the only way to make the request stick.
+        "-DOPUS_STATIC_RUNTIME=ON"
     )
 
 # ==================== combine vpx + opus into MTVideoCodecs.lib ====================

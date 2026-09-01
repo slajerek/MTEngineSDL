@@ -15,9 +15,9 @@
 // output to `transpose=cclock` applied to the un-rotated source, and
 // substantially different output from `transpose=clock`).
 //
-// The remap math below mirrors PhotoCruise's PC_TransformOrientation (EXIF
+// The remap math below mirrors the photo app's PC_TransformOrientation (EXIF
 // orientation 6 == rotate-90-CW, 8 == rotate-90-CCW), reimplemented locally
-// so the engine has no dependency on PhotoCruise: rotationDeg==90 uses the
+// so the engine has no dependency on the photo app: rotationDeg==90 uses the
 // orientation-8 (CCW) formula, rotationDeg==270 uses the orientation-6 (CW)
 // formula.
 //

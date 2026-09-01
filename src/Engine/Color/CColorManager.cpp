@@ -100,7 +100,7 @@ public:
 	// creation is not "ruinously" expensive the way WCS's is (see
 	// EvictIfNeeded below), and it is MIT-licensed with no Store-compatibility
 	// concern. ICM 2.0 and WCS 1.0 remain selectable via SetEngineVariant for
-	// users who want them (see PhotoCruise's colour-engine setting).
+	// users who want them (see the photo app's colour-engine setting).
 	CColorManagerImpl()
 		: mutex(new CSlrMutex("CColorManager")), lruClock(0), liveTransforms(0),
 		  variant(CMS_VARIANT_LCMS2)

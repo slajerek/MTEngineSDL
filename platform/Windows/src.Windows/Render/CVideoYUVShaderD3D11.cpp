@@ -298,7 +298,7 @@ void CVideoYUVShaderD3D11::DrawQuad(EYUVShaderMode mode,
 	// That is how the "no leaked PQ EOTF into another app's cutscene" guarantee
 	// is implemented rather than merely intended: GL uniforms are program state
 	// that survives between draws, and this entry point is shared with
-	// LightHeroes' cutscenes. A D3D constant buffer is rewritten whole each
+	// the game app's cutscenes. A D3D constant buffer is rewritten whole each
 	// draw so it cannot leak the same way -- but the two backends must agree on
 	// BEHAVIOUR, or the divergence is the bug.
 	u.colorTrc        = hdr.IsHdr() ? hdr.colorTrc : 2;
@@ -472,7 +472,7 @@ void CVideoYUVShaderD3D11::Render(void *texY, void *texU, void *texV, void *texA
 	// directly does nothing at all, and we are inside that walk so we cannot
 	// append a command to it either.
 	//
-	// The live caller already does the right thing: LightHeroes'
+	// The live caller already does the right thing: the game app's
 	// CViewCutscene queues ImDrawCallback_ResetRenderState immediately after
 	// the callback that reaches us. That obsolete sentinel still works --
 	// ImDrawList::AddCallback translates it to

@@ -26,7 +26,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MACOS_DIR="$ROOT_DIR/platform/MacOS"
 ENGINE_PROJECT="$MACOS_DIR/MTEngineSDL.xcodeproj/project.pbxproj"
 
-SCRIPTS=(build-sdl2.sh build-sdl3.sh build-ftxui.sh build-mbedtls.sh
+SCRIPTS=(build-sdl3.sh build-ftxui.sh build-mbedtls.sh
          build-image_codecs.sh build-video_codecs.sh build-llama_cpp.sh)
 
 fail() { echo "$*" >&2; exit 1; }

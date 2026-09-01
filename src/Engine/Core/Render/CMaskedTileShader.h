@@ -1,7 +1,7 @@
 #ifndef _CMaskedTileShader_h_
 #define _CMaskedTileShader_h_
 
-// Backend-neutral interface for the masked-tile shader (LightHeroes' hex grid).
+// Backend-neutral interface for the masked-tile shader (the game app's hex grid).
 //
 // This is deliberately NOT `CRenderShader *`: consumers store the QUEUED variant
 // and call BeginBatch()/PushTileBounds() on it, neither of which exists on

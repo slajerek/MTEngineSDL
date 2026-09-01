@@ -15,7 +15,7 @@ and the `_compressed_size` symbols are constant-folded away entirely.
 
 A host that wants the same bytes — rather than shipping a second copy of the
 same typeface as an asset — includes `"Fonts/MTEmbeddedFonts.h"` (the qualified
-path: include dirs expose `src/Embedded`, not `src/Embedded/Fonts`). PhotoCruise
+path: include dirs expose `src/Embedded`, not `src/Embedded/Fonts`). the photo app
 does exactly this for its UI face.
 
 ## Fonts Included

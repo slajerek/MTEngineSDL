@@ -1,4 +1,8 @@
 #include "CVideoSourceWebMVpx.h"
+// The whole TU is capability-gated (unification plan Phase 2, 2026-08-31):
+// at MT_ENABLE_WEBM_VPX=0 the video-codecs archive is a stub with no vpx/opus
+// symbols, and the nestegg/vpx include dirs may not exist at all.
+#if MT_ENABLE_WEBM_VPX
 #include "DBG_Log.h"
 
 #include <cstring>
@@ -602,3 +606,4 @@ void CVideoSourceWebMVpx::FreeResources()
 	info = SVideoInfo();
 	errorReason.clear();
 }
+#endif // MT_ENABLE_WEBM_VPX

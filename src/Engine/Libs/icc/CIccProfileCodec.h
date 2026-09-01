@@ -64,7 +64,7 @@ public:
     // Split a profile into JPEG APP2 payloads: each is "ICC_PROFILE\0" (12
     // bytes) + a 1-based sequence number + the total count + up to
     // kMaxApp2ProfileBytes profile bytes. The single-segment result is
-    // byte-identical to the framing PhotoCruise's exporter already writes.
+    // byte-identical to the framing the photo app's exporter already writes.
     // Returns an empty vector for empty input or for a profile too large to
     // number in one byte (255 segments).
     static std::vector<std::vector<uint8_t> > SplitApp2(const uint8_t *profile, uint32_t size);
