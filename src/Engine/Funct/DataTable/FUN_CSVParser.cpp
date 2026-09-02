@@ -313,6 +313,6 @@ void FUN_ExportCSV(CDataTable *dataTable, u16 charSeparator, char *fileName)
 //	}
 //}
 //
-//FUN_ExportCSV(usos, ';', "/Users/mars/Desktop/tout.txt");
+//FUN_ExportCSV(usos, ';', "out.txt");
 
 

@@ -64,6 +64,7 @@ MANIFEST=""
 APP_NAME=""
 PRINT_SETTINGS=false
 
+CAPS_SETS=()
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --debug)        CONFIGURATION="Debug" ;;
@@ -75,6 +76,7 @@ while [[ $# -gt 0 ]]; do
         --manifest)     MANIFEST="${2:-}"; [[ -n "$MANIFEST" ]] || { echo "ERROR: --manifest needs a value" >&2; exit 2; }; shift ;;
         --app)          APP_NAME="${2:-}"; [[ -n "$APP_NAME" ]] || { echo "ERROR: --app needs a value" >&2; exit 2; }; shift ;;
         --print-settings) PRINT_SETTINGS=true ;;
+        --set)          CAPS_SETS+=("--set" "${2:-}"); [[ -n "${2:-}" ]] || { echo "ERROR: --set needs KEY=VALUE" >&2; exit 2; }; shift ;;
         -h|--help)
             sed -n '4,46p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
             exit 0 ;;
@@ -169,7 +171,7 @@ if [[ -n "$MANIFEST" || -n "$APP_NAME" ]]; then
         MTCAPS_OUTPUT="$("$PYTHON3" -B "$SCRIPT_DIR/tools/mtcaps/mtcaps.py" resolve \
             --manifest "$MANIFEST" --app "$APP_NAME" \
             --platform macos --arch "$RESOLVE_ARCH" --config "$CONFIGURATION" \
-            --engine-dir "$SCRIPT_DIR" "${ENGINE_OPTIONS[@]}")" || {
+            --engine-dir "$SCRIPT_DIR" "${ENGINE_OPTIONS[@]}" ${CAPS_SETS[@]+"${CAPS_SETS[@]}"})" || {
             echo "ERROR: mtcaps resolve failed for $MANIFEST" >&2
             exit 2
         }

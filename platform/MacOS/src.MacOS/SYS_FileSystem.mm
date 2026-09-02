@@ -167,18 +167,44 @@ void SYS_InitFileSystem()
 #else
 	
 	/////////////////////////////////////
-	/// development version, use Documents folder
-	
-//	//gOSPathToDocuments = @"/Users/mars/develop/RockinChristmasTree/_RUNTIME_/Documents/";
-	gOSPathToDocuments = @"/Users/mars/develop/MTEngine/_RUNTIME_/Documents/";
-
-//
-////#if defined(IS_TRACKER)
-////#if !defined(FINAL_RELEASE)
-////	gOSPathToDocuments = @"/Users/mars/Documents/ft209/xms/";
-////#endif
-////#endif
-//
+	/// development version: everything under one writable folder.
+	///
+	/// UNREACHABLE TODAY -- SYS_Defs.h defines FINAL_RELEASE unconditionally,
+	/// so the branch above is what every build compiles. It is kept because
+	/// that define is a hand-flipped switch (its neighbours in SYS_Defs.h are
+	/// commented-out toggles of the same kind), and the moment somebody
+	/// comments it out this code runs.
+	///
+	/// Which is why it no longer hardcodes an absolute path. It used to name
+	/// one author's home directory in full -- in a public repository, pointing
+	/// at a directory that exists on exactly one machine in the world. Anyone
+	/// else flipping the switch got silent writes to a path that is not there.
+	///
+	/// MTENGINE_DEV_DOCUMENTS overrides, for whoever wants a fixed workspace
+	/// (export MTENGINE_DEV_DOCUMENTS=/Users/you/develop/MTEngine/_RUNTIME_/Documents).
+	/// Otherwise: ~/Documents/<settings folder name>/, per app, created if
+	/// absent -- the release branch's Documents lookup, narrowed by app so two
+	/// apps in dev mode do not share one folder.
+	NSError *devError = nil;
+	const char *devOverride = getenv("MTENGINE_DEV_DOCUMENTS");
+	if (devOverride != NULL && devOverride[0] != 0x00)
+	{
+		NSString *overridePath = [NSString stringWithUTF8String:devOverride];
+		if (![overridePath hasSuffix:@"/"])
+			overridePath = [overridePath stringByAppendingString:@"/"];
+		gOSPathToDocuments = overridePath;
+	}
+	else
+	{
+		NSArray *devPaths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+		NSString *devDocuments = [devPaths firstObject];
+		NSString *devFolderName = [NSString stringWithUTF8String:MT_GetSettingsFolderName()];
+		gOSPathToDocuments = [[NSString alloc] initWithFormat:@"%@/%@/", devDocuments, devFolderName];
+	}
+	[[NSFileManager defaultManager] createDirectoryAtPath:gOSPathToDocuments
+							  withIntermediateDirectories:YES
+											   attributes:nil
+													error:&devError];
 	NSLog(@"gOSPathToDocuments=%@", gOSPathToDocuments);
 	
 	const char *path = (const char *)[gOSPathToDocuments UTF8String];

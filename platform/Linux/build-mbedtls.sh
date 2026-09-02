@@ -76,6 +76,7 @@ fi
 # Phase 5: the build tree lives OUTSIDE the checkout, in the shared work root.
 BUILD_DIR="$(mt_caps_work_dir mbedtls)/build-linux"
 
+mt_caps_reset_stale_cmake_cache "$BUILD_DIR" "$MBEDTLS_SRC_DIR"
 cmake -S "$MBEDTLS_SRC_DIR" -B "$BUILD_DIR" \
   -DCMAKE_BUILD_TYPE=Release \
   -DBUILD_SHARED_LIBS=OFF \

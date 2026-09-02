@@ -144,7 +144,7 @@ u32 CSlrFileMemory::Read(u8 *data, u32 numBytes)
 //	delete buf;
 //	
 //	char buf2[64];
-//	sprintf(buf2, "/Users/mars/BUFS/MEM-%08d", debugMemBufNum++);
+//	sprintf(buf2, "%sMEM-%08d", gCPathToTemp, debugMemBufNum++);
 //	
 //	FILE *fp = fopen(buf2, "wb");
 //	fwrite(data, 1, copyNumBytes, fp);

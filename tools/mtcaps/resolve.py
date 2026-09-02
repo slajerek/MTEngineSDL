@@ -272,15 +272,52 @@ def canonical_form(vocab, values):
     return ";".join("%s=%d" % (k, values[k]) for k in keys)
 
 
-def deps_form(vocab, values):
-    """The canonical form MINUS the symbols key, for the deps-dir hash only.
+def deps_key_capabilities(vocab):
+    """The capabilities that can change a third-party archive: exactly those
+    with an `acquisition` entry in the vocabulary (L16, 2026-09-03).
 
-    A third-party archive is byte-identical whatever MT_RELEASE_SYMBOLS says
-    -- the key drives APP build settings -- so keying the archives on it
-    would rebuild SDL3, FFmpeg and llama.cpp to produce identical bytes.
-    Deliberately byte-identical to the PRE-0.5 canonical form, so every
-    existing keyed deps bucket stays valid."""
-    keys = sorted(list(vocab.keys) + [COMMERCIAL_KEY, PRIVATE_KEY])
+    Declared intent, not inference. A capability with an acquisition script
+    OWNS an archive in the deps bucket, so its value must key that bucket;
+    one without has nothing there to key. The set is a deliberate SUPERSET of
+    what the scripts are measured to read -- uSockets is acquired
+    unconditionally today and MT_CAP_WEBSOCKETS still keys the bucket -- and
+    superset is the safe direction: a key that carries more than it needs
+    wastes a bucket, a key that carries less REUSES A WRONG ARCHIVE.
+
+    test_deps_key_covers_every_capability_the_scripts_read is the gate on the
+    unsafe direction: it strips comments from every platform/*/build-*
+    script, collects the vocabulary flags each one actually reads, and fails
+    if any of them belongs to a capability outside this set."""
+    return sorted(k for k in vocab.keys if vocab.acquisition(k))
+
+
+def deps_form(vocab, values):
+    """The key for the deps-dir hash: the ACQUISITION capabilities plus the two
+    licence keys, and nothing else.
+
+    It excludes MT_RELEASE_SYMBOLS because a third-party archive is
+    byte-identical whatever it says (the key drives APP build settings), and
+    since L16 it also excludes every capability that owns no dependency at
+    all -- MIDI, GAMEPADS, UNDO, TERMINAL, the rest.
+
+    WHY THAT CHANGE. The old form was the whole vocabulary, so flipping a
+    capability no dependency has ever heard of moved the bucket, and a moved
+    bucket is an EMPTY directory: the stamp check finds nothing and every
+    dependency rebuilds from scratch to produce the same bytes. Measured on
+    13 macOS buckets before this change: libSDL3.a had ONE distinct content
+    across all of them (248 members, built 13 times), uSockets.a likewise,
+    and 454 MB of 571 MB was duplicate. The cost was never mainly the disk;
+    it was rebuilding FFmpeg and llama.cpp for a MIDI flag.
+
+    The two licence keys stay: build-video_codecs.* reads
+    MT_FFMPEG_BUILD_MODE, which derives from MT_PRIVATE_BUILD, and the
+    commercial gate narrows the decoder set. They change what the archive
+    CONTAINS, which is exactly what a key is for.
+
+    NOT byte-identical to the pre-L16 form, so every existing bucket is
+    orphaned once -- harmless (they are a cache), and mtengine-gc.py reclaims
+    them on its normal retention."""
+    keys = sorted(deps_key_capabilities(vocab) + [COMMERCIAL_KEY, PRIVATE_KEY])
     return ";".join("%s=%d" % (k, values[k]) for k in keys)
 
 

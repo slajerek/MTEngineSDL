@@ -23,7 +23,13 @@
 #
 # Usage (from the app stub):
 #   tools/appbuild/app-build-macos.sh --app-dir <dir> [--debug|--release]
-#       [--clean] [--skip-deps] [--gc [gc-args...]]
+#       [--clean] [--skip-deps] [--gc [gc-args...]] [--set KEY=VALUE ...]
+#   --set forwards a capability override to mtcaps (rung 1, persisted to
+#   overrides.caps so `check` re-resolves identically). It is how a store
+#   build is made -- `--set MT_COMMERCIAL_BUILD=1 --set MT_PRIVATE_BUILD=0` --
+#   WITHOUT editing the app's tracked licence manifest. The override changes
+#   the caps hash, so such a build gets its own out root and deps bucket and
+#   cannot be confused with a dev one.
 #   --clean cleans and STOPS (no build; same contract on all three platforms).
 #   --gc is a shortcut to tools/appbuild/mtengine-gc.py; everything after it
 #   goes to the GC verbatim (--gc = report, --gc --prune, --gc --prune
@@ -37,6 +43,7 @@ APP_DIR=""
 CONFIGURATION="Release"
 CLEAN=false
 SKIP_DEPS=false
+CAPS_SETS=()
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -46,6 +53,7 @@ while [[ $# -gt 0 ]]; do
         --clean)     CLEAN=true; SKIP_DEPS=true ;;
         --gc)        shift; exec python3 "$ENGINE_DIR/tools/appbuild/mtengine-gc.py" "$@" ;;
         --skip-deps) SKIP_DEPS=true ;;
+        --set)       [[ -n "${2:-}" ]] || { echo "ERROR: --set needs KEY=VALUE" >&2; exit 2; }; CAPS_SETS+=("--set" "$2"); shift ;;
         --incremental) : ;;  # compatibility no-op: incremental IS the default
         -h|--help)   sed -n '2,28p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) echo "ERROR: unknown argument '$1' (try --help)" >&2; exit 2 ;;
@@ -102,7 +110,8 @@ MT_SETTINGS=()
 while IFS= read -r line; do
     MT_SETTINGS+=("$line")
 done < <(bash "$ENGINE_DIR/build-macos.sh" $MT_CONFIG_FLAG \
-             --manifest "$MANIFEST" --app "$MT_APP_NAME" --print-settings)
+             --manifest "$MANIFEST" --app "$MT_APP_NAME" --print-settings \
+             ${CAPS_SETS[@]+"${CAPS_SETS[@]}"})
 [[ ${#MT_SETTINGS[@]} -gt 0 ]] || { echo "ERROR: the engine wrapper returned no capability settings." >&2; exit 1; }
 
 MT_OUT=""; MT_CAPS_LIBS_DIR=""; MT_CAPS_RESOLVED=""; MT_FFMPEG_BUILD_MODE=""; MT_RELEASE_SYMBOLS=""
@@ -136,7 +145,8 @@ echo "  mode    : $([ "$COMMERCIAL" = 1 ] && echo commercial || echo full), ffmp
 # ---------------------------------------------------------------------------
 if [[ "$SKIP_DEPS" != "true" ]]; then
     MTENGINE_PRERESOLVED_OUT="$MT_OUT" bash "$ENGINE_DIR/build-macos.sh" \
-        --deps-only $MT_CONFIG_FLAG --manifest "$MANIFEST" --app "$MT_APP_NAME"
+        --deps-only $MT_CONFIG_FLAG --manifest "$MANIFEST" --app "$MT_APP_NAME" \
+        ${CAPS_SETS[@]+"${CAPS_SETS[@]}"}
 fi
 
 # ---------------------------------------------------------------------------

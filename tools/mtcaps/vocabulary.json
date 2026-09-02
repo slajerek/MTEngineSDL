@@ -36,10 +36,10 @@
         { "name": "llama.cpp", "licence": "MIT", "version": "submodule other/lib/llama.cpp", "provenance": "git submodule", "size_mb": 598, "commercial_safe": true }
       ],
       "acquisition": {
-        "linux": "platform/Linux/build-llama-cpp.sh",
         "macos": "platform/MacOS/build-llama_cpp.sh",
         "windows": "platform/Windows/build-llama-cpp.ps1"
       },
+      "acquisition_note": "No Linux entry: platform/Linux/build-llama-cpp.sh was named here but has never existed. On Linux llama.cpp is built IN-TREE by the engine's own CMake (add_subdirectory(other/lib/llama.cpp), CMakeLists.txt:428), not acquired into the keyed deps bucket. Found 2026-09-03 by the L16 gate test, which checks that every acquisition path resolves to a file.",
       "artefacts": {
         "linux": "libllama_cpp.a",
         "macos": "libllama_cpp.a",

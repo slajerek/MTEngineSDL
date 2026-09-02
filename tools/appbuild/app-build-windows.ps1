@@ -29,6 +29,12 @@ param(
     [switch]$SkipDeps,
     [switch]$NoProd,
     [switch]$Clean,
+    # Capability overrides forwarded to mtcaps (rung 1, persisted to
+    # overrides.caps). How a store build is made -- -Set MT_COMMERCIAL_BUILD=1
+    # -Set MT_PRIVATE_BUILD=0 -- WITHOUT editing the app's tracked licence
+    # manifest. The override changes the caps hash, so such a build gets its
+    # own out root and deps bucket and cannot be confused with a dev one.
+    [string[]]$Set,
     [switch]$Gc,
     [Parameter(ValueFromRemainingArguments)][string[]]$GcArgs
 )
@@ -128,14 +134,20 @@ if ($mtIsBranch) {
     Write-Host "WARNING: $msg -- building what is checked out" -ForegroundColor Yellow
 }
 
-$stubTemplate = Join-Path $mtDir 'tools\appbuild\stubs\build-windows.ps1'
-$appStub = Join-Path $appDir 'build-windows.ps1'
-if ((Test-Path $stubTemplate) -and (Test-Path $appStub)) {
-    $a = Get-Content $stubTemplate -Raw
-    $b = Get-Content $appStub -Raw
-    if ($a -ne $b) {
-        Write-Host "NOTE: build-windows.ps1 differs from the engine's canonical stub template." -ForegroundColor Yellow
-        Write-Host "      Refresh it: Copy-Item `"$stubTemplate`" `"$appStub`"" -ForegroundColor Yellow
+# Both app-side files the engine owns a template for: the build stub, and
+# (L13) the MSBuild targets stub that imports the engine's IDE channel.
+foreach ($pair in @(
+        @{ Template = 'tools\appbuild\stubs\build-windows.ps1';        App = 'build-windows.ps1' },
+        @{ Template = 'tools\appbuild\stubs\Directory.Build.targets';  App = 'platform\Windows\Directory.Build.targets' })) {
+    $stubTemplate = Join-Path $mtDir $pair.Template
+    $appStub = Join-Path $appDir $pair.App
+    if ((Test-Path $stubTemplate) -and (Test-Path $appStub)) {
+        $a = Get-Content $stubTemplate -Raw
+        $b = Get-Content $appStub -Raw
+        if ($a -ne $b) {
+            Write-Host "NOTE: $($pair.App) differs from the engine's canonical stub template." -ForegroundColor Yellow
+            Write-Host "      Refresh it: Copy-Item `"$stubTemplate`" `"$appStub`"" -ForegroundColor Yellow
+        }
     }
 }
 
@@ -168,7 +180,8 @@ $mtcapsArgs = @(
     '--manifest', $manifest, '--app', $appName,
     '--platform', 'windows', '--arch', $Platform, '--config', $Configuration,
     '--engine-dir', $mtDir
-) + (Get-MTLlamaBackendOption -Platform $Platform -SkipCuda:$SkipCuda)
+) + (Get-MTLlamaBackendOption -Platform $Platform -SkipCuda:$SkipCuda) `
+  + @($Set | Where-Object { $_ } | ForEach-Object { '--set'; $_ })
 $pyArgs = @($pythonExe | Select-Object -Skip 1)
 $mtcapsOut = & $pythonExe[0] ($pyArgs + $mtcapsArgs)
 if ($LASTEXITCODE -ne 0) { throw "mtcaps resolve failed for $manifest" }

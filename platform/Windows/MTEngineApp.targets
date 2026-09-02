@@ -1,0 +1,241 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project>
+  <!-- ===================================================================
+       THE VISUAL STUDIO IDE CHANNEL, app side.
+
+       Same mechanism as the engine's, and the same reason for it: MSBuild
+       evaluates <Import> before any target runs, so a Visual Studio build -
+       which passes no /p:MTOutRoot - cannot import the generated .props for the
+       build it is in. A TARGET running BeforeTargets="ClCompile" can modify
+       ClCompile item metadata, because those items are read by the task at
+       EXECUTION time. F5 and a Release build from the IDE therefore produce the
+       same binary build-windows.ps1 does.
+
+       This reads ide-defines-APP.txt, not the engine's: an app sees the
+       app-visible set, the engine additionally sees the flags no app guards on.
+       That asymmetry is the per-target split, made by which file each side
+       reads.
+
+       ENGINE-OWNED (L13, 2026-09-02). This file used to be copied into all
+       four app repos, 146 lines each, differing only in the app name - the
+       same duplication the stub-shrink removed from the build scripts. The
+       app now keeps a short Directory.Build.targets that imports THIS file
+       and supplies $(MTCapsApp), which its Directory.Build.props already
+       declares.
+
+       An app that needs something of its own adds it to its own
+       Directory.Build.targets AFTER the Import; nothing here reads back.
+       =================================================================== -->
+
+  <Target Name="MTCapsResolveForIDE"
+          BeforeTargets="ClCompile"
+          Condition="'$(MTOutRoot)' == '' And '$(MT_STANDALONE)' != '1'">
+
+    <!-- ANCHOR ON THIS FILE, WHICH NOW LIVES IN THE ENGINE. Before L13 this
+         block sat in the app's own Directory.Build.targets, so
+         $(MSBuildThisFileDirectory)..\.. was the APP root and the engine was
+         derived from it. The move inverted that: this file is the engine's, so
+         the same expression is the ENGINE root, and every app's IDE build
+         resolved $(MTCapsManifest) to MTEngineSDL\mtengine.caps and stopped at
+         the Error below. Derive in the direction this file's location actually
+         supports, engine from here and app from $(MTCapsApp) beside it, which
+         is what the engine's own Directory.Build.targets already does. -->
+    <PropertyGroup>
+      <MTCapsEngineDir>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..'))</MTCapsEngineDir>
+      <MTCapsAppDir>$([System.IO.Path]::GetFullPath('$(MTCapsEngineDir)\..\$(MTCapsApp)'))</MTCapsAppDir>
+      <MTCapsManifest>$(MTCapsAppDir)\mtengine.caps</MTCapsManifest>
+    </PropertyGroup>
+
+    <Error Condition="'$(MTCapsApp)' == ''"
+           Text="MTCapsApp is empty. The app's platform\Windows\Directory.Build.props declares it, and this file is parameterized on it." />
+    <Error Condition="!Exists('$(MTCapsManifest)')"
+           Text="No manifest at $(MTCapsManifest) for MTCapsApp=$(MTCapsApp). The apps are expected as siblings of the engine checkout." />
+    <Error Condition="!Exists('$(MTCapsEngineDir)\tools\mtcaps\mtcaps.py')"
+           Text="MTEngineSDL not found at $(MTCapsEngineDir). It is expected as a sibling of this repository." />
+
+    <!-- The llama.cpp backend, as an ENGINE OPTION rather than a capability.
+         MT_LLAMA_CUDA selects a materially different archive under an identical
+         capability set (see resolve.backend_hash), and the backend component
+         keys both $MT_OUT and the dependency directory. The IDE has no
+         -SkipCuda to read, only $(Platform), and ARM64 never gets CUDA.
+
+         IT MUST MATCH WHAT build-windows.ps1 PASSES, and what the ENGINE's own
+         Directory.Build.targets derives. Three resolves, one answer, or the
+         engine and this project link different directories. -->
+    <PropertyGroup>
+      <MTCapsCuda Condition="'$(Platform)' == 'ARM64'">OFF</MTCapsCuda>
+      <MTCapsCuda Condition="'$(MTCapsCuda)' == ''">ON</MTCapsCuda>
+      <MTCapsResolveArgs>--manifest &quot;$(MTCapsManifest)&quot; --app $(MTCapsApp) --platform windows --arch $(Platform) --config $(Configuration) --engine-dir &quot;$(MTCapsEngineDir)&quot; --engine-option MT_LLAMA_CUDA=$(MTCapsCuda)</MTCapsResolveArgs>
+    </PropertyGroup>
+
+    <!-- `py -3` where it exists, `python` otherwise. Never a bare guess. -->
+    <Exec Command="where py &gt;nul 2&gt;&amp;1 &amp;&amp; (py -3 -B &quot;$(MTCapsEngineDir)\tools\mtcaps\mtcaps.py&quot; resolve $(MTCapsResolveArgs) --print out-dir) || (python -B &quot;$(MTCapsEngineDir)\tools\mtcaps\mtcaps.py&quot; resolve $(MTCapsResolveArgs) --print out-dir)"
+          ConsoleToMSBuild="true"
+          StandardOutputImportance="low">
+      <Output TaskParameter="ConsoleOutput" PropertyName="MTCapsResolvedRoot" />
+    </Exec>
+
+    <Error Condition="'$(MTCapsResolvedRoot)' == ''"
+           Text="mtcaps resolve produced no output root for $(MTCapsManifest)." />
+
+    <!-- The dependency-archive directory. Identical arguments to the resolve
+         above, so the two cannot disagree on the backend, and one bare value
+         because MSBuild joins a task's whole stdout into one ';'-separated
+         property. -->
+    <Exec Command="where py &gt;nul 2&gt;&amp;1 &amp;&amp; (py -3 -B &quot;$(MTCapsEngineDir)\tools\mtcaps\mtcaps.py&quot; resolve $(MTCapsResolveArgs) --print deps-dir) || (python -B &quot;$(MTCapsEngineDir)\tools\mtcaps\mtcaps.py&quot; resolve $(MTCapsResolveArgs) --print deps-dir)"
+          ConsoleToMSBuild="true"
+          StandardOutputImportance="low">
+      <Output TaskParameter="ConsoleOutput" PropertyName="MTCapsLibsDir" />
+    </Exec>
+
+    <Error Condition="'$(MTCapsLibsDir)' == ''"
+           Text="mtcaps resolve produced no dependency directory for $(MTCapsManifest)." />
+
+    <!-- L9: the generated headers (MT_Capabilities.h) live under the REV-FREE
+         build root, not the rev-keyed out root, which has no include directory
+         at all. The engine's own Directory.Build.targets resolves this third
+         value for exactly this reason (D6, 2026-09-02); the app-side copy never
+         did, so an IDE build of any app died on
+         "Cannot open include file: 'MT_Capabilities.h'".
+
+         Deliberately NOT called MTBuildRoot, which is what the engine names it:
+         each app's Directory.Build.props uses MTBuildRoot for the static _ide\
+         IntDir fallback (HANDOVER item 19), and re-pointing that property from
+         inside a target, after IntDir has already been evaluated, would
+         make one name mean two directories in one build. -->
+    <Exec Command="where py &gt;nul 2&gt;&amp;1 &amp;&amp; (py -3 -B &quot;$(MTCapsEngineDir)\tools\mtcaps\mtcaps.py&quot; resolve $(MTCapsResolveArgs) --print build-dir) || (python -B &quot;$(MTCapsEngineDir)\tools\mtcaps\mtcaps.py&quot; resolve $(MTCapsResolveArgs) --print build-dir)"
+          ConsoleToMSBuild="true"
+          StandardOutputImportance="low">
+      <Output TaskParameter="ConsoleOutput" PropertyName="MTCapsIdeBuildRoot" />
+    </Exec>
+    <PropertyGroup>
+      <MTCapsIdeBuildRoot Condition="'$(MTCapsIdeBuildRoot)' != '' And !HasTrailingSlash('$(MTCapsIdeBuildRoot)')">$(MTCapsIdeBuildRoot)\</MTCapsIdeBuildRoot>
+    </PropertyGroup>
+
+    <PropertyGroup>
+      <MTCapsDefinesFile>$(MTCapsResolvedRoot)\ide-defines-app.txt</MTCapsDefinesFile>
+    </PropertyGroup>
+
+    <Error Condition="!Exists('$(MTCapsDefinesFile)')"
+           Text="mtcaps resolve reported $(MTCapsResolvedRoot) but wrote no ide-defines-app.txt there." />
+
+    <PropertyGroup>
+      <MTCapsIdeDefines>$([System.IO.File]::ReadAllText('$(MTCapsDefinesFile)').Trim())</MTCapsIdeDefines>
+      <MTCapsIncludeDir Condition="'$(MTCapsIdeBuildRoot)' != ''">$(MTCapsIdeBuildRoot)include</MTCapsIncludeDir>
+      <MTCapsIncludeDir Condition="'$(MTCapsIncludeDir)' == ''">$(MTCapsResolvedRoot)\include</MTCapsIncludeDir>
+    </PropertyGroup>
+
+    <Message Importance="high"
+             Text="Capabilities (IDE): $(MTCapsApp) -&gt; $(MTCapsResolvedRoot)" />
+    <Message Importance="high"
+             Text="Dependencies (IDE): $(MTCapsLibsDir)" />
+
+    <ItemGroup>
+      <ClCompile>
+        <PreprocessorDefinitions>$(MTCapsIdeDefines);%(ClCompile.PreprocessorDefinitions)</PreprocessorDefinitions>
+        <!-- The dependency headers too, same D6 fix as the engine's file. The
+             .vcxproj names $(MTCapsLibsDir)\image-codecs\include and
+             \ffmpeg\include in an ItemDefinitionGroup, which MSBuild evaluates
+             BEFORE any target runs, and on the IDE path that property is still
+             empty there, so both entries expanded to bogus relative paths.
+             Re-add them here, where the property has a value. -->
+        <AdditionalIncludeDirectories>$(MTCapsIncludeDir);$(MTCapsLibsDir)\image-codecs\include;$(MTCapsLibsDir)\ffmpeg\include;%(ClCompile.AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      </ClCompile>
+      <!-- Keyed directory FIRST, ahead of the tracked prebuilts in
+           platform\Windows\libs, so a freshly built archive wins over any
+           same-named file left there from before the archives moved out. -->
+      <Link>
+        <AdditionalLibraryDirectories>$(MTCapsLibsDir);%(Link.AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      </Link>
+    </ItemGroup>
+  </Target>
+
+  <!-- THE LIBRARY DIRECTORY HAS TO BE APPLIED BEFORE Link, NOT BEFORE ClCompile.
+       MTCapsResolveForIDE runs BeforeTargets="ClCompile" because that is when
+       ClCompile metadata still reaches the compiler. But the Link ITEM does not
+       exist that early, because Microsoft.CppBuild.targets creates it later, so the
+       AdditionalLibraryDirectories written there modified nothing and the
+       linker never saw the dependency bucket. It surfaced as
+       "LNK1181: cannot open input file 'MTImageCodecs.lib'" on the first
+       Build Solution ever run for an app; the engine never hit it because it is
+       a static library with no link step.
+
+       $(MTCapsLibsDir) is already computed by the resolve target above and
+       properties persist across targets in one project instance, so this costs
+       nothing extra. -->
+  <Target Name="MTCapsLinkDirsForIDE"
+          BeforeTargets="Link"
+          Condition="'$(MTOutRoot)' == '' And '$(MT_STANDALONE)' != '1' And '$(MTCapsLibsDir)' != ''">
+    <ItemGroup>
+      <Link>
+        <AdditionalLibraryDirectories>$(MTCapsLibsDir);$(MTCapsLibsDir)\ffmpeg\lib;$(MTCapsLibsDir)\ffmpeg\bin;%(Link.AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      </Link>
+    </ItemGroup>
+  </Target>
+
+  <!-- The FFmpeg DLL copy, for the same reason as the library directories
+       above. The .vcxproj spells this PostBuildEvent with $(MTCapsLibsDir),
+       which is empty at evaluation time on the IDE path, so the command ran as
+       xcopy /Y /D "\ffmpeg\bin\*.dll" and exited 4. Restating it here,
+       where the property has a value, is the same trick the ClCompile and Link
+       item groups use. Keep it in step with the PostBuildEvent in the
+       .vcxproj, which stays the source of truth for the command-line build. -->
+  <Target Name="MTCapsPostBuildForIDE"
+          BeforeTargets="PostBuildEvent"
+          Condition="'$(MTOutRoot)' == '' And '$(MT_STANDALONE)' != '1' And '$(MTCapsLibsDir)' != ''">
+    <ItemGroup>
+      <PostBuildEvent>
+        <Command>if exist "$(MTCapsLibsDir)\ffmpeg\bin" xcopy /Y /D "$(MTCapsLibsDir)\ffmpeg\bin\*.dll" "$(OutDir)"</Command>
+      </PostBuildEvent>
+    </ItemGroup>
+  </Target>
+
+  <!-- ===================================================================
+       THE FFMPEG IMPORT LIBRARIES, GATED ON THE CAPABILITY.
+
+       avcodec, avformat, avutil, swscale and swresample used to be named
+       unconditionally in every app's .vcxproj, in all four configurations.
+       That happens to match the capability set each app SHIPS, and it is
+       wrong the moment one is flipped:
+
+         build-windows.ps1 -Set MT_CAP_VIDEO_PLAYBACK=0
+
+       keys a new dependency bucket with no ffmpeg\ directory in it, so a
+       capability that resolved, built its dependencies and compiled still
+       could not produce a binary:
+
+         LINK : fatal error LNK1181: cannot open input file 'avcodec.lib'
+
+       (Windows pre-push gate, 2026-09-02.)
+
+       Named HERE and not in the .vcxproj because the two channels learn the
+       answer at different times. On the command line MTEngineCaps.props is
+       imported before the .vcxproj body, so $(MT_ENABLE_FFMPEG) is a real
+       property by then. In the IDE nothing is imported and the value exists
+       only after MTCapsResolveForIDE has run, which is a TARGET. A target
+       running BeforeTargets="Link" is the one place both channels have an
+       answer, which is exactly why MTCapsLinkDirsForIDE exists.
+
+       MTVideoCodecs.lib is deliberately NOT gated: the engine's video wrapper
+       is always packed into the bucket, as a stub when the capability is off,
+       so naming it costs nothing and keeps the app projects unchanged there.
+
+       String::Copy(...).Contains rather than $(MTCapsIdeDefines.Contains(...)):
+       the property is empty on the command-line path, and a method call on an
+       unset property is not something to rely on.
+       =================================================================== -->
+  <Target Name="MTCapsFFmpegLinkInputs"
+          BeforeTargets="Link"
+          Condition="'$(MT_STANDALONE)' != '1'">
+    <PropertyGroup>
+      <MTCapsFFmpeg Condition="'$(MT_ENABLE_FFMPEG)' != ''">$(MT_ENABLE_FFMPEG)</MTCapsFFmpeg>
+      <MTCapsFFmpeg Condition="'$(MTCapsFFmpeg)' == '' And $([System.String]::Copy('$(MTCapsIdeDefines)').Contains('MT_ENABLE_FFMPEG=1'))">1</MTCapsFFmpeg>
+      <MTCapsFFmpeg Condition="'$(MTCapsFFmpeg)' == ''">0</MTCapsFFmpeg>
+    </PropertyGroup>
+    <ItemGroup Condition="'$(MTCapsFFmpeg)' == '1'">
+      <Link>
+        <AdditionalDependencies>avcodec.lib;avformat.lib;avutil.lib;swscale.lib;swresample.lib;%(Link.AdditionalDependencies)</AdditionalDependencies>
+      </Link>
+    </ItemGroup>
+  </Target>
+</Project>

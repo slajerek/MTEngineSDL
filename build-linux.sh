@@ -283,6 +283,7 @@ fi
 # 7. Build MTEngineSDL via CMake
 echo -e "\n\e[94mBuilding \e[31mMTEngineSDL\e[0m"
 mkdir -p "$BUILD_DIR"
+mt_caps_reset_stale_cmake_cache "$BUILD_DIR" "$SCRIPT_DIR"
 cd "$BUILD_DIR"
 echo -e "\e[94mEngine build dir: $BUILD_DIR\e[0m"
 

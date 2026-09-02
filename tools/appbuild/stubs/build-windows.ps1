@@ -18,6 +18,7 @@ param(
     [switch]$SkipDeps,
     [switch]$NoProd,
     [switch]$Clean,
+    [string[]]$Set,
     [switch]$Gc,
     [switch]$Help,
     [Parameter(ValueFromRemainingArguments)][string[]]$GcArgs
@@ -49,6 +50,7 @@ $driverArgs = @{
     Clean         = $Clean
     Gc            = $Gc
 }
+if ($Set) { $driverArgs.Set = $Set }
 if ($GcArgs) { $driverArgs.GcArgs = $GcArgs }
 if ($Platform) { $driverArgs.Platform = $Platform }
 & $driver @driverArgs

@@ -87,6 +87,7 @@ fi
 # Phase 5: the build tree lives OUTSIDE the checkout, in the shared work root.
 BUILD_DIR="$(mt_caps_work_dir sdl3)/build-macos"
 
+mt_caps_reset_stale_cmake_cache "$BUILD_DIR" "$SDL3_SRC_DIR"
 cmake -S "$SDL3_SRC_DIR" -B "$BUILD_DIR" \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \

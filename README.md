@@ -5,51 +5,64 @@ SDL3, ImGui and OpenGL.
 
 # How to compile
 
-Engine compiles SDL3 with ImGui and app as static binary. SDL3 is built from
-the vendored source tree in `other/lib/SDL-release-3.4.14-static/` by the
-platform build scripts -- no system or package-manager SDL is used or needed.
-You need to compile the MTEngineSDL first.
-
-MTEngineSDL: https://github.com/slajerek/MTEngineSDL
-SDL3: https://github.com/libsdl-org/SDL
-ImGui: https://github.com/imgui
-
-Verbose log can be switched on by commenting out `#define GLOBAL_DEBUG_OFF`
-in `DBG_Log.h` file.
-
-## macOS
-
-cd `./platform/MacOS`
-I normally put files into `~/develop/MTEngineSDL` folder. 
-Project should compile as is in Xcode, remember to reference SDL library.
-The precompled library is put in `~/develop/MTEngineSDL/MacOS/libs` folder.
-
-## Windows
-
-Check VS2019 project in `./platform/Windows`. This should work when put into
-`C:\develop\MTEngineSDL`
-
-Static SDL3 libraries are in `./platform/Windows/libs` folder (x64 and ARM64,
-Debug and Release -- 32-bit Windows was dropped in 2026-08).
-
-Windows version uses LogConsole.exe app to display verbose log when compiled
-without `GLOBAL_DEBUG_OFF` in `DBG_Log.h`
-
-Fast Log Console C# project: https://sourceforge.net/projects/fastlogconsole/
-
-# Linux
+One command per platform. It clones what it needs, builds every dependency
+from the vendored sources, and links the engine -- no system SDL, no
+package-manager dependency, nothing to install first beyond a compiler and
+CMake.
 
 ```
-sudo apt-get install build-essential libgtk-3-dev libsdl2-dev libglew-dev
-mkdir build
-cd build
-cmake ./../
-make
+./build-macos.sh          # macOS (Xcode toolchain)
+./build-linux.sh          # Linux
+.\build-windows.ps1       # Windows (PowerShell, VS2019/2022)
 ```
 
-No SDL package needs to be installed: SDL3 is built from the vendored source
-tree by `platform/Linux/build-sdl3.sh`, which `build-linux.sh` runs for you.
+SDL3 is built from `other/lib/SDL-release-3.4.14-static/`; ImGui, FreeType,
+mbedTLS, libuv and the rest come from `other/lib/` or from submodules the
+build initialises on demand.
 
+Nothing a build produces is written inside this checkout. Object files,
+dependency archives, generated headers and final binaries all live under a
+cache root outside it -- `${XDG_CACHE_HOME:-~/.cache}/mtengine` on macOS and
+Linux, `%USERPROFILE%\.cache\mtengine` on Windows. Override it with
+`MTENGINE_BUILD_ROOT`. `tools/appbuild/mtengine-gc.py` reports on that cache
+and prunes it.
+
+## Building an app on top of the engine
+
+The engine is a host framework: you write the app, it provides the window,
+the ImGui context, the view stack, the file system and the rest. An app is a
+sibling checkout of this one that implements the `MT_API.h` lifecycle and
+carries three small files -- a capability manifest (`mtengine.caps`), a
+parameter file (`mtengine-app.conf`) and a build stub per platform that hands
+over to `tools/appbuild/app-build-<platform>`. The build flow itself lives
+here, so an app repo holds parameters rather than a copy of the machinery.
+
+`MTEngineSDLDummyApp` is the template to copy:
+https://github.com/slajerek/MTEngineSDLDummyApp
+
+## Capabilities
+
+What the engine compiles in is selected per app, not fixed here. The manifest
+names capabilities -- video playback, photo codecs, LLM inference, HTTPS,
+websockets, MIDI, the terminal, the test engine and more -- and the build
+resolves them into compiler defines, the dependency set to acquire, and the
+licence documents to ship. A capability that is off costs nothing: its
+dependency is never built and its code is never compiled.
+
+`tools/mtcaps/vocabulary.json` is the authoritative list, with each
+capability's dependencies, licences and acquisition scripts. Its tests run
+standalone:
+
+```
+python3 tools/mtcaps/tests/test_mtcaps.py
+```
+
+## Verbose logging
+
+Comment out `#define GLOBAL_DEBUG_OFF` in `DBG_Log.h`. Without `--log-dir`
+the log goes to the system temp folder, or to `./log/` when that directory
+exists. On Windows, LogConsole.exe displays it live:
+https://sourceforge.net/projects/fastlogconsole/
 
 # Thanks
 

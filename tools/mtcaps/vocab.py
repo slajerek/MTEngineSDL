@@ -101,6 +101,16 @@ class Vocabulary:
     def app_visible(self, key):
         return self.capabilities[key]["app_visible"]
 
+    def acquisition(self, key):
+        """The per-platform scripts that BUILD this capability's dependency into
+        the keyed deps bucket, or None when it owns no such archive (vendored,
+        header-only, or compiled straight into the engine).
+
+        Presence is what makes a capability part of the deps key (L16,
+        resolve.deps_key_capabilities): a capability with an acquisition script
+        owns an archive whose content its value can change."""
+        return self.capabilities[key].get("acquisition")
+
     def all_dependencies(self):
         """Core dependencies first, then per-capability, as (owner, dep) pairs."""
         for dep in self.core["dependencies"]:

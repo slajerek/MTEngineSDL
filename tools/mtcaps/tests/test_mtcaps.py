@@ -10,7 +10,9 @@ stdlib unittest, no pip -- the same constraint as the tool itself.
 """
 
 import glob
+import io
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -34,6 +36,32 @@ MTCAPS = os.path.join(TOOL, "mtcaps.py")
 def run(*args, **kw):
     return subprocess.run([sys.executable, "-B", MTCAPS] + list(args),
                           capture_output=True, text=True, **kw)
+
+
+def find_cxx():
+    """clang++ or g++, including where Visual Studio hides its bundled LLVM.
+
+    VS ships clang++ but never puts it on PATH, so shutil.which alone answered
+    "no C++ compiler" on a Windows box that has one, and the two tests proving
+    the generated header COMPILES AND LINKS were skipped exactly where a
+    Windows-specific header bug would show. Host arch first: on an ARM64
+    machine the x64 copies run under emulation.
+    """
+    found = shutil.which("clang++") or shutil.which("g++")
+    if found or os.name != "nt":
+        return found
+    host = os.environ.get("PROCESSOR_ARCHITECTURE", "").upper()
+    subdirs = ["ARM64", "", "x64"] if host == "ARM64" else ["x64", "", "ARM64"]
+    roots = [r for r in (os.environ.get("ProgramFiles"),
+                         os.environ.get("ProgramFiles(x86)")) if r]
+    for sub in subdirs:
+        for root in roots:
+            hits = sorted(glob.glob(os.path.join(
+                root, "Microsoft Visual Studio", "*", "*", "VC", "Tools",
+                "Llvm", sub, "bin", "clang++.exe")))
+            if hits:
+                return hits[-1]
+    return None
 
 
 class Base(unittest.TestCase):
@@ -334,7 +362,13 @@ class TestManifestFormat(Base):
         """Not an argument -- a measurement. If bash cannot source it, the format
         claim is false whatever this module thinks."""
         m = self.manifest("# comment\n\nMT_CAP_LLM=0\nMT_CAP_HTTPS__MACOS=1\n")
-        proc = subprocess.run(["bash", "-c", "set -e; source %s; echo $MT_CAP_LLM" % m],
+        # The path travels in argv, not in the script text. A Windows temp path
+        # is full of backslashes and bash reads those as escapes, so
+        # interpolating it into -c turned C:\Users\... into C:Users... and this
+        # test failed on every Windows machine for a reason nothing to do with
+        # the manifest format it is measuring.
+        proc = subprocess.run(["bash", "-c", 'set -e; source "$1"; echo $MT_CAP_LLM',
+                               "bash", m.replace("\\", "/")],
                               capture_output=True, text=True)
         self.assertEqual(proc.returncode, 0, proc.stderr)
         self.assertEqual(proc.stdout.strip(), "0")
@@ -475,38 +509,71 @@ class TestMSBuildFragments(Base):
     somebody remembering."""
 
     def _msbuild_files(self):
-        root = os.path.dirname(os.path.dirname(os.path.dirname(TOOL)))
+        """The ENGINE's own MSBuild fragments, and only those.
+
+        This used to glob the sibling app repos as well, which made the
+        engine's suite go red over a file in another repository and assumed
+        the engine checkout was called MTEngineSDL. Neither is the engine's
+        business: someone clones this repo alone on a fresh machine and
+        writes a new app against it. App fragments are validated where they
+        live -- by MSBuild itself, loudly (MSB4024), and by the app-build
+        driver's drift check against the engine's stub template."""
         out = []
-        for pat in ("*/platform/Windows/Directory.Build.props",
-                    "*/platform/Windows/Directory.Build.targets",
-                    "*/platform/Windows/*/*.vcxproj"):
-            out += glob.glob(os.path.join(root, pat))
+        for rel in ("platform/Windows/Directory.Build.props",
+                    "platform/Windows/Directory.Build.targets",
+                    "platform/Windows/MTEngineApp.targets"):
+            p = os.path.join(ENGINE, rel)
+            if os.path.exists(p):
+                out.append(p)
+        out += glob.glob(os.path.join(ENGINE, "platform/Windows/*/*.vcxproj"))
         return out
 
     def test_every_msbuild_fragment_is_well_formed_xml(self):
         files = self._msbuild_files()
-        self.assertGreater(len(files), 5, "found almost no MSBuild files to check")
+        self.assertGreater(len(files), 3, "found almost no MSBuild files to check")
         for p in files:
             try:
                 ET.parse(p)
             except ET.ParseError as e:
                 self.fail("%s is not well-formed XML: %s" % (p, e))
 
+    #: Since L13 the app-side IDE logic lives ONCE in the engine and the apps
+    #: import it, so the files carrying targets are the engine's own
+    #: Directory.Build.targets and MTEngineApp.targets -- not four copies.
+    IDE_TARGET_FILES = ("platform/Windows/Directory.Build.targets",
+                        "platform/Windows/MTEngineApp.targets")
+
     def test_the_ide_target_reads_the_flat_defines_file(self):
         """The Visual Studio path turns on one thing: a target that runs before
         ClCompile reading a file MSBuild's property-function whitelist can
         actually read. If someone 'tidies' it into an <Import> it silently stops
         working, because an Import is evaluated before any target runs."""
-        root = os.path.dirname(os.path.dirname(os.path.dirname(TOOL)))
-        targets = glob.glob(os.path.join(root, "*/platform/Windows/Directory.Build.targets"))
-        self.assertGreaterEqual(len(targets), 5, "expected engine + four apps")
-        for p in targets:
+        for rel in self.IDE_TARGET_FILES:
+            p = os.path.join(ENGINE, rel)
+            self.assertTrue(os.path.exists(p), p)
             text = open(p, encoding="utf-8").read()
             self.assertIn('BeforeTargets="ClCompile"', text, p)
             self.assertIn("System.IO.File]::ReadAllText", text, p)
             self.assertIn("%(ClCompile.PreprocessorDefinitions)", text, p)
             self.assertNotIn("%%(ClCompile", text, "double-escaped metadata in " + p)
 
+    def test_the_app_stub_template_imports_the_engine_targets(self):
+        """The ENGINE's half of L13, checked without leaving the engine repo.
+
+        An earlier version of this test globbed the four sibling app repos and
+        asserted all four had the stub. That was wrong twice over: the engine's
+        suite must pass in a bare clone (someone clones the engine on a new
+        machine and writes a brand-new app -- there is nothing to glob), and
+        the check already exists where it belongs, in the app-build driver,
+        which compares each app's copy against this template on every build and
+        prints a refresh command when they differ. What is genuinely the
+        engine's business is that the template it hands out is not broken."""
+        template = os.path.join(ENGINE, "tools/appbuild/stubs/Directory.Build.targets")
+        self.assertTrue(os.path.exists(template), template)
+        text = open(template, encoding="utf-8").read()
+        self.assertIn("MTEngineApp.targets", text)
+        self.assertIn("<Import", text)
+        ET.fromstring(text)
 
 class TestOutputRootKey(Base):
     def test_key_separates_every_dimension(self):
@@ -538,8 +605,9 @@ class TestOutputRootKey(Base):
         a = self.out_of(self.resolve(m))
         b = self.out_of(self.resolve(m, "--set", "MT_COMMERCIAL_BUILD=1"))
         self.assertNotEqual(a, b)
-        self.assertIn("/full/", a)
-        self.assertIn("/commercial/", b)
+        # separator-agnostic: the same segment reads "\full\" on Windows
+        self.assertIn("/full/", a.replace(os.sep, "/"))
+        self.assertIn("/commercial/", b.replace(os.sep, "/"))
 
     def test_engine_options_key_backend_but_NOT_the_resolved_form(self):
         """They select a different llama.cpp backend: a materially different
@@ -551,19 +619,53 @@ class TestOutputRootKey(Base):
         self.assertNotEqual(self.out_of(plain), self.out_of(cuda))
         self.assertEqual(self.resolved_of(plain), self.resolved_of(cuda))
 
-    def test_default_root_is_outside_every_checkout(self):
-        root = R.default_build_root()
-        # Against the REAL siblings of this engine checkout -- whatever repos
-        # actually live next to it on this machine -- rather than a literal
-        # roster typed here (Phase 6: the public tree names no private apps).
+    def _sibling_repo_paths(self):
+        """Absolute paths of the git checkouts beside this engine -- whatever
+        they happen to be. Deliberately not a roster typed here: the public
+        tree names no private app (Phase 6), and a developer's parent
+        directory is their own business. On this author's machine it is 53
+        repositories; on a fresh clone it is one."""
         parent = os.path.dirname(ENGINE)
-        siblings = [d for d in os.listdir(parent)
-                    if os.path.isdir(os.path.join(parent, d, ".git"))]
-        self.assertIn(os.path.basename(ENGINE), siblings)
-        for repo in siblings:
-            self.assertNotIn(os.sep + repo + os.sep, root + os.sep)
+        out = []
+        for name in sorted(os.listdir(parent)):
+            p = os.path.join(parent, name)
+            if os.path.isdir(os.path.join(p, ".git")):
+                out.append(os.path.realpath(p))
+        return out
+
+    @staticmethod
+    def _is_inside(path, directory):
+        path, directory = os.path.realpath(path), os.path.realpath(directory)
+        return path == directory or path.startswith(directory + os.sep)
+
+    def test_default_root_is_outside_every_checkout(self):
+        """The programme's permanent rule, as an assertion.
+
+        CONTAINMENT BY PATH, not by name. This compared `os.sep + name +
+        os.sep` against the root string, so a repository whose NAME happened
+        to appear as a path component of the cache root failed the test with
+        nothing actually wrong. The root is <home>/.cache/mtengine, so a
+        sibling checkout called after the user, `Users`, or `mtengine` would
+        each have tripped it -- and on the machine where this was found, a
+        repo one keystroke from the last already sat there. With dozens of
+        checkouts in one parent directory that stops being hypothetical."""
+        root = R.default_build_root()
+        repos = self._sibling_repo_paths()
+        self.assertIn(os.path.realpath(ENGINE), repos)
+        for repo in repos:
+            self.assertFalse(self._is_inside(root, repo),
+                             "build root %s is inside the checkout %s" % (root, repo))
         self.assertNotIn("mtengine/mtengine", root.replace("\\", "/"),
                          "the default already ends in /mtengine; do not append it twice")
+
+    def test_a_root_inside_a_checkout_is_detected(self):
+        """The test above can only be trusted if it can fail. Point the root
+        at a directory inside the engine checkout and the containment check
+        must catch it -- name-substring matching would have missed this for
+        any engine directory not named like a cache path component."""
+        inside = os.path.join(ENGINE, "build", "cache")
+        self.assertTrue(self._is_inside(inside, ENGINE))
+        self.assertFalse(self._is_inside(R.default_build_root(), ENGINE))
 
 
 class TestEmittedFragments(Base):
@@ -733,12 +835,28 @@ class TestEmittedFragments(Base):
         if proc.returncode != 0:
             self.fail("cmake failed on the generated fragment:\n" + proc.stderr)
         flags = os.path.join(d, "CMakeFiles", "t.dir", "flags.make")
-        if not os.path.isfile(flags):
+        if os.path.isfile(flags):
+            for line in open(flags):
+                if line.startswith("C_DEFINES"):
+                    return line
+            return ""
+        # Windows: the default generator is Visual Studio, which emits no
+        # flags.make at all. The same defines land in the generated project, so
+        # read them from there. Returning None here made the three callers that
+        # guard with `if defs is not None` into silent no-ops on every Windows
+        # machine -- reported as passes, asserting nothing.
+        proj = os.path.join(d, "t.vcxproj")
+        if not os.path.isfile(proj):
             return None
-        for line in open(flags):
-            if line.startswith("C_DEFINES"):
-                return line
-        return ""
+        opts = []
+        for line in open(proj, encoding="utf-8"):
+            line = line.strip()
+            if not line.startswith("<PreprocessorDefinitions>"):
+                continue
+            body = line[len("<PreprocessorDefinitions>"):].split("</", 1)[0]
+            opts += ["-D" + i for i in body.split(";")
+                     if i and not i.startswith("%(")]
+        return " ".join(opts)
 
     def test_a_downgrade_after_the_include_reaches_the_compile_line(self):
         """The whole reason the fragment emits KEYS rather than a frozen
@@ -789,7 +907,7 @@ class TestEmittedFragments(Base):
     def test_generated_header_compiles_AND_LINKS_through_MT_HAS_CAP(self):
         """Compile-only proved nothing three rounds running: `inline bool f();`
         with no body compiles until something calls it."""
-        clang = shutil.which("clang++") or shutil.which("g++")
+        clang = find_cxx()
         if not clang:
             self.skipTest("no C++ compiler")
         src = os.path.join(self.tmp, "link.cpp")
@@ -839,7 +957,7 @@ class TestEmittedFragments(Base):
         self.assertGreater(checked, 5, "the SBOM listed almost nothing")
 
     def test_MT_REQUIRE_CAP_fails_for_an_OFF_capability(self):
-        clang = shutil.which("clang++") or shutil.which("g++")
+        clang = find_cxx()
         if not clang:
             self.skipTest("no C++ compiler")
         src = os.path.join(self.tmp, "neg.cpp")
@@ -875,16 +993,20 @@ class TestDepsDir(Base):
         self.assertEqual(len(parts[-2]), 12)    # <caps-hash>
 
     def test_caps_hash_is_the_documented_sha_prefix(self):
-        """Byte-identical to what the retired mt_caps_deps_key produced, or every
-        existing cache is orphaned by a formatting change. Since decision 0.5
-        the DEPS hash comes from deps_form() -- the canonical string minus
-        MT_RELEASE_SYMBOLS -- which is deliberately byte-identical to the
-        pre-0.5 canonical, so the existing buckets stay valid."""
+        """The DEPS hash is sha256(deps_form)[:12], and deps_form is the
+        ACQUISITION capabilities plus the two licence keys (L16, 2026-09-03).
+
+        It used to be the whole canonical minus MT_RELEASE_SYMBOLS. That
+        change orphans every pre-L16 bucket exactly once, deliberately: the
+        old key rebuilt FFmpeg and llama.cpp whenever a capability no
+        dependency reads was flipped."""
         import hashlib
+        vocab = V.load(None)
+        in_key = set(R.deps_key_capabilities(vocab)) | {R.COMMERCIAL_KEY, R.PRIVATE_KEY}
         proc = self.resolve(self.manifest(self.CAPS))
         resolved = self.resolved_of(proc)
         deps_str = ";".join(kv for kv in resolved.split(";")
-                            if not kv.startswith("MT_RELEASE_SYMBOLS="))
+                            if kv.split("=")[0] in in_key)
         expected = hashlib.sha256(deps_str.encode("utf-8")).hexdigest()[:12]
         self.assertEqual(self.deps_of(proc).split(os.sep)[-2], expected)
         # And the OUT dir hash keeps the full canonical -- the two differ.
@@ -973,6 +1095,97 @@ class TestDepsDir(Base):
             proc = self.resolve(m, "--print", mode)
             self.assertEqual(len(proc.stdout.strip().splitlines()), 1,
                              "%s: %s" % (mode, proc.stdout))
+
+
+class TestDepsKey(unittest.TestCase):
+    """L16. The deps bucket is keyed by the ACQUISITION capabilities only.
+
+    That key is safe in one direction and fatal in the other: carrying a
+    capability no dependency reads only wastes a bucket, while OMITTING one a
+    dependency does read makes two different builds share one archive --
+    silently, and in the linker's favour. These tests hold the fatal
+    direction shut."""
+
+    #: Read by the dependency scripts and legitimately not capabilities: the
+    #: licence keys and the FFmpeg mode derived from them. deps_form carries
+    #: MT_COMMERCIAL_BUILD and MT_PRIVATE_BUILD explicitly.
+    MODE_KEYS = frozenset({"MT_COMMERCIAL_BUILD", "MT_PRIVATE_BUILD",
+                           "MT_FFMPEG_BUILD_MODE", "MT_RELEASE_SYMBOLS"})
+
+    @staticmethod
+    def _strip_comments(text, is_ps1):
+        """A flag NAMED IN A COMMENT is not a read. Three of this scan's first
+        four hits were comments explaining why a flag is NOT used (SDL3's
+        SDL_CAMERA=OFF rationale names MT_CAMERA_CAPTURE_ENABLED), so a
+        scanner that skips this step reports the opposite of the truth."""
+        if is_ps1:
+            text = re.sub(r"<#.*?#>", "", text, flags=re.S)
+        return "\n".join(re.sub(r"#.*$", "", line) for line in text.splitlines())
+
+    def _scripts(self):
+        found = sorted(glob.glob(os.path.join(ENGINE, "platform", "*", "build-*.sh")) +
+                       glob.glob(os.path.join(ENGINE, "platform", "*", "build-*.ps1")))
+        self.assertTrue(found, "no dependency scripts found under platform/*/")
+        return found
+
+    def _flag_owner(self, vocab):
+        owner = {}
+        for key in vocab.keys:
+            owner[key] = key
+            for flag in vocab.enables(key):
+                owner[flag] = key
+        return owner
+
+    def test_deps_key_covers_every_capability_the_scripts_read(self):
+        vocab = V.load(None)
+        owner = self._flag_owner(vocab)
+        in_key = set(R.deps_key_capabilities(vocab))
+        pattern = re.compile(r"\bMT_[A-Z][A-Z0-9_]*")
+        offenders = []
+        for path in self._scripts():
+            raw = io.open(path, encoding="utf-8", errors="replace").read()
+            text = self._strip_comments(raw, path.endswith(".ps1"))
+            for symbol in sorted(set(pattern.findall(text))):
+                if symbol in self.MODE_KEYS or symbol not in owner:
+                    continue
+                if owner[symbol] not in in_key:
+                    offenders.append("%s reads %s (owned by %s, which is not in the deps key)"
+                                     % (os.path.relpath(path, ENGINE), symbol, owner[symbol]))
+        self.assertEqual([], offenders, "\n".join(offenders))
+
+    def test_every_acquisition_capability_is_in_the_key(self):
+        """The other half: a capability that owns an acquisition script must key
+        the bucket, or its archive would be shared across values."""
+        vocab = V.load(None)
+        in_key = set(R.deps_key_capabilities(vocab))
+        for key in vocab.keys:
+            if vocab.acquisition(key):
+                self.assertIn(key, in_key, key)
+
+    def test_acquisition_paths_exist(self):
+        """A stale acquisition path would silently drop its capability from the
+        key the day the file is renamed."""
+        vocab = V.load(None)
+        for key in vocab.keys:
+            acq = vocab.acquisition(key)
+            if not acq:
+                continue
+            for platform, rel in acq.items():
+                self.assertTrue(os.path.exists(os.path.join(ENGINE, rel)),
+                                "%s: %s acquisition script missing: %s" % (key, platform, rel))
+
+    def test_deps_form_ignores_a_capability_no_dependency_owns(self):
+        """The point of L16, as a behaviour: flipping MIDI must not move the
+        deps bucket, while flipping a codec capability must."""
+        vocab = V.load(None)
+        base = dict((k, 1) for k in vocab.keys)
+        base[R.COMMERCIAL_KEY] = 0
+        base[R.PRIVATE_KEY] = 1
+        base[V.SYMBOLS_KEY if hasattr(V, "SYMBOLS_KEY") else "MT_RELEASE_SYMBOLS"] = 1
+        same = dict(base); same["MT_CAP_MIDI"] = 0
+        moved = dict(base); moved["MT_CAP_VIDEO_PLAYBACK"] = 0
+        self.assertEqual(R.deps_form(vocab, base), R.deps_form(vocab, same))
+        self.assertNotEqual(R.deps_form(vocab, base), R.deps_form(vocab, moved))
 
 
 if __name__ == "__main__":

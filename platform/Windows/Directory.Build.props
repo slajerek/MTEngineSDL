@@ -59,7 +59,20 @@
          run; the IDE is a convenience path, the command-line driver stays
          canonical. The target-time resolve still overrides MTBuildRoot for
          MTCapsIncludeDir, so headers come from the real caps-keyed build dir. -->
-    <MTBuildRoot Condition="'$(MTBuildRoot)' == ''">$(MTCacheRoot)\_ide\$(MSBuildProjectName)\$(Platform)\$(Configuration)\</MTBuildRoot>
+    <!-- SOLUTION-KEYED (2026-09-02). The engine is compiled with the
+         CAPABILITIES OF THE APP whose solution is open, so a single
+         _ide\MTEngineSDL\ tree shared by four app solutions means every switch
+         between them recompiles the whole engine. Not a WRONG build, because
+         the CL command line changes and MSBuild notices, but a full one every
+         time. $(SolutionName) is a global property in every solution build,
+         and it is the same for the solution's own instance of a project and
+         for the instance an app's ProjectReference resolves, so keying on it
+         separates the four apps without splitting one build into two
+         instances. Empty when a .vcxproj is built with no solution around it,
+         which falls back to the project name alone. -->
+    <MTIdeKey>$(MSBuildProjectName)</MTIdeKey>
+    <MTIdeKey Condition="'$(SolutionName)' != ''">$(SolutionName)\$(MSBuildProjectName)</MTIdeKey>
+    <MTBuildRoot Condition="'$(MTBuildRoot)' == ''">$(MTCacheRoot)\_ide\$(MTIdeKey)\$(Platform)\$(Configuration)\</MTBuildRoot>
   </PropertyGroup>
   <Import Project="$(MTOutRoot)\MTEngineCaps.props"
           Condition="'$(MTOutRoot)' != '' And Exists('$(MTOutRoot)\MTEngineCaps.props')" />

@@ -5,7 +5,11 @@
 # this script.
 #
 # Usage: tools/appbuild/app-build-linux.sh --app-dir <dir> [--debug|--release]
-#        [--clean] [--skip-deps] [--gc [gc-args...]]
+#        [--clean] [--skip-deps] [--gc [gc-args...]] [--set KEY=VALUE ...]
+# --set forwards a capability override to mtcaps (rung 1): it is how a store
+# build is made -- --set MT_COMMERCIAL_BUILD=1 --set MT_PRIVATE_BUILD=0 --
+# without editing the app's tracked licence manifest. The override changes the
+# caps hash, so such a build gets its own out root and deps bucket.
 # --clean cleans and STOPS (no build; same contract on all three platforms).
 # --gc is a shortcut to tools/appbuild/mtengine-gc.py; everything after it
 # goes to the GC verbatim (--gc = report, --gc --prune, ...).
@@ -18,6 +22,7 @@ APP_DIR=""
 CONFIGURATION="Release"
 CLEAN=false
 SKIP_DEPS=false
+CAPS_SETS=()
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -27,6 +32,7 @@ while [[ $# -gt 0 ]]; do
         --clean)     CLEAN=true; SKIP_DEPS=true ;;
         --gc)        shift; exec python3 "$ENGINE_DIR/tools/appbuild/mtengine-gc.py" "$@" ;;
         --skip-deps) SKIP_DEPS=true ;;
+        --set)       [[ -n "${2:-}" ]] || { echo "ERROR: --set needs KEY=VALUE" >&2; exit 2; }; CAPS_SETS+=("--set" "$2"); shift ;;
         --incremental) : ;;  # compatibility no-op: incremental IS the default
         -h|--help)   sed -n '2,9p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) echo "ERROR: unknown argument '$1' (try --help)" >&2; exit 2 ;;
@@ -75,7 +81,8 @@ esac
 MTCAPS_OUTPUT="$("$PYTHON3" -B "$ENGINE_DIR/tools/mtcaps/mtcaps.py" resolve \
     --manifest "$MANIFEST" --app "$MT_APP_NAME" \
     --platform linux --arch "$(uname -m)" --config Release \
-    --engine-dir "$ENGINE_DIR" --engine-option "$MT_ENGINE_OPTION")" || {
+    --engine-dir "$ENGINE_DIR" --engine-option "$MT_ENGINE_OPTION" \
+    ${CAPS_SETS[@]+"${CAPS_SETS[@]}"})" || {
     echo "ERROR: mtcaps resolve failed for $MANIFEST" >&2; exit 2; }
 
 MT_OUT="$(printf '%s\n' "$MTCAPS_OUTPUT" | sed -n 's/^out_dir=//p')"

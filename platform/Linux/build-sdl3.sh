@@ -77,6 +77,7 @@ BUILD_DIR="$(mt_caps_work_dir sdl3)/build-linux"
 # SDL_CAMERA=OFF matches the macOS script: we have our own capture path and
 # these are store-shipped apps, so an unused camera surface is the wrong
 # default. See platform/MacOS/build-sdl3.sh for the full reasoning.
+mt_caps_reset_stale_cmake_cache "$BUILD_DIR" "$SDL3_SRC_DIR"
 cmake -S "$SDL3_SRC_DIR" -B "$BUILD_DIR" \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_POSITION_INDEPENDENT_CODE=ON \

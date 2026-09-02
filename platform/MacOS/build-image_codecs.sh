@@ -273,6 +273,7 @@ build_cmake() {
   local arch="$4"
   shift 4
 
+  mt_caps_reset_stale_cmake_cache "$build" "$src"
   cmake -S "$src" -B "$build" \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_OSX_ARCHITECTURES="$arch" \

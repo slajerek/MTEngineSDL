@@ -165,6 +165,48 @@ mt_caps_work_dir() {
     printf '%s\n' "$dir"
 }
 
+# mt_caps_reset_stale_cmake_cache <build-dir> <source-dir>
+#
+# CMake refuses to reconfigure a build directory whose cache was generated from
+# a DIFFERENT source path, and says so in a message that is a dead end inside an
+# automated build:
+#
+#   CMake Error: The source ".../other/lib/llama.cpp/CMakeLists.txt" does not
+#   match the source ".../other/lib/llama.cpp/CMakeLists.txt" used to generate
+#   cache.  Re-run cmake with a different source directory.
+#
+# The work trees under $MT_OUT/_deps/work are keyed by dependency name alone, so
+# TWO CHECKOUTS OF THE ENGINE ON ONE MACHINE share them -- a fork beside the
+# original, a second clone to test a public export, a per-branch checkout. The
+# second one to build hits this and stops.
+#
+# Every caller owns its build directory outright, so the answer is to configure
+# afresh. Windows has had this since the from-source dep scripts landed
+# (Reset-MTStaleCMakeCache in mt-build-common.ps1); the sh side did not, which
+# is how a fresh clone of the public tree failed to build on a machine that
+# already had a cache.
+mt_caps_reset_stale_cmake_cache() {
+    local build_dir="$1"
+    local source_dir="$2"
+    local cache="$build_dir/CMakeCache.txt"
+    [[ -f "$cache" ]] || return 0
+
+    local cached
+    cached="$(sed -n 's/^CMAKE_HOME_DIRECTORY:INTERNAL=//p' "$cache" | head -n 1)"
+    [[ -n "$cached" ]] || return 0
+
+    # Compare resolved paths: a symlinked or /private-prefixed spelling of the
+    # same directory is not a mismatch.
+    local a b
+    a="$(cd "$cached" 2>/dev/null && pwd -P || printf '%s' "$cached")"
+    b="$(cd "$source_dir" 2>/dev/null && pwd -P || printf '%s' "$source_dir")"
+    if [[ "$a" != "$b" ]]; then
+        echo "Work tree $build_dir was configured from $a, this build is $b -- reconfiguring from scratch."
+        rm -rf "$build_dir"
+        mkdir -p "$build_dir"
+    fi
+}
+
 mt_caps_stub_archive() {
     local out_lib="$1"
     local prefix="$2"

@@ -134,8 +134,8 @@ void SYS_UnMapMemoryFromFile(uint8 *memoryMap, int memorySize, void **fileDescri
 void SYS_SetCurrentFolder(CSlrString *path);
 char *SYS_GetFileExtension(const char *fileName);
 char *SYS_GetFileName(const char *filePath);
-std::string SYS_GetRelativePath(const char* pathToFolder, const char* pathToFile);	// eg. folder /Users/mars/assets  file /Users/mars/assets/folder/file.png  result folder/file.png
-std::string SYS_GetAbsolutePath(const char* pathToFolder, const char* relativePath); // eg. folder /Users/mars/assets  file folder/file.png  result /Users/mars/assets/folder/file.png
+std::string SYS_GetRelativePath(const char* pathToFolder, const char* pathToFile);	// eg. folder /home/user/assets  file /home/user/assets/folder/file.png  result folder/file.png
+std::string SYS_GetAbsolutePath(const char* pathToFolder, const char* relativePath); // eg. folder /home/user/assets  file folder/file.png  result /home/user/assets/folder/file.png
 
 const char *SYS_ExecSystemCommand(const char *cmd, int *terminationCode);
 long SYS_GetFileModifiedTime(const char *filePath);

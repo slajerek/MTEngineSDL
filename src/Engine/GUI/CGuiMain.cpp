@@ -776,7 +776,7 @@ bool CGuiMain::DeserializeLayout(CLayoutData *layout)
 	u8 *data = byteBuffer->GetBytes(len);
 
 	// debug dump layout
-//	FILE *fp = fopen("/Users/mars/Desktop/layout.txt", "wb");
+//	FILE *fp = fopen("layout.txt", "wb");
 //	fwrite(data, len, 1, fp);
 //	fclose(fp);
 	

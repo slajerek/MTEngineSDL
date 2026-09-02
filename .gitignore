@@ -1,10 +1,15 @@
-build
+# ANCHORED to the repo root -- an unanchored `build` ignores a directory of
+# that name at ANY depth. The vendored trees below still need theirs ignored
+# by name; they are stale CMake/autotools output (1347 files) that the
+# codec scripts no longer create, since they build under $MT_OUT/_deps/work.
+/build/
+other/lib/**/build/
 *.mode1v3
 *.mode2v3
 *.pbxuser
 *.perspectivev3
 *~.nib
-.gitattributes
+/.gitattributes
 .vs
 .DS_Store
 Browse.VC.db
@@ -30,15 +35,24 @@ other/tools/DeployMaker/Debug/
 other/tools/DeployMaker/Release/
 bmfont2slrfont/Debug/
 Debug/
-core.*
-core
+# CORE DUMPS, and nothing else that happens to be spelled "core".
+#
+# This was `core.*` plus a bare `core`, which is a name rule pretending to be
+# a content rule. It matched other/lib/libuv/src/{unix,win}/core.c -- libuv's
+# event loop -- and, because macOS's filesystem is case-insensitive, the
+# engine's own src/Engine/Core/ directory and every SDL src/core/. Six
+# negation lines existed solely to undo it, one of them added by 33a4404
+# after the same rule swallowed SDL2's src/core/. Tracked files stay tracked,
+# so this repository never broke; the PUBLIC MIRROR did, silently, because
+# its export rebuilt the tree with `git add -A` and both libuv core.c files
+# were simply never added.
+#
+# A dump is `core.<pid>` (Linux) or lands in /cores (macOS). Neither shape
+# can be confused with a source file or a directory, so the negations are
+# gone with the rule that needed them.
+core.[0-9]*
+/cores/
 *~
-!src/Engine/Core/
-!src/Engine/Core/*
-!src/Engine/Core/**/*
-!other/lib/SDL2-2.0.10-static/src/core/
-!other/lib/SDL-release-2.32.10-static/src/core/
-!other/lib/SDL-release-3.4.14-static/src/core/
 /Release/
 other/lib/SDL2-2.0.10-static/VisualC/Win32/
 other/lib/SDL2-2.0.10-static/VisualC/x64/
@@ -99,10 +113,25 @@ src/Engine/Sci/Llama/llama_cpp_version.h
 __pycache__/
 *.pyc
 
+# Windows dependency archives that platform/Windows/build-*.ps1 now rebuild.
+# These were tracked prebuilts (~92 MB) that nothing on Windows could
+# regenerate, while macOS and Linux had build-sdl3.sh and friends all along.
+# build-deps.ps1 stages them into the caps libs directory outside the
+# checkout; the paths below are only where a pre-existing checkout still has
+# copies. SDL2.lib/SDL2main.lib stay TRACKED: nothing here links them and no
+# build-sdl2.ps1 exists yet, so untracking them could break a sibling app.
+platform/Windows/libs/*/*/SDL3.lib
+platform/Windows/libs/*/*/libuv.lib
+platform/Windows/libs/*/*/uSockets.lib
+platform/Windows/libs/*/*/freetype.lib
+other/lib/uSockets.vs/**/uSockets.lib
+
 # --- Build artifacts: never commit (compiler/linker/IDE outputs) -------------
-# Carried over from the public repo (commit 16f4088). The private repo lost
-# these rules, and consequently tracked 289 MB of Visual Studio precompiled
-# headers, Debug prebuilts and IDE caches. None of that is published.
+# These rules lived only in the PUBLIC repo (16f4088) while this one tracked
+# 289 MB of Visual Studio precompiled headers, IDE caches and Debug prebuilts.
+# Restored here 2026-09-03 together with the deletion of that content, so both
+# trees now say the same thing and the export no longer needs a frozen copy of
+# someone else's .gitignore.
 *.obj
 *.pdb
 *.ipch
@@ -117,20 +146,13 @@ __pycache__/
 *.res
 *.pch
 *.dSYM/
-*.stamp
+*.user
 **/.vs/
 
-# Visual Studio build outputs inside the vendored uSockets project. The project
-# itself (.sln, .vcxproj, pch.h, framework.h) IS tracked -- it is how uSockets
-# gets built on Windows. The archives it produces are not, and nothing in the
-# tree consumes them: the libs the build links live in platform/Windows/libs/.
-other/lib/uSockets.vs/ARM64/
-other/lib/uSockets.vs/x64/
-other/lib/uSockets.vs/Debug/
-other/lib/uSockets.vs/Release/
-
-# CMake build dir inside the vendored SDL3 pkg-support tree
-other/lib/SDL3/build/
-
-# Windows: ship Release prebuilt libs only, never Debug
-platform/Windows/libs/*/Debug/
+# freetype's autotools output from a local ./configure run. The engine builds
+# freetype through CMake and platform/Windows/build-freetype.ps1; nothing reads
+# these, and config.log/config.status embed the absolute paths of whichever
+# machine ran configure.
+other/lib/freetype-2.10.4/builds/unix/config.log
+other/lib/freetype-2.10.4/builds/unix/config.status
+other/lib/freetype-2.10.4/builds/unix/unix-def.mk

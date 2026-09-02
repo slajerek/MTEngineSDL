@@ -84,6 +84,7 @@ fi
 # Phase 5: the build tree lives OUTSIDE the checkout, in the shared work root.
 BUILD_DIR="$(mt_caps_work_dir ftxui)/build-macos"
 
+mt_caps_reset_stale_cmake_cache "$BUILD_DIR" "$FTXUI_SRC_DIR"
 cmake -S "$FTXUI_SRC_DIR" -B "$BUILD_DIR" \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \

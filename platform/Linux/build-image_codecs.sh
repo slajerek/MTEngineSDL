@@ -184,6 +184,7 @@ build_cmake() {
   local build="$2"
   local prefix="$3"
   shift 3
+  mt_caps_reset_stale_cmake_cache "$build" "$src"
   cmake -S "$src" -B "$build" \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX="$prefix" \

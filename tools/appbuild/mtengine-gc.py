@@ -19,10 +19,21 @@ REAL tooling: the current engine HEAD (and, for deps/_build, an actual
 
     mtengine-gc.py                       report
     mtengine-gc.py --prune [--dry-run]   prune with the default retention
-        --days N        keep non-live rev dirs younger than N days (14)
-        --dirty-days N  keep non-live -dirty- rev dirs younger than N (3)
-        --deps-days N   keep non-live deps buckets younger than N (30)
-        --deep          also prune _deps/work trees older than --days
+        --keep N        rev dirs to keep per app besides the live one(s) (2)
+        --keep-dirty N  -dirty- rev dirs to keep per app (1)
+        --keep-deps N   non-live deps buckets to keep (2)
+        --min-age-hours H   never touch anything modified within H hours (6)
+        --days N        ALSO prune kept dirs older than N days (0 = off)
+        --deep          also prune _deps/work trees (full rebuild next time)
+
+RETENTION IS GENERATIONAL, NOT AGE-BASED, and that is a correction of the
+first design. A rev dir is superseded the moment you build a newer engine
+revision; it does not become garbage on a birthday. The first version kept
+anything younger than 14 days (3 for dirty), which on a machine doing a dozen
+engine commits in one afternoon meant `--prune` reported "nothing eligible"
+while sitting on 2.3 GB of dead directories -- the exact case that prompted
+this rewrite. Age survives only as `--min-age-hours`, whose job is different:
+never delete something a concurrent build might be writing.
 """
 import argparse
 import os
@@ -55,14 +66,25 @@ def human(n):
         n /= 1024.0
 
 
-def age_days(path):
+def newest_mtime(path):
+    """The newest mtime one level down, not the directory's own: a rev dir's own
+    mtime stops moving once its subdirectories exist, so it under-reports how
+    recently the tree was actually written."""
     try:
         newest = os.path.getmtime(path)
         for entry in os.scandir(path):
             newest = max(newest, entry.stat().st_mtime)
-        return (time.time() - newest) / 86400.0
+        return newest
     except OSError:
         return 0.0
+
+
+def age_days(path):
+    return (time.time() - newest_mtime(path)) / 86400.0
+
+
+def age_hours(path):
+    return (time.time() - newest_mtime(path)) / 3600.0
 
 
 def sibling_apps():
@@ -77,12 +99,23 @@ def sibling_apps():
     return out
 
 
-def live_engine_rev():
-    """Current HEAD's short rev -- WITHOUT any dirty suffix. A dirty digest
-    changes on every edit, so dirty dirs are protected only by --dirty-days."""
-    out = subprocess.run(["git", "-C", ENGINE, "rev-parse", "--short", "HEAD"],
-                         capture_output=True, text=True).stdout.strip()
-    return out
+def live_engine_revs():
+    """The rev dirs a build STARTED RIGHT NOW would write to: the clean HEAD
+    short rev, and -- when the checkout is dirty -- the dirty-suffixed rev the
+    resolver actually computes.
+
+    This replaces guessing by mtime. A build in flight writes to exactly one of
+    these two names, so protecting them is a fact rather than a heuristic; the
+    --min-age-hours window shrank to a safety net for the odd case of a second
+    checkout state being built concurrently."""
+    clean = subprocess.run(["git", "-C", ENGINE, "rev-parse", "--short", "HEAD"],
+                           capture_output=True, text=True).stdout.strip()
+    revs = {clean} if clean else set()
+    try:
+        revs.add(R.engine_rev(ENGINE))
+    except Exception:
+        pass
+    return revs
 
 
 def live_resolve_paths(platform):
@@ -117,9 +150,17 @@ def main():
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--prune", action="store_true")
     ap.add_argument("--dry-run", action="store_true")
-    ap.add_argument("--days", type=float, default=14)
-    ap.add_argument("--dirty-days", type=float, default=3)
-    ap.add_argument("--deps-days", type=float, default=30)
+    ap.add_argument("--keep", type=int, default=2,
+                    help="rev dirs to keep per app besides the live one")
+    ap.add_argument("--keep-dirty", type=int, default=1,
+                    help="-dirty- rev dirs to keep per app")
+    ap.add_argument("--keep-deps", type=int, default=2,
+                    help="non-live deps buckets to keep")
+    ap.add_argument("--min-age-hours", type=float, default=1.0,
+                    help="never touch anything modified within this many hours "
+                         "(a safety net; the rev a build would write is protected by name)")
+    ap.add_argument("--days", type=float, default=0,
+                    help="also prune KEPT dirs older than this many days (0 = off)")
     ap.add_argument("--deep", action="store_true")
     args = ap.parse_args()
 
@@ -132,13 +173,17 @@ def main():
         return 0
 
     platform = {"darwin": "macos", "win32": "windows"}.get(sys.platform, "linux")
-    head = live_engine_rev()
+    heads = live_engine_revs()
     live = live_resolve_paths(platform) if args.prune else set()
     if args.prune:
-        print("live engine rev: %s; %d live resolve paths" % (head, len(live)))
+        print("live engine rev(s): %s; %d live resolve paths"
+              % (", ".join(sorted(heads)), len(live)))
 
-    victims = []   # (path, size, reason)
-    report = []    # (label, size)
+    victims = []      # (path, size, reason)
+    report = []       # (label, size)
+    candidates = {}   # (app, dirty) -> [(path, rev, size)]
+    dead_deps = []    # (path, rel, size) -- non-live buckets, newest kept
+    kept_recent = 0   # protected by --min-age-hours
 
     for app in sorted(os.listdir(root)):
         app_dir = os.path.join(root, app)
@@ -156,13 +201,23 @@ def main():
             dirty = "-dirty-" in rev
             label = "%s/%s%s" % (app, rev, " (dirty)" if dirty else "")
             report.append((label, size))
-            if args.prune:
-                if rev == head:
-                    continue  # the clean current rev is always live
-                a = age_days(p)
-                limit = args.dirty_days if dirty else args.days
-                if a > limit:
-                    victims.append((p, size, "rev %s, %.0fd old" % (rev, a)))
+            if args.prune and rev not in heads:  # what a build now would write
+                candidates.setdefault((app, dirty), []).append((p, rev, size))
+
+    # Generational selection: newest-first, keep N, the rest are dead. A dir
+    # modified within --min-age-hours is never a candidate -- a build running
+    # right now is the one thing age is genuinely good at detecting.
+    for (app, dirty), entries in sorted(candidates.items()):
+        entries.sort(key=lambda e: -newest_mtime(e[0]))
+        keep_n = args.keep_dirty if dirty else args.keep
+        for i, (path, rev, size) in enumerate(entries):
+            if age_hours(path) < args.min_age_hours:
+                kept_recent += 1
+                continue
+            if i < keep_n and not (args.days and age_days(path) > args.days):
+                continue
+            why = "rev %s, #%d newest%s" % (rev, i + 1, ", dirty" if dirty else "")
+            victims.append((path, size, why))
 
     deps_root = os.path.join(root, "_deps")
     if os.path.isdir(deps_root):
@@ -174,9 +229,8 @@ def main():
                 if args.prune and args.deep:
                     for t in sorted(os.listdir(dirpath)):
                         tp = os.path.join(dirpath, t)
-                        a = age_days(tp)
-                        if a > args.days:
-                            victims.append((tp, du(tp), "work tree, %.0fd old" % a))
+                        if age_hours(tp) >= args.min_age_hours:
+                            victims.append((tp, du(tp), "work tree (--deep)"))
                 continue
             if "libs" in dirnames:
                 dirnames[:] = []
@@ -187,9 +241,16 @@ def main():
                     lp = os.path.normpath(os.path.join(dirpath, "libs"))
                     if lp in live:
                         continue
-                    a = age_days(dirpath)
-                    if a > args.deps_days:
-                        victims.append((dirpath, size, "deps bucket, %.0fd old, not live" % a))
+                    dead_deps.append((dirpath, rel, size))
+
+    dead_deps.sort(key=lambda e: -newest_mtime(e[0]))
+    for i, (path, rel, size) in enumerate(dead_deps):
+        if age_hours(path) < args.min_age_hours:
+            kept_recent += 1
+            continue
+        if i < args.keep_deps and not (args.days and age_days(path) > args.days):
+            continue
+        victims.append((path, size, "deps bucket, not live, #%d newest" % (i + 1)))
 
     report.sort(key=lambda x: -x[1])
     total = sum(s for _, s in report)
@@ -204,7 +265,12 @@ def main():
         return 0
 
     if not victims:
-        print("\nnothing eligible to prune.")
+        print("\nnothing eligible to prune: the live rev, the %d newest rev dirs "
+              "per app (%d dirty) and the %d newest deps buckets are kept%s."
+              % (args.keep, args.keep_dirty, args.keep_deps,
+                 ", and %d entries were modified within %.0fh" % (kept_recent, args.min_age_hours)
+                 if kept_recent else ""))
+        print("Keep fewer with --keep 0 --keep-dirty 0 --keep-deps 0.")
         return 0
     freed = sum(s for _, s, _ in victims)
     print("\npruning %d entries, %s:" % (len(victims), human(freed)))

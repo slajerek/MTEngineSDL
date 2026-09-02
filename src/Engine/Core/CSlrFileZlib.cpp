@@ -5,6 +5,7 @@
 #include <assert.h>
 
 #include "CSlrFileFromOS.h"
+#include "SYS_FileSystem.h"
 
 #define ZLIB_CHUNK_SIZE 1024*1024
 
@@ -294,7 +295,11 @@ void UNITTEST_TestZlib()
 {
 	LOGM("UNITTEST_TestZlib");
 
-	const char *fileName = "/Users/mars/Downloads2/test";
+	// Written under the app's temp folder, not a path on one author's disk.
+	// This helper has no callers today, so nothing has ever noticed that the
+	// old hardcoded /Users/<name>/... target exists on exactly one machine.
+	char fileName[MAX_STRING_LENGTH];
+	sprintf(fileName, "%sUNITTEST_TestZlib.bin", gCPathToTemp ? gCPathToTemp : "");
 	const int numTries = 4;
 	
 	int size = 1024*1024*16;

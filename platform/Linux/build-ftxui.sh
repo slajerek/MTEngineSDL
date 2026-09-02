@@ -69,6 +69,7 @@ fi
 BUILD_DIR="$(mt_caps_work_dir ftxui)/build-linux"
 
 echo "Configuring FTXUI in $BUILD_DIR"
+mt_caps_reset_stale_cmake_cache "$BUILD_DIR" "$FTXUI_SRC_DIR"
 cmake -S "$FTXUI_SRC_DIR" -B "$BUILD_DIR" \
   -DCMAKE_BUILD_TYPE=Release \
   -DBUILD_SHARED_LIBS=OFF \
