@@ -125,6 +125,43 @@
       <MTCapsIncludeDir Condition="'$(MTCapsIncludeDir)' == ''">$(MTCapsResolvedRoot)\include</MTCapsIncludeDir>
     </PropertyGroup>
 
+    <!-- THE SAME FILE AGAIN, AS AN ITEM, and the property above is not enough.
+         MSBuild ESCAPES the result of a property function, so the `;` inside
+         $(MTCapsIdeDefines) is `%3B` and stays one literal token wherever the
+         property is expanded. The CL task then receives the whole capability
+         set as a SINGLE /D:
+
+             /D "MT_CAP_CAMERA=1;MT_CAP_COLOR_MANAGEMENT=1;..."
+
+         which defines one macro called MT_CAP_CAMERA whose value is the rest of
+         the line, and none of the other thirty. Every `#if MT_CAP_*` and
+         `#if MT_ENABLE_*` in the app was false on the IDE path, so an IDE build
+         of the DummyApp came out with no imgui test engine in it and
+         CImGuiDummyTests.obj at 3 KB. Found 2026-09-02 on Windows.
+
+         The engine's Directory.Build.targets does not have the bug because the
+         engine compiles with ClangCL, whose task splits the value; the apps use
+         the MSVC CL task, which does not. Same expression, two behaviours.
+
+         [MSBuild]::Unescape is the fix, and it is the ONLY one of the three
+         obvious candidates that works. Measured with a throwaway project on a
+         file reading `A=1;B=2;C=3`:
+
+             Include="$(P)"                  1 item   "A=1;B=2;C=3"
+             ReadLinesFromFile               1 item   "A=1;B=2;C=3"
+             Include="$(unescaped)"          3 items  A=1 | B=2 | C=3
+
+         ReadLinesFromFile does NOT apply Include semantics to a `;` inside a
+         line, which is the plausible-looking answer that does not work. The
+         property is kept as well, because the FFmpeg probe further down does a
+         .Contains() on it. -->
+    <PropertyGroup>
+      <MTCapsIdeDefinesUnescaped>$([MSBuild]::Unescape($(MTCapsIdeDefines)))</MTCapsIdeDefinesUnescaped>
+    </PropertyGroup>
+    <ItemGroup>
+      <MTCapsIdeDefineItem Include="$(MTCapsIdeDefinesUnescaped)" />
+    </ItemGroup>
+
     <Message Importance="high"
              Text="Capabilities (IDE): $(MTCapsApp) -&gt; $(MTCapsResolvedRoot)" />
     <Message Importance="high"
@@ -132,7 +169,31 @@
 
     <ItemGroup>
       <ClCompile>
-        <PreprocessorDefinitions>$(MTCapsIdeDefines);%(ClCompile.PreprocessorDefinitions)</PreprocessorDefinitions>
+        <!-- APPENDED, exactly as the engine's Directory.Build.targets does it,
+             and for two reasons that turned out to be one bug each.
+
+             ORDER. The comment in the engine's file explains it: a .vcxproj's
+             own hardcoded BARE defines must land FIRST and the resolved caps
+             LAST, because a bare `/D NAME` means 1 and the last /D wins. This
+             file had them the other way round.
+
+             SPLITTING, which is the half that bit. Prepended, the value began
+             with $(MTCapsIdeDefines) and the CL task received the whole
+             capability set as ONE quoted /D argument:
+
+                 /D "MT_CAP_CAMERA=1;MT_CAP_COLOR_MANAGEMENT=1;...
+                     MT_ENABLE_IMGUI_TEST_ENGINE=1;..."
+
+             which defines a single macro named MT_CAP_CAMERA whose value is the
+             rest of the line, and NONE of the other thirty. Every `#if MT_CAP_*`
+             and `#if MT_ENABLE_*` in the app was therefore false on the IDE
+             path: an IDE build of the DummyApp silently produced a binary with
+             no imgui test engine in it, which is how this was found (a
+             driver-built exe carries `run-tests` and the test names; the
+             IDE-built one carries neither, and CImGuiDummyTests.obj comes out
+             3 KB). The engine's file never had the problem because its value
+             starts with %(ClCompile.PreprocessorDefinitions). -->
+        <PreprocessorDefinitions>%(ClCompile.PreprocessorDefinitions);@(MTCapsIdeDefineItem)</PreprocessorDefinitions>
         <!-- The dependency headers too, same D6 fix as the engine's file. The
              .vcxproj names $(MTCapsLibsDir)\image-codecs\include and
              \ffmpeg\include in an ItemDefinitionGroup, which MSBuild evaluates

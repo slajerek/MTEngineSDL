@@ -102,6 +102,8 @@
     <ClInclude Include="..\src.Windows\Render\CVideoYUVShaderD3D11.h" />
     <ClCompile Include="..\src.Windows\Render\CRenderShaderFlatColorD3D11.cpp" />
     <ClInclude Include="..\src.Windows\Render\CRenderShaderFlatColorD3D11.h" />
+    <ClCompile Include="..\src.Windows\Render\CRenderShaderMaskedTileD3D11.cpp" />
+    <ClInclude Include="..\src.Windows\Render\CRenderShaderMaskedTileD3D11.h" />
     <ClCompile Include="..\src.Windows\Render\CRenderBackendD3D11.cpp" />
     <ClInclude Include="..\src.Windows\Render\CRenderBackendD3D11.h" />
     <ClCompile Include="..\src.Windows\SYS_WindowsHdr.cpp" />
@@ -114,6 +116,7 @@
   <ItemGroup>
     <None Include="..\src.Windows\Render\Shaders\Resolve.hlsl" />
     <None Include="..\src.Windows\Render\Shaders\FlatColor.hlsl" />
+    <None Include="..\src.Windows\Render\Shaders\MaskedTile.hlsl" />
     <None Include="..\src.Windows\Render\Shaders\VideoYUV.hlsl" />
     <ClInclude Include="..\..\..\src\Engine\Core\MT_SrgbCurve.h" />
     <ClCompile Include="..\..\..\src\Engine\Tests\CTestSurfaceEncoding.cpp" />

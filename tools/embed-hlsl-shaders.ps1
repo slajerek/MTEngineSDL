@@ -83,7 +83,8 @@ $shaders = @(
     @{ File = 'Resolve.hlsl';   Entry = 'ResolvePS';   Profile = 'ps_4_0'; Name = 'ResolvePS'   },
     @{ File = 'FlatColor.hlsl'; Entry = 'FlatColorPS'; Profile = 'ps_4_0'; Name = 'FlatColorPS' },
     @{ File = 'VideoYUV.hlsl';  Entry = 'YuvVS';       Profile = 'vs_4_0'; Name = 'VideoYuvVS'  },
-    @{ File = 'VideoYUV.hlsl';  Entry = 'YuvPS';       Profile = 'ps_4_0'; Name = 'VideoYuvPS'  }
+    @{ File = 'VideoYUV.hlsl';  Entry = 'YuvPS';       Profile = 'ps_4_0'; Name = 'VideoYuvPS'  },
+    @{ File = 'MaskedTile.hlsl';Entry = 'MaskedTilePS';Profile = 'ps_4_0'; Name = 'MaskedTilePS'}
 )
 
 function Get-SourceSha256([string]$path) {

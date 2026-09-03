@@ -47,6 +47,11 @@ ARCH="$(uname -m)"
 BUILD_DIR="$CACHE_DIR/build-linux-$ARCH"
 OUT_LIB_DIR="$(mt_caps_lib_dir)"
 
+# Store and view (L16). The video codecs follow MT_CAP_VIDEO_PLAYBACK and the two licence keys.
+# With no store in the environment (a standalone run) the store IS the view
+# and the sync is a no-op.
+mt_caps_use_store "${MT_STORE_VIDEO_CODECS:-}" video_codecs
+
 # Single native-arch install prefix. FFmpeg's shared libs/headers AND vpx's/
 # opus's static libs all install here side by side (no per-arch merge is needed
 # on Linux, so there is only ever one "$PREFIX_DIR", unlike macOS where
@@ -371,13 +376,15 @@ build_ffmpeg() {
   # internal builds -- on Linux there is no native decoder at all, so full
   # builds gain HEVC video and AAC/E-AC-3 audio outright. eac3's ac3-core
   # dependency is already satisfied (ac3 in the base list, both modes).
+  # THE MODE, not the tier. $FFMPEG_BUILD_MODE comes from resolved
+  # MT_FFMPEG_BUILD_MODE, which is `full` only for MT_PRIVATE_BUILD=1.
+  # $COMMERCIAL is the LICENCE TIER: the public/free tier is COMMERCIAL=0
+  # with mode `commercial`, because patents attach to distribution, not to
+  # payment. Reading the tier here handed that tier the withheld decoders.
+  # No mode branch: MT_FFMPEG_DECODERS and MT_FFMPEG_PARSERS already carry the
+  # withheld names when the resolved mode is `full`. (Identical note to the
+  # macOS script.)
   local mode_flags=()
-  if [[ "$COMMERCIAL" == "0" ]]; then
-    mode_flags+=(--enable-decoder=wmv1,wmv2,wmv3,vc1,wmav1,wmav2,wmapro)
-    mode_flags+=(--enable-decoder=msmpeg4v1,msmpeg4v2,msmpeg4v3)
-    mode_flags+=(--enable-decoder=hevc,aac,eac3)
-    mode_flags+=(--enable-parser=vc1)
-  fi
 
   # NOTE: FFmpeg's mpeg4 decoder select-depends on the h263 decoder core
   # (configure: mpeg4_decoder_select="h263_decoder"); h263 is therefore
@@ -391,10 +398,9 @@ build_ffmpeg() {
     --enable-shared --disable-static --disable-programs --disable-doc \
     --disable-network --disable-everything \
     --enable-protocol=file \
-    --enable-demuxer=mov,matroska,avi,mpegts,mpegps,mpegvideo,asf \
-    --enable-decoder=h264,prores,mjpeg,mpeg2video,mpeg4,mpeg1video,vp8,vp9,dvvideo \
-    --enable-decoder=pcm_s16le,pcm_s16be,pcm_s24le,pcm_u8,mp3,mp2,ac3,opus,vorbis,flac \
-    --enable-parser=h264,hevc,mpeg4video,mpegvideo,mjpeg,vp8,vp9,aac,ac3,mpegaudio,opus,vorbis,flac \
+    --enable-demuxer="$(policy_csv "$MT_FFMPEG_DEMUXERS")" \
+    --enable-decoder="$(policy_csv "$MT_FFMPEG_DECODERS")" \
+    --enable-parser="$(policy_csv "$MT_FFMPEG_PARSERS")" \
     --disable-encoders --disable-muxers --disable-filters --disable-bsfs \
     --enable-bsf=hevc_mp4toannexb,h264_mp4toannexb,aac_adtstoasc \
     --disable-devices \
@@ -420,15 +426,21 @@ build_ffmpeg() {
 # best-effort secondary). Identical lists and identical parsing mechanism to
 # the macOS script (grep/sed/tr/sort config_components.h -- all standard
 # POSIX text tools).
-FFMPEG_EXPECTED_DECODERS_COMMERCIAL="ac3 dvvideo flac h263 h264 mjpeg mp2 mp3 mpeg1video mpeg2video mpeg4 opus pcm_s16be pcm_s16le pcm_s24le pcm_u8 prores vorbis vp8 vp9"
-FFMPEG_EXPECTED_DECODERS_FULL="$FFMPEG_EXPECTED_DECODERS_COMMERCIAL aac eac3 hevc msmpeg4v1 msmpeg4v2 msmpeg4v3 vc1 wmapro wmav1 wmav2 wmv1 wmv2 wmv3"
-FFMPEG_EXPECTED_DEMUXERS="asf avi matroska mov mpegps mpegts mpegvideo"
-FFMPEG_EXPECTED_PARSERS_COMMERCIAL="aac ac3 flac h263 h264 hevc mjpeg mpeg4video mpegaudio mpegvideo opus vorbis vp8 vp9"
-FFMPEG_EXPECTED_PARSERS_FULL="$FFMPEG_EXPECTED_PARSERS_COMMERCIAL vc1"
+# Policy comes from the vocabulary through MT_FFMPEG_*; what FFmpeg
+# force-enables on top of it is a fact about ffmpeg-$FFMPEG_VERSION and lives
+# here beside that pin. (Identical note to the macOS script.)
+FFMPEG_IMPLICIT_DECODERS="h263"
+FFMPEG_IMPLICIT_PARSERS="h263"
+
+FFMPEG_EXPECTED_DECODERS="$(policy_sorted "$MT_FFMPEG_DECODERS $FFMPEG_IMPLICIT_DECODERS")"
+FFMPEG_EXPECTED_DEMUXERS="$(policy_sorted "$MT_FFMPEG_DEMUXERS")"
+FFMPEG_EXPECTED_PARSERS="$(policy_sorted "$MT_FFMPEG_PARSERS $FFMPEG_IMPLICIT_PARSERS")"
 # HEVC/AAC/EAC3 moved from a former always-forbidden list on 2026-07-19
 # (codec-superset spec): full builds carry them as software fallbacks;
 # commercial exclusion unchanged.
-FFMPEG_FORBIDDEN_DECODERS_COMMERCIAL="HEVC AAC EAC3 WMV1 WMV2 WMV3 VC1 WMAV1 WMAV2 WMAPRO"
+# Derived from the same withheld list the licence scanner reads, so the two
+# cannot drift; 13 names now, where the hand-written copy had 10.
+FFMPEG_FORBIDDEN_DECODERS_COMMERCIAL="$(printf '%s' "$MT_FFMPEG_DECODERS_WITHHELD" | tr '[:lower:] ' '[:upper:]\n' | tr '\n' ' ')"
 
 # require_ffmpeg_exact_set <build-dir> <KIND> <expected-space-separated>
 # KIND is the config_components.h suffix: DECODER, DEMUXER, or PARSER.
@@ -526,15 +538,16 @@ build_libvpx "$PREFIX_DIR"
 build_opus "$PREFIX_DIR"
 build_ffmpeg "$PREFIX_DIR"
 
-if [[ "$COMMERCIAL" == "1" ]]; then
+# The guard picks its expected set on the same value the configure line used,
+# or it asserts one mode's library against the other's set.
+# ONE expected set per kind, whatever the mode. (Identical note to the macOS
+# script.) Only the absence check is mode-specific.
+require_ffmpeg_exact_set "$BUILD_DIR/ffmpeg" "DECODER" "$FFMPEG_EXPECTED_DECODERS"
+require_ffmpeg_exact_set "$BUILD_DIR/ffmpeg" "PARSER" "$FFMPEG_EXPECTED_PARSERS"
+if [[ "$FFMPEG_BUILD_MODE" == "commercial" ]]; then
   for dec in $FFMPEG_FORBIDDEN_DECODERS_COMMERCIAL; do
     require_ffmpeg_decoder_disabled "$BUILD_DIR/ffmpeg" "$dec"
   done
-  require_ffmpeg_exact_set "$BUILD_DIR/ffmpeg" "DECODER" "$FFMPEG_EXPECTED_DECODERS_COMMERCIAL"
-  require_ffmpeg_exact_set "$BUILD_DIR/ffmpeg" "PARSER" "$FFMPEG_EXPECTED_PARSERS_COMMERCIAL"
-else
-  require_ffmpeg_exact_set "$BUILD_DIR/ffmpeg" "DECODER" "$FFMPEG_EXPECTED_DECODERS_FULL"
-  require_ffmpeg_exact_set "$BUILD_DIR/ffmpeg" "PARSER" "$FFMPEG_EXPECTED_PARSERS_FULL"
 fi
 require_ffmpeg_exact_set "$BUILD_DIR/ffmpeg" "DEMUXER" "$FFMPEG_EXPECTED_DEMUXERS"
 
@@ -573,7 +586,7 @@ require_ffmpeg_no_forbidden_symbols() {
   echo "Commercial trace scan clean: no forbidden decoder symbols in $libdir"
 }
 
-if [[ "$COMMERCIAL" == "1" ]]; then
+if [[ "$FFMPEG_BUILD_MODE" == "commercial" ]]; then
   require_ffmpeg_no_forbidden_symbols "$PREFIX_DIR/lib"
 fi
 

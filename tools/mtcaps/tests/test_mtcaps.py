@@ -26,6 +26,7 @@ TOOL = os.path.dirname(HERE)
 ENGINE = os.path.dirname(os.path.dirname(TOOL))
 sys.path.insert(0, TOOL)
 
+import emit                  # noqa: E402
 import resolve as R          # noqa: E402
 import vocab as V            # noqa: E402
 from errors import ManifestError, VocabError  # noqa: E402
@@ -521,7 +522,8 @@ class TestMSBuildFragments(Base):
         out = []
         for rel in ("platform/Windows/Directory.Build.props",
                     "platform/Windows/Directory.Build.targets",
-                    "platform/Windows/MTEngineApp.targets"):
+                    "platform/Windows/MTEngineApp.targets",
+                    "platform/Windows/MTEngineApp.props"):
             p = os.path.join(ENGINE, rel)
             if os.path.exists(p):
                 out.append(p)
@@ -572,6 +574,39 @@ class TestMSBuildFragments(Base):
         self.assertTrue(os.path.exists(template), template)
         text = open(template, encoding="utf-8").read()
         self.assertIn("MTEngineApp.targets", text)
+
+    def test_the_props_stub_template_imports_the_engine_props(self):
+        """The same argument one file over. Directory.Build.props was the half
+        L13 did not take: ~70 lines of IDE path logic copied into four app
+        repos, differing only in the app name, which is exactly the shape that
+        made a per-app fix of defect C mean four hand edits.
+
+        The template keeps ONE app-specific token, because $(MTCapsApp) is what
+        the engine's file is parameterized on and cannot be moved into it. The
+        driver substitutes it before comparing."""
+        template = os.path.join(ENGINE, "tools/appbuild/stubs/Directory.Build.props")
+        self.assertTrue(os.path.exists(template), template)
+        text = io.open(template, encoding="utf-8-sig").read()
+        self.assertIn("MTEngineApp.props", text)
+        self.assertIn("__MT_APP_NAME__", text)
+        # The logic must have LEFT the stub, not been duplicated into it --
+        # judged on the CODE. The header comment names what moved and where it
+        # went, which is the stub earning its keep, not drift.
+        code = re.sub(r"<!--.*?-->", "", text, flags=re.S)
+        for moved in ("MTCacheRoot", "MTIdeKey", "MTIdeBuild", "MTBuildRoot",
+                      "MTEngineCaps.props"):
+            self.assertNotIn(moved, code,
+                             "%s belongs in MTEngineApp.props, not the stub" % moved)
+        engine_props = os.path.join(ENGINE, "platform/Windows/MTEngineApp.props")
+        self.assertTrue(os.path.exists(engine_props), engine_props)
+        etext = io.open(engine_props, encoding="utf-8-sig").read()
+        for moved in ("MTCacheRoot", "MTIdeKey", "MTIdeBuild", "MTBuildRoot",
+                      "MTEngineCaps.props"):
+            self.assertIn(moved, etext)
+        # MTIdeBuild is only meaningful if it is decided BEFORE MTBuildRoot
+        # gets its IDE default; after that line the two paths are identical.
+        self.assertLess(etext.index("<MTIdeBuild"), etext.index("<MTBuildRoot"),
+                        "MTIdeBuild must be set before MTBuildRoot's IDE default")
         self.assertIn("<Import", text)
         ET.fromstring(text)
 
@@ -690,6 +725,26 @@ class TestEmittedFragments(Base):
         distribution-tier tests compare two resolves of one manifest."""
         with open(os.path.join(out, *parts), encoding="utf-8") as f:
             return f.read()
+
+    def test_cmake_fragment_carries_windows_paths_without_breaking(self):
+        r"""L16's store paths are absolute, and on Windows absolute means
+        backslashes. CMake reads `\U` inside a quoted argument as a character
+        escape, so `set(MT_STORE_FTXUI "C:\Users\...")` is a PARSE ERROR --
+        the fragment does not load at all, and every capability with it. That
+        cost three failures in this suite on the Windows box while passing on
+        macOS, where a temp root has no backslash to trip over. So the Windows
+        SHAPE is supplied here rather than waited for.
+        """
+        self.assertEqual(emit.cmake_path(r"C:\Users\me\.cache\mtengine\_depstore"),
+                         "C:/Users/me/.cache/mtengine/_depstore")
+        self.assertEqual(emit.cmake_path("/home/me/.cache/mtengine"),
+                         "/home/me/.cache/mtengine")
+        # And the fragment this resolve actually wrote: no quoted value in it
+        # may carry a backslash, whichever platform generated it.
+        for line in self.read("MTEngineCapabilities.cmake").splitlines():
+            m = re.match(r'set\((MT_[A-Z0-9_]+) "(.*)"\)$', line.strip())
+            if m:
+                self.assertNotIn("\\", m.group(2), line)
 
     def test_all_four_fragments_plus_header_and_stamp_exist(self):
         for name in ("MTEngineCapabilities.cmake", "MTEngineCaps.xcconfig",
@@ -1097,6 +1152,148 @@ class TestDepsDir(Base):
                              "%s: %s" % (mode, proc.stdout))
 
 
+class TestBuildUnits(unittest.TestCase):
+    """L16. The deps VIEW is keyed by every acquisition capability; a per-unit
+    STORE is keyed only by what that unit reads. The narrower key is what makes
+    flipping MT_CAP_FTXUI stop rebuilding SDL3 -- and it is unsafe in exactly
+    one direction: a `reads` list that OMITS a capability its script consults
+    makes two materially different archives share one store, and the second
+    build takes the first one's stamp and links the wrong library.
+
+    TestDepsKey below holds that door shut for the shared key. These hold it
+    shut per unit, which is where it can now go wrong."""
+
+    def _units(self):
+        for platform in ("macos", "linux", "windows"):
+            for name, unit in sorted(R.build_units(platform).items()):
+                yield platform, name, unit
+
+    def test_declared_producers_exist(self):
+        missing = ["%s/%s -> %s" % (p, n, sc)
+                   for p, n, u in self._units() for sc in u["scripts"]
+                   if not os.path.exists(os.path.join(ENGINE, sc))]
+        self.assertEqual([], missing, "\n".join(missing))
+
+    def test_every_dependency_script_is_classified(self):
+        """A new build-*.ps1 that nobody classified is the failure this catches.
+        Left unclassified it would stage into the shared view with no store and
+        no key of its own -- working, until the day its output starts depending
+        on a capability."""
+        claimed = set(R.DISPATCH_SCRIPTS)
+        for _, _, unit in self._units():
+            claimed.update(unit["scripts"])
+        found = sorted(glob.glob(os.path.join(ENGINE, "platform", "*", "build-*.sh")) +
+                       glob.glob(os.path.join(ENGINE, "platform", "*", "build-*.ps1")))
+        self.assertTrue(found, "no dependency scripts found under platform/*/")
+        orphans = [os.path.relpath(f, ENGINE).replace(os.sep, "/") for f in found
+                   if os.path.relpath(f, ENGINE).replace(os.sep, "/") not in claimed]
+        self.assertEqual([], orphans,
+                         "unclassified dependency scripts (add to a unit's "
+                         "`scripts` or to DISPATCH_SCRIPTS): %s" % ", ".join(orphans))
+
+    def test_unit_store_key_covers_what_its_script_reads(self):
+        """The fatal direction, per unit."""
+        vocab = V.load(None)
+        owner = {}
+        for key in vocab.keys:
+            owner[key] = key
+            for flag in vocab.enables(key):
+                owner[flag] = key
+        pattern = re.compile(r"\bMT_[A-Z][A-Z0-9_]*")
+        mode_keys = frozenset({"MT_COMMERCIAL_BUILD", "MT_PRIVATE_BUILD",
+                               "MT_FFMPEG_BUILD_MODE"})
+        offenders = []
+        for platform, name, unit in self._units():
+            covered = set(unit["reads"])
+            for scr in unit["scripts"]:
+                path = os.path.join(ENGINE, scr)
+                if not os.path.exists(path):
+                    continue
+                with io.open(path, encoding="utf-8", errors="replace") as fh:
+                    raw = fh.read()
+                text = TestDepsKey._strip_comments(raw, path.endswith(".ps1"))
+                for symbol in sorted(set(pattern.findall(text))):
+                    if symbol in mode_keys:
+                        # Reading the licence keys or the derived FFmpeg mode is
+                        # what `mode` declares. Missing it is the same defect.
+                        if not unit.get("mode"):
+                            offenders.append(
+                                "%s: %s reads %s but the unit does not set mode"
+                                % (platform, scr, symbol))
+                        continue
+                    if symbol not in owner:
+                        continue
+                    if owner[symbol] not in covered:
+                        offenders.append(
+                            "%s: %s reads %s (owned by %s) but %s's reads=%s"
+                            % (platform, scr, symbol, owner[symbol], name,
+                               sorted(unit["reads"])))
+        self.assertEqual([], sorted(set(offenders)), "\n".join(sorted(set(offenders))))
+
+    def test_every_producer_routes_through_its_store(self):
+        """A producer that writes straight into the view has no store, so its
+        stamp lives in a directory keyed by the WHOLE capability set and it
+        rebuilds whenever anything at all changes -- the exact waste L16 set out
+        to remove, reintroduced silently by one script that skipped the helper.
+
+        The shell and PowerShell helpers differ because their exit mechanics do:
+        an EXIT trap there, try/finally here. Both must appear."""
+        offenders = []
+        for platform, name, unit in self._units():
+            for scr in unit["scripts"]:
+                path = os.path.join(ENGINE, scr)
+                if not os.path.exists(path):
+                    continue
+                with io.open(path, encoding="utf-8-sig", errors="replace") as fh:
+                    text = fh.read()
+                if scr.endswith(".ps1"):
+                    needed = ("Use-MTStore", "Complete-MTStore")
+                else:
+                    needed = ("mt_caps_use_store",)
+                for token in needed:
+                    if token not in text:
+                        offenders.append("%s (%s/%s) never calls %s"
+                                         % (scr, platform, name, token))
+        self.assertEqual([], offenders, "\n".join(offenders))
+
+    def test_a_unit_that_reads_nothing_shares_one_store(self):
+        """The payoff, asserted rather than assumed: SDL3 reads no capability,
+        so every app on the machine resolves it to the same bucket."""
+        vocab = V.load(None)
+        # The licence keys join the values because a `mode` unit's form reads
+        # them; sdl3 does not, which is the point being asserted.
+        a = dict((k, 1) for k in vocab.keys)
+        b = dict((k, 0) for k in vocab.keys)
+        for d, v in ((a, 1), (b, 0)):
+            d[R.COMMERCIAL_KEY] = v
+            d[R.PRIVATE_KEY] = v
+        for platform in ("macos", "linux", "windows"):
+            unit = R.build_units(platform)["sdl3"]
+            self.assertEqual(R.unit_form(unit, a), R.unit_form(unit, b))
+            self.assertTrue(R.unit_store_dir("/r", platform, "arm64", "common",
+                                             "sdl3", unit, a, "default")
+                            .endswith(os.path.join("sdl3", "common")))
+
+    def test_flipping_an_unread_capability_does_not_move_a_store(self):
+        """The regression this whole change exists to prevent."""
+        vocab = V.load(None)
+        base = dict((k, 1) for k in vocab.keys)
+        base[R.COMMERCIAL_KEY] = 0
+        base[R.PRIVATE_KEY] = 1
+        flipped = dict(base, MT_CAP_FTXUI=0)
+        for platform in ("macos", "linux", "windows"):
+            for name, unit in R.build_units(platform).items():
+                before = R.unit_store_dir("/r", platform, "arm64", "common",
+                                          name, unit, base, "default")
+                after = R.unit_store_dir("/r", platform, "arm64", "common",
+                                         name, unit, flipped, "default")
+                if name == "ftxui":
+                    self.assertNotEqual(before, after, "ftxui must move")
+                else:
+                    self.assertEqual(before, after,
+                                     "%s/%s moved when MT_CAP_FTXUI flipped" % (platform, name))
+
+
 class TestDepsKey(unittest.TestCase):
     """L16. The deps bucket is keyed by the ACQUISITION capabilities only.
 
@@ -1186,6 +1383,93 @@ class TestDepsKey(unittest.TestCase):
         moved = dict(base); moved["MT_CAP_VIDEO_PLAYBACK"] = 0
         self.assertEqual(R.deps_form(vocab, base), R.deps_form(vocab, same))
         self.assertNotEqual(R.deps_form(vocab, base), R.deps_form(vocab, moved))
+
+
+class TestFFmpegPolicy(unittest.TestCase):
+    """L4. The FFmpeg decoder policy has one home, and these are the checks
+    that mean something about it.
+
+    NOT "the emitted lists equal the vocabulary's lists" -- that compares
+    emit.py's serialisation against its own input and passes however wrong
+    the policy is. What can actually be wrong is the RELATIONS between the
+    four lists, and a name appearing in a place its licence status forbids."""
+
+    def policy(self):
+        vocab = V.load(None)
+        return vocab.get("MT_CAP_VIDEO_PLAYBACK")["ffmpeg"]
+
+    def test_withheld_and_base_do_not_overlap(self):
+        """A name cannot be both always-present and withheld. If one drifts
+        into both lists, the commercial build enables it in configure and the
+        absence guard then fails it -- an unbuildable commercial tier."""
+        ff = self.policy()
+        overlap = set(ff["decoders_base"]) & set(ff["decoders_withheld"])
+        self.assertEqual(set(), overlap, "decoders in both base and withheld: %s" % sorted(overlap))
+        poverlap = set(ff["parsers_base"]) & set(ff["parsers_withheld"])
+        self.assertEqual(set(), poverlap, "parsers in both base and withheld: %s" % sorted(poverlap))
+
+    def test_full_mode_is_base_plus_withheld_and_commercial_is_base(self):
+        """The emitted list for each mode, against the relation it must hold.
+        This is what the two hand-written per-mode sets in each script used to
+        assert, in three places that could disagree."""
+        import emit
+        vocab = V.load(None)
+        ff = self.policy()
+        base = dict((k, 1) for k in vocab.keys)
+        base[R.COMMERCIAL_KEY] = 0
+        base[R.SYMBOLS_KEY] = 1
+
+        private = dict(base); private[R.PRIVATE_KEY] = 1
+        public = dict(base); public[R.PRIVATE_KEY] = 0
+
+        full = emit.ffmpeg_policy(vocab, private)
+        comm = emit.ffmpeg_policy(vocab, public)
+
+        self.assertEqual(ff["decoders_base"], comm["MT_FFMPEG_DECODERS"].split())
+        self.assertEqual(ff["decoders_base"] + ff["decoders_withheld"],
+                         full["MT_FFMPEG_DECODERS"].split())
+        self.assertEqual(ff["parsers_base"], comm["MT_FFMPEG_PARSERS"].split())
+        self.assertEqual(ff["parsers_base"] + ff["parsers_withheld"],
+                         full["MT_FFMPEG_PARSERS"].split())
+        # The withheld list itself never varies by mode -- it is what the
+        # licence scanner denies, not what this build happens to contain.
+        self.assertEqual(full["MT_FFMPEG_DECODERS_WITHHELD"],
+                         comm["MT_FFMPEG_DECODERS_WITHHELD"])
+        # Demuxers are mode-independent (asf demuxing is licensing-safe).
+        self.assertEqual(full["MT_FFMPEG_DEMUXERS"], comm["MT_FFMPEG_DEMUXERS"])
+
+    def test_the_public_free_tier_gets_the_withheld_set_withheld(self):
+        """The defect this whole item began with, as an assertion: a build
+        that is non-commercial but DISTRIBUTED must not carry the withheld
+        decoders. COMMERCIAL=0 alone is not permission."""
+        import emit
+        vocab = V.load(None)
+        values = dict((k, 1) for k in vocab.keys)
+        values[R.COMMERCIAL_KEY] = 0
+        values[R.PRIVATE_KEY] = 0
+        values[R.SYMBOLS_KEY] = 1
+        emitted = emit.ffmpeg_policy(vocab, values)["MT_FFMPEG_DECODERS"].split()
+        for name in self.policy()["decoders_withheld"]:
+            self.assertNotIn(name, emitted,
+                             "%s reached a public/free build's configure line" % name)
+
+    def test_the_scanners_still_see_every_withheld_name(self):
+        """The withheld list moved out of commercial.forbidden_decoders_commercial
+        into the ffmpeg block. Both scanners union the old field across all
+        capabilities, so if they were not taught the new home the deny-list
+        would silently shrink to photo policy alone."""
+        import json
+        vocab_path = os.path.join(TOOL, "vocabulary.json")
+        data = json.load(io.open(vocab_path, encoding="utf-8"))
+        names = []
+        for cap in data["capabilities"].values():
+            names += cap.get("ffmpeg", {}).get("decoders_withheld", [])
+            names += cap.get("commercial", {}).get("forbidden_decoders_commercial", [])
+        for scanner in ("scan-forbidden-symbols.sh", "scan-forbidden-symbols.ps1"):
+            text = io.open(os.path.join(ENGINE, "tools/appbuild", scanner), encoding="utf-8").read()
+            self.assertIn("decoders_withheld", text, "%s does not read the new home" % scanner)
+        self.assertIn("hevc", names)
+        self.assertIn("heif", names)
 
 
 if __name__ == "__main__":

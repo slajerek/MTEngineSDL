@@ -121,10 +121,13 @@ public:
 	virtual CRenderShader *CreateFlatColorShader(float r, float g, float b, float a) override;
 	virtual CVideoYUVConverter *CreateVideoYUVConverter() override;
 
-	// CreateMaskedTileShader() is deliberately NOT overridden: it serves c64d
-	// and the game app, which keep working on OpenGL, and every caller already
-	// tolerates NULL by drawing its unshaded fallback. Porting more HLSL blind
-	// is what would make this stage unfinishable.
+	// Ported 2026-09-02, when a host application using masked tiles was first
+	// built and run on Windows. It had been left on the default NULL on the
+	// reasoning that "every caller already tolerates NULL by drawing its
+	// unshaded fallback" -- which was not true: that application's main view
+	// called BeginBatch() on it unconditionally and segfaulted. Both halves are
+	// fixed; see Shaders/MaskedTile.hlsl.
+	virtual CMaskedTileShader *CreateMaskedTileShader(bool queued) override;
 
 	// --- per-draw samplers -------------------------------------------------
 	//

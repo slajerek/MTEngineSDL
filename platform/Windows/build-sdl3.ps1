@@ -37,7 +37,12 @@ if (-not (Get-Command cmake -ErrorAction SilentlyContinue)) {
 }
 
 $repoRoot = (Resolve-Path "$PSScriptRoot\..\..").Path
-$outDir = $OutLibDir
+# Per-unit store (L16). The unit builds in a directory keyed only by the
+# capabilities IT reads, then its outputs are copied into the shared view. The
+# body is wrapped in try/finally because a stamp hit and a capability-off stub
+# both leave early and both still owe the view a copy.
+$outDir = Use-MTStore -Unit 'sdl3' -View $OutLibDir
+try {
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 
 # Newest vendored SDL3 static source tree, so a version bump needs no edit here.
@@ -109,3 +114,8 @@ if (Test-Path $outLib) { Remove-Item -Force $outLib }
 Copy-Item -Force $built $outLib
 Set-Content -NoNewline -Path $stamp -Value $stampValue
 Write-Host "Done. Output: $outLib"
+
+} finally {
+    # Runs on `exit` and on a terminating error alike.
+    Complete-MTStore
+}

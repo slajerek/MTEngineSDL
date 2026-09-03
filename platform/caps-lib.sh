@@ -37,12 +37,26 @@ mt_caps_read_flags() {
             # The one string-valued mode line (Phase 2): set(MT_FFMPEG_BUILD_MODE "full")
             sed -n 's/^set(MT_FFMPEG_BUILD_MODE "\(full\|commercial\)")$/MT_FFMPEG_BUILD_MODE = \1/p' \
                 "$fragment" >> "$normalised"
+            # The decoder policy lists (L4), same shape as the mode line: a
+            # quoted space-separated string, deliberately NOT a CMake ;-list,
+            # so one sed serves every string-valued setting here.
+            sed -n 's/^set(\(MT_FFMPEG_[A-Z_]*\) "\(.*\)")$/\1 = \2/p' \
+                "$fragment" >> "$normalised"
+            # Per-unit store paths (L16), same string shape again.
+            sed -n 's/^set(\(MT_STORE_[A-Z0-9_]*\) "\(.*\)")$/\1 = \2/p' \
+                "$fragment" >> "$normalised"
             ;;
     esac
 
     local line key value found=0
     while IFS= read -r line; do
         case "$line" in
+            MT_STORE_*|MT_FFMPEG_DECODERS*|MT_FFMPEG_PARSERS*|MT_FFMPEG_DEMUXERS*)
+                key="${line%% =*}"
+                value="${line#* = }"
+                export "$key=$value"
+                found=$((found + 1))
+                ;;
             MT_ENABLE_*|MT_CAP_*|MT_CAMERA_CAPTURE_ENABLED*)
                 key="${line%% =*}"
                 value="${line##*= }"
@@ -205,6 +219,109 @@ mt_caps_reset_stale_cmake_cache() {
         rm -rf "$build_dir"
         mkdir -p "$build_dir"
     fi
+}
+
+# policy_csv <space-separated list>  ->  comma-separated, for --enable-X=
+# policy_sorted <space-separated list>  ->  sorted, deduplicated, space-separated
+#
+# The decoder policy travels as a space-separated string (the shape every
+# string-valued caps setting uses). configure wants commas; the exact-set
+# guard compares against a sorted set, because FFmpeg reports what it enabled
+# in its own order and a list that differs only in order is the same policy.
+policy_csv() {
+    printf '%s' "$1" | tr -s ' ' ',' | sed 's/^,//; s/,$//'
+}
+
+policy_sorted() {
+    printf '%s' "$1" | tr ' ' '\n' | grep -v '^$' | sort -u | tr '\n' ' ' | sed 's/ $//'
+}
+
+# Where the engine is, derived from this file rather than from a caller's
+# variable: caps-lib.sh is sourced by producers that each spell their engine
+# path differently, and the lock helper below must find the same one from all
+# of them.
+MT_CAPS_ENGINE_DIR="${MT_CAPS_ENGINE_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+
+# mt_caps_sync_store_to_view <store-dir> <view-dir>
+#
+# A unit BUILDS in its own store, keyed by what it reads, and its outputs are
+# then copied into the one `libs` view every consumer links against (L16).
+#
+# ON EVERY INVOCATION, INCLUDING A STAMP HIT. This is the point that is easy
+# to get wrong: a hit means the STORE is valid, and says nothing about the
+# view -- which is keyed by the whole capability set and may be a directory
+# created seconds ago. A script that returns early on its stamp without
+# copying leaves the linker with nothing. The same applies to the
+# capability-off stub paths, which also exit early and also owe the view
+# their stub archive.
+#
+# tar rather than `cp -R`: the FFmpeg install is three-deep symlink chains
+# (libavcodec.dylib -> libavcodec.61.dylib -> libavcodec.61.19.101.dylib) and
+# `cp -R` on some platforms follows them, turning one library into three
+# copies. tar preserves them, merges into an existing view, and does not nest
+# a directory inside itself on a rerun.
+# The store's own bookkeeping is excluded: the lock directory and the owner
+# records live INSIDE the store, and a view is a link path -- it gets the
+# archives and nothing else.
+mt_caps_sync_store_to_view() {
+    local store="$1" view="$2"
+    [[ -d "$store" ]] || return 0
+    mkdir -p "$view"
+    ( cd "$store" && tar cf - --exclude '.build.lock' --exclude '.owner.*' . ) \
+        | ( cd "$view" && tar xf - )
+}
+
+# mt_caps_use_store <store-path-or-empty> [unit-name]
+#
+# One line per producing script. It redirects the script's output directory to
+# its own store and arranges for the outputs to reach the view on EVERY exit
+# path -- through a trap, not a call at the end.
+#
+# WHY A TRAP. These scripts leave by three or four different doors: a
+# capability-off stub, a stamp hit, sometimes a second stamp hit for a
+# sub-component, and the normal end. Every one of them owes the view a copy,
+# because a stamp says the STORE is valid and says nothing about a view that
+# may have been created seconds ago by a fresh capability set. A copy call at
+# each door is a copy call somebody will forget at the next door they add.
+#
+# It syncs only on success: a failed build must not publish a half-written
+# archive into a directory the linker is about to read.
+# It also takes a lock on the store. The build lock serializes apps that share
+# an engine CHECKOUT; a store hangs off the cache root instead, so a second
+# clone of the engine builds into the same `sdl3/common` while holding a
+# different build lock. Locking per store rather than per store-root is what
+# lets two units still build in parallel -- they are independent by
+# construction, which was the point of splitting them.
+mt_caps_use_store() {
+    local store="${1:-}"
+    local unit="${2:-$(basename "${store:-unit}")}"
+    MT_VIEW_LIB_DIR="$OUT_LIB_DIR"
+    MT_STORE_LIB_DIR="${store:-$OUT_LIB_DIR}"
+    mkdir -p "$MT_STORE_LIB_DIR"
+    OUT_LIB_DIR="$MT_STORE_LIB_DIR"
+    MT_STORE_LOCK=""
+    MT_STORE_LOCK_UNIT="$unit"
+    if [[ -n "$store" ]]; then
+        MT_STORE_LOCK="$MT_STORE_LIB_DIR/.build.lock"
+        MT_BUILD_LOCK_PID="$$" MTENGINE_LOCK_DIR="$MT_STORE_LOCK" \
+            "$MT_CAPS_ENGINE_DIR/tools/mtcaps/build-lock.sh" acquire "$unit"
+    fi
+    trap '_mt_caps_sync_exit' EXIT
+}
+
+_mt_caps_sync_exit() {
+    local status=$?
+    if [[ "$status" -eq 0 ]]; then
+        mt_caps_sync_store_to_view "$MT_STORE_LIB_DIR" "$MT_VIEW_LIB_DIR"
+    fi
+    # Released AFTER the sync, not before: the view copy reads the store, and a
+    # second builder let in early would be rewriting what tar is reading.
+    if [[ -n "${MT_STORE_LOCK:-}" ]]; then
+        MT_BUILD_LOCK_PID="$$" MTENGINE_LOCK_DIR="$MT_STORE_LOCK" \
+            "$MT_CAPS_ENGINE_DIR/tools/mtcaps/build-lock.sh" \
+            release "$MT_STORE_LOCK_UNIT" || true
+    fi
+    return "$status"
 }
 
 mt_caps_stub_archive() {

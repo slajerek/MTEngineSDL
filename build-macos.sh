@@ -40,20 +40,10 @@ set -euo pipefail
 #
 # Everything else -- SDL3, image/video codecs, llama.cpp, mbedTLS, FTXUI -- is
 # built by the engine target's own Xcode script phases, so there is nothing to
-# pre-build here. uSockets is the one exception; see Step 3.
+# pre-build here. uSockets is the one exception; see Step 2.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 XCODE_PROJECT="$SCRIPT_DIR/platform/MacOS/MTEngineSDL.xcodeproj"
-# The staging destination is resolved LATER, once the manifest has been read --
-# it depends on $MT_CAPS_OUT. See mt_caps_lib_dir in platform/caps-lib.sh.
-LIBS_DIR=""
-
-# uSockets is VENDORED inside this repository -- not a submodule and not a
-# sibling checkout. The vendored copy carries a local ARM64 fix
-# (`listenAddr = NULL` in other/lib/uSockets/src/bsd.c); pristine upstream
-# leaves that pointer uninitialised, so cloning upstream over it silently
-# produces a broken archive. Build this copy and only this copy.
-USOCKETS_DIR="$SCRIPT_DIR/other/lib/uSockets"
 
 CONFIGURATION="Release"
 ARCH=""
@@ -238,7 +228,19 @@ if [[ -n "$MANIFEST" || -n "$APP_NAME" ]]; then
         # reads MT_RELEASE_SYMBOLS for the strip decision.
         "MT_FFMPEG_BUILD_MODE=$(caps_value MT_FFMPEG_BUILD_MODE)"
         "MT_RELEASE_SYMBOLS=$(caps_value MT_RELEASE_SYMBOLS)"
+        # The decoder policy itself (L4): the codec script used to carry its
+        # own copy of these lists, and so did the other two platforms, so a
+        # name added in one was invisible to the rest and to the scanner.
+        "MT_FFMPEG_DECODERS=$(caps_value MT_FFMPEG_DECODERS)"
+        "MT_FFMPEG_DECODERS_WITHHELD=$(caps_value MT_FFMPEG_DECODERS_WITHHELD)"
+        "MT_FFMPEG_PARSERS=$(caps_value MT_FFMPEG_PARSERS)"
+        "MT_FFMPEG_DEMUXERS=$(caps_value MT_FFMPEG_DEMUXERS)"
     )
+    # Per-unit store paths (L16). Every producer on macOS is an Xcode script
+    # phase, so a build setting is the only way in; the phases read their own.
+    while IFS= read -r _store_line; do
+        [[ -n "$_store_line" ]] && MTCAPS_SETTINGS+=("$_store_line")
+    done < <(sed -n 's/^\(MT_STORE_[A-Z0-9_]*\) = \(.*\)$/\1=\2/p' "$MT_OUT/MTEngineCaps.xcconfig" 2>/dev/null)
     if [[ ${#MTCAPS_FLAG_SETTINGS[@]} -gt 0 ]]; then
         MTCAPS_SETTINGS+=("${MTCAPS_FLAG_SETTINGS[@]}")
     fi
@@ -271,7 +273,7 @@ if [[ -n "$MANIFEST" || -n "$APP_NAME" ]]; then
     # EXPORT it, do not merely pass it to xcodebuild. $MT_OUT reaches the Xcode
     # script phases as a build setting (MTCAPS_SETTINGS above), which is why the
     # acquisition scripts they run stage correctly. But this SHELL also stages a
-    # dependency -- uSockets, Step 3 -- through mt_caps_lib_dir, and that helper
+    # dependency -- uSockets, Step 2 -- through mt_caps_lib_dir, and that helper
     # reads $MT_CAPS_OUT from the environment. Without this export it fell back
     # to the _standalone root, so uSockets.a landed outside the keyed tree the
     # app then searched (measured: everything else keyed correctly, uSockets did
@@ -281,7 +283,11 @@ if [[ -n "$MANIFEST" || -n "$APP_NAME" ]]; then
     echo "Capabilities: $APP_NAME"
     echo "  manifest : $MANIFEST"
     echo "  out      : $MT_OUT"
-    echo "  mode     : $([ "$COMMERCIAL" = 1 ] && echo commercial || echo full)"
+    # The TIER, named as the tier. It used to print as "mode", which is the
+    # other axis: the public/free tier is commercial=0 with ffmpeg mode
+    # `commercial`, and a line calling that "full" told the reader the
+    # opposite of what was being built.
+    echo "  tier     : $([ "$COMMERCIAL" = 1 ] && echo commercial || echo non-commercial)"
 elif [[ "$PRINT_SETTINGS" == "true" ]]; then
     echo "ERROR: --print-settings needs --manifest and --app." >&2
     exit 2
@@ -308,18 +314,7 @@ fi
 mt_caps_init_submodules "$SCRIPT_DIR"
 
 # ---------------------------------------------------------------------------
-# Step 2: sanity-check the vendored uSockets
-# ---------------------------------------------------------------------------
-if [[ ! -f "$USOCKETS_DIR/Makefile" ]]; then
-    echo "ERROR: vendored uSockets not found at $USOCKETS_DIR" >&2
-    echo "       It ships inside this repository. Restore it with:" >&2
-    echo "         git checkout HEAD -- other/lib/uSockets" >&2
-    echo "       Do NOT clone uSockets from upstream -- the vendored copy is patched." >&2
-    exit 1
-fi
-
-# ---------------------------------------------------------------------------
-# Step 3: build and stage uSockets.a
+# Step 2: build and stage uSockets.a
 #
 # This lives here rather than in each app's build script. uSockets is the
 # engine's vendored dependency, so restoring and building it is the engine's
@@ -329,6 +324,10 @@ fi
 # The engine target is a static library, so it does not link uSockets itself --
 # the apps do. Staging it here is what lets an app build without knowing the
 # archive's provenance.
+#
+# The build itself moved to platform/MacOS/build-usockets.sh (L16), which is
+# where every other dependency on every other platform already lived. It gained
+# a stamp in the move: the inline version re-ran `make` on every invocation.
 # ---------------------------------------------------------------------------
 # THE BUILD LOCK, taken here because THIS script is what writes inside the
 # checkout: `make` runs in the vendored uSockets source tree below, which all
@@ -351,18 +350,7 @@ if [[ -x "$MT_LOCK" ]]; then
     trap '"$MT_LOCK" release "${APP_NAME:-MTEngineSDL}" >/dev/null 2>&1 || true' EXIT
 fi
 
-echo "Building uSockets"
-. "$SCRIPT_DIR/platform/caps-lib.sh"
-# Phase 5: build in a disposable WORK COPY -- the in-tree `make` was the last
-# build write inside this checkout on macOS. The vendored tree stays pristine.
-USOCKETS_WORK="$(mt_caps_work_dir uSockets)/src-macos"
-rm -rf "$USOCKETS_WORK"
-mkdir -p "$USOCKETS_WORK"
-cp -R "$USOCKETS_DIR/." "$USOCKETS_WORK/"
-( cd "$USOCKETS_WORK" && make -j"$(sysctl -n hw.ncpu)" )
-LIBS_DIR="$(mt_caps_lib_dir)"
-mkdir -p "$LIBS_DIR"
-cp -f "$USOCKETS_WORK/uSockets.a" "$LIBS_DIR/"
+"$SCRIPT_DIR/platform/MacOS/build-usockets.sh"
 
 if [[ "$DEPS_ONLY" == "true" ]]; then
     echo ""
@@ -371,7 +359,7 @@ if [[ "$DEPS_ONLY" == "true" ]]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Step 4: build MTEngineSDL
+# Step 3: build MTEngineSDL
 #
 # ALWAYS BUILD VIA -scheme, NEVER -target or a bare -project.
 #
@@ -415,7 +403,7 @@ echo "Building MTEngineSDL ($CONFIGURATION${ARCH:+, $ARCH}) via xcodebuild..."
 xcodebuild "${XCODE_ARGS[@]}" ${MTENGINE_XCODE_ARGS:-} build
 
 # ---------------------------------------------------------------------------
-# Step 5: locate and verify the product
+# Step 4: locate and verify the product
 #
 # ASK xcodebuild where it put things -- do NOT search DerivedData.
 #

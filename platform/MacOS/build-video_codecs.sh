@@ -27,6 +27,11 @@ if ! declare -f mt_caps_lib_dir >/dev/null 2>&1; then
   . "$ROOT_DIR/platform/caps-lib.sh"
 fi
 OUT_LIB_DIR="$(mt_caps_lib_dir)"
+
+# Store and view (L16). The video codecs follow MT_CAP_VIDEO_PLAYBACK and the two licence keys, because the FFmpeg decoder set depends on the resolved mode -- a full and a commercial build must never share a store.
+# With no store in the environment (a standalone run) the store IS the view
+# and the sync is a no-op.
+mt_caps_use_store "${MT_STORE_VIDEO_CODECS:-}" video_codecs
 OUT_LIB="$OUT_LIB_DIR/libmt_video_codecs.a"
 STAMP_FILE="$OUT_LIB_DIR/libmt_video_codecs.stamp"
 
@@ -332,13 +337,17 @@ build_ffmpeg() {
   # OS decoders always win where present -- these are used only when no
   # native decoder resolves. eac3's configure dependency on the ac3 core is
   # already satisfied (ac3 is in the base enabled-decoder list, both modes).
+  # THE MODE, not the tier. $FFMPEG_BUILD_MODE is derived at the top of this
+  # script from resolved MT_FFMPEG_BUILD_MODE, which is `full` only for
+  # MT_PRIVATE_BUILD=1. $COMMERCIAL is the LICENCE TIER and answers a
+  # different question: the public/free tier is COMMERCIAL=0 with mode
+  # `commercial`, because patents attach to distribution, not to payment.
+  # Reading the tier here handed that tier the withheld decoders.
+  # No mode branch here any more: MT_FFMPEG_DECODERS and MT_FFMPEG_PARSERS
+  # already carry the withheld names when the resolved mode is `full`, and
+  # mtcaps decided that from MT_PRIVATE_BUILD. The branch this replaces read
+  # the licence TIER and handed the public/free tier the withheld set.
   local mode_flags=()
-  if [[ "$COMMERCIAL" == "0" ]]; then
-    mode_flags+=(--enable-decoder=wmv1,wmv2,wmv3,vc1,wmav1,wmav2,wmapro)
-    mode_flags+=(--enable-decoder=msmpeg4v1,msmpeg4v2,msmpeg4v3)
-    mode_flags+=(--enable-decoder=hevc,aac,eac3)
-    mode_flags+=(--enable-parser=vc1)
-  fi
 
   # NOTE: FFmpeg's mpeg4 decoder select-depends on the h263 decoder core
   # (configure: mpeg4_decoder_select="h263_decoder"); h263 is therefore
@@ -354,10 +363,9 @@ build_ffmpeg() {
     --enable-shared --disable-static --disable-programs --disable-doc \
     --disable-network --disable-everything \
     --enable-protocol=file \
-    --enable-demuxer=mov,matroska,avi,mpegts,mpegps,mpegvideo,asf \
-    --enable-decoder=h264,prores,mjpeg,mpeg2video,mpeg4,mpeg1video,vp8,vp9,dvvideo \
-    --enable-decoder=pcm_s16le,pcm_s16be,pcm_s24le,pcm_u8,mp3,mp2,ac3,opus,vorbis,flac \
-    --enable-parser=h264,hevc,mpeg4video,mpegvideo,mjpeg,vp8,vp9,aac,ac3,mpegaudio,opus,vorbis,flac \
+    --enable-demuxer="$(policy_csv "$MT_FFMPEG_DEMUXERS")" \
+    --enable-decoder="$(policy_csv "$MT_FFMPEG_DECODERS")" \
+    --enable-parser="$(policy_csv "$MT_FFMPEG_PARSERS")" \
     --enable-videotoolbox \
     --disable-encoders --disable-muxers --disable-filters --disable-bsfs \
     --enable-bsf=hevc_mp4toannexb,h264_mp4toannexb,aac_adtstoasc \
@@ -385,25 +393,37 @@ build_ffmpeg() {
 # Full mode adds the 7 WMV/WMA software decoders (wmv3 select-depends on
 # vc1, which is already on the list), the 3 msmpeg4 decoders, and the
 # hevc/aac/eac3 software fallbacks (2026-07-19 codec-superset spec).
-FFMPEG_EXPECTED_DECODERS_COMMERCIAL="ac3 dvvideo flac h263 h264 mjpeg mp2 mp3 mpeg1video mpeg2video mpeg4 opus pcm_s16be pcm_s16le pcm_s24le pcm_u8 prores vorbis vp8 vp9"
-FFMPEG_EXPECTED_DECODERS_FULL="$FFMPEG_EXPECTED_DECODERS_COMMERCIAL aac eac3 hevc msmpeg4v1 msmpeg4v2 msmpeg4v3 vc1 wmapro wmav1 wmav2 wmv1 wmv2 wmv3"
+# WHAT IS POLICY AND WHAT IS THIS FFMPEG. The requested sets come from the
+# vocabulary through MT_FFMPEG_*; what FFmpeg force-enables on top of them is
+# a fact about ffmpeg-$FFMPEG_VERSION and lives here, next to that pin:
+#   h263 decoder  <- mpeg4_decoder_select     (configure:3026)
+#   h263 parser   <- mpeg4video parser select
+# Putting these in the vocabulary would make it a second source of truth for
+# someone else's configure, version-coupled to a pin it does not own.
+FFMPEG_IMPLICIT_DECODERS="h263"
+FFMPEG_IMPLICIT_PARSERS="h263"
+
+FFMPEG_EXPECTED_DECODERS="$(policy_sorted "$MT_FFMPEG_DECODERS $FFMPEG_IMPLICIT_DECODERS")"
 
 # Demuxers: identical in both modes (asf demuxing is licensing-safe under
 # Microsoft's Open Specification Promise). None of the requested demuxers
 # select-depends on another demuxer.
-FFMPEG_EXPECTED_DEMUXERS="asf avi matroska mov mpegps mpegts mpegvideo"
+FFMPEG_EXPECTED_DEMUXERS="$(policy_sorted "$MT_FFMPEG_DEMUXERS")"
 
 # Parsers: the 13 requested plus h263 (force-enabled as a select-dependency
 # of the mpeg4video parser). Full mode adds vc1 for the software VC-1
 # decode path.
-FFMPEG_EXPECTED_PARSERS_COMMERCIAL="aac ac3 flac h263 h264 hevc mjpeg mpeg4video mpegaudio mpegvideo opus vorbis vp8 vp9"
-FFMPEG_EXPECTED_PARSERS_FULL="$FFMPEG_EXPECTED_PARSERS_COMMERCIAL vc1"
+FFMPEG_EXPECTED_PARSERS="$(policy_sorted "$MT_FFMPEG_PARSERS $FFMPEG_IMPLICIT_PARSERS")"
 
 # Decoders that must be confirmed absent (CONFIG_*_DECODER 0) in COMMERCIAL
 # builds (store-safety guard, 2026-07-18 spec). HEVC/AAC/EAC3 moved here from
 # a former always-forbidden list on 2026-07-19 (codec-superset spec): full
 # builds now carry them as software fallbacks; commercial exclusion unchanged.
-FFMPEG_FORBIDDEN_DECODERS_COMMERCIAL="HEVC AAC EAC3 WMV1 WMV2 WMV3 VC1 WMAV1 WMAV2 WMAPRO"
+# Upper-cased for the CONFIG_<NAME>_DECODER symbols this checks. Derived from
+# the same withheld list the licence scanner reads, so the two cannot drift --
+# and it grows from 10 names to 13, because the scripts' hand-written copy had
+# been missing msmpeg4v1/v2/v3 while the vocabulary listed them.
+FFMPEG_FORBIDDEN_DECODERS_COMMERCIAL="$(printf '%s' "$MT_FFMPEG_DECODERS_WITHHELD" | tr '[:lower:] ' '[:upper:]\n' | tr '\n' ' ')"
 
 # require_ffmpeg_exact_set <build-dir> <KIND> <expected-space-separated>
 # KIND is the config_components.h suffix: DECODER, DEMUXER, or PARSER.
@@ -644,15 +664,17 @@ for arch in "${ARCH_LIST[@]}"; do
   build_libvpx "$arch" "$arch_prefix"
   build_opus "$arch" "$arch_prefix"
   build_ffmpeg "$arch" "$arch_prefix"
-  if [[ "$COMMERCIAL" == "1" ]]; then
+  # ONE expected set per kind, whatever the mode: the policy lists already
+  # carry the withheld names when the mode is `full`, so the guard no longer
+  # picks between two hand-written sets -- which is what it got wrong by
+  # picking on the licence tier. Only the absence check is mode-specific,
+  # because "these must NOT be here" has no meaning in full mode.
+  require_ffmpeg_exact_set "$BUILD_DIR/ffmpeg-$arch" "DECODER" "$FFMPEG_EXPECTED_DECODERS"
+  require_ffmpeg_exact_set "$BUILD_DIR/ffmpeg-$arch" "PARSER" "$FFMPEG_EXPECTED_PARSERS"
+  if [[ "$FFMPEG_BUILD_MODE" == "commercial" ]]; then
     for dec in $FFMPEG_FORBIDDEN_DECODERS_COMMERCIAL; do
       require_ffmpeg_decoder_disabled "$BUILD_DIR/ffmpeg-$arch" "$dec"
     done
-    require_ffmpeg_exact_set "$BUILD_DIR/ffmpeg-$arch" "DECODER" "$FFMPEG_EXPECTED_DECODERS_COMMERCIAL"
-    require_ffmpeg_exact_set "$BUILD_DIR/ffmpeg-$arch" "PARSER" "$FFMPEG_EXPECTED_PARSERS_COMMERCIAL"
-  else
-    require_ffmpeg_exact_set "$BUILD_DIR/ffmpeg-$arch" "DECODER" "$FFMPEG_EXPECTED_DECODERS_FULL"
-    require_ffmpeg_exact_set "$BUILD_DIR/ffmpeg-$arch" "PARSER" "$FFMPEG_EXPECTED_PARSERS_FULL"
   fi
   require_ffmpeg_exact_set "$BUILD_DIR/ffmpeg-$arch" "DEMUXER" "$FFMPEG_EXPECTED_DEMUXERS"
   normalize_ffmpeg_install_names "$arch"
@@ -677,7 +699,7 @@ for ff_lib in libavutil libavcodec libavformat libswscale libswresample; do
   require_ffmpeg_clean_deps "$PREFIX_DIR/lib/$ff_soname"
 done
 
-if [[ "$COMMERCIAL" == "1" ]]; then
+if [[ "$FFMPEG_BUILD_MODE" == "commercial" ]]; then
   require_ffmpeg_no_forbidden_symbols "$PREFIX_DIR/lib"
 fi
 

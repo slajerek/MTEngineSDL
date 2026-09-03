@@ -1,0 +1,106 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!-- ===================================================================
+     THE APP-SIDE MSBuild PROPERTIES, owned by the engine.
+
+     Companion to MTEngineApp.targets, and the same argument (L13): what
+     lived here was 70-odd lines copied into four app repos, differing only
+     in the app name. An app's Directory.Build.props now declares its
+     identity and imports this.
+
+     WHY A SEPARATE FILE FROM MTEngineApp.targets, rather than more of it:
+     these are PROPERTIES, and IntDir and OutDir are evaluated before any
+     target runs. Directory.Build.targets is imported after
+     Microsoft.Cpp.targets has already derived TargetDir and TargetPath from
+     OutDir, so a value set there arrives too late and would leave the two
+     disagreeing. Only an import reached from Directory.Build.props is early
+     enough.
+
+     APP-SPECIFIC MSBuild goes in the app's own file, BELOW its import of
+     this one. Never inside this file.
+     =================================================================== -->
+<Project>
+
+  <PropertyGroup>
+    <!-- THE IDE PATH. IntDir and OutDir are EVALUATED before any target
+         runs, so MTCapsResolveForIDE cannot feed them. Each app's .vcxproj
+         carries
+
+           <IntDir Condition="'$(MTBuildRoot)' != ''">$(MTBuildRoot)obj\...
+
+         (L12), and with nothing giving MTBuildRoot a value on the IDE path
+         that condition was never true: IntDir fell back to MSBuild's
+         project-relative $(Platform)\$(Configuration)\ and an IDE build
+         wrote its objects INTO THE CHECKOUT.
+
+         The command-line driver passes /p:MTBuildRoot=..., which is a GLOBAL
+         property, and a global property cannot be overridden by a
+         PropertyGroup, so these lines are inert on that path and only ever
+         supply the IDE default.
+
+         No caps-hash in the path on purpose: a caps-keyed path needs the
+         resolve, which only targets can run. The IDE is the convenience
+         path; the command-line driver stays canonical. -->
+    <MTCacheRoot>$(MTENGINE_BUILD_ROOT)</MTCacheRoot>
+    <MTCacheRoot Condition="'$(MTCacheRoot)' == ''">$(USERPROFILE)\.cache\mtengine</MTCacheRoot>
+
+    <!-- SOLUTION-KEYED (2026-09-02). The engine is compiled with the
+         CAPABILITIES OF THE APP whose solution is open, so a single
+         _ide\MTEngineSDL\ tree shared by four app solutions means every
+         switch between them recompiles the whole engine. Not a WRONG build,
+         because the CL command line changes and MSBuild notices, but a full
+         one every time. $(SolutionName) is a global property in every
+         solution build, and it is the same for the solution's own instance of
+         a project and for the instance an app's ProjectReference resolves, so
+         keying on it separates the four apps without splitting one build into
+         two instances. Empty when a .vcxproj is built with no solution around
+         it, which falls back to the project name alone. -->
+    <MTIdeKey>$(MSBuildProjectName)</MTIdeKey>
+    <MTIdeKey Condition="'$(SolutionName)' != ''">$(SolutionName)\$(MSBuildProjectName)</MTIdeKey>
+
+    <!-- WHICH PATH IS THIS? Recorded one line before MTBuildRoot gets its IDE
+         default, because that is the only moment the two are still
+         distinguishable: after the next line both have a non-empty
+         MTBuildRoot and nothing tells them apart.
+
+         WHY IT EXISTS (2026-09-02, defect C). The IDE and the driver both
+         wrote <App>.exe to platform\Windows\bin\<Arch>\<Cfg>\ while using
+         different IntDirs since L12, so each one's link step saw an exe newer
+         than its own objects and skipped linking. Measured on Windows: a
+         solution build linked an exe, the driver then ran, reported "Build
+         successful" and "Deployed", relinked nothing, and the prod package
+         got a byte-identical copy of the IDE's binary. A driver build could
+         ship a binary it did not produce, silently.
+
+         Each app's .vcxproj consumes this the way it already consumes
+         MTBuildRoot for IntDir, one conditional line per configuration:
+
+           <OutDir Condition="'$(MTIdeBuild)' == 'true'">$(MTBuildRoot)bin\...
+
+         which is where it has to live, since OutDir is set per configuration
+         in the project file. The DRIVER path keeps its own OutDir: it asserts
+         the exe under platform\Windows\bin\ and packages it from there.
+         MTEngineSDL.vcxproj has always keyed OutDir on MTBuildRoot; this is
+         the apps catching up. -->
+    <MTIdeBuild Condition="'$(MTBuildRoot)' == ''">true</MTIdeBuild>
+    <MTBuildRoot Condition="'$(MTBuildRoot)' == ''">$(MTCacheRoot)\_ide\$(MTIdeKey)\$(Platform)\$(Configuration)\</MTBuildRoot>
+  </PropertyGroup>
+
+  <!-- The generated capability fragment. $(MTOutRoot) is its directory,
+       outside every checkout; it cannot be computed here (its key carries a
+       git revision and a capability hash), so build-windows.ps1 supplies it
+       as /p:MTOutRoot=... and each .vcxproj carries it across the
+       ProjectReference with AdditionalProperties. An IDE build supplies
+       neither and stops at the engine's guard, naming the script to run. -->
+  <Import Project="$(MTOutRoot)\MTEngineCaps.props"
+          Condition="'$(MTOutRoot)' != '' And Exists('$(MTOutRoot)\MTEngineCaps.props')" />
+
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <PreprocessorDefinitions Condition="'$(MTExtraDefines)' != ''">$(MTExtraDefines);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <!-- /utf-8: source AND execution charset are UTF-8 on the MSVC (v143)
+           toolset, matching Clang, GCC and Apple clang, so raw UTF-8 string
+           literals mean the same bytes on every compiler. -->
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+</Project>

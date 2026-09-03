@@ -77,3 +77,62 @@ mt_appbuild_check_stub() {
         echo "      Refresh it: cp \"$TEMPLATE\" \"$APP_DIR/$NAME\"" >&2
     fi
 }
+
+# mt_appbuild_prod_binary <app-dir> <binary-basename>
+#
+# Echoes "<prod-dir>|<binary-path>" for the newest release package that holds a
+# runnable binary, or nothing at all. Both halves matter and the FIRST is the
+# one people forget.
+#
+# WHY THE DIRECTORY IS PART OF THE ANSWER. An MTEngineSDL app finds its assets
+# through the CURRENT WORKING DIRECTORY and nothing else: RES_ResolveResourceDir
+# has exactly two candidate roots, the relative path itself and
+# gPathToResources, and on Windows SYS_InitFileSystem builds that second one as
+# the working directory plus "\Resources\". The executable's own location is
+# never consulted. So "where the binary is" does not determine whether it can
+# load anything -- "where you launched it from" does.
+#
+# The release package is the directory laid out to satisfy that: the binary,
+# assets/, LICENSES.txt and any runtime DLLs together. A test that runs the
+# binary out of the build tree with the repo root as its CWD only works for an
+# app whose repo root happens to have assets/ in it; an app that needs assets
+# cannot start at all that way. Hence the rule, from the maintainer 2026-09-02:
+# apps are built to prod and the tests run FROM there.
+#
+# NO ARCH MAPPING, deliberately. The obvious implementation reads `uname -m`
+# and maps it to the directory the driver used -- but that mapping differs per
+# platform (ARM64/x64 on Windows, arm64/x86_64 on macOS, aarch64 on Linux) AND
+# per shell (`uname -m` under Git Bash on an ARM64 Windows box reports the
+# emulated x86_64). Three of those six answers would be wrong. Globbing the
+# packages that actually EXIST and taking the newest cannot be wrong about a
+# name it never has to spell.
+mt_appbuild_prod_binary() {
+    local APP_DIR="$1"
+    local NAME="$2"
+    local best="" best_mtime=0 prod bin mtime
+
+    for prod in "$APP_DIR"/platform/*/prod/*/; do
+        [[ -d "$prod" ]] || continue
+        # macOS keeps the executable inside the bundle; the CWD is still the
+        # package directory, which is where assets/ sits.
+        for bin in "$prod$NAME"*.app/Contents/MacOS/"$NAME" \
+                   "$prod$NAME"*.exe "$prod$NAME"*; do
+            [[ -f "$bin" && -x "$bin" ]] || continue
+            case "$bin" in *.app) continue ;; esac
+            mtime=$(mt_appbuild_mtime "$bin") || continue
+            if [[ "$mtime" -gt "$best_mtime" ]]; then
+                best_mtime="$mtime"
+                best="${prod%/}|$bin"
+            fi
+        done
+    done
+
+    [[ -n "$best" ]] && printf '%s\n' "$best"
+}
+
+# stat(1) is not portable: BSD/macOS wants -f %m, GNU/Linux and Git Bash want
+# -c %Y. Both are tried rather than branching on `uname`, because Git Bash is a
+# GNU stat on a system that says it is Windows.
+mt_appbuild_mtime() {
+    stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null
+}

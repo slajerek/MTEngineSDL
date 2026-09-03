@@ -30,6 +30,11 @@ if ! declare -f mt_caps_lib_dir >/dev/null 2>&1; then
   . "$ROOT_DIR/platform/caps-lib.sh"
 fi
 OUT_LIB_DIR="$(mt_caps_lib_dir)"
+
+# Store and view (L16). SDL3 reads no capability at all: one bucket for the life of the machine.
+# With no store in the environment (a standalone run) the store IS the view
+# and the sync is a no-op.
+mt_caps_use_store "${MT_STORE_SDL3:-}" sdl3
 OUT_LIB="$OUT_LIB_DIR/libSDL3.a"
 STAMP_FILE="$OUT_LIB_DIR/libSDL3.stamp"
 

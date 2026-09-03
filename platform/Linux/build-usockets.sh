@@ -29,6 +29,11 @@ if ! declare -f mt_caps_lib_dir >/dev/null 2>&1; then
   . "$ROOT_DIR/platform/caps-lib.sh"
 fi
 OUT_LIB_DIR="$(mt_caps_lib_dir)"
+
+# Store and view (L16). uSockets reads no capability on any platform -- the vocabulary gives it an acquisition row, but the script gates on nothing.
+# With no store in the environment (a standalone run) the store IS the view
+# and the sync is a no-op.
+mt_caps_use_store "${MT_STORE_USOCKETS:-}" usockets
 OUT_LIB="$OUT_LIB_DIR/uSockets.a"
 STAMP_FILE="$OUT_LIB_DIR/uSockets.stamp"
 

@@ -43,7 +43,12 @@ if (Test-Path -LiteralPath $legacyBuildDir) {
 # platform\Windows\libs path cannot creep back in here -- that directory holds
 # 25 TRACKED prebuilts and a build must not write into it.
 if (-not $OutLibDir) { throw "-OutLibDir is required. Run this through build-deps.ps1, which resolves it." }
-$outDir = $OutLibDir
+# Per-unit store (L16). The unit builds in a directory keyed only by the
+# capabilities IT reads, then its outputs are copied into the shared view. The
+# body is wrapped in try/finally because a stamp hit and a capability-off stub
+# both leave early and both still owe the view a copy.
+$outDir = Use-MTStore -Unit 'llama_cpp' -View $OutLibDir
+try {
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 
 # Self-skip (L11): keyed like the CPU leg; the marker lib for the check is
@@ -145,3 +150,8 @@ New-Item -ItemType Directory -Force -Path (Split-Path -Parent $versionHeader) | 
 #pragma once
 #define MT_LLAMA_CPP_VERSION "$versionTag"
 "@ | Set-Content -Path $versionHeader -Encoding UTF8
+
+} finally {
+    # Runs on `exit` and on a terminating error alike.
+    Complete-MTStore
+}

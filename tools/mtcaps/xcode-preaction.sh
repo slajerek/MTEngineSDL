@@ -187,6 +187,23 @@ DEFINES_ENGINE="$(caps_value MT_CAPS_DEFINES_ENGINE)"
 # were still fetched and built for a manifest that does not want them.
 FLAG_SETTINGS="$(grep -E '^(MT_ENABLE_|MT_CAP_|MT_CAMERA_CAPTURE_ENABLED)[A-Z0-9_]* = [01]$' "$GEN" || true)"
 
+# THE NON-NUMERIC SETTINGS, and they are not optional decoration.
+#
+# build-macos.sh passes MT_FFMPEG_BUILD_MODE and MT_RELEASE_SYMBOLS as build
+# settings precisely BECAUSE the numeric filter above skips them (see its
+# comment at "Build-settings mode values"), and the contract at the head of
+# this file is that the IDE path and the script path converge -- "anything
+# else appearing in one and not the other is a bug". These two were exactly
+# that bug.
+#
+# What it cost: build-video_codecs.sh derives its decoder set from
+# MT_FFMPEG_BUILD_MODE and falls back to `full` when nothing sets it. On the
+# IDE path nothing did, so an Xcode build of a manifest whose resolved mode is
+# `commercial` silently built and linked a patent-encumbered FFmpeg -- on the
+# one path that runs no licence scan. The nine tier-vs-mode branches fixed
+# alongside this do not reach it; only publishing the value does.
+MODE_SETTINGS="$(grep -E '^(MT_FFMPEG_[A-Z_]*|MT_STORE_[A-Z0-9_]*|MT_RELEASE_SYMBOLS) = .+$' "$GEN" || true)"
+
 write_xcconfig() {
     local path="$1" which="$2" extra="$3"
     mkdir -p "$(dirname "$path")"
@@ -220,6 +237,11 @@ write_xcconfig() {
         echo "// Each flag standalone, so the acquisition script phases can read one"
         echo "// directly rather than re-parsing a define blob in six shell scripts."
         printf '%s\n' "$FLAG_SETTINGS"
+        echo ""
+        echo "// The values that are not 0/1, and that the filter above therefore"
+        echo "// skips. build-video_codecs.sh picks its decoder set from"
+        echo "// MT_FFMPEG_BUILD_MODE; without this line it fell back to \"full\"."
+        printf '%s\n' "$MODE_SETTINGS"
     } > "$path"
 }
 

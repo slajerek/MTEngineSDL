@@ -1263,6 +1263,12 @@
     <ClInclude Include="..\src.Windows\Render\CRenderShaderFlatColorD3D11.h">
       <Filter>Source Files\src.Windows\Render</Filter>
     </ClInclude>
+    <ClCompile Include="..\src.Windows\Render\CRenderShaderMaskedTileD3D11.cpp">
+      <Filter>Source Files\src.Windows\Render</Filter>
+    </ClCompile>
+    <ClInclude Include="..\src.Windows\Render\CRenderShaderMaskedTileD3D11.h">
+      <Filter>Source Files\src.Windows\Render</Filter>
+    </ClInclude>
     <ClCompile Include="..\src.Windows\Render\CRenderBackendD3D11.cpp">
       <Filter>Source Files\src.Windows\Render</Filter>
     </ClCompile>
@@ -1293,6 +1299,9 @@
       <Filter>Source Files\src.Windows\Render\Shaders</Filter>
     </None>
     <None Include="..\src.Windows\Render\Shaders\FlatColor.hlsl">
+      <Filter>Source Files\src.Windows\Render\Shaders</Filter>
+    </None>
+    <None Include="..\src.Windows\Render\Shaders\MaskedTile.hlsl">
       <Filter>Source Files\src.Windows\Render\Shaders</Filter>
     </None>
     <None Include="..\src.Windows\Render\Shaders\VideoYUV.hlsl">

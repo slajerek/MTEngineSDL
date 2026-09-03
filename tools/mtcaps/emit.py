@@ -34,12 +34,27 @@ def _write(path, text):
         f.write(data)
 
 
+def store_settings(meta):
+    """MT_STORE_<UNIT> for every build unit on this platform (L16).
+
+    Delivered as string settings in the same shape as MT_FFMPEG_BUILD_MODE and
+    the decoder policy, so the four readers that already carry string values to
+    the producing scripts need one wider pattern rather than a new mechanism
+    each. A producer reads its own -- build-sdl3.sh reads MT_STORE_SDL3 -- and
+    computes nothing: keys are mtcaps' business, and a shell that computed one
+    would be the second implementation of a key that this system has already
+    had to delete once.
+    """
+    return dict(("MT_STORE_%s" % name.upper(), path)
+                for name, path in sorted(meta.get("stores", {}).items()))
+
+
 def emit_all(vocab, values, canonical, out, include_dir, meta):
     """Writes every artefact and returns the list of paths written."""
     written = []
-    written.append(emit_cmake(vocab, values, canonical, out, include_dir))
-    written.append(emit_xcconfig(vocab, values, canonical, out, include_dir))
-    written.append(emit_props(vocab, values, canonical, out, include_dir))
+    written.append(emit_cmake(vocab, values, canonical, out, include_dir, meta))
+    written.append(emit_xcconfig(vocab, values, canonical, out, include_dir, meta))
+    written.append(emit_props(vocab, values, canonical, out, include_dir, meta))
     written.append(emit_header(vocab, values, canonical, include_dir))
     written.append(emit_msbuild_ide_defines(vocab, values, out))
     written.append(emit_llama_version_placeholder(include_dir))
@@ -52,11 +67,63 @@ def emit_all(vocab, values, canonical, out, include_dir, meta):
 # Linux -- CMake
 # ---------------------------------------------------------------------------
 
-def emit_cmake(vocab, values, canonical, out, include_dir):
+def _camel(key):
+    """MT_FFMPEG_DECODERS_WITHHELD -> MTFFmpegDecodersWithheld, matching the
+    MTFFmpegBuildMode / MTReleaseSymbols properties beside it."""
+    parts = key.split("_")
+    out = "MT" + ("FFmpeg" if parts[1] == "FFMPEG" else parts[1].capitalize())
+    for p in parts[2:]:
+        out += p.capitalize()
+    return out
+
+
+def ffmpeg_policy(vocab, values):
+    """The FFmpeg decoder policy for the resolved mode, as four space-separated
+    lists: decoders, parsers, demuxers, and the withheld set.
+
+    ONE SHAPE FOR ALL OF THEM, and it is the shape MT_FFMPEG_BUILD_MODE
+    already uses -- a space-separated string, not a CMake `;`-list -- because
+    the three readers that carry these values into the codec scripts parse
+    fragments line by line with a sed and two regexes. A second shape would
+    mean a second parser in each of them.
+
+    The withheld set is emitted SEPARATELY from the decoder list rather than
+    folded into it, because the scripts need both: the configure line wants
+    the union for `full`, and the guard wants to know which names are the
+    withheld ones. Deriving one from the other in three scripts is how the
+    lists drifted apart in the first place.
+    """
+    ff = vocab.get("MT_CAP_VIDEO_PLAYBACK").get("ffmpeg", {})
+    full = ffmpeg_mode(values) == "full"
+    decoders = list(ff.get("decoders_base", []))
+    parsers = list(ff.get("parsers_base", []))
+    if full:
+        decoders += ff.get("decoders_withheld", [])
+        parsers += ff.get("parsers_withheld", [])
+    return {
+        "MT_FFMPEG_DECODERS": " ".join(decoders),
+        "MT_FFMPEG_PARSERS": " ".join(parsers),
+        "MT_FFMPEG_DEMUXERS": " ".join(ff.get("demuxers", [])),
+        "MT_FFMPEG_DECODERS_WITHHELD": " ".join(ff.get("decoders_withheld", [])),
+    }
+
+
+def cmake_path(path):
+    r"""A path CMake can read on every platform.
+
+    CMake parses `\U` inside a quoted argument as a character escape and fails
+    the whole fragment, so a Windows path spelled with backslashes is a syntax
+    error rather than a wrong value. Forward slashes are accepted everywhere
+    CMake accepts a path, on Windows included.
+    """
+    return path.replace("\\", "/")
+
+
+def emit_cmake(vocab, values, canonical, out, include_dir, meta=None):
     lines = ["# %s" % BANNER, ""]
     lines.append('set(MT_CAPS_RESOLVED "%s")' % canonical)
-    lines.append('set(MT_CAPS_INCLUDE_DIR "%s")' % include_dir.replace("\\", "/"))
-    lines.append('set(MT_CAPS_BUILD_DIR "%s")' % os.path.dirname(include_dir).replace("\\", "/"))
+    lines.append('set(MT_CAPS_INCLUDE_DIR "%s")' % cmake_path(include_dir))
+    lines.append('set(MT_CAPS_BUILD_DIR "%s")' % cmake_path(os.path.dirname(include_dir)))
     lines.append("")
     lines.append("# Capabilities, as CMake variables AND as compile definitions.")
     for key in vocab.keys:
@@ -92,6 +159,13 @@ def emit_cmake(vocab, values, canonical, out, include_dir):
     lines.append("# Build-settings mode values (decision 0.5 / 0.2) -- values, not defines.")
     lines.append("set(MT_RELEASE_SYMBOLS %d)" % values[SYMBOLS_KEY])
     lines.append('set(MT_FFMPEG_BUILD_MODE "%s")' % ffmpeg_mode(values))
+    for k, v in sorted(ffmpeg_policy(vocab, values).items()):
+        lines.append('set(%s "%s")' % (k, v))
+    # Through cmake_path, like MT_CAPS_INCLUDE_DIR above. The store paths are
+    # the first ABSOLUTE paths this fragment carried that are not already
+    # normalised, and on Windows they broke it outright (`C:\Users\...`).
+    for k, v in sorted(store_settings(meta or {}).items()):
+        lines.append('set(%s "%s")' % (k, cmake_path(v)))
     lines.append("")
     lines.append("function(mt_apply_capabilities target)")
     lines.append("    set(_mt_defs \"\")")
@@ -142,7 +216,7 @@ def emit_cmake(vocab, values, canonical, out, include_dir):
 # back, and folds nothing into GCC_PREPROCESSOR_DEFINITIONS.
 # ---------------------------------------------------------------------------
 
-def emit_xcconfig(vocab, values, canonical, out, include_dir):
+def emit_xcconfig(vocab, values, canonical, out, include_dir, meta=None):
     lines = ["// %s" % BANNER,
              "//",
              "// This file is READ BY build-macos.sh and imported by nothing. See emit.py.",
@@ -158,6 +232,10 @@ def emit_xcconfig(vocab, values, canonical, out, include_dir):
     # script input, not a compile-time branch.
     lines.append("MT_RELEASE_SYMBOLS = %d" % values[SYMBOLS_KEY])
     lines.append("MT_FFMPEG_BUILD_MODE = %s" % ffmpeg_mode(values))
+    for k, v in sorted(ffmpeg_policy(vocab, values).items()):
+        lines.append("%s = %s" % (k, v))
+    for k, v in sorted(store_settings(meta or {}).items()):
+        lines.append("%s = %s" % (k, v))
     lines.append("")
     lines.append("MT_CAPS_DEFINES = %s" % " ".join(app_visible_defines(vocab, values)))
     lines.append("MT_CAPS_DEFINES_ENGINE = %s" % " ".join(engine_only_defines(vocab, values)))
@@ -175,7 +253,7 @@ def emit_xcconfig(vocab, values, canonical, out, include_dir):
 # Windows -- MSBuild
 # ---------------------------------------------------------------------------
 
-def emit_props(vocab, values, canonical, out, include_dir):
+def emit_props(vocab, values, canonical, out, include_dir, meta=None):
     # platform="windows": this fragment is imported ONLY by MSBuild (see the
     # section header below), so it always reflects Windows reality, regardless
     # of which --platform a given `resolve` invocation happened to run under.
@@ -201,6 +279,19 @@ def emit_props(vocab, values, canonical, out, include_dir):
         "    <MTCapsBuildDir>%s</MTCapsBuildDir>" % os.path.dirname(include_dir),
         "    <MTReleaseSymbols>%d</MTReleaseSymbols>" % values[SYMBOLS_KEY],
         "    <MTFFmpegBuildMode>%s</MTFFmpegBuildMode>" % ffmpeg_mode(values),
+    ] + [
+        # MSBuild property names cannot carry the MT_FFMPEG_ prefix's
+        # underscores by convention here, so they follow the CamelCase of
+        # their neighbours; the codec script reads them through the
+        # environment the driver builds, not from this file.
+        "    <%s>%s</%s>" % (_camel(k), v, _camel(k))
+        for k, v in sorted(ffmpeg_policy(vocab, values).items())
+    ] + [
+        # Per-unit stores, so an IDE build reaches the same directories the
+        # driver does. MTStoreSdl3, MTStoreVideoCodecs, ...
+        "    <%s>%s</%s>" % (_camel(k), v, _camel(k))
+        for k, v in sorted(store_settings(meta or {}).items())
+    ] + [
         "  </PropertyGroup>",
         "  <PropertyGroup>",
     ]

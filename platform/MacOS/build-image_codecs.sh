@@ -30,6 +30,11 @@ if ! declare -f mt_caps_lib_dir >/dev/null 2>&1; then
   . "$ROOT_DIR/platform/caps-lib.sh"
 fi
 OUT_LIB_DIR="$(mt_caps_lib_dir)"
+
+# Store and view (L16). The image codecs follow the three capabilities their configure reads: photo codecs, RAW and colour management.
+# With no store in the environment (a standalone run) the store IS the view
+# and the sync is a no-op.
+mt_caps_use_store "${MT_STORE_IMAGE_CODECS:-}" image_codecs
 OUT_LIB="$OUT_LIB_DIR/libmt_image_codecs.a"
 STAMP_FILE="$OUT_LIB_DIR/libmt_image_codecs.stamp"
 

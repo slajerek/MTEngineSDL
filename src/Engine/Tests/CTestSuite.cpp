@@ -13,6 +13,51 @@
 #endif
 using namespace std;
 
+// The results file, and why it is not simply a relative path any more.
+//
+// An MTEngineSDL app finds its assets through the CURRENT WORKING DIRECTORY --
+// RES_ResolveResourceDir has two candidate roots and both are CWD-derived -- so
+// a test run has to start in the release package, where assets/ sits beside the
+// binary. A host application that needs assets cannot start anywhere else.
+//
+// But this path was a relative literal opened with fopen("w"), which does not
+// create directories. Running from the package therefore wrote nothing: the
+// app looked for tests/results/ UNDER the package, found none, logged a failure
+// nobody reads, and the runner then parsed a stale file from the previous run
+// or none at all. Silent, and it would have reported the previous run's verdict.
+//
+// So the path is resolvable, exactly as CLAUDE.md permits for test output:
+// "Environment variables or CLI flags are acceptable for test configuration,
+// output paths, and deterministic fixtures". --results-file wins, then
+// MT_TEST_RESULTS, then the historical relative default so that every existing
+// invocation keeps behaving as it did.
+const char *MT_TestResultsPath()
+{
+	static string resolved;
+	if (!resolved.empty())
+		return resolved.c_str();
+
+	for (size_t i = 0; i < sysCommandLineArguments.size(); i++)
+	{
+		if (strcmp(sysCommandLineArguments[i], "--results-file") == 0
+			&& i + 1 < sysCommandLineArguments.size())
+		{
+			resolved = sysCommandLineArguments[i + 1];
+			return resolved.c_str();
+		}
+	}
+
+	const char *fromEnv = getenv("MT_TEST_RESULTS");
+	if (fromEnv != NULL && fromEnv[0] != '\0')
+	{
+		resolved = fromEnv;
+		return resolved.c_str();
+	}
+
+	resolved = "tests/results/last_run.txt";
+	return resolved.c_str();
+}
+
 // Restore default signal handlers before SYS_Shutdown().
 // ImGuiTestEngine_InstallDefaultCrashHandler() hooks SIGABRT etc. with a handler
 // that calls abort(), which re-raises SIGABRT causing infinite CrashHandler spam
@@ -60,7 +105,7 @@ void CTestSuite::RunFromCLI(CTestSuite *suite, const char *testName)
 	CTestRunner::isTestPending = true;
 
 	suite->exitOnCompletion = true;
-	suite->resultsFilePath = "tests/results/last_run.txt";
+	suite->resultsFilePath = MT_TestResultsPath();
 
 	// Default: run every test and report all failures in one pass. Opt back into
 	// fast-fail with --stop-on-first-failure. --all-plugin-tests asks the

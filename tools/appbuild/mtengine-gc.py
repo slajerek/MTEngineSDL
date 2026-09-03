@@ -11,6 +11,8 @@ requirement of the capability system). The cache root layout it knows:
                                            generated include; bounded)
     <root>/_deps/<plat>/<arch>/<cfg>/<backend>/<hash>/libs   dependency buckets
     <root>/_deps/work/...                  shared dependency build trees
+    <root>/_depstore/<plat>/<arch>/<cfg>/<unit>[/<backend>]/<hash>
+                                           per-unit dependency build stores (L16)
     <root>/_standalone/, <root>/_deps/standalone/            caps-less builds
 
 Default action is a REPORT. --prune deletes, with liveness computed from the
@@ -119,11 +121,24 @@ def live_engine_revs():
 
 
 def live_resolve_paths(platform):
-    """deps and _build dirs the CURRENT manifests resolve to, per sibling app
-    per config. A path the tooling would use today is never pruned."""
+    """Every directory the CURRENT manifests resolve to, per sibling app per
+    config: the deps view, the rev-free build dir, and each per-unit store.
+    A path the tooling would use today is never pruned.
+
+    One resolve call per (app, config) parses all of them from the pinned
+    lines. The earlier form called --print twice and so could not have seen
+    the stores at all: --print answers with one path, and there are now as
+    many live paths as there are build units."""
     live = set()
     mtcaps = os.path.join(ENGINE, "tools", "mtcaps", "mtcaps.py")
     arch = os.uname().machine if hasattr(os, "uname") else os.environ.get("PROCESSOR_ARCHITECTURE", "x64")
+    # The drivers pass these; omitting them puts every resolved path under the
+    # "default" backend segment, which on an ARM machine is a segment nothing
+    # builds into -- liveness would then protect directories that do not exist
+    # and leave the real ones unprotected.
+    engine_opts = []
+    for k, v in sorted(R.default_engine_options(arch).items()):
+        engine_opts += ["--engine-option", "%s=%s" % (k, v)]
     for name, path in sibling_apps():
         app = name
         conf = open(os.path.join(path, "mtengine-app.conf"), encoding="utf-8").read()
@@ -131,18 +146,68 @@ def live_resolve_paths(platform):
             if line.startswith("MT_APP_NAME="):
                 app = line.split("=", 1)[1].strip().strip('"')
         for config in ("Debug", "Release"):
-            for what in ("deps-dir", "build-dir"):
-                r = subprocess.run(
-                    [sys.executable, "-B", mtcaps, "resolve",
-                     "--manifest", os.path.join(path, "mtengine.caps"),
-                     "--app", app, "--platform", platform,
-                     "--arch", arch, "--config", config,
-                     "--engine-dir", ENGINE, "--print", what],
-                    capture_output=True, text=True)
-                p = r.stdout.strip()
-                if r.returncode == 0 and p:
-                    live.add(os.path.normpath(p))
+            r = subprocess.run(
+                [sys.executable, "-B", mtcaps, "resolve",
+                 "--manifest", os.path.join(path, "mtengine.caps"),
+                 "--app", app, "--platform", platform,
+                 "--arch", arch, "--config", config,
+                 "--engine-dir", ENGINE] + engine_opts,
+                capture_output=True, text=True)
+            if r.returncode != 0:
+                continue
+            for line in r.stdout.splitlines():
+                k, _, v = line.partition("=")
+                if k in ("deps_dir", "build_dir") or k.startswith("store."):
+                    if v.strip():
+                        live.add(os.path.normpath(v.strip()))
     return live
+
+
+def store_buckets(root):
+    """Yield (platform, unit, path) for every bucket under _depstore.
+
+    Where a bucket STARTS is read from the build-unit registry, not guessed
+    from the path: the backend segment exists only for units that read the
+    backend, so `llama_cpp` is one level deeper than `sdl3`. A unit dir the
+    registry no longer knows is yielded with unit=None -- nothing can resolve
+    to it again, so it is reported and prunable as a whole."""
+    base = os.path.join(root, "_depstore")
+    if not os.path.isdir(base):
+        return
+    for platform in sorted(os.listdir(base)):
+        pdir = os.path.join(base, platform)
+        if not os.path.isdir(pdir):
+            continue
+        try:
+            units = R.build_units(platform)
+        except Exception:
+            units = {}
+        for arch in sorted(os.listdir(pdir)):
+            adir = os.path.join(pdir, arch)
+            if not os.path.isdir(adir):
+                continue
+            for cfg in sorted(os.listdir(adir)):
+                cdir = os.path.join(adir, cfg)
+                if not os.path.isdir(cdir):
+                    continue
+                for unit in sorted(os.listdir(cdir)):
+                    udir = os.path.join(cdir, unit)
+                    if not os.path.isdir(udir):
+                        continue
+                    if unit not in units:
+                        yield platform, None, udir
+                        continue
+                    depth = 2 if units[unit].get("backend") else 1
+                    stack = [(udir, 0)]
+                    while stack:
+                        d, lvl = stack.pop()
+                        if lvl == depth:
+                            yield platform, unit, d
+                            continue
+                        for sub in sorted(os.listdir(d)):
+                            sp = os.path.join(d, sub)
+                            if os.path.isdir(sp):
+                                stack.append((sp, lvl + 1))
 
 
 def main():
@@ -242,6 +307,36 @@ def main():
                     if lp in live:
                         continue
                     dead_deps.append((dirpath, rel, size))
+
+    # Per-unit stores (L16). Retention is per unit rather than global: three
+    # newest buckets across the whole store would happily evict SDL3 entirely
+    # while keeping three flavours of video_codecs, and the point of the split
+    # was that a unit's buckets are independent of every other unit's.
+    dead_stores = {}   # (platform, unit) -> [(path, rel, size)]
+    for platform_name, unit, path in store_buckets(root):
+        size = du(path)
+        rel = os.path.relpath(path, root)
+        report.append((rel, size))
+        if not args.prune:
+            continue
+        if unit is None:
+            if age_hours(path) >= args.min_age_hours:
+                victims.append((path, size, "store unit not in the registry"))
+            continue
+        if os.path.normpath(path) in live:
+            continue
+        dead_stores.setdefault((platform_name, unit), []).append((path, rel, size))
+
+    for (platform_name, unit), entries in sorted(dead_stores.items()):
+        entries.sort(key=lambda e: -newest_mtime(e[0]))
+        for i, (path, rel, size) in enumerate(entries):
+            if age_hours(path) < args.min_age_hours:
+                kept_recent += 1
+                continue
+            if i < args.keep_deps and not (args.days and age_days(path) > args.days):
+                continue
+            victims.append((path, size,
+                            "%s store, not live, #%d newest" % (unit, i + 1)))
 
     dead_deps.sort(key=lambda e: -newest_mtime(e[0]))
     for i, (path, rel, size) in enumerate(dead_deps):

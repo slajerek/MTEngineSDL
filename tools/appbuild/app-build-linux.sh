@@ -5,7 +5,9 @@
 # this script.
 #
 # Usage: tools/appbuild/app-build-linux.sh --app-dir <dir> [--debug|--release]
-#        [--clean] [--skip-deps] [--gc [gc-args...]] [--set KEY=VALUE ...]
+#        [--clean] [--skip-deps] [--no-prod] [--gc [gc-args...]]
+#        [--set KEY=VALUE ...]
+# --no-prod skips the release package; a dev loop does not need it.
 # --set forwards a capability override to mtcaps (rung 1): it is how a store
 # build is made -- --set MT_COMMERCIAL_BUILD=1 --set MT_PRIVATE_BUILD=0 --
 # without editing the app's tracked licence manifest. The override changes the
@@ -22,6 +24,7 @@ APP_DIR=""
 CONFIGURATION="Release"
 CLEAN=false
 SKIP_DEPS=false
+NO_PROD=false
 CAPS_SETS=()
 
 while [[ $# -gt 0 ]]; do
@@ -32,6 +35,7 @@ while [[ $# -gt 0 ]]; do
         --clean)     CLEAN=true; SKIP_DEPS=true ;;
         --gc)        shift; exec python3 "$ENGINE_DIR/tools/appbuild/mtengine-gc.py" "$@" ;;
         --skip-deps) SKIP_DEPS=true ;;
+        --no-prod)   NO_PROD=true ;;
         --set)       [[ -n "${2:-}" ]] || { echo "ERROR: --set needs KEY=VALUE" >&2; exit 2; }; CAPS_SETS+=("--set" "$2"); shift ;;
         --incremental) : ;;  # compatibility no-op: incremental IS the default
         -h|--help)   sed -n '2,9p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
@@ -108,7 +112,8 @@ MT_RELEASE_SYMBOLS="$(sed -n 's/^set(MT_RELEASE_SYMBOLS \([01]\))$/\1/p' "$MT_OU
 echo "Capabilities: $MT_APP_NAME"
 echo "  out     : $MT_OUT"
 echo "  deps    : $MT_CAPS_LIBS_DIR"
-echo "  mode    : $([ "$COMMERCIAL" = 1 ] && echo commercial || echo full), ffmpeg=$MT_FFMPEG_BUILD_MODE, symbols=${MT_RELEASE_SYMBOLS:-1}"
+# tier and ffmpeg mode are different axes; see app-build-macos.sh.
+echo "  tier    : $([ "$COMMERCIAL" = 1 ] && echo commercial || echo non-commercial), ffmpeg=$MT_FFMPEG_BUILD_MODE, symbols=${MT_RELEASE_SYMBOLS:-1}"
 
 # ---------------------------------------------------------------------------
 # deps + engine, PRE-RESOLVED (submodule init inside -- the only init path).
@@ -198,6 +203,54 @@ if [[ -d "$MT_ROOT/$MT_APP_NAME" ]]; then
     if [[ "$REV_COUNT" -gt 12 ]]; then
         echo "NOTE: $REV_COUNT rev-keyed build dirs under $MT_ROOT/$MT_APP_NAME -- consider: python3 \"$ENGINE_DIR/tools/appbuild/mtengine-gc.py\" --prune"
     fi
+fi
+
+# ---------------------------------------------------------------------------
+# Release package (Stage 7). Same shape as the Windows and macOS drivers: a
+# directory cleared on every run, holding the artifact, the assets and the
+# licence document mtcaps writes into $MT_OUT on every resolve. Until now
+# only Windows implemented this, so a contract reading "LICENSES.txt ships
+# ALWAYS" held on one platform in three.
+# ---------------------------------------------------------------------------
+if [[ "$NO_PROD" != "true" ]]; then
+    PROD_DIR="$APP_DIR/platform/Linux/prod/$(uname -m)"
+    # The tier in the artifact name, as on Windows and macOS.
+    PROD_NAME="$MT_CMAKE_TARGET$([[ "${COMMERCIAL:-0}" == "1" ]] || echo -n "-nc")"
+
+    echo ""
+    echo "=== Deploying release package ($(uname -m) $CONFIGURATION) ==="
+    rm -rf "$PROD_DIR"
+    mkdir -p "$PROD_DIR"
+    cp "$APP_BINARY" "$PROD_DIR/$PROD_NAME"
+
+    LICENCES_SRC="$MT_OUT/LICENSES.txt"
+    [[ -f "$LICENCES_SRC" ]] || { echo "ERROR: mtcaps wrote no LICENSES.txt at $LICENCES_SRC" >&2; exit 1; }
+    cp "$LICENCES_SRC" "$PROD_DIR/LICENSES.txt"
+
+    ASSETS_NAME="${MT_LINUX_ASSETS:-assets}"
+    [[ -d "$APP_DIR/$ASSETS_NAME" ]] && cp -R "$APP_DIR/$ASSETS_NAME" "$PROD_DIR/assets"
+
+    # MT_APP_PAYLOAD -- further directories the app needs AT RUNTIME, copied in
+    # under their own names. One `assets` directory was not enough: the package
+    # is the working directory a test or a user runs from, so anything the app
+    # opens by a relative path has to be in it. One host application reads a
+    # config file under data/ during init and SYS_FatalExit's without it, which
+    # is exactly what the first run of its package did (2026-09-02).
+    # Space separated, repo-relative, same key on all three platforms.
+    for _mt_payload in ${MT_APP_PAYLOAD:-}; do
+        if [[ -d "$APP_DIR/$_mt_payload" ]]; then
+            cp -R "$APP_DIR/$_mt_payload" "$PROD_DIR/$(basename "$_mt_payload")"
+        else
+            echo "WARNING: MT_APP_PAYLOAD names '$_mt_payload', which does not exist in $APP_DIR" >&2
+        fi
+    done
+
+    # Belt for the symbols contract: the separated debug info lives in
+    # $MT_OUT/symbols and never rides the package.
+    find "$PROD_DIR" -name '*.debug' -delete 2>/dev/null || true
+
+    [[ -f "$PROD_DIR/LICENSES.txt" ]] || { echo "ERROR: release package has no LICENSES.txt: $PROD_DIR" >&2; exit 1; }
+    echo "Deployed: $PROD_DIR/$PROD_NAME"
 fi
 
 echo ""

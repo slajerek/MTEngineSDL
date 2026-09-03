@@ -23,7 +23,10 @@ public:
 	// no file, so a runner or a CI job had to grep log text for a number -- which is
 	// how a suite stops running and nobody notices.
 	// `path` is relative to the working directory, like CTestSuite's.
-	static void WriteResults(const char *path = "tests/results/last_run.txt");
+	// NULL means MT_TestResultsPath(): --results-file / MT_TEST_RESULTS /
+	// the historical relative default. Callers pass nothing, so both test
+	// paths resolve identically without an app-side change.
+	static void WriteResults(const char *path = NULL);
 
 	static ImGuiTestEngine *GetEngine() { return engine; }
 	static bool showUI;

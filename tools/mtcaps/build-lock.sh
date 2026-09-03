@@ -77,6 +77,25 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENGINE_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 IDE_ROOT="$(cd "$ENGINE_DIR/.." && pwd)/.mtengine-ide"
 LOCK_DIR="$IDE_ROOT/build.lock"
+
+# A SECOND THING TO SERIALIZE, with the same rules (L16).
+#
+# The lock above is per engine CHECKOUT: it is what stops four apps sharing one
+# checkout from configuring the same other/lib/*/build tree at once. The per-unit
+# dependency stores are not per checkout -- they hang off the cache root, so a
+# SECOND clone of the engine builds into the very same `_depstore/.../sdl3/common`
+# while holding a different build lock. That is not exotic for the shared units:
+# `common` means one bucket per machine, so two clones collide there by design.
+#
+# The recovery logic below -- dead owner, idle owner, the atomic rename that stops
+# two waiters from both "winning" a stale lock -- is the part that was hard to get
+# right, and it does not care what is being serialized. So the caller supplies the
+# directory and inherits all of it, rather than a second mutex being written from
+# scratch beside a hardened one.
+if [[ -n "${MTENGINE_LOCK_DIR:-}" ]]; then
+    LOCK_DIR="$MTENGINE_LOCK_DIR"
+    IDE_ROOT="$(dirname "$LOCK_DIR")"
+fi
 OWNER_FILE="$LOCK_DIR/owner"
 
 TTL="${MTENGINE_BUILD_LOCK_TTL:-1800}"          # 30 min; only reached when neither liveness probe can decide

@@ -183,6 +183,83 @@ function Get-MTCMakeCacheValue {
     return ($line -replace $pattern, '')
 }
 
+function Sync-MTStoreToView {
+    <#
+    .SYNOPSIS
+        Copy a build unit's outputs from its store into the shared libs view.
+    .DESCRIPTION
+        The PowerShell counterpart of mt_caps_sync_store_to_view. Runs on every
+        invocation, including a stamp hit: a hit means the STORE is valid and
+        says nothing about the view, which is keyed by the whole capability set
+        and may have been created seconds ago.
+    #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$Store, [Parameter(Mandatory)][string]$View)
+    if (-not (Test-Path $Store)) { return }
+    New-Item -ItemType Directory -Force -Path $View | Out-Null
+    Copy-Item -Path (Join-Path $Store '*') -Destination $View -Recurse -Force
+}
+
+function Use-MTStore {
+    <#
+    .SYNOPSIS
+        Point a producer at its own per-unit store and remember the view.
+    .DESCRIPTION
+        The PowerShell counterpart of mt_caps_use_store. A unit BUILDS in a store
+        keyed only by the capabilities it reads, and its outputs are copied into
+        the shared caps-keyed view every consumer links against (L16).
+
+        Returns the directory the caller should build into. Pair it with
+        Complete-MTStore in a `finally` block -- see the note there for why a
+        call at the end of the script is not enough.
+
+        With no MT_STORE_<UNIT> in the environment (a standalone run, or a
+        resolve too old to emit one) the store IS the view and the whole thing
+        degrades to what the script did before.
+    #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$Unit, [Parameter(Mandatory)][string]$View)
+
+    $envName = "MT_STORE_" + ($Unit.ToUpperInvariant())
+    $store = [Environment]::GetEnvironmentVariable($envName)
+    if (-not $store) { $store = $View }
+    New-Item -ItemType Directory -Force -Path $store | Out-Null
+    $global:MTStoreState = @{ Unit = $Unit; Store = $store; View = $View }
+    if ($store -ne $View) {
+        Write-Host "$Unit : building in its store $store"
+    }
+    return $store
+}
+
+function Complete-MTStore {
+    <#
+    .SYNOPSIS
+        Copy this unit's store into the view. Call from `finally`, always.
+    .DESCRIPTION
+        WHY `finally` AND NOT THE END OF THE SCRIPT. These producers leave by
+        several doors -- a capability-off stub, a stamp hit, sometimes a second
+        stamp hit for a sub-component, and the normal end -- and EVERY one of
+        them owes the view a copy, because a stamp says the STORE is valid and
+        says nothing about a view that a fresh capability set may have created
+        seconds ago. PowerShell runs `finally` on `exit` as well as on a
+        terminating error, which makes it the counterpart of the EXIT trap the
+        shell producers use.
+
+        Unlike the shell side this DOES sync after a failure as well: the caller
+        has no cheap way to know its own exit status here, and a producer that
+        failed has written nothing new to copy. If that turns out to be wrong on
+        a real failure path, pass -OnlyIfSucceeded from the caller.
+    #>
+    [CmdletBinding()]
+    param()
+    $state = $global:MTStoreState
+    if (-not $state) { return }
+    $global:MTStoreState = $null
+    if ($state.Store -ne $state.View) {
+        Sync-MTStoreToView -Store $state.Store -View $state.View
+    }
+}
+
 function Reset-MTStaleCMakeCache {
     <#
     .SYNOPSIS
@@ -405,6 +482,17 @@ function Import-MTCapsEnvironment {
         # legacy COMMERCIAL env channel.
         elseif ($line -match '^\s*MT_FFMPEG_BUILD_MODE\s*=\s*(full|commercial)\s*$') {
             $env:MT_FFMPEG_BUILD_MODE = $Matches[1]
+        }
+        # The decoder policy lists (L4). Same shape as the mode line -- a
+        # space-separated string -- so build-video_codecs.ps1 stops carrying
+        # its own copy of what the vocabulary already says.
+        elseif ($line -match '^\s*(MT_FFMPEG_(?:DECODERS|DECODERS_WITHHELD|PARSERS|DEMUXERS))\s*=\s*(.+?)\s*$') {
+            Set-Item -Path "env:$($Matches[1])" -Value $Matches[2]
+        }
+        # Per-unit store paths (L16): where each dependency builds, before it
+        # copies its outputs into the shared libs view.
+        elseif ($line -match '^\s*(MT_STORE_[A-Z0-9_]+)\s*=\s*(.+?)\s*$') {
+            Set-Item -Path "env:$($Matches[1])" -Value $Matches[2]
         }
     }
 

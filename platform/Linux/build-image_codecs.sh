@@ -21,6 +21,11 @@ SRC_DIR="$CACHE_DIR/src"
 BUILD_DIR="$CACHE_DIR/build-linux"
 PREFIX_DIR="$CACHE_DIR/install-linux"
 OUT_LIB_DIR="$(mt_caps_lib_dir)"
+
+# Store and view (L16). The image codecs follow the three capabilities their configure reads.
+# With no store in the environment (a standalone run) the store IS the view
+# and the sync is a no-op.
+mt_caps_use_store "${MT_STORE_IMAGE_CODECS:-}" image_codecs
 OUT_LIB="$OUT_LIB_DIR/libmt_image_codecs.a"
 STAMP_FILE="$OUT_LIB_DIR/libmt_image_codecs.stamp"
 JOBS="${MT_BUILD_JOBS:-$(nproc 2>/dev/null || echo 4)}"

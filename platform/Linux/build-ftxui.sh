@@ -15,6 +15,11 @@ if ! declare -f mt_caps_lib_dir >/dev/null 2>&1; then
   . "$ROOT_DIR/platform/caps-lib.sh"
 fi
 OUT_LIB_DIR="$(mt_caps_lib_dir)"
+
+# Store and view (L16). FTXUI follows MT_CAP_FTXUI and nothing else.
+# With no store in the environment (a standalone run) the store IS the view
+# and the sync is a no-op.
+mt_caps_use_store "${MT_STORE_FTXUI:-}" ftxui
 OUT_LIB="$OUT_LIB_DIR/libftxui.a"
 
 mkdir -p "$OUT_LIB_DIR"

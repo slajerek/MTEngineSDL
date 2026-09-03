@@ -98,9 +98,18 @@ def _compute_out(args, vocab, values, canonical, engine_options):
     deps = R.deps_dir(root, args.platform, args.arch,
                       R.deps_config(args.platform, args.config), backend,
                       R.caps_hash(R.deps_form(vocab, values)))
+    # Per-unit stores (L16): where each dependency BUILDS, keyed by what that
+    # dependency actually reads. The `libs` view above stays the one directory
+    # every consumer links against; a unit copies its outputs into it. Flipping
+    # a capability SDL3 has never heard of no longer moves SDL3's bucket.
+    stores = {}
+    for name, unit in R.build_units(args.platform).items():
+        stores[name] = R.unit_store_dir(root, args.platform, args.arch,
+                                        R.deps_config(args.platform, args.config),
+                                        name, unit, values, backend)
     return out, dict(rev=rev, mode=mode, backend=backend, caps_hash=chash,
                      root=root, deps_dir=deps, build_dir=build,
-                     ffmpeg_mode=R.ffmpeg_mode(values))
+                     ffmpeg_mode=R.ffmpeg_mode(values), stores=stores)
 
 
 # ---------------------------------------------------------------------------
@@ -163,6 +172,12 @@ def cmd_resolve(args):
     print("ffmpeg_mode=%s" % key["ffmpeg_mode"])
     # Fifth pinned line (L9): the rev-free build root for compiled objects.
     print("build_dir=%s" % key["build_dir"])
+    # One line per build unit (L16): where that dependency BUILDS, keyed only by
+    # the capabilities it actually reads. Emitted here as well as into the
+    # fragments so the GC can ask what is live without parsing a fragment it
+    # would first have to know how to find.
+    for name in sorted(key["stores"]):
+        print("store.%s=%s" % (name, key["stores"][name]))
     return EXIT_OK
 
 

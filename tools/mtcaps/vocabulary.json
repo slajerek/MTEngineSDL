@@ -79,8 +79,18 @@
       "commercial": {
         "effect": "variant",
         "note": "NOT a whole-capability veto. Video playback stays fully on and a decoder SET is withheld. A boolean field would describe none of this correctly.",
-        "forbidden_decoders_commercial": ["hevc", "wmv1", "wmv2", "wmv3", "vc1", "wmav1", "wmav2", "wmapro", "msmpeg4v1", "msmpeg4v2", "msmpeg4v3", "aac", "eac3"],
         "sites": ["Video/CVideoSourceFFmpeg.cpp:290-301", "Video/CVideoSourceFFmpeg.cpp:419-442", "Video/CVideoSourceFFmpeg.cpp:696-760"]
+      },
+      "ffmpeg": {
+        "note": "The FFmpeg decoder policy, in one place. Three build scripts used to carry their own copies of these lists -- and of the guard sets derived from them -- so a name added in one platform's script was invisible to the other two and to the licence scanner. What is NOT here, deliberately: FFmpeg's implicit selects (h263 arrives with mpeg4, its parser with mpeg4video) and the object-file names, which are facts about a pinned FFmpeg version rather than policy, and belong beside that pin in the scripts.",
+        "decoders_base": ["h264", "prores", "mjpeg", "mpeg2video", "mpeg4", "mpeg1video", "vp8", "vp9", "dvvideo", "pcm_s16le", "pcm_s16be", "pcm_s24le", "pcm_u8", "mp3", "mp2", "ac3", "opus", "vorbis", "flac"],
+        "decoders_withheld": ["hevc", "wmv1", "wmv2", "wmv3", "vc1", "wmav1", "wmav2", "wmapro", "msmpeg4v1", "msmpeg4v2", "msmpeg4v3", "aac", "eac3"],
+        "decoders_withheld_note": "Patent-encumbered, and withheld from every DISTRIBUTED build -- the public/free tier as much as the store tier, because patents attach to distribution rather than to payment. Present only when the resolved mode is `full`, which mtcaps gives only to MT_PRIVATE_BUILD=1. This list was commercial.forbidden_decoders_commercial until 2026-09-02; the licence scanners read it here now.",
+        "parsers_base": ["h264", "hevc", "mpeg4video", "mpegvideo", "mjpeg", "vp8", "vp9", "aac", "ac3", "mpegaudio", "opus", "vorbis", "flac"],
+        "parsers_withheld": ["vc1"],
+        "parsers_note": "A parser is not a decoder: hevc and aac parse in both modes because parsing a bitstream infringes nothing. Only the vc1 parser follows its decoder into full mode.",
+        "demuxers": ["asf", "avi", "matroska", "mov", "mpegps", "mpegts", "mpegvideo"],
+        "demuxers_note": "Identical in both modes -- asf demuxing is licensing-safe under Microsoft's Open Specification Promise -- and none select-depends on another demuxer."
       },
       "symbols": { "forbidden_when_off": "av_|avcodec_|avformat_|vpx_|opus_", "required_when_on": "avcodec_" }
     },

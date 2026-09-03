@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     The Windows APP-BUILD DRIVER (unification plan, Phase 3).
 .DESCRIPTION
@@ -14,6 +14,11 @@
     licence gate (keyed marker + forbidden-decoder scan for restricted
     modes) -> symbols contract (PDB to $MT_OUT\symbols; never shipped at
     MT_RELEASE_SYMBOLS=0) -> prod deploy with LICENSES.txt.
+
+    The deploy stage is what ships the licence document, and -NoProd skips
+    the stage. "Always" therefore means "whenever a package is produced" --
+    a dev loop that skips the package skips the document with it, and a
+    release does not skip the package.
 .PARAMETER AppDir
     The app repo root (the stub passes $PSScriptRoot).
 #>
@@ -134,19 +139,32 @@ if ($mtIsBranch) {
     Write-Host "WARNING: $msg -- building what is checked out" -ForegroundColor Yellow
 }
 
-# Both app-side files the engine owns a template for: the build stub, and
-# (L13) the MSBuild targets stub that imports the engine's IDE channel.
+# The app-side files the engine owns a template for: the build stub, (L13) the
+# MSBuild targets stub that imports the engine's IDE channel, and the props stub
+# beside it.
+#
+# The props template carries __MT_APP_NAME__ where the others carry nothing app
+# specific, because the app's identity is the one thing that cannot move into
+# the engine: $(MTCapsApp) is what the engine's file is parameterized ON. So the
+# comparison substitutes it first, and a stub that hardcoded some OTHER app's
+# name -- the classic copy-paste between these four repos -- still shows up as
+# drift.
 foreach ($pair in @(
         @{ Template = 'tools\appbuild\stubs\build-windows.ps1';        App = 'build-windows.ps1' },
-        @{ Template = 'tools\appbuild\stubs\Directory.Build.targets';  App = 'platform\Windows\Directory.Build.targets' })) {
+        @{ Template = 'tools\appbuild\stubs\Directory.Build.targets';  App = 'platform\Windows\Directory.Build.targets' },
+        @{ Template = 'tools\appbuild\stubs\Directory.Build.props';    App = 'platform\Windows\Directory.Build.props' })) {
     $stubTemplate = Join-Path $mtDir $pair.Template
     $appStub = Join-Path $appDir $pair.App
     if ((Test-Path $stubTemplate) -and (Test-Path $appStub)) {
-        $a = Get-Content $stubTemplate -Raw
+        $a = (Get-Content $stubTemplate -Raw).Replace('__MT_APP_NAME__', $appName)
         $b = Get-Content $appStub -Raw
         if ($a -ne $b) {
             Write-Host "NOTE: $($pair.App) differs from the engine's canonical stub template." -ForegroundColor Yellow
-            Write-Host "      Refresh it: Copy-Item `"$stubTemplate`" `"$appStub`"" -ForegroundColor Yellow
+            if ($pair.App -like '*Directory.Build.props') {
+                Write-Host "      Refresh it: (Get-Content `"$stubTemplate`" -Raw).Replace('__MT_APP_NAME__','$appName') | Set-Content `"$appStub`" -NoNewline" -ForegroundColor Yellow
+            } else {
+                Write-Host "      Refresh it: Copy-Item `"$stubTemplate`" `"$appStub`"" -ForegroundColor Yellow
+            }
         }
     }
 }
@@ -205,7 +223,8 @@ $releaseSymbols = (($mtResolvedFlags | Where-Object { $_ -match '^MT_RELEASE_SYM
 if (-not $releaseSymbols) { $releaseSymbols = '1' }
 Write-Host "Capabilities: $appName -> $mtOutRoot" -ForegroundColor Cyan
 Write-Host "  deps: $mtLibsDir"
-Write-Host "  mode: $(if ($commercial -eq '1') { 'commercial' } else { 'full' }), ffmpeg=$ffmpegMode, symbols=$releaseSymbols" -ForegroundColor Cyan
+# tier and ffmpeg mode are different axes; see app-build-macos.sh.
+Write-Host "  tier: $(if ($commercial -eq '1') { 'commercial' } else { 'non-commercial' }), ffmpeg=$ffmpegMode, symbols=$releaseSymbols" -ForegroundColor Cyan
 [string[]]$mtCapsArgs = @("/p:MTOutRoot=$mtOutRoot", "/p:MTCapsApp=$appName",
                           "/p:MTCapsLibsDir=$mtLibsDir",
                           "/p:MTBuildRoot=$mtBuildRoot")
@@ -347,6 +366,23 @@ if (-not $NoProd) {
     $assetsName = if ($conf['MT_WINDOWS_ASSETS']) { $conf['MT_WINDOWS_ASSETS'] } else { 'assets' }
     $assetsDir = Join-Path $appDir $assetsName
     if (Test-Path $assetsDir) { Copy-Item $assetsDir (Join-Path $prodDir 'assets') -Recurse -Force }
+    # MT_APP_PAYLOAD -- further directories the app needs AT RUNTIME, copied in
+    # under their own names. One `assets` directory was not enough: the package
+    # is the working directory a test or a user runs from, so anything the app
+    # opens by a relative path has to be in it. One host application reads a
+    # config file under data/ during init and SYS_FatalExit's without it, which
+    # is exactly what the first run of its package did (2026-09-02).
+    # Space separated, repo-relative, same key on all three platforms.
+    if ($conf['MT_APP_PAYLOAD']) {
+        foreach ($rel in ($conf['MT_APP_PAYLOAD'] -split '\s+' | Where-Object { $_ })) {
+            $src = Join-Path $appDir $rel
+            if (Test-Path $src) {
+                Copy-Item $src (Join-Path $prodDir (Split-Path $rel -Leaf)) -Recurse -Force
+            } else {
+                Write-Warning "MT_APP_PAYLOAD names '$rel', which does not exist in $appDir"
+            }
+        }
+    }
     $cudaPluginSrc = Join-Path $outDir 'Data\lib\mt_llama_cuda_backend.dll'
     if (Test-Path $cudaPluginSrc) {
         $cudaPluginDestDir = Join-Path $prodDir 'Data\lib'
@@ -355,5 +391,12 @@ if (-not $NoProd) {
     }
     # Belt for the symbols contract: a PDB must never ride a prod deploy.
     Get-ChildItem $prodDir -Recurse -Filter '*.pdb' -ErrorAction SilentlyContinue | Remove-Item -Force
+    # The licence check. Stage 7 says the document ships ALWAYS, and until the
+    # sh drivers grew this stage that was true on one platform in three. It is
+    # checked here rather than assumed, because a copy that silently did not
+    # happen is exactly what "always" is supposed to rule out.
+    if (-not (Test-Path (Join-Path $prodDir 'LICENSES.txt'))) {
+        throw "release package has no LICENSES.txt: $prodDir"
+    }
     Write-Host "Deployed: $prodDir\$prodExeName" -ForegroundColor Green
 }

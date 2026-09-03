@@ -10,6 +10,12 @@ using namespace std;
 
 class CTest;
 
+// The results file every test path writes: --results-file, then
+// MT_TEST_RESULTS, then the historical relative default. Resolved once.
+// It exists because a test run's CWD is the release package (that is how
+// an app finds its assets) while the results belong in the repo.
+const char *MT_TestResultsPath();
+
 struct CTestSuiteResult
 {
 	string testName;

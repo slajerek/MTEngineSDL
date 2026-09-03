@@ -134,7 +134,12 @@ $srcDir = "$cacheDir\src"
 #
 # It comes FIRST now, because the FFmpeg prefix below is derived from it.
 if (-not $OutLibDir) { throw "-OutLibDir is required. Run this through build-deps.ps1, which resolves it." }
-$outLibDir = $OutLibDir
+# Per-unit store (L16). The unit builds in a directory keyed only by the
+# capabilities IT reads, then its outputs are copied into the shared view. The
+# body is wrapped in try/finally because a stamp hit and a capability-off stub
+# both leave early and both still owe the view a copy.
+$outLibDir = Use-MTStore -Unit 'video_codecs' -View $OutLibDir
+try {
 $outLib = "$outLibDir\MTVideoCodecs.lib"
 $stampFile = "$outLibDir\MTVideoCodecs.stamp"
 
@@ -237,15 +242,41 @@ $ffmpegHash = "089bc60fb59d6aecc5d994ff530fd0dcb3ee39aa55867849a2bbc4e555f9c304"
 # AUTHORITATIVE one (config_components.h reflects what was compiled).
 # Identical lists to the macOS/Linux scripts; do not edit without updating
 # all three.
-$ffmpegExpectedDecodersCommercial = "ac3 dvvideo flac h263 h264 mjpeg mp2 mp3 mpeg1video mpeg2video mpeg4 opus pcm_s16be pcm_s16le pcm_s24le pcm_u8 prores vorbis vp8 vp9"
-$ffmpegExpectedDecodersFull = "$ffmpegExpectedDecodersCommercial aac eac3 hevc msmpeg4v1 msmpeg4v2 msmpeg4v3 vc1 wmapro wmav1 wmav2 wmv1 wmv2 wmv3"
-$ffmpegExpectedDemuxers = "asf avi matroska mov mpegps mpegts mpegvideo"
-$ffmpegExpectedParsersCommercial = "aac ac3 flac h263 h264 hevc mjpeg mpeg4video mpegaudio mpegvideo opus vorbis vp8 vp9"
-$ffmpegExpectedParsersFull = "$ffmpegExpectedParsersCommercial vc1"
-# HEVC/AAC/EAC3 moved from a former always-forbidden list on 2026-07-19
-# (codec-superset spec): full builds carry them as software fallbacks;
-# commercial exclusion unchanged.
-$ffmpegForbiddenDecodersCommercial = "HEVC","AAC","EAC3","WMV1","WMV2","WMV3","VC1","WMAV1","WMAV2","WMAPRO"
+# THE POLICY COMES FROM THE VOCABULARY. mt-build-common.ps1 reads
+# MT_FFMPEG_DECODERS / _PARSERS / _DEMUXERS / _DECODERS_WITHHELD out of the
+# caps fragment; this script used to carry its own copy of all four, as did
+# the two sh scripts, so a name added in one platform was invisible to the
+# other two and to the licence scanner.
+#
+# Interpolated HERE, in PowerShell, because the configure line is generated
+# into a bash heredoc that MSYS2 runs -- there is no reading an environment
+# variable "later" on that side.
+function Policy-Csv([string]$list) { ($list -split '\s+' | Where-Object { $_ }) -join ',' }
+function Policy-Sorted([string]$list) { (($list -split '\s+' | Where-Object { $_ }) | Sort-Object -Unique) -join ' ' }
+
+$ffmpegDecoders = $env:MT_FFMPEG_DECODERS
+$ffmpegParsers = $env:MT_FFMPEG_PARSERS
+$ffmpegDemuxers = $env:MT_FFMPEG_DEMUXERS
+$ffmpegWithheld = $env:MT_FFMPEG_DECODERS_WITHHELD
+foreach ($pair in @(@('MT_FFMPEG_DECODERS', $ffmpegDecoders), @('MT_FFMPEG_PARSERS', $ffmpegParsers),
+                    @('MT_FFMPEG_DEMUXERS', $ffmpegDemuxers), @('MT_FFMPEG_DECODERS_WITHHELD', $ffmpegWithheld))) {
+    if ([string]::IsNullOrWhiteSpace($pair[1])) {
+        throw "$($pair[0]) is empty -- the caps fragment carries the decoder policy since 2026-09-02; run through the driver, or pass -CapsFile."
+    }
+}
+
+# What FFmpeg force-enables on top of the requested sets is a fact about
+# ffmpeg-$ffmpegVersion, not policy, and lives beside that pin:
+#   h263 decoder <- mpeg4_decoder_select; h263 parser <- mpeg4video parser
+$ffmpegImplicitDecoders = "h263"
+$ffmpegImplicitParsers = "h263"
+
+$ffmpegExpectedDecoders = Policy-Sorted "$ffmpegDecoders $ffmpegImplicitDecoders"
+$ffmpegExpectedParsers = Policy-Sorted "$ffmpegParsers $ffmpegImplicitParsers"
+$ffmpegExpectedDemuxers = Policy-Sorted $ffmpegDemuxers
+# Upper-cased for the CONFIG_<NAME>_DECODER symbols; 13 names now, where the
+# hand-written copy had 10 (it was missing msmpeg4v1/v2/v3).
+$ffmpegForbiddenDecodersCommercial = ($ffmpegWithheld -split '\s+' | Where-Object { $_ }) | ForEach-Object { $_.ToUpperInvariant() }
 
 # ---- Platform -> toolchain arg mappings ----
 
@@ -651,10 +682,18 @@ if ($Platform -eq 'ARM64') {
 # pre-HEVC GPU) or the native AAC path is unavailable. Native MF decoders
 # always win where present. eac3's ac3-core configure dependency is already
 # satisfied (ac3 in the base enabled-decoder list, both modes).
+# THE MODE, not the tier. $ffmpegBuildMode is derived above from resolved
+# MT_FFMPEG_BUILD_MODE, which is `full` only for MT_PRIVATE_BUILD=1. The tier
+# ($commercial) answers a different question: the public/free tier is
+# COMMERCIAL=0 with mode `commercial`, because patents attach to distribution
+# rather than to payment. Reading the tier here handed that tier the withheld
+# decoders -- and on this platform $commercial is not even assigned unless the
+# legacy fallback branch runs, so a standalone -CapsFile invocation read $null
+# and took NEITHER side.
+# No mode branch: $ffmpegDecoders and $ffmpegParsers already carry the
+# withheld names when the resolved mode is `full`, decided by mtcaps from
+# MT_PRIVATE_BUILD. The branch this replaces read the licence TIER.
 $ffmpegModeConfigureArgs = ""
-if ($commercial -eq "0") {
-    $ffmpegModeConfigureArgs = "--enable-decoder=wmv1,wmv2,wmv3,vc1,wmav1,wmav2,wmapro --enable-decoder=msmpeg4v1,msmpeg4v2,msmpeg4v3 --enable-decoder=hevc,aac,eac3 --enable-parser=vc1 "
-}
 
 # ==================== FFmpeg (built once per Platform) ====================
 
@@ -718,10 +757,9 @@ cd '$ffmpegBuildPosix'
   --enable-shared --disable-static --disable-programs --disable-doc \
   --disable-network --disable-everything \
   --enable-protocol=file \
-  --enable-demuxer=mov,matroska,avi,mpegts,mpegps,mpegvideo,asf \
-  --enable-decoder=h264,prores,mjpeg,mpeg2video,mpeg4,mpeg1video,vp8,vp9,dvvideo \
-  --enable-decoder=pcm_s16le,pcm_s16be,pcm_s24le,pcm_u8,mp3,mp2,ac3,opus,vorbis,flac \
-  --enable-parser=h264,hevc,mpeg4video,mpegvideo,mjpeg,vp8,vp9,aac,ac3,mpegaudio,opus,vorbis,flac \
+  --enable-demuxer=$(Policy-Csv $ffmpegDemuxers) \
+  --enable-decoder=$(Policy-Csv $ffmpegDecoders) \
+  --enable-parser=$(Policy-Csv $ffmpegParsers) \
   --enable-d3d11va --enable-dxva2 \
   --disable-encoders --disable-muxers --disable-filters --disable-bsfs \
   --enable-bsf=hevc_mp4toannexb,h264_mp4toannexb,aac_adtstoasc \
@@ -738,7 +776,7 @@ set -e
 # decoder is genuinely compiled, ff_eac3_bits_vs_hebap resolves normally, and
 # this recovery is expected to never fire (the error-signature grep below
 # simply won't match). If the Windows pass ever shows full mode tripping it
-# (double-linked eac3_data.o), guard this block on `$commercial = "1" -- the
+# (double-linked eac3_data.o), guard this block on the commercial MODE -- the
 # splice is only ever needed for the commercial dead-code link gap.
 if [ `$MAKE_STATUS -ne 0 ]; then
   if grep -q 'unresolved external symbol ff_eac3_bits_vs_hebap' make.log; then
@@ -766,37 +804,31 @@ make install 2>&1 | tee install.log
     Write-BashScript $ffmpegScriptPath $ffmpegConfigureScript
     Invoke-Msys2Script $ffmpegScriptPath (Join-Path $ffmpegBuildDir "msys2-driver.log")
 
-    if ($commercial -eq "1") {
+    # The guard picks its expected set on the same value the configure line
+    # used, or it asserts one mode's library against the other's set.
+    # ONE expected set per kind, whatever the mode: the policy lists already
+    # carry the withheld names in full mode, so the guard no longer picks
+    # between two hand-written sets -- which is what it got wrong by picking
+    # on the licence tier. Only the absence check is mode-specific.
+    Require-FfmpegExactSet $ffmpegBuildDir "DECODER" $ffmpegExpectedDecoders
+    Require-FfmpegExactSet $ffmpegBuildDir "PARSER" $ffmpegExpectedParsers
+    if ($ffmpegBuildMode -eq "commercial") {
         foreach ($dec in $ffmpegForbiddenDecodersCommercial) {
             Require-FfmpegDecoderDisabled $ffmpegBuildDir $dec
         }
-        Require-FfmpegExactSet $ffmpegBuildDir "DECODER" $ffmpegExpectedDecodersCommercial
-        Require-FfmpegExactSet $ffmpegBuildDir "PARSER" $ffmpegExpectedParsersCommercial
-    } else {
-        Require-FfmpegExactSet $ffmpegBuildDir "DECODER" $ffmpegExpectedDecodersFull
-        Require-FfmpegExactSet $ffmpegBuildDir "PARSER" $ffmpegExpectedParsersFull
     }
     Require-FfmpegExactSet $ffmpegBuildDir "DEMUXER" $ffmpegExpectedDemuxers
 
-    # Commercial-only binary trace scan (secondary guard; the exact-set checks
-    # above on config_components.h are authoritative). FFmpeg's MSVC DLLs
-    # export only the public av_*/sw_* API (makedef-generated .def), so
-    # ff_<name>_decoder entry symbols are internal; dumpbin /symbols on a
-    # linked DLL yields little. Scan the COFF archive import/export tables and
-    # the intermediate libavcodec/*.o object list instead: in a commercial
-    # build the forbidden decoders' objects (wmv2dec.o, vc1dec.o, wmadec.o,
-    # wmaprodec.o, ...) must not have been compiled at all. Best-effort by
-    # design.
-    $forbiddenObjects = @('vc1dec.o','wmv2dec.o','wmadec.o','wmaprodec.o','hevcdec.o','aacdec.o','eac3dec.o')
-    if ($commercial -eq "1") {
-        $avcodecObjDir = Join-Path $ffmpegBuildDir "libavcodec"
-        foreach ($obj in $forbiddenObjects) {
-            if (Test-Path (Join-Path $avcodecObjDir $obj)) {
-                throw "Commercial trace scan: forbidden decoder object $obj was compiled into the FFmpeg build tree"
-            }
-        }
-        Write-Host "Commercial trace scan clean: no forbidden decoder objects in $avcodecObjDir" -ForegroundColor Green
-    }
+    # The object-file trace scan that stood here is GONE, as L4 (engine
+    # 2e35fb25) said it would be and this file alone did not get. Three of its
+    # seven names could never have matched -- hevcdec.o and aacdec.o are built
+    # under libavcodec/hevc/ and libavcodec/aac/ while it looked in
+    # libavcodec/ flat, and eac3dec.o never exists because eac3dec.c is
+    # #included by ac3dec_float.c -- and the remaining four were a hand-kept
+    # subset of a policy that now has thirteen names and one home. The
+    # exact-set and absence checks above read config_components.h, which is
+    # what configure actually decided, and scan-forbidden-symbols.ps1 reads
+    # the built DLL. A stale seven-name list adds nothing to either.
 
     # Mode marker: consumed by app build scripts (guard #3 in the 2026-07-18
     # WMV spec). A commercial app build against a "full" install is a fatal
@@ -1012,3 +1044,8 @@ $stampValue | Out-File -FilePath $stampFile -Encoding ASCII -NoNewline
 
 Write-Host "`nVideo codec bundle built: $outLib" -ForegroundColor Green
 Write-Host "FFmpeg LGPL decode DLLs: $ffmpegPrefix\bin (avcodec/avformat/avutil/swscale/swresample)" -ForegroundColor Green
+
+} finally {
+    # Runs on `exit` and on a terminating error alike.
+    Complete-MTStore
+}

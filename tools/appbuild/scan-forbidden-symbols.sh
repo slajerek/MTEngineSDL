@@ -53,6 +53,12 @@ with open('$VOCAB', encoding='utf-8') as f:
     data = json.load(f)
 names = []
 for cap in data['capabilities'].values():
+    # The FFmpeg policy block is where the withheld decoder list lives since
+    # 2026-09-02 (L4); before that it was commercial.forbidden_decoders_commercial,
+    # which other capabilities still use for policy of their own -- photo codecs
+    # withhold 'heif', which is not an FFmpeg decoder at all and is harmless
+    # noise in a libavcodec grep.
+    names += cap.get('ffmpeg', {}).get('decoders_withheld', [])
     names += cap.get('commercial', {}).get('forbidden_decoders_commercial', [])
 print(' '.join(sorted(set(names))))
 ")" || { echo 'ERROR: could not read the vocabulary' >&2; exit 2; }

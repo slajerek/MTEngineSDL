@@ -24,6 +24,7 @@
 #include "Core/Render/CRenderTarget.h"
 #include "Video/CVideoYUVConverter.h"
 #include "CRenderShaderFlatColorD3D11.h"
+#include "CRenderShaderMaskedTileD3D11.h"
 #include "CVideoYUVShaderD3D11.h"
 #include "imgui.h"
 #include "imgui_impl_dx11.h"
@@ -74,11 +75,15 @@
 //     ImageNeedsSamplerOverride, QueueSamplerForImage, QueueDefaultSampler,
 //     CreatePlaneTexture/Update/Delete, CreateLutTexture3D/Update/Delete.
 //
-//   DELIBERATELY LEFT ON THE DEFAULT
-//     CreateMaskedTileShader -> NULL. It serves c64d and the game app, which
-//       keep working on OpenGL, and every caller already draws its unshaded
-//       fallback rather than dereferencing. Porting more HLSL blind is what
-//       would make this stage unfinishable.
+//   NO LONGER LEFT ON THE DEFAULT
+//     CreateMaskedTileShader was NULL here until 2026-09-02, on the reasoning
+//       that the game app "keeps working on OpenGL" and that "every caller
+//       already draws its unshaded fallback rather than dereferencing". The
+//       first Windows build of a host application that uses masked tiles
+//       disproved the second half: its main view called BeginBatch() on the
+//       result without a null check and segfaulted. The shader is ported (see
+//       Shaders/MaskedTile.hlsl) and that caller's null check is fixed, because
+//       either alone would have left the other latent.
 //
 // THE FOUR THAT ARE MANDATORY AND LOOK OPTIONAL, because without them nothing
 // the suites test can run: the three plane-texture methods (every video plane
@@ -2111,6 +2116,14 @@ CRenderTarget *CRenderBackendD3D11::CreateRenderTarget()
 	if (gDevice == NULL)
 		return NULL;
 	return new CD3D11RenderTarget();
+}
+
+CMaskedTileShader *CRenderBackendD3D11::CreateMaskedTileShader(bool queued)
+{
+	// One class covers both variants -- the queued behaviour is a Clear/Push/Pop
+	// on CMaskedTileBoundsQueue -- so unlike the OpenGL backend this needs no
+	// adapter around a pair of GL-specific types.
+	return new CRenderShaderMaskedTileD3D11(this, queued);
 }
 
 CRenderShader *CRenderBackendD3D11::CreateFlatColorShader(float r, float g, float b, float a)

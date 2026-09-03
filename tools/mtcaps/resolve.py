@@ -490,6 +490,22 @@ def backend_hash(engine_options):
     return hashlib.sha256(items.encode("utf-8")).hexdigest()[:8]
 
 
+def default_engine_options(arch):
+    """The engine options the BUILD DRIVERS pass for a given arch, as a dict.
+
+    The rule -- MT_GGML_NATIVE follows the machine, OFF on ARM where the option's
+    ON default miscompiles -- is implemented in four shell sites (both drivers,
+    the Xcode pre-action, the decoder probe) because shell cannot import this
+    module. Any PYTHON caller that needs to know which bucket a build actually
+    lands in must use this, and not omit engine options: `backend_hash({})` is
+    "default", a segment no real build on an ARM machine ever writes to. The GC
+    computed liveness that way and would have deleted the live deps bucket the
+    moment retention dropped to zero."""
+    if str(arch).lower() in ("arm64", "aarch64"):
+        return {"MT_GGML_NATIVE": "OFF"}
+    return {"MT_GGML_NATIVE": "ON"}
+
+
 def default_build_root():
     """Outside all five checkouts. `${XDG_CACHE_HOME:-$HOME/.cache}` and not a bare
     `$XDG_CACHE_HOME`: the variable is unset on macOS and on most Linux systems, so
@@ -579,6 +595,143 @@ def deps_dir(root, platform, arch, dconfig, backend, chash):
     manifests resolve alike get one build instead of four."""
     return os.path.join(root, "_deps", platform, arch, dconfig, backend, chash,
                         "libs")
+
+
+# ---------------------------------------------------------------------------
+# THE BUILD-UNIT REGISTRY (L16)
+#
+# One row per producing script, per platform, saying WHICH INPUTS ITS OUTPUT
+# DEPENDS ON. That is the whole of the per-unit key: a unit is rebuilt when
+# something it reads changes, and not when something it has never heard of
+# changes.
+#
+# WHY A REGISTRY AND NOT A DERIVATION. The obvious move is to read the
+# vocabulary's `acquisition` rows -- one per capability, naming its script.
+# They do not cover the units that matter most: SDL3, FreeType and libuv are
+# `core.dependencies` with no capability at all, and uSockets is inline in
+# build-macos.sh on macOS, a script on Linux and a core dep of build-deps.ps1
+# on Windows. Those four are exactly the units that read NOTHING and would
+# otherwise keep forking a bucket per capability flip. A derivation that
+# cannot see them is not a derivation.
+#
+# WHY PER PLATFORM. The same dependency is a different unit on each platform:
+# uSockets has a capability row on Linux and none elsewhere, and llama.cpp is
+# one script on macOS and two on Windows.
+#
+# The `reads` lists are MEASURED, not guessed -- from what each script
+# actually references, checked by TestDepsKey against the scripts themselves.
+# `mode` means the unit reads MT_FFMPEG_BUILD_MODE, which mtcaps derives from
+# the licence keys, so those two join its key. `backend` means the unit is
+# built differently by MT_LLAMA_CUDA / MT_GGML_NATIVE.
+BUILD_UNITS = {
+    "macos": {
+        "sdl3":          {"reads": [], "mode": False, "backend": False,
+                          "scripts": ["platform/MacOS/build-sdl3.sh"]},
+        "usockets":      {"reads": [], "mode": False, "backend": False,
+                          "scripts": ["platform/MacOS/build-usockets.sh"]},
+        "mbedtls":       {"reads": ["MT_CAP_HTTPS"], "mode": False, "backend": False,
+                          "scripts": ["platform/MacOS/build-mbedtls.sh"]},
+        "ftxui":         {"reads": ["MT_CAP_FTXUI"], "mode": False, "backend": False,
+                          "scripts": ["platform/MacOS/build-ftxui.sh"]},
+        "llama_cpp":     {"reads": ["MT_CAP_LLM"], "mode": False, "backend": True,
+                          "scripts": ["platform/MacOS/build-llama_cpp.sh"]},
+        "image_codecs":  {"reads": ["MT_CAP_PHOTO_CODECS", "MT_CAP_RAW",
+                                    "MT_CAP_COLOR_MANAGEMENT"], "mode": False, "backend": False,
+                          "scripts": ["platform/MacOS/build-image_codecs.sh"]},
+        "video_codecs":  {"reads": ["MT_CAP_VIDEO_PLAYBACK"], "mode": True, "backend": False,
+                          "scripts": ["platform/MacOS/build-video_codecs.sh"]},
+    },
+    # No llama_cpp: on Linux llama.cpp is an add_subdirectory of the app's own
+    # CMake build, not a staged archive, so there is no producer to give a store.
+    "linux": {
+        "sdl3":          {"reads": [], "mode": False, "backend": False,
+                          "scripts": ["platform/Linux/build-sdl3.sh"]},
+        "usockets":      {"reads": [], "mode": False, "backend": False,
+                          "scripts": ["platform/Linux/build-usockets.sh"]},
+        "mbedtls":       {"reads": ["MT_CAP_HTTPS"], "mode": False, "backend": False,
+                          "scripts": ["platform/Linux/build-mbedtls.sh"]},
+        "ftxui":         {"reads": ["MT_CAP_FTXUI"], "mode": False, "backend": False,
+                          "scripts": ["platform/Linux/build-ftxui.sh"]},
+        "image_codecs":  {"reads": ["MT_CAP_PHOTO_CODECS", "MT_CAP_RAW",
+                                    "MT_CAP_COLOR_MANAGEMENT"], "mode": False, "backend": False,
+                          "scripts": ["platform/Linux/build-image_codecs.sh"]},
+        "video_codecs":  {"reads": ["MT_CAP_VIDEO_PLAYBACK"], "mode": True, "backend": False,
+                          "scripts": ["platform/Linux/build-video_codecs.sh"]},
+    },
+    # freetype and libuv are Windows-only units: the other two platforms take
+    # them from the system rather than building them.
+    "windows": {
+        "sdl3":          {"reads": [], "mode": False, "backend": False,
+                          "scripts": ["platform/Windows/build-sdl3.ps1"]},
+        "freetype":      {"reads": [], "mode": False, "backend": False,
+                          "scripts": ["platform/Windows/build-freetype.ps1"]},
+        "libuv":         {"reads": [], "mode": False, "backend": False,
+                          "scripts": ["platform/Windows/build-libuv.ps1"]},
+        "usockets":      {"reads": [], "mode": False, "backend": False,
+                          "scripts": ["platform/Windows/build-usockets.ps1"]},
+        "mbedtls":       {"reads": ["MT_CAP_HTTPS"], "mode": False, "backend": False,
+                          "scripts": ["platform/Windows/build-mbedtls.ps1"]},
+        "ftxui":         {"reads": ["MT_CAP_FTXUI"], "mode": False, "backend": False,
+                          "scripts": ["platform/Windows/build-ftxui.ps1"]},
+        # One unit, two producers: the CPU and CUDA scripts are two spellings of
+        # one dependency, told apart by <backend> rather than by unit name.
+        "llama_cpp":     {"reads": ["MT_CAP_LLM"], "mode": False, "backend": True,
+                          "scripts": ["platform/Windows/build-llama_cpp_cpu.ps1",
+                                      "platform/Windows/build-llama_cpp_cuda.ps1"]},
+        "image_codecs":  {"reads": ["MT_CAP_PHOTO_CODECS", "MT_CAP_RAW",
+                                    "MT_CAP_COLOR_MANAGEMENT"], "mode": False, "backend": False,
+                          "scripts": ["platform/Windows/build-image_codecs.ps1"]},
+        "video_codecs":  {"reads": ["MT_CAP_VIDEO_PLAYBACK"], "mode": True, "backend": False,
+                          "scripts": ["platform/Windows/build-video_codecs.ps1"]},
+    },
+}
+
+
+# Scripts under platform/*/ that build-* naming makes look like producers but
+# that own no store, because they own no output: they forward -OutLibDir to a
+# leaf script and the leaf's store is the one that counts. Listed rather than
+# pattern-matched so that a NEW dependency script fails the registry test until
+# somebody says which of the two it is.
+DISPATCH_SCRIPTS = frozenset({
+    "platform/Windows/build-deps.ps1",       # runs the whole set in order
+    "platform/Windows/build-llama-cpp.ps1",  # picks the CPU or the CUDA leaf
+})
+
+
+def build_units(platform):
+    return BUILD_UNITS.get(platform, {})
+
+
+def unit_form(unit, values):
+    """The canonical string a unit's hash is taken over: the capabilities it
+    reads, plus the licence keys when it reads the derived FFmpeg mode.
+
+    The licence keys are NOT optional for such a unit. FFmpeg's CONTENT
+    depends on them -- that is the whole of decision 0.2 -- so a full and a
+    commercial build must never share a store."""
+    keys = sorted(unit["reads"])
+    if unit.get("mode"):
+        keys += [COMMERCIAL_KEY, PRIVATE_KEY]
+    return ";".join("%s=%d" % (k, values[k]) for k in sorted(keys))
+
+
+def unit_store_dir(root, platform, arch, dconfig, unit_name, unit, values, backend):
+    """Where a unit BUILDS and stamps. The view it copies into stays the one
+    shared `libs` directory every consumer already reads.
+
+    A SEPARATE `_depstore` ROOT, not another segment under `_deps`: the GC
+    decides what is a bucket by finding a `libs` directory inside it
+    (mtengine-gc.py), and a `<unit>` name sharing the slot a caps-hash uses
+    would make the two indistinguishable.
+
+    <backend> appears only for units that read it -- llama.cpp -- rather than
+    above every unit as it sits in the view path. SDL3 does not care which
+    llama backend an app asked for."""
+    parts = [root, "_depstore", platform, arch, dconfig, unit_name]
+    if unit.get("backend"):
+        parts.append(backend)
+    parts.append(caps_hash(unit_form(unit, values)) if unit_form(unit, values) else "common")
+    return os.path.join(*parts)
 
 
 def standalone_out_dir(root, platform, arch, config):

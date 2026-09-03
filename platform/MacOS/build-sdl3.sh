@@ -54,10 +54,17 @@ if ! declare -f mt_caps_lib_dir >/dev/null 2>&1; then
   . "$ROOT_DIR/platform/caps-lib.sh"
 fi
 OUT_LIB_DIR="$(mt_caps_lib_dir)"
+mkdir -p "$OUT_LIB_DIR"
+
+# Store and view (L16): SDL3 reads no capability at all, so its store key is
+# empty and it has ONE bucket for the life of the machine -- where before, any
+# capability flip moved the whole libs directory and rebuilt it to produce the
+# same 248 objects. With no store in the environment (a standalone run) the
+# store IS the view and the sync is a no-op.
+mt_caps_use_store "${MT_STORE_SDL3:-}" sdl3
+
 OUT_LIB="$OUT_LIB_DIR/libSDL3.a"
 STAMP_FILE="$OUT_LIB_DIR/libSDL3.stamp"
-
-mkdir -p "$OUT_LIB_DIR"
 
 if [[ ! -d "$SDL3_SRC_DIR" ]]; then
   echo "ERROR: vendored SDL3 source not found at $SDL3_SRC_DIR" >&2
@@ -80,6 +87,8 @@ fi
 STAMP_VALUE="${SDL3_SRC_SHA}:${SCRIPT_SHA}"
 if [[ -f "$OUT_LIB" && -f "$STAMP_FILE" ]]; then
   if [[ "$(cat "$STAMP_FILE")" == "$STAMP_VALUE" ]]; then
+    # The exit trap installed by mt_caps_use_store copies the store into the
+    # view; a stamp hit means the store is good, not that the view has it.
     exit 0
   fi
 fi

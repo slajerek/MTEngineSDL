@@ -1,6 +1,7 @@
 #if MT_ENABLE_IMGUI_TEST_ENGINE
 
 #include "CImGuiTestEngine.h"
+#include "CTestSuite.h"   // MT_TestResultsPath()
 #include "imgui_te_engine.h"
 #include "imgui_te_ui.h"
 #include "imgui_te_coroutine.h"
@@ -201,6 +202,11 @@ bool CImGuiTestEngine::IsTestQueueEmpty()
 // and two spellings of "the results file" is one spelling too many.
 void CImGuiTestEngine::WriteResults(const char *path)
 {
+	// Default (and every caller passes none): the one resolved path, so the
+	// imgui suite and CTestSuite cannot disagree about where results go.
+	if (path == NULL)
+		path = MT_TestResultsPath();
+
 	if (!engine)
 	{
 		LOGError("CImGuiTestEngine::WriteResults: no engine");

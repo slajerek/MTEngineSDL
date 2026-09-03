@@ -30,6 +30,13 @@ $vocab = Join-Path $PSScriptRoot '..\mtcaps\vocabulary.json'
 $data = Get-Content $vocab -Raw | ConvertFrom-Json
 $decoders = @()
 foreach ($cap in $data.capabilities.PSObject.Properties.Value) {
+    # The FFmpeg policy block is where the withheld decoder list lives since
+    # 2026-09-02 (L4). commercial.forbidden_decoders_commercial stays readable
+    # because other capabilities still use it -- photo codecs withhold 'heif',
+    # which is not an FFmpeg decoder and is harmless noise in this grep.
+    if ($cap.ffmpeg -and $cap.ffmpeg.decoders_withheld) {
+        $decoders += $cap.ffmpeg.decoders_withheld
+    }
     if ($cap.commercial -and $cap.commercial.forbidden_decoders_commercial) {
         $decoders += $cap.commercial.forbidden_decoders_commercial
     }

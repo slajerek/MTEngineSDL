@@ -164,6 +164,7 @@
 
     <PropertyGroup>
       <MTCapsIdeDefines>$([System.IO.File]::ReadAllText('$(MTCapsDefinesFile)').Trim())</MTCapsIdeDefines>
+      <MTCapsIdeDefinesUnescaped>$([MSBuild]::Unescape($([System.IO.File]::ReadAllText('$(MTCapsDefinesFile)').Trim())))</MTCapsIdeDefinesUnescaped>
       <!-- L9: the generated headers (MT_Capabilities.h, Sci/) live under the
            REV-FREE build root, not the rev-keyed out root. MTBuildRoot is
            already resolved by the third Exec above; naming MTCapsResolvedRoot
@@ -179,11 +180,55 @@
     <Message Importance="high"
              Text="Dependencies (IDE): $(MTCapsLibsDir)" />
 
+    <!-- FILL THE VIEW FROM THE STORES (L16, decided on the Windows box
+         2026-09-02). The IDE path resolves the dependency directory and, until
+         now, nothing ever put anything in it: acquisition runs only from the
+         driver. On a capability set whose view has not been built, or whose
+         view was pruned by the GC, that is not a Link error: the view carries
+         the dependency HEADERS as well, so the build dies at ClCompile with
+         `'tiffio.h' file not found`, which names nothing a reader can act on.
+
+         Before L16 the only fix was to BUILD the dependencies here, and a
+         forty-minute FFmpeg compile starting because somebody pressed F7 is
+         worse than the failure. A store is a built unit and a view is a copy of
+         stores, so the fix is now a file copy: 317 files, measured at 3 s, no
+         compiler, and no possibility of a long build appearing by surprise.
+
+         It runs on EVERY IDE build, not only when the view is missing. A stamp
+         hit says the STORE is valid and says nothing about the view, which is the same
+         reason the producers sync from a `finally` rather than at the end.
+
+         ContinueOnError: this step can only ADD to the view. If it fails, the
+         build is exactly as well off as it was before the step existed, and it
+         must not be the thing that breaks an IDE build that would have worked. -->
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MTCapsEngineDir)\platform\Windows\sync-deps-view.ps1&quot; -CapsFile &quot;$(MTCapsResolvedRoot)\MTEngineCaps.xcconfig&quot; -OutLibDir &quot;$(MTCapsLibsDir)&quot;"
+          Condition="Exists('$(MTCapsResolvedRoot)\MTEngineCaps.xcconfig')"
+          ContinueOnError="WarnAndContinue"
+          StandardOutputImportance="high" />
+
+    <!-- The capability defines as an ITEM LIST. See the note on
+         PreprocessorDefinitions below for why the property alone will not do. -->
+    <ItemGroup>
+      <MTCapsIdeDefineItem Include="$(MTCapsIdeDefinesUnescaped)" />
+    </ItemGroup>
+
     <!-- The point of the whole file. Modifying ClCompile metadata inside a
          target that runs before the ClCompile task DOES reach the compiler. -->
     <ItemGroup>
       <ClCompile>
-        <!-- APPENDED, not prepended, and the order is the whole point. The
+        <!-- @(MTCapsIdeDefineItem), not $(MTCapsIdeDefines), and the two are
+             not interchangeable. MSBuild escapes the result of a property
+             function, so the `;` in the property is `%3B` and the whole
+             capability set expands as ONE token. The MSVC CL task then emits it
+             as a single quoted /D and every capability macro but the first is
+             simply not defined. This engine project is spared today only
+             because it compiles with ClangCL, whose task splits the value
+             anyway; the apps use the MSVC task, and the identical line in
+             MTEngineApp.targets silently built a DummyApp with no imgui test
+             engine in it (found on Windows, 2026-09-02). Depending on the
+             toolset for that is not a property worth keeping.
+
+             APPENDED, not prepended, and the order is the whole point. The
              .vcxproj hardcodes a legacy set of BARE defines
              (MT_ENABLE_LIBTIFF;MT_ENABLE_LIBWEBP;MT_ENABLE_LIBAVIF;
              MT_ENABLE_LIBRAW;MT_ENABLE_FFMPEG;MT_ENABLE_LCMS2;...), and a bare
@@ -195,7 +240,7 @@
              wins, and an IDE build compiled codec sources the manifest had
              switched OFF (it then failed on tiffio.h / webp/decode.h, which is
              how this was found). Appending reproduces the command-line order. -->
-        <PreprocessorDefinitions>%(ClCompile.PreprocessorDefinitions);$(MTCapsIdeDefines)</PreprocessorDefinitions>
+        <PreprocessorDefinitions>%(ClCompile.PreprocessorDefinitions);@(MTCapsIdeDefineItem)</PreprocessorDefinitions>
         <!-- The dependency headers too. The .vcxproj names the image-codecs and
              ffmpeg include dirs off $(MTCapsLibsDir) in an ItemDefinitionGroup,
              which MSBuild evaluates BEFORE any target runs, and on the IDE path

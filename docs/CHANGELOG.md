@@ -20,6 +20,62 @@ stability meaning.
 
 ---
 
+## 3.21.1 — development
+
+Build-system work on top of 3.21, and the first Windows fixes that came out of
+building every host application on that platform. No engine source behaviour
+changes on macOS or Linux; the D3D11 addition is new code on a path that
+previously had none.
+
+**A build store per dependency.** Dependency archives used to be keyed by the
+whole acquisition capability set: switching one capability off moved the bucket
+for *every* dependency, so changing a terminal-UI library rebuilt SDL3, mbedTLS,
+the image codecs and FFmpeg from scratch to produce the same bytes. Each
+dependency now builds and stamps in a store keyed only by the capabilities it
+actually reads, then copies its outputs into the same shared `libs` directory
+consumers link against — nothing downstream changed. Dependencies that read no
+capability at all (SDL3, FreeType, libuv, uSockets) get one bucket per machine,
+shared by every application on it. Measured: turning FTXUI off rebuilds FTXUI
+and nothing else.
+
+**The FFmpeg decoder policy has one home.** The decoder, parser and demuxer
+lists live in `tools/mtcaps/vocabulary.json` and reach the codec scripts as
+resolved values; the scripts no longer carry their own copies. In the same
+change the built decoder set follows the *resolved build mode* rather than the
+licence tier, which are not the same question — a non-commercial tier can
+legitimately resolve to a restricted decoder set.
+
+**A release package on every platform.** `platform/<Platform>/prod/<arch>/`
+holds the application, its assets and `LICENSES.txt`, on macOS and Linux as it
+already did on Windows, and the deploy step fails rather than shipping a package
+without its licence document. Applications are tested *from* that package,
+because an engine application resolves its assets through the working directory
+and never through the executable's own location.
+
+**Windows.** The generated CMake fragment could not carry a Windows path: a
+backslash in a quoted value is a character escape, so the line was a parse error
+that took the whole fragment down. An IDE build compiled applications with no
+capability defines at all. An IDE build had no way to populate its dependency
+directory short of building the dependencies inside Visual Studio, and now syncs
+them from the stores instead (`platform/Windows/sync-deps-view.ps1`). IDE and
+command-line builds no longer write their executable to the same path, where
+each could see the other's as up to date. The app-side MSBuild properties moved
+into the engine (`platform/Windows/MTEngineApp.props`), leaving an application
+with a stub that declares its identity.
+
+**D3D11: the masked-tile shader.** It had been left unimplemented on this
+backend with a note that every caller drew an unshaded fallback; one did not.
+Ported from the GLSL original deliberately without its Y flip, since
+`SV_Position` is already top-left where `gl_FragCoord` is bottom-left.
+
+**Cache maintenance.** `tools/appbuild/mtengine-gc.py` understands the per-unit
+stores and keeps them per dependency rather than globally. Its liveness check
+resolved without engine options, which put every path it computed under a
+backend segment that no build on an ARM machine ever writes to — it protected
+directories that did not exist and could have deleted a live bucket.
+
+---
+
 ## 3.21 — development
 
 The capability system, and a build that keeps its output out of your checkout.
