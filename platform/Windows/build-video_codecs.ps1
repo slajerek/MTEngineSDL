@@ -361,10 +361,35 @@ function Download-Archive($name, $url, $expectedHash, $ext) {
     }
 }
 
-function Extract-Archive($name, $topDir, $ext, $tarFlag) {
+# Fails if any of $Expect (paths relative to $dest) is missing. Separate from
+# the extractor's exit code ON PURPOSE: bsdtar's 0 says "I stopped without
+# raising an error", not "the tree is complete", and there is no manifest check
+# anywhere else in this script.
+function Assert-Extracted($name, $dest, [string[]]$Expect) {
+    foreach ($rel in $Expect) {
+        $path = Join-Path $dest $rel
+        if (-not (Test-Path $path)) {
+            throw "$name is not fully extracted: '$path' is missing. Delete '$dest' and re-run to extract it again. (The extraction step reported success; this check exists because that report is not sufficient.)"
+        }
+    }
+}
+
+function Extract-Archive($name, $topDir, $ext, $tarFlag, [string[]]$Expect) {
     $archive = Join-Path $downloadDir "$name.$ext"
     $dest = Join-Path $srcDir $topDir
-    if (Test-Path $dest) { return }
+    # THE EARLY-OUT, SAID OUT LOUD. The existence of the destination directory
+    # is the ONLY thing that makes extraction a once-per-cache event -- there is
+    # no stamp, no manifest, no size check. So a HALF-extracted tree is
+    # permanent: every later run reaches this line, sees the directory, returns,
+    # and then fails somewhere much further along with a message that says
+    # nothing about extraction at all. $Expect is the guard, and it runs on this
+    # cached path as well as on the freshly extracted one -- a cache poisoned by
+    # an earlier failed run is reported HERE, where the cause is still legible,
+    # and the fix is one rm -rf away.
+    if (Test-Path $dest) {
+        Assert-Extracted $name $dest $Expect
+        return
+    }
     Write-Host "Extracting $name..."
     # GNU tar (Git-for-Windows/MSYS2) applies its host:path remote-shell
     # heuristic to the -C argument too, not just -f: a raw "C:\foo\bar"
@@ -390,6 +415,7 @@ function Extract-Archive($name, $topDir, $ext, $tarFlag) {
         & tar $tarFlag "$archive" -C "$srcDir"
         if ($LASTEXITCODE -ne 0) { throw "Failed to extract $archive" }
     }
+    Assert-Extracted $name $dest $Expect
 }
 
 function Require-File($path) {
@@ -425,6 +451,48 @@ function Find-Msys2Bash {
         throw "MSYS2 bash.exe not found at $bash. Install MSYS2 from https://www.msys2.org/ (default path C:\msys64) or set `$env:MSYS2_ROOT to your install location."
     }
     return $bash
+}
+
+# THE MAKE THE GENERATED SCRIPTS MUST USE, and why it is spelled absolutely.
+#
+# FFmpeg is configured OUT OF TREE, and its configure then writes a one-line
+# Makefile into the build directory:
+#
+#     include /c/Users/.../video-codecs/src/ffmpeg-7.1.2/Makefile
+#
+# an ABSOLUTE path in MSYS2's /c/... spelling, because that is what `pwd`
+# returns inside the shell configure ran in. Only an MSYS2 make can read it. A
+# NATIVE Windows GNU make -- the "Built for Windows32" build a Chocolatey,
+# Strawberry Perl or CMake-adjacent install can put on PATH -- reads /c/Users
+# as C:\c\Users and stops with
+#
+#     Makefile:1: /c/Users/.../Makefile: No such file or directory
+#     make: *** No rule to make target '/c/Users/.../Makefile'.  Stop.
+#
+# which is exactly how GitHub's windows runner failed on 2026-09-03 (run
+# 33742482983), and exactly what a native make reproduces here on demand. The
+# failure names the SOURCE tree, so it reads like a broken extraction; it is
+# not. Note that libvpx sails through the same shell untouched: ITS generated
+# Makefile says `include config.mk`, relative, which any make resolves -- so
+# "vpx built, FFmpeg did not" is the signature of this defect, not evidence
+# against it.
+#
+# Import-VcVars splices MSYS2's usr\bin into PATH ahead of the pre-existing
+# entries, which is enough WHEN MSYS2 HAS make INSTALLED -- it is not part of
+# a base MSYS2 install, it is the documented `pacman -S --needed make`
+# prerequisite. When it is absent, PATH search does not fail; it falls through
+# to whatever other make the machine has, and the build gets a make that
+# cannot read its own Makefile. Naming /usr/bin/make removes the search
+# entirely: /usr/bin inside the bash we launch is always <MSYS2_ROOT>\usr\bin,
+# whatever $env:MSYS2_ROOT is set to.
+function Require-Msys2Make {
+    $msys2Root = $env:MSYS2_ROOT
+    if (-not $msys2Root) { $msys2Root = "C:\msys64" }
+    $make = Join-Path $msys2Root "usr\bin\make.exe"
+    if (-not (Test-Path $make)) {
+        throw "MSYS2's make is not installed: $make is missing. It is a documented prerequisite of this script -- from an MSYS2 shell run: pacman -S --needed make diffutils pkgconf. There is deliberately no fallback to another make on PATH: FFmpeg's out-of-tree Makefile includes its source Makefile by absolute /c/... path, which only an MSYS2 make can resolve."
+    }
+    return '/usr/bin/make'
 }
 
 # Imports the VS developer environment (cl.exe, link.exe, lib.exe, msbuild.exe,
@@ -634,13 +702,22 @@ Download-Archive "libvpx-$vpxVersion" $vpxUrl $vpxHash "tar.gz"
 Download-Archive "opus-$opusVersion" $opusUrl $opusHash "tar.gz"
 Download-Archive "ffmpeg-$ffmpegVersion" $ffmpegUrl $ffmpegHash "tar.xz"
 
-Extract-Archive "libvpx-$vpxVersion" "libvpx-$vpxVersion" "tar.gz" "-xzf"
-Extract-Archive "opus-$opusVersion" "opus-$opusVersion" "tar.gz" "-xzf"
-Extract-Archive "ffmpeg-$ffmpegVersion" "ffmpeg-$ffmpegVersion" "tar.xz" "-xJf"
+# The -Expect lists are the files the build IMMEDIATELY needs and would
+# otherwise miss late and confusingly: each tree's configure, and -- for FFmpeg,
+# whose out-of-tree build includes it by absolute path from a generated
+# one-liner -- the top-level Makefile too.
+Extract-Archive "libvpx-$vpxVersion" "libvpx-$vpxVersion" "tar.gz" "-xzf" @("configure")
+Extract-Archive "opus-$opusVersion" "opus-$opusVersion" "tar.gz" "-xzf" @("configure")
+Extract-Archive "ffmpeg-$ffmpegVersion" "ffmpeg-$ffmpegVersion" "tar.xz" "-xJf" @("configure", "Makefile")
 
 # ==================== load VS environment for this Platform ====================
 
 Import-VcVars $vcArch
+
+# Checked HERE, before a single archive is configured, rather than at the first
+# `make` an hour in: a missing prerequisite should cost seconds. See
+# Require-Msys2Make for why the answer is an absolute path and not PATH.
+$msysMake = Require-Msys2Make
 
 if ($Platform -eq 'x64') {
     # The documented install path (`pacman -S nasm` inside an MSYS2 shell)
@@ -779,7 +856,7 @@ cd '$ffmpegBuildPosix'
   2>&1 | tee configure.log
 
 set +e
-make -j$Jobs 2>&1 | tee make.log
+$msysMake -j$Jobs 2>&1 | tee make.log
 MAKE_STATUS=`$?
 set -e
 
@@ -792,22 +869,22 @@ set -e
 if [ `$MAKE_STATUS -ne 0 ]; then
   if grep -q 'unresolved external symbol ff_eac3_bits_vs_hebap' make.log; then
     echo '=== Known MSVC/eac3 dead-code link gap (owner-approved fix): linking eac3_data.o (pure tables, no decoder) into avcodec only ==='
-    make libavcodec/eac3_data.o
-    LINKCMD=`$(make -n libavcodec/avcodec-61.dll | grep -F '/compat/windows/mslink ')
+    $msysMake libavcodec/eac3_data.o
+    LINKCMD=`$($msysMake -n libavcodec/avcodec-61.dll | grep -F '/compat/windows/mslink ')
     if [ -z "`$LINKCMD" ]; then
       echo 'ERROR: could not recover the avcodec-61.dll link command from a make dry-run' >&2
       exit 1
     fi
     LINKCMD=`${LINKCMD/libavcodec\/avcodec.o /libavcodec\/avcodec.o libavcodec\/eac3_data.o }
     eval "`$LINKCMD"
-    make -j$Jobs 2>&1 | tee make-continued.log
+    $msysMake -j$Jobs 2>&1 | tee make-continued.log
   else
     echo 'FFmpeg build failed for a reason other than the known eac3 dead-code link gap -- not auto-recovering.' >&2
     exit `$MAKE_STATUS
   fi
 fi
 
-make install 2>&1 | tee install.log
+$msysMake install 2>&1 | tee install.log
 "@
 
     $ffmpegScriptPath = Join-Path $ffmpegBuildDir "build.sh"
@@ -896,14 +973,14 @@ cd '$vpxBuildPosix'
   --disable-vp9-encoder \
   2>&1 | tee configure.log
 
-make -j$Jobs 2>&1 | tee make.log
+$msysMake -j$Jobs 2>&1 | tee make.log
 "@
 
 $vpxScriptPath = Join-Path $vpxBuildDir "configure.sh"
 Write-BashScript $vpxScriptPath $vpxConfigureScript
 Invoke-Msys2Script $vpxScriptPath (Join-Path $vpxBuildDir "msys2-driver.log")
 
-# NOTE (bare `make`, not `make vpx.sln`): the generated top-level Makefile
+# NOTE (make with NO GOAL, not `make vpx.sln`): the generated top-level Makefile
 # only defines a real "vpx.sln" target once $(target) is set (it conditionally
 # includes "$(target)-$(TOOLCHAIN).mk", see its own comment "we invoke make
 # recursively for multiple targets"); with $(target) empty -- our case, since

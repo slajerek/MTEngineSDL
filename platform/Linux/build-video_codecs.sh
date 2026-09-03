@@ -44,6 +44,28 @@ DOWNLOAD_DIR="$CACHE_DIR/downloads"
 SRC_DIR="$CACHE_DIR/src"
 
 ARCH="$(uname -m)"
+
+# AN x86 TARGET NEEDS AN x86 ASSEMBLER, and libvpx has no way to go without one.
+#
+# FFmpeg degrades: --disable-x86asm costs decode speed and builds. libvpx's
+# configure simply stops, deep inside this script, with a message that names
+# neither the package to install nor the build that wanted it -- and on macOS it
+# does so inside an Xcode script phase, where almost nobody finds it. Twice in
+# one day of CI (2026-09-03), on two platforms, for the same missing tool.
+#
+# So it is asked here, once, before anything is downloaded or built.
+mt_require_x86_assembler() {
+    command -v nasm >/dev/null 2>&1 && return 0
+    command -v yasm >/dev/null 2>&1 && return 0
+    echo "ERROR: building x86_64 video codecs needs an x86 assembler (nasm), and neither nasm nor yasm is on PATH." >&2
+    echo "       libvpx cannot be built without one; FFmpeg would only lose its x86 assembly." >&2
+    echo "       Install it:  sudo apt-get install -y nasm   (or your distro's nasm package)" >&2
+    return 1
+}
+
+case "$ARCH" in
+    x86_64|amd64) mt_require_x86_assembler || exit 1 ;;
+esac
 BUILD_DIR="$CACHE_DIR/build-linux-$ARCH"
 OUT_LIB_DIR="$(mt_caps_lib_dir)"
 

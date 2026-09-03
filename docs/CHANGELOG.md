@@ -20,6 +20,77 @@ stability meaning.
 
 ---
 
+## 3.21.4 — development
+
+**macOS staged the FFmpeg headers and nothing else, so the engine compiled
+against whichever libvpx the machine happened to have.** It includes
+`<vpx/vpx_codec.h>` and `<opus/opus.h>` directly, not through FFmpeg, and only
+the five `libav*` directories reached the shared include root. Those headers
+were therefore never provided by the build at all. One machine here compiled
+against Homebrew's libvpx 1.16.0 while linking the 1.15.2 this build produces,
+and it worked only because the two happen to agree; a machine with no system
+libvpx cannot compile the engine at all. Linux always staged the whole install
+prefix and Windows always merged vpx and opus into one include root — macOS was
+the outlier.
+
+**An x86 target says up front that it needs an x86 assembler.** libvpx has no
+assembler-less fallback the way FFmpeg's `--disable-x86asm` is, so without nasm
+its configure stops deep inside the codec build, naming neither the package to
+install nor the build that wanted it — and on macOS it does so from inside an
+Xcode script phase, where it is nearly unfindable. The question is now asked
+once, before anything is downloaded, and the answer names the package. macOS
+always builds universal so it always asks; Linux asks only when the machine's
+own architecture is x86.
+
+**The Windows codec build names MSYS2's `make` absolutely, instead of trusting
+PATH.** FFmpeg is configured out of tree, and its configure then writes a
+one-line Makefile into the build directory:
+
+    include /c/Users/.../video-codecs/src/ffmpeg-7.1.2/Makefile
+
+an absolute path in MSYS2's `/c/...` spelling, because that is what `pwd`
+returns in the shell configure ran in. Only an MSYS2 `make` can read it. A
+native Windows GNU make reads `/c/Users` as `C:\c\Users` and stops with
+
+    Makefile:1: /c/Users/.../Makefile: No such file or directory
+    make: *** No rule to make target '/c/Users/.../Makefile'.  Stop.
+
+naming FFmpeg's own source Makefile — so it reads as a broken extraction, and it
+is not. libvpx passes through the same shell untouched, because ITS generated
+Makefile says `include config.mk`, relative, which any make resolves; "vpx
+built, FFmpeg did not" is the signature of this defect rather than evidence
+against it.
+
+`Import-VcVars` splices MSYS2's `usr\bin` into PATH ahead of the pre-existing
+entries, which is sufficient *when MSYS2 has make installed*. It is not part of
+a base MSYS2 install — it is the documented `pacman -S --needed make`
+prerequisite — and when it is absent PATH search does not fail; it falls through
+to whatever other make the machine has. `/usr/bin/make` removes the search:
+`/usr/bin` inside the bash this script launches is always
+`<MSYS2_ROOT>\usr\bin`, whatever `$env:MSYS2_ROOT` says. The prerequisite is now
+checked once, before the first archive is configured, and reported as the pacman
+line rather than as a missing Makefile an hour later.
+
+Measured on Windows 11 ARM64 2026-09-03, against the real generated Makefile in
+an MSYS2 shell with a native make first on PATH: bare `make` reproduces the
+runner's message byte for byte, `/usr/bin/make` runs. Worth knowing while
+reading this: a plain MSYS2 shell inherits the Windows PATH, so bare `make`
+there is the native one on any machine that has one — a Chocolatey install is
+enough.
+
+**Both extractors verify what they extracted.** `Extract-Archive` returned early
+whenever the destination directory existed, and that early-out is the only thing
+making extraction a once-per-cache event: no stamp, no manifest, no size check.
+A half-extracted tree was therefore permanent, and every later run failed
+somewhere that said nothing about extraction. Both copies now take a list of
+files the build immediately needs — each tree's `configure`, and FFmpeg's
+top-level `Makefile` — and check it on the cached path as well as on the freshly
+extracted one, so a cache poisoned by a failed run is reported where the cause
+is still legible. bsdtar's exit code says it stopped without raising an error,
+not that the tree is complete; nothing else here checked the difference.
+
+---
+
 ## 3.21.3 — development
 
 Two more failures from continuous integration, both of the same shape as the

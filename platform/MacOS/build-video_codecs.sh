@@ -36,6 +36,27 @@ OUT_LIB="$OUT_LIB_DIR/libmt_video_codecs.a"
 STAMP_FILE="$OUT_LIB_DIR/libmt_video_codecs.stamp"
 
 ARCH_LIST=(arm64 x86_64)
+
+# AN x86 TARGET NEEDS AN x86 ASSEMBLER, and libvpx has no way to go without one.
+#
+# FFmpeg degrades: --disable-x86asm costs decode speed and builds. libvpx's
+# configure simply stops, deep inside this script, with a message that names
+# neither the package to install nor the build that wanted it -- and on macOS it
+# does so inside an Xcode script phase, where almost nobody finds it. Twice in
+# one day of CI (2026-09-03), on two platforms, for the same missing tool.
+#
+# So it is asked here, once, before anything is downloaded or built.
+mt_require_x86_assembler() {
+    command -v nasm >/dev/null 2>&1 && return 0
+    command -v yasm >/dev/null 2>&1 && return 0
+    echo "ERROR: building x86_64 video codecs needs an x86 assembler (nasm), and neither nasm nor yasm is on PATH." >&2
+    echo "       libvpx cannot be built without one; FFmpeg would only lose its x86 assembly." >&2
+    echo "       Install it:  brew install nasm   (or: port install nasm)" >&2
+    return 1
+}
+
+# macOS always builds universal, so the x86_64 half is never optional.
+mt_require_x86_assembler || exit 1
 DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-10.15}"
 JOBS="${MT_BUILD_JOBS:-8}"
 
@@ -594,8 +615,22 @@ require_ffmpeg_clean_deps() {
 merge_ffmpeg_headers() {
   rm -rf "$PREFIX_DIR/include"
   mkdir -p "$PREFIX_DIR/include"
+  # vpx and opus BELONG HERE, and their absence was invisible for as long as
+  # every machine that built this had them from Homebrew or MacPorts.
+  #
+  # The engine includes <vpx/vpx_codec.h> and <opus/opus.h> directly, not
+  # through FFmpeg. Staging only the libav* directories left those headers to
+  # be found wherever the machine happened to keep a copy: this one compiled
+  # against Homebrew's libvpx 1.16.0 while linking the 1.15.2 this script
+  # builds, and nobody noticed because the two happen to agree. A runner with
+  # no system libvpx simply cannot compile the engine -- measured 2026-09-03,
+  # "fatal error: 'vpx/vpx_codec.h' file not found", after every dependency
+  # had built successfully.
+  #
+  # Linux never had this: it stages the whole install prefix, so vpx's and
+  # opus's headers travel with FFmpeg's. This makes macOS match.
   local dir
-  for dir in libavutil libavcodec libavformat libswscale libswresample; do
+  for dir in libavutil libavcodec libavformat libswscale libswresample vpx opus; do
     cp -R "$CACHE_DIR/install-${ARCH_LIST[0]}/include/$dir" "$PREFIX_DIR/include/"
   done
 

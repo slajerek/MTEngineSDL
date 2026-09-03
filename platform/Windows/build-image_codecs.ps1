@@ -199,10 +199,32 @@ function Download-Archive($name, $url, $expectedHash) {
     }
 }
 
-function Extract-Archive($name, $topDir) {
+# Fails if any of $Expect (paths relative to $dest) is missing. Separate from
+# the extractor's exit code ON PURPOSE: bsdtar's 0 says "I stopped without
+# raising an error", not "the tree is complete". Same function, same reasoning,
+# as build-video_codecs.ps1's copy -- read the longer note there.
+function Assert-Extracted($name, $dest, [string[]]$Expect) {
+    foreach ($rel in $Expect) {
+        $path = Join-Path $dest $rel
+        if (-not (Test-Path $path)) {
+            throw "$name is not fully extracted: '$path' is missing. Delete '$dest' and re-run to extract it again. (The extraction step reported success; this check exists because that report is not sufficient.)"
+        }
+    }
+}
+
+function Extract-Archive($name, $topDir, [string[]]$Expect) {
     $archive = Join-Path $downloadDir "$name.tar.gz"
     $dest = Join-Path $srcDir $topDir
-    if (Test-Path $dest) { return }
+    # THE EARLY-OUT, SAID OUT LOUD. The destination directory existing is the
+    # ONLY thing that makes extraction a once-per-cache event, so a HALF
+    # extracted tree is permanent -- every later run returns here and fails
+    # later, somewhere that says nothing about extraction. $Expect runs on this
+    # cached path as well as the freshly extracted one, so a cache poisoned by
+    # an earlier failed run is reported HERE.
+    if (Test-Path $dest) {
+        Assert-Extracted $name $dest $Expect
+        return
+    }
     Write-Host "Extracting $name..."
     # Extract into $srcDir so the tarball's top-level dir creates $dest naturally
     # (avoids double nesting like src/tiff-4.7.1/tiff-4.7.1/)
@@ -213,6 +235,7 @@ function Extract-Archive($name, $topDir) {
         & tar -xzf "$archive" -C "$srcDir"
         if ($LASTEXITCODE -ne 0) { throw "Failed to extract $archive" }
     }
+    Assert-Extracted $name $dest $Expect
 }
 
 # git writes routine progress ("Cloning into...", "Submodule '...' registered
@@ -308,12 +331,12 @@ Download-Archive "libavif-$avifVersion" $avifUrl    $avifHash
 Download-Archive "LibRaw-$librawVersion" $librawUrl $librawHash
 Download-Archive "lcms$lcms2Version"    $lcms2Url   $lcms2Hash
 
-Extract-Archive "tiff-$tiffVersion"    "tiff-$tiffVersion"
-Extract-Archive "libwebp-$webpVersion" "libwebp-$webpVersion"
-Extract-Archive "libavif-$avifVersion" "libavif-$avifVersion"
+Extract-Archive "tiff-$tiffVersion"    "tiff-$tiffVersion" @("CMakeLists.txt")
+Extract-Archive "libwebp-$webpVersion" "libwebp-$webpVersion" @("CMakeLists.txt")
+Extract-Archive "libavif-$avifVersion" "libavif-$avifVersion" @("CMakeLists.txt")
 Clone-GitTag "libgav1-v$libgav1Version" $libgav1GitUrl "v$libgav1Version" $libgav1GitRev
-Extract-Archive "LibRaw-$librawVersion" "LibRaw-$librawVersion"
-Extract-Archive "lcms$lcms2Version"    "Little-CMS-lcms$lcms2Version"
+Extract-Archive "LibRaw-$librawVersion" "LibRaw-$librawVersion" @("CMakeLists.txt")
+Extract-Archive "lcms$lcms2Version"    "Little-CMS-lcms$lcms2Version" @("CMakeLists.txt")
 
 # Link libgav1 into avif ext dir
 $libgav1Src = Join-Path $srcDir "libgav1-v$libgav1Version"
