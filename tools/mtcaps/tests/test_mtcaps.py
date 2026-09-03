@@ -359,19 +359,53 @@ class TestManifestFormat(Base):
             R.resolve(self.vocab, m, "macos")
         self.assertIn("shell identifier", str(cm.exception))
 
+    @staticmethod
+    def _real_bash():
+        """A bash that can actually source a file, or None.
+
+        `bash` on PATH is not necessarily one. Windows ships
+        System32\\bash.exe, the WSL launcher, and on a machine with no
+        distribution installed it exits 1 having written its complaint to
+        STDOUT -- so the caller sees a failed run with an EMPTY stderr and no
+        hint of why. Measured on a CI runner 2026-09-03, where it read as a
+        manifest-format failure and is nothing of the kind.
+
+        So the candidate is asked what it is before it is trusted: GNU bash
+        says so in --version. Git for Windows keeps a real one outside PATH."""
+        candidates = [shutil.which("bash")]
+        if os.name == "nt":
+            candidates += [r"C:\Program Files\Git\bin\bash.exe",
+                           r"C:\Program Files\Git\usr\bin\bash.exe",
+                           r"C:\msys64\usr\bin\bash.exe"]
+        for cand in candidates:
+            if not cand or not os.path.exists(cand):
+                continue
+            try:
+                out = subprocess.run([cand, "--version"], capture_output=True,
+                                     text=True, timeout=30)
+            except Exception:
+                continue
+            if out.returncode == 0 and "GNU bash" in (out.stdout or ""):
+                return cand
+        return None
+
     def test_the_manifest_really_does_source_in_bash(self):
         """Not an argument -- a measurement. If bash cannot source it, the format
         claim is false whatever this module thinks."""
+        bash = self._real_bash()
+        if bash is None:
+            self.skipTest("no GNU bash available to measure with")
         m = self.manifest("# comment\n\nMT_CAP_LLM=0\nMT_CAP_HTTPS__MACOS=1\n")
         # The path travels in argv, not in the script text. A Windows temp path
         # is full of backslashes and bash reads those as escapes, so
         # interpolating it into -c turned C:\Users\... into C:Users... and this
         # test failed on every Windows machine for a reason nothing to do with
         # the manifest format it is measuring.
-        proc = subprocess.run(["bash", "-c", 'set -e; source "$1"; echo $MT_CAP_LLM',
+        proc = subprocess.run([bash, "-c", 'set -e; source "$1"; echo $MT_CAP_LLM',
                                "bash", m.replace("\\", "/")],
                               capture_output=True, text=True)
-        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(proc.returncode, 0,
+                         "bash=%s stderr=%r stdout=%r" % (bash, proc.stderr, proc.stdout))
         self.assertEqual(proc.stdout.strip(), "0")
 
     def test_unknown_key_is_an_error(self):

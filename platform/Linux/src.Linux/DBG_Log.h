@@ -14,21 +14,17 @@
 #include <string>
 #include <type_traits>
 
-// TEMPORARY, 2026-09-03 -- DIAGNOSTIC BUILD, REVERT WHEN THE CRASH IS FOUND.
+// Off by default here, unlike the other platforms -- and that is a real cost
+// worth knowing about. With this set EVERY log macro compiles to nothing,
+// including the LOGError inside SYS_FatalExit, so a crash on this platform
+// prints no diagnostic whatsoever: not one hidden in a file, none written at
+// all. That is exactly what happened on 2026-09-03, when a MIDI fault showed up
+// in CI as a bare "Segmentation fault" and the cause could only be found by
+// commenting this line out for one run and reading the startup trace.
 //
-// Linux is the only platform where this is on by default, and with it on EVERY
-// log macro compiles to nothing -- including LOGError inside SYS_FatalExit. So
-// the engine's own account of why it is dying is not merely hidden in a file,
-// it is never written at all. CI showed a bare "Aborted (core dumped)" with no
-// diagnostic whatsoever, then a bare "Segmentation fault", and static reading
-// of every audio path (DebugPrintAudioDevices, EnumerateAvailableOutputDevices,
-// SetOutputAudioDevice, StartPlaying) found each one correctly guarded against
-// zero devices -- so the crash site cannot be identified by reading alone.
-//
-// Logging goes to stdout here (see DBG_Log.cpp), so a CI run with this off
-// prints the engine's startup trace up to the last thing it managed before
-// dying, which is the one piece of evidence nothing else can supply.
-//#define GLOBAL_DEBUG_OFF
+// If you are debugging something here and the program is dying silently, this
+// line is the first thing to comment out.
+#define GLOBAL_DEBUG_OFF
 
 #define DBGLVL_ALL_OFF	0x0000
 #define DBGLVL_ALL_ON	0xFFFF

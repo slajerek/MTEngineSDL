@@ -26,6 +26,25 @@ back level. A number is cheap; a reader guessing at a pairing is not.
 
 ---
 
+## 3.21.10 — development
+
+**The Linux diagnostic logging from 3.21.8 is off again**, its job done: it
+found the MIDI sequencer crash and nothing else needs it. The comment left in
+its place says what it costs to have it off — with `GLOBAL_DEBUG_OFF` set, a
+crash on this platform prints no diagnostic at all — so the next person
+debugging something silent knows which line to comment out first.
+
+**The manifest's bash test finds a real bash before measuring with it.** Windows
+ships `System32\bash.exe`, the WSL launcher, and on a machine with no
+distribution installed it exits 1 having written its complaint to *stdout* — so
+the test saw a failed run with an empty stderr and reported it as a
+manifest-format failure, which it is not. The candidate is now asked what it is
+(`--version` must say GNU bash), Git for Windows' own bash is looked for outside
+PATH, and the test skips honestly if no such bash exists rather than blaming the
+format it is measuring.
+
+---
+
 ## 3.21.9 — development
 
 **MIDI input asks whether there is a sequencer before opening one, and never
