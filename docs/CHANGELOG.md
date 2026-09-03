@@ -26,6 +26,22 @@ back level. A number is cheap; a reader guessing at a pairing is not.
 
 ---
 
+## 3.21.8 — development
+
+**Temporary: Linux debug logging is on, to find a crash that leaves no trace.**
+Linux is the only platform where `GLOBAL_DEBUG_OFF` is set by default, and with
+it set every log macro compiles to nothing — including the `LOGError` inside
+`SYS_FatalExit`. So when the app died during automated testing it printed
+absolutely nothing: not a hidden diagnostic in a log file, but no diagnostic
+written anywhere at all. Reading the code could not narrow it either; every
+audio path is correctly guarded against having no device.
+
+With the define commented out, logging goes to stdout and a run prints the
+engine's startup trace up to the last thing it managed before dying. **This is
+a diagnostic build and the define comes back as soon as the crash is found.**
+
+---
+
 ## 3.21.7 — development
 
 **The Windows app follows the engine's own toolset choice, instead of quietly
