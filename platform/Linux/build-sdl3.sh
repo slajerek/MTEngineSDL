@@ -5,7 +5,7 @@ set -euo pipefail
 #
 # WHY THIS SCRIPT EXISTS AT ALL -- it is a FIX, not just a build step.
 #
-# CLAUDE.md's rule is that we build our OWN copy of every third-party library
+# The rule here is that we build our OWN copy of every third-party library
 # on every platform, because a package-manager path in a shipped artifact is a
 # release blocker for the store builds. Linux violated that for SDL from the
 # beginning: `find_package(SDL2 REQUIRED)` plus `apt-get install libsdl2-dev`,

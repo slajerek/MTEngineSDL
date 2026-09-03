@@ -35,7 +35,7 @@
 
        UNVERIFIED. Nothing here has been executed: there is no MSBuild on the
        machine this was written on. It is reasoned from documented behaviour, and
-       spike #2.1 in claude/WINDOWS-HANDOVER.md is what confirms or refutes it.
+       a first MSBuild run on Windows is what confirms or refutes it.
        =================================================================== -->
 
   <Target Name="MTCapsResolveForIDE"

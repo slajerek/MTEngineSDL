@@ -88,7 +88,7 @@ fi
 # the fragments to $MT_OUT -- outside every checkout -- and passes the resolved
 # values to xcodebuild as SETTINGS. Nothing is written inside this repository.
 #
-# Measured (spike G, claude/spikes/xcconfig/README.md in the DummyApp repo):
+# Measured (spike G, 2026-08-23):
 #
 #   * a command-line setting reaches a CROSS-PROJECT dependency's compile line,
 #     which is what makes one invocation configure both the engine and the app;

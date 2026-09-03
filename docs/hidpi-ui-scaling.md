@@ -173,8 +173,8 @@ grown.
 
 **What the app still owns**: whether the scale follows the display or a stored
 preference, and migrating any geometry the app has already persisted. Those are
-policy and app-specific formats; RetroDebugger's are in `C64DUiScale.h` and
-`claude/architecture/hidpi-ui-scaling.md` in that repo.
+policy and app-specific formats; RetroDebugger's are in `C64DUiScale.h` in
+that repository.
 
 ### A config trap that is NOT there -- and how a bad test invented one
 

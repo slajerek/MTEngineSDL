@@ -108,7 +108,7 @@ part.
 
 If this is ever revisited, the honest order is to amend THE RULE first, with its
 reasoning, and only then the code — never to leave code contradicting a rule that
-still stands in `CLAUDE.md`.
+still stands.
 
 The only shape that would genuinely work is each app owning its own copy of the
 engine *target* rather than referencing it — four parallel copies of the engine's

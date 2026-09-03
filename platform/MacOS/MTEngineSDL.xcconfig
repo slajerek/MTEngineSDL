@@ -13,7 +13,7 @@
 //     could ever name it. build-macos.sh READS it and turns it into xcodebuild
 //     settings.
 //
-// MEASURED (spike G, 2026-08-23, claude/spikes/xcconfig/README.md):
+// MEASURED (spike G, 2026-08-23):
 //
 //   * $(MT_CAPS_DEFINES) DOES expand here when the value is supplied on the
 //     xcodebuild command line -- question 9, and the whole mechanism rests on it;
@@ -108,7 +108,7 @@ MT_CAPS_LIBS_DIR = $(HOME)/.cache/mtengine/_deps/standalone/libs
 // acceptable for this manifest).
 //
 // Measured: a pre-action's write takes effect in the SAME build, and an absolute
-// #include? resolves. See claude/spikes/xcconfig/README.md.
+// #include? resolves.
 //
 // A command-line setting still beats this, so the script path is never a VICTIM
 // of a stale file here: the wrapper's values win and the two agree anyway.

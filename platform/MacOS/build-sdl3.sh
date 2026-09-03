@@ -4,7 +4,7 @@ set -euo pipefail
 # Build a static libSDL3.a from the vendored SDL3 source.
 #
 # WHY VENDORED AND STATIC (do not "simplify" this):
-#  - CLAUDE.md's third-party rule: we build our OWN copy of every library on
+#  - This project's third-party rule: we build our OWN copy of every library on
 #    every platform. A Homebrew/MacPorts path in `otool -L` is a release
 #    blocker for the App Store / Microsoft Store builds.
 #  - Homebrew's "sdl2" formula is nowadays an alias for sdl2-compat (a dynamic

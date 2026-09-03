@@ -12,8 +12,7 @@
 # the ENGINE's defaults rather than the app's mtengine.caps -- so an Archive
 # could ship libraries the manifest turns off.
 #
-# HOW IT WORKS, and both halves are measured (claude/spikes/xcconfig/README.md
-# in the DummyApp repo):
+# HOW IT WORKS, and both halves are measured:
 #
 #   * a scheme pre-action's WRITE takes effect in the SAME build. Verified with a
 #     file that did not exist when the build started and whose value the build

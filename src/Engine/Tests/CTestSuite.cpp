@@ -26,9 +26,10 @@ using namespace std;
 // nobody reads, and the runner then parsed a stale file from the previous run
 // or none at all. Silent, and it would have reported the previous run's verdict.
 //
-// So the path is resolvable, exactly as CLAUDE.md permits for test output:
-// "Environment variables or CLI flags are acceptable for test configuration,
-// output paths, and deterministic fixtures". --results-file wins, then
+// So the path is resolvable, which is exactly what the testing rule allows:
+// environment variables and CLI flags are acceptable for test configuration,
+// output paths and deterministic fixtures, and not for skipping anything that
+// is being measured. --results-file wins, then
 // MT_TEST_RESULTS, then the historical relative default so that every existing
 // invocation keeps behaving as it did.
 const char *MT_TestResultsPath()

@@ -263,7 +263,7 @@ pkg_check_modules(GTK3 REQUIRED gtk+-3.0)
 include_directories(${GTK3_INCLUDE_DIRS})
 link_directories(${GTK3_LIBRARY_DIRS})
 add_definitions(${GTK3_CFLAGS_OTHER})
-# VENDORED SDL3, not find_package. CLAUDE.md's rule is that we build our own
+# VENDORED SDL3, not find_package. The rule here is that we build our own
 # copy of every third-party library on every platform; Linux violated it for SDL
 # from the beginning (find_package(SDL2 REQUIRED) + apt-get install
 # libsdl2-dev). The SDL3 port is where that stops -- adding

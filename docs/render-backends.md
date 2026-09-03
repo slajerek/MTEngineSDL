@@ -105,8 +105,7 @@ just chosen a capable backend, and leave it enabled after they chose an
 incapable one.
 
 A worked example of both the picker and the HDR gating is
-`MTEngineSDLDummyApp` — `claude/architecture/settings-menu.md` and
-`claude/architecture/hdr-test.md`.
+`MTEngineSDLDummyApp`, in its Settings menu and its HDR test bench.
 
 ## Overrides
 
