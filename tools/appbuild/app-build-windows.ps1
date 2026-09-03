@@ -181,7 +181,22 @@ $msbuild = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere
     -find "MSBuild\**\Bin\MSBuild.exe" 2>$null | Select-Object -First 1
 if (-not $msbuild) { Write-Error "MSBuild not found. Install Visual Studio 2022 with C++ workload."; exit 1 }
 Write-Host "Using MSBuild: $msbuild"
-[string[]]$toolsetArgs = if ($Compiler -eq 'MSVC') { @('/p:PlatformToolset=v143') } else { @() }
+# EXPLICIT for BOTH branches, and forwarded to BOTH the engine .sln and the
+# app .sln below (@toolsetArgs appears on both `& $msbuild` calls). An empty
+# array here would not mean "no opinion" -- MSBuild then falls through to
+# whatever PlatformToolset each .vcxproj hardcodes for itself, and the two
+# disagree: the engine's is ClangCL, the app's is v143. That split reached CI
+# for the first time on 2026-09-03 as 16 unresolved __std_* STL symbols at the
+# app's final link -- object code the ClangCL engine build compiled against
+# one STL/SDK vintage, linked by the app's v143 build against another's import
+# libraries. A command-line /p: value is a GLOBAL property, which a .vcxproj's
+# own unconditioned <PlatformToolset> assignment cannot override, so stating
+# the toolset here -- for either $Compiler value -- settles it for both
+# projects the same way regardless of what each .vcxproj says on its own.
+# -Compiler stays the one command-line switch that decides it; the .vcxproj
+# defaults are for an IDE build only, which never sees this script or its /p:
+# arguments (see MTEngineApp.targets / Directory.Build.targets for that path).
+[string[]]$toolsetArgs = if ($Compiler -eq 'MSVC') { @('/p:PlatformToolset=v143') } else { @('/p:PlatformToolset=ClangCL') }
 Write-Host "Compiler: $Compiler" -ForegroundColor Cyan
 $env:PATH = (Split-Path $msbuild) + ";$env:PATH"
 $null = Add-MTVCToolsToPath -Platform $Platform

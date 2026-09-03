@@ -983,8 +983,36 @@ Invoke-Msys2Script $vpxScriptPath (Join-Path $vpxBuildDir "msys2-driver.log")
 $vpxSln = Get-ChildItem -Path $vpxBuildDir -Filter "*.sln" -ErrorAction SilentlyContinue | Select-Object -First 1
 if (-not $vpxSln) { throw "libvpx 'make' did not produce a .sln in $vpxBuildDir" }
 
+# WholeProgramOptimization=false, UNCONDITIONALLY -- not a PlatformToolset
+# override, and that distinction is the point, found the hard way. libvpx's
+# own project generator enables /GL on its Release config, which link.exe
+# happily consumes (it invokes cl.exe's own LTCG backend on such an object as
+# part of linking) but lld-link cannot read at all -- not a compatibility gap
+# it will ever close, it is a different, MSVC-proprietary intermediate format,
+# not a plain COFF object:
+#
+#     lld-link : error : ARM64\Release\vpx\vp9_vp9_dx_iface.obj: is not a
+#     native COFF file. Recompile without /GL?
+#
+# That is the ONLY thing standing between vpx.sln's output and being linkable
+# by either linker, so it is the only thing touched. The first attempt at this
+# fix also forced PlatformToolset=ClangCL to match -Compiler, on the theory
+# that vpx.sln should follow the same toolset as everything it is linked into
+# -- which then hit a SEPARATE, unrelated wall: libvpx's ARM64 NEON dotprod
+# path (vpx_convolve8_neon_dotprod.c) needs the `dotprod` target feature
+# enabled at the TRANSLATION UNIT the always_inline intrinsic is used in, a
+# strictness cl.exe's ARM64 front end does not enforce the same way and that
+# libvpx's own build files have no Clang-specific flag for on this generated
+# Windows project. Fixing THAT would mean patching either libvpx's source (an
+# unpatched vendor tree everywhere else in this script) or the auto-generated
+# vcxproj's per-file compiler flags for a feature this repo has no informed
+# opinion on enabling globally. Disabling /GL sidesteps both problems by never
+# switching vpx.sln's compiler at all: plain COFF from either MSVC or Clang
+# links under either linker, so WHICH compiler produced it stops mattering,
+# and vpx.sln is free to keep resolving whatever PlatformToolset MSBuild
+# resolves by default for it, exactly as it always has.
 Write-Host "Building $($vpxSln.FullName) ($Configuration|$msbuildPlat)"
-& msbuild $vpxSln.FullName "/p:Configuration=$Configuration" "/p:Platform=$msbuildPlat" "/m:$Jobs" "/nologo"
+& msbuild $vpxSln.FullName "/p:Configuration=$Configuration" "/p:Platform=$msbuildPlat" "/p:WholeProgramOptimization=false" "/m:$Jobs" "/nologo"
 if ($LASTEXITCODE -ne 0) { throw "msbuild failed for $($vpxSln.FullName)" }
 
 # Prefer a .lib under a path naming OUR OWN Configuration+Platform (what the

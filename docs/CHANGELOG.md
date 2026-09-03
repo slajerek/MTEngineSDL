@@ -26,6 +26,61 @@ back level. A number is cheap; a reader guessing at a pairing is not.
 
 ---
 
+## 3.21.7 — development
+
+**The Windows app follows the engine's own toolset choice, instead of quietly
+picking its own.** `app-build-windows.ps1`'s `-Compiler` switch only stated an
+explicit `/p:PlatformToolset=` override for `-Compiler MSVC`; for the default
+`Clang` it passed nothing, so each `.vcxproj` fell back to whatever it hardcodes
+for itself — ClangCL for the engine, v143 for the app — never actually telling
+the app to follow `-Compiler` at all. That split reached CI for the first time
+on 2026-09-03 as 16 unresolved `__std_*` STL symbols at the app's final link:
+object code the ClangCL engine build compiled against one STL/SDK vintage,
+linked by the app's v143 build against another's import libraries. A
+command-line `/p:` value is a global property a `.vcxproj`'s own unconditioned
+`<PlatformToolset>` assignment cannot override, so stating the toolset
+explicitly for BOTH `-Compiler` values settles it for both projects the same
+way, regardless of what each `.vcxproj` says on its own. `-Compiler` stays the
+one command-line switch that decides it; a `.vcxproj`'s own hardcoded default
+is for an IDE build only, which this script's `/p:` arguments never reach.
+
+**libvpx's generated `vpx.sln` disables whole-program optimization, so it links
+under either toolset.** Unifying the app onto the engine's toolset surfaced a
+second, real incompatibility one level down: `vpx.sln` — generated fresh by
+libvpx's own build scripts, not something this repo owns the source of —
+enables `/GL` on its Release config by default, an MSVC-proprietary
+intermediate object format `link.exe` happily consumes (it invokes cl.exe's own
+LTCG backend on such an object as part of linking) but `lld-link` cannot read
+at all:
+
+    lld-link : error : ARM64\Release\vpx\vp9_vp9_dx_iface.obj: is not a
+    native COFF file. Recompile without /GL?
+
+That stayed invisible for as long as whatever linked `MTVideoCodecs.lib` was
+also plain MSVC `link.exe`. The first attempt at fixing it forced
+`PlatformToolset=ClangCL` on `vpx.sln` to match `-Compiler`, on the theory that
+it should follow the same toolset as everything it is linked into — which then
+hit a third, unrelated wall: libvpx's ARM64 NEON dotprod path
+(`vpx_convolve8_neon_dotprod.c`) needs the `dotprod` target feature enabled at
+the translation unit its `always_inline` intrinsic is used in, a strictness
+cl.exe's ARM64 front end does not enforce the same way, and libvpx's own build
+files carry no Clang-specific flag for it on this generated Windows project.
+Fixing that would have meant patching either libvpx's vendored source or the
+auto-generated `.vcxproj`'s per-file compiler flags for a feature this repo has
+no informed opinion on enabling globally. Disabling `/GL` sidesteps both
+problems by never switching `vpx.sln`'s compiler at all: plain COFF, from
+either MSVC or Clang, links under either linker, so which compiler produced it
+stops mattering, and `vpx.sln` is free to keep resolving whatever
+`PlatformToolset` MSBuild resolves for it by default, exactly as it always has.
+
+Verified on Windows 11 ARM64: a full from-scratch MTEngineSDLDummyApp build now
+compiles and links the engine and the app both under ClangCL, and the app's
+test suites are 4/4 and 12/12 from the release package.
+
+Follows engine 3.21.6.
+
+---
+
 ## 3.21.6 — development
 
 **HEIF follows the platform's own decoder, and the capability fragments stop

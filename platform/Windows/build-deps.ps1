@@ -152,6 +152,11 @@ Write-Host "`n=== Building Image Codecs ($Platform $Configuration) ===" -Foregro
 # wrapper called build-video_codecs.ps1 itself, each with its own gating --
 # one orchestrator, one gate, like the four above. The script stubs itself
 # at MT_ENABLE_WEBM_VPX=0 and reads MT_FFMPEG_BUILD_MODE for the decoder set.
+# No -Compiler here, unlike the families above: FFmpeg's --toolchain=msvc runs
+# through MSYS2 and never sees an MSBuild PlatformToolset, opus is CMake+MSVC
+# deliberately, and libvpx's generated vpx.sln disables /GL unconditionally
+# instead of following -Compiler -- see that script's WholeProgramOptimization
+# comment for why forcing its toolset to match turned out to be the wrong fix.
 Write-Host "`n=== Building Video Codecs ($Platform $Configuration) ===" -ForegroundColor Cyan
 & "$scriptDir\build-video_codecs.ps1" -OutLibDir $OutLibDir -Platform $Platform -Configuration $Configuration
 
