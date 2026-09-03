@@ -26,6 +26,28 @@ back level. A number is cheap; a reader guessing at a pairing is not.
 
 ---
 
+## 3.21.9 — development
+
+**MIDI input asks whether there is a sequencer before opening one, and never
+leaves a garbage pointer behind.** RtMidi's ALSA backend opens `/dev/snd/seq` in
+its constructor, and when that device does not exist — a container, a CI runner,
+any machine without `snd-seq` loaded — it does not fail cleanly: it continues
+with a null sequencer handle and faults inside libasound. That is not an
+`RtMidiError`, so the `try`/`catch` around it never had anything to catch.
+
+The device is now probed first and its absence means no MIDI input and a
+running application, which is how every other missing device here already
+behaves — audio has asked before opening since it was written.
+
+Two latent bugs in the same function are fixed with it: `midiIn` was never
+initialised and the `catch` left it untouched (the two lines that would have
+cleared it were commented out), so a construction that threw left a dangling
+pointer for every later call to find; and the member is now assigned only after
+the port is open and named, because `openPort()` and `getPortName()` can throw
+too and a half-open device must not be reachable.
+
+---
+
 ## 3.21.8 — development
 
 **Temporary: Linux debug logging is on, to find a crash that leaves no trace.**

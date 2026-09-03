@@ -2,6 +2,30 @@
 #include "CMidiInKeyboard.h"
 #include "CSlrString.h"
 
+#if defined(LINUX)
+#include <unistd.h>
+
+// IS THERE AN ALSA SEQUENCER TO TALK TO AT ALL?
+//
+// RtMidi's ALSA backend opens /dev/snd/seq in its constructor. When that device
+// does not exist -- a container, a CI runner, a server with snd-seq not loaded
+// -- it does not fail cleanly: it carries on with a null sequencer handle and
+// SEGFAULTS inside libasound, which is not an RtMidiError and so cannot be
+// caught. Measured 2026-09-03 on a CI runner: the last thing the engine logged
+// was CMidiInKeyboard::Init, then ALSA's own "open /dev/snd/seq failed", then
+// the process died -- with neither the catch block's LOGError nor the trailing
+// "done" ever printed, which is what places the fault inside the constructor.
+//
+// So the question is asked BEFORE constructing, the same way SND_Init asks
+// before opening an audio device and carries on without one. A machine with no
+// sequencer gets no MIDI and keeps running, which is the behaviour every other
+// absent device already gets here.
+static bool MIDI_AlsaSequencerAvailable()
+{
+	return access("/dev/snd/seq", R_OK | W_OK) == 0;
+}
+#endif
+
 void slrMidiCallback( double deltatime, std::vector< unsigned char > *message, void *userData );
 
 CMidiInKeyboard::CMidiInKeyboard(int portNum, CMidiInKeyboardCallback *callback)
@@ -95,32 +119,62 @@ void CMidiInKeyboard::Init(int portNum)
 {
 	LOGD("CMidiInKeyboard::Init: portNum=%d", portNum);
 	errorString = NULL;
-	
+
+	// NULL BEFORE ANYTHING ELSE. This member was never initialised and the
+	// catch below left it alone (the two lines that would have cleared it were
+	// commented out), so a construction that threw left a garbage pointer that
+	// every later IsOpen()/destructor call was free to dereference.
+	midiIn = NULL;
+	deviceName[0] = 0x00;
+
+#if defined(LINUX)
+	if (!MIDI_AlsaSequencerAvailable())
+	{
+		LOGWarning("CMidiInKeyboard::Init: no ALSA sequencer (/dev/snd/seq), continuing without MIDI input");
+		return;
+	}
+#endif
+
+	// Assigned to the MEMBER only on full success: openPort() and getPortName()
+	// can throw too, and a half-constructed device must not be reachable.
+	RtMidiIn *opened = NULL;
+
 	try
 	{
 #if defined(MACOS)
-		midiIn = new RtMidiIn(RtMidi::MACOSX_CORE);
+		opened = new RtMidiIn(RtMidi::MACOSX_CORE);
 #elif defined(WIN32)
-		midiIn = new RtMidiIn(RtMidi::WINDOWS_MM);
+		opened = new RtMidiIn(RtMidi::WINDOWS_MM);
 #elif defined(LINUX)
-		midiIn = new RtMidiIn(RtMidi::LINUX_ALSA);
+		opened = new RtMidiIn(RtMidi::LINUX_ALSA);
 #endif
-		midiIn->setCallback( &slrMidiCallback, (void*)this );
+		if (opened == NULL)
+		{
+			LOGWarning("CMidiInKeyboard::Init: no MIDI backend on this platform, continuing without MIDI input");
+			return;
+		}
 
-		midiIn->openPort(portNum);
+		opened->setCallback( &slrMidiCallback, (void*)this );
+
+		opened->openPort(portNum);
 		//midiIn->ignoreTypes( false, false, false )
 		
-		std::string portNameStr = midiIn->getPortName(portNum);
+		std::string portNameStr = opened->getPortName(portNum);
 		strncpy(deviceName, portNameStr.c_str(), 512);
-		
+
+		midiIn = opened;
 	}
 	catch (RtMidiError &error)
 	{
 		LOGError("CMidiInKeyboard::CMidiInKeyboard: error %s", error.getMessage().c_str());
 		LOGTODO("convert errorMessage: std::string to CSlrString");
 		errorString = new CSlrString(error.getMessage().c_str());
-//		delete midiIn;
-//		midiIn = NULL;
+
+		// `opened` is NULL when the constructor threw and a live object when
+		// openPort/getPortName did, so this both frees the half-open device and
+		// leaves the member at a defined value.
+		delete opened;
+		midiIn = NULL;
 		
 		deviceName[0] = 0x00;
 	}
