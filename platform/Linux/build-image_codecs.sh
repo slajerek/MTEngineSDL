@@ -445,8 +445,28 @@ patch_libraw_jxl
 build_libraw "$PREFIX_DIR"
 
 # Build lcms2 (Linux-only CMS backend). MIT-licensed and store-safe.
+#
+# TOOLS AND TESTS OFF, and the tools are not merely waste. LCMS2_BUILD_TOOLS
+# defaults to ON and builds tificc/tifdiff/jpgicc, which `find_package(TIFF)`
+# -- and that finds the libtiff THIS SCRIPT just installed into the prefix,
+# whose exported target names CMath::CMath, a target its config does not teach
+# the consumer to define. The generate step then fails with
+#
+#   The link interface of target "TIFF::tiff" contains: CMath::CMath
+#   but the target was not found.
+#
+# A machine with libtiff-dev installed never sees it, because find_package
+# picks the system copy first; a clean CI runner has only ours. Measured on
+# GitHub's ubuntu image 2026-09-03. Nothing here consumes the command-line
+# tools, so the dependency should never have been taken. The Windows script has
+# carried these four options since it was written, with a note that they are
+# independent of BUILD_SHARED_LIBS; Linux is the copy that never got them.
 build_cmake "$SRC_DIR/Little-CMS-lcms${LCMS2_VERSION}" "$BUILD_DIR/lcms2" "$PREFIX_DIR" \
   -DBUILD_SHARED_LIBS=OFF \
+  -DLCMS2_BUILD_SHARED=OFF \
+  -DLCMS2_BUILD_STATIC=ON \
+  -DLCMS2_BUILD_TOOLS=OFF \
+  -DLCMS2_BUILD_TESTS=OFF \
   -DCMAKE_POSITION_INDEPENDENT_CODE=ON
 
 # Collect all static libs

@@ -20,6 +20,31 @@ stability meaning.
 
 ---
 
+## 3.21.3 — development
+
+Two more failures from continuous integration, both of the same shape as the
+last: something a development machine happens to have, and a clean runner does
+not.
+
+**lcms2 no longer builds its command-line tools on Linux.** `LCMS2_BUILD_TOOLS`
+defaults to ON and builds `tificc`, `tifdiff` and `jpgicc`, which
+`find_package(TIFF)` — and that finds the libtiff this same script installed
+into the prefix a few steps earlier, whose exported target names
+`CMath::CMath` without teaching the consumer to define it. The generate step
+then fails. A machine with `libtiff-dev` installed never sees it, because
+`find_package` picks the system copy first. Nothing here consumes those tools.
+The Windows script has passed these options since it was written; the Linux copy
+never got them.
+
+**The Windows tar fallback passed a POSIX path to a tar that cannot read one.**
+The video-codec extractor tries GNU tar with `--force-local` and falls back to
+the system tar, but both calls gave `-C` the MSYS spelling of the directory. On
+a runner where `tar.exe` is the Windows built-in BSD tar, the fallback then
+failed for a second, unrelated reason — `could not chdir to '/c/Users/...'`. The
+two tars want opposite spellings of the same directory.
+
+---
+
 ## 3.21.2 — development
 
 Two build fixes, both found by the first continuous-integration run of a

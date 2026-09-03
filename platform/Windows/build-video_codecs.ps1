@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Build Windows video codec dependencies: libvpx + opus (static), FFmpeg (shared, LGPL).
 .DESCRIPTION
@@ -375,8 +375,19 @@ function Extract-Archive($name, $topDir, $ext, $tarFlag) {
     $srcDirPosix = ConvertTo-MsysPath $srcDir
     & tar --force-local $tarFlag "$archive" -C "$srcDirPosix" 2>&1
     if ($LASTEXITCODE -ne 0) {
-        # Fallback: BSD tar (Windows built-in) doesn't support --force-local
-        & tar $tarFlag "$archive" -C "$srcDirPosix"
+        # Fallback: BSD tar, which is what Windows ships as tar.exe and what a
+        # runner without MSYS2 first on PATH gets. It rejects --force-local
+        # outright -- AND it cannot chdir to the POSIX form, because /c/Users
+        # means nothing to a native Win32 program. So the fallback passes the
+        # WINDOWS path: the two tars want opposite spellings of the same
+        # directory, and giving both the MSYS one made this fallback fail as
+        # reliably as the call it was there to rescue. Measured on GitHub's
+        # windows image 2026-09-03: "Option --force-local is not supported",
+        # then "could not chdir to '/c/Users/...'".
+        #
+        # build-image_codecs.ps1's copy of this function has always passed the
+        # Windows path here, and extracts on that same runner.
+        & tar $tarFlag "$archive" -C "$srcDir"
         if ($LASTEXITCODE -ne 0) { throw "Failed to extract $archive" }
     }
 }
