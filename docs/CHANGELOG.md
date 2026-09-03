@@ -18,6 +18,48 @@ engine's `devel`, its `master` the engine's `master`.
 The convention starts at 3.21. Earlier numbers below predate it and carry no
 stability meaning.
 
+**The engine and the app template carry the SAME number.** They are a matched
+pair and are read as one release, so a reader who has 3.21.6 of one should not
+have to work out which of the other goes with it. 3.21.5 is absent here for that
+reason: the two had drifted a patch apart and the engine skips a number to come
+back level. A number is cheap; a reader guessing at a pairing is not.
+
+---
+
+## 3.21.6 — development
+
+**HEIF follows the platform's own decoder, and the capability fragments stop
+disagreeing about it.** HEIF's payload is HEVC and HEVC is patent-encumbered, so
+calling the platform decoder means the licence is Apple's or Microsoft's,
+already paid for on the machine the code runs on. The engine has always
+dispatched that way — ImageIO on macOS, WIC on Windows, libheif only on Linux
+where no system decoder exists — but the table that switched the library off
+named Windows alone. macOS therefore resolved `MT_ENABLE_LIBHEIF=1`, compiled a
+translation unit its own dispatch can never reach, and offered to link an HEVC
+decoder into a binary whose HEVC licence was Apple's.
+
+`PLATFORM_PROVIDES_FLAGS` is a third category, kept apart from the two that
+existed: "not obtainable here yet" invites someone to do the work, while "the
+platform already provides it" says do not. Windows stays in the first, because
+there the reason really is a missing port. The distribution gate is unchanged
+and still overrides both — patent pools attach to distribution, so being free
+and open settles the copyright question and not the patent one.
+
+In the same change the emitters stopped guessing which platform they were
+writing for. Two hardcoded Windows and two passed nothing, so a single resolve
+could write an xcconfig saying `1` beside a props saying `0`. The target
+platform now travels with the key.
+
+**Two Windows build fixes.** The new post-extraction check expected a
+`CMakeLists.txt` of LibRaw, which the archive does not contain — upstream ships
+autotools, and the file this build uses is written by the script afterwards. It
+failed on a cold cache and passed on every later run in the same cache, so a
+machine that had built once could not reproduce it. And both extractors now ask
+`tar --version` once instead of attempting a call that is *expected* to fail:
+the resulting "Option --force-local is not supported" was printed before every
+archive on the healthy path, and was read as the cause of an unrelated failure
+four archives later.
+
 ---
 
 ## 3.21.4 — development

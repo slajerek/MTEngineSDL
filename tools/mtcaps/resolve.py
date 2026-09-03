@@ -359,6 +359,26 @@ PLATFORM_UNAVAILABLE_FLAGS = {
     "windows": frozenset({"MT_ENABLE_LIBHEIF"}),
 }
 
+# 1b. THE PLATFORM ALREADY PROVIDES IT, permanently. Not a gap and not a
+#     policy -- a fact about the operating system that no amount of work here
+#     will change, and that we do not WANT to change.
+#
+#     macOS decodes HEIF through ImageIO. CImageDataHEIF.cpp dispatches to it
+#     unconditionally on Apple platforms and never reaches the libheif path, so
+#     compiling that translation unit asks the machine for a header it will not
+#     use -- and, worse, would link an HEVC decoder into a binary whose HEVC
+#     licence is otherwise Apple's, already paid for on the machine the code
+#     runs on. Windows sits in the table above instead, because there the
+#     reason really is a missing port; if that port ever lands, WIC still wins
+#     in the dispatch and the entry moves here.
+#
+#     Kept apart from the table above on purpose. One says "nobody has done
+#     the work yet" and invites someone to do it; this one says "do not". A
+#     single table would lose that difference the first time somebody read it.
+PLATFORM_PROVIDES_FLAGS = {
+    "macos": frozenset({"MT_ENABLE_LIBHEIF"}),
+}
+
 # 2. DISTRIBUTION-RESTRICTED. A library whose terms are not settled for any
 #    artifact that leaves the building. Allowed ONLY when MT_PRIVATE_BUILD=1.
 #
@@ -389,9 +409,11 @@ def enabled_flags(vocab, values, platform=None):
     implication has over rung 2, but for platform reality and distribution
     policy instead of manifest coherence.
 
-    `platform=None` (the default) skips only the platform table; the
-    distribution table always applies, because MT_PRIVATE_BUILD is in `values`
-    and needs no caller cooperation to be correct.
+    `platform=None` (the default) skips both platform tables; the distribution
+    table always applies, because MT_PRIVATE_BUILD is in `values` and needs no
+    caller cooperation to be correct. Passing None is therefore a bug in any
+    caller that emits a fragment FOR a platform -- it produced an xcconfig
+    saying MT_ENABLE_LIBHEIF=1 beside a props saying 0, from one resolve.
 
     MT_COMMERCIAL_BUILD is deliberately NOT here; see emit.py."""
     flags = {}
@@ -399,9 +421,10 @@ def enabled_flags(vocab, values, platform=None):
         for flag in vocab.enables(key):
             # A flag serving two capabilities is on if EITHER is on.
             flags[flag] = max(flags.get(flag, 0), values[key])
-    for flag in PLATFORM_UNAVAILABLE_FLAGS.get(platform, ()):
-        if flag in flags:
-            flags[flag] = 0
+    for table in (PLATFORM_UNAVAILABLE_FLAGS, PLATFORM_PROVIDES_FLAGS):
+        for flag in table.get(platform, ()):
+            if flag in flags:
+                flags[flag] = 0
     if values.get(PRIVATE_KEY, 0) != 1:
         for flag in PRIVATE_ONLY_FLAGS:
             if flag in flags:

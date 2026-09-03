@@ -391,30 +391,13 @@ function Extract-Archive($name, $topDir, $ext, $tarFlag, [string[]]$Expect) {
         return
     }
     Write-Host "Extracting $name..."
-    # GNU tar (Git-for-Windows/MSYS2) applies its host:path remote-shell
-    # heuristic to the -C argument too, not just -f: a raw "C:\foo\bar"
-    # value makes it try to rmt_open() "C" as a remote host. --force-local
-    # is not sufficient by itself; converting -C's argument to the /c/foo/bar
-    # POSIX form (same convention already used for MSYS2-bridged FFmpeg/vpx
-    # invocations elsewhere in this script) avoids the colon entirely.
-    $srcDirPosix = ConvertTo-MsysPath $srcDir
-    & tar --force-local $tarFlag "$archive" -C "$srcDirPosix" 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        # Fallback: BSD tar, which is what Windows ships as tar.exe and what a
-        # runner without MSYS2 first on PATH gets. It rejects --force-local
-        # outright -- AND it cannot chdir to the POSIX form, because /c/Users
-        # means nothing to a native Win32 program. So the fallback passes the
-        # WINDOWS path: the two tars want opposite spellings of the same
-        # directory, and giving both the MSYS one made this fallback fail as
-        # reliably as the call it was there to rescue. Measured on GitHub's
-        # windows image 2026-09-03: "Option --force-local is not supported",
-        # then "could not chdir to '/c/Users/...'".
-        #
-        # build-image_codecs.ps1's copy of this function has always passed the
-        # Windows path here, and extracts on that same runner.
-        & tar $tarFlag "$archive" -C "$srcDir"
-        if ($LASTEXITCODE -ne 0) { throw "Failed to extract $archive" }
-    }
+    # WHICH tar decides how the destination must be spelled -- GNU tar needs
+    # --force-local and the /c/... form, BSD tar rejects the flag and cannot
+    # chdir to /c/... at all. The shared helper asks once, instead of making an
+    # attempt that is EXPECTED to fail print a red multi-line usage message
+    # before every archive. See Invoke-MTTarExtract.
+    Invoke-MTTarExtract -Archive $archive -TarFlag $tarFlag `
+        -DestWindows $srcDir -DestPosix (ConvertTo-MsysPath $srcDir)
     Assert-Extracted $name $dest $Expect
 }
 

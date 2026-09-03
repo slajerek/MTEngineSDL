@@ -107,8 +107,12 @@ def _compute_out(args, vocab, values, canonical, engine_options):
         stores[name] = R.unit_store_dir(root, args.platform, args.arch,
                                         R.deps_config(args.platform, args.config),
                                         name, unit, values, backend)
+    # The TARGET platform travels with the key. Every fragment this resolve
+    # writes is written FOR that platform, and the flag tables in resolve.py are
+    # platform-dependent -- an emitter that guesses produced an xcconfig saying
+    # MT_ENABLE_LIBHEIF=1 beside a props saying 0, from one resolve.
     return out, dict(rev=rev, mode=mode, backend=backend, caps_hash=chash,
-                     root=root, deps_dir=deps, build_dir=build,
+                     root=root, deps_dir=deps, build_dir=build, platform=args.platform,
                      ffmpeg_mode=R.ffmpeg_mode(values), stores=stores)
 
 

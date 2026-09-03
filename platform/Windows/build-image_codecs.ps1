@@ -227,14 +227,13 @@ function Extract-Archive($name, $topDir, [string[]]$Expect) {
     }
     Write-Host "Extracting $name..."
     # Extract into $srcDir so the tarball's top-level dir creates $dest naturally
-    # (avoids double nesting like src/tiff-4.7.1/tiff-4.7.1/)
-    # --force-local prevents Cygwin/MSYS2 tar from interpreting C:\ as host:path
-    & tar --force-local -xzf "$archive" -C "$srcDir" 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        # Fallback: BSD tar (Windows built-in) doesn't support --force-local
-        & tar -xzf "$archive" -C "$srcDir"
-        if ($LASTEXITCODE -ne 0) { throw "Failed to extract $archive" }
-    }
+    # (avoids double nesting like src/tiff-4.7.1/tiff-4.7.1/).
+    #
+    # WHICH tar decides how the destination must be spelled, and the shared
+    # helper asks once instead of making an attempt that is EXPECTED to fail
+    # print a red multi-line usage message before every archive.
+    Invoke-MTTarExtract -Archive $archive -TarFlag "-xzf" `
+        -DestWindows $srcDir -DestPosix (ConvertTo-MTMsysPath $srcDir)
     Assert-Extracted $name $dest $Expect
 }
 
@@ -335,7 +334,13 @@ Extract-Archive "tiff-$tiffVersion"    "tiff-$tiffVersion" @("CMakeLists.txt")
 Extract-Archive "libwebp-$webpVersion" "libwebp-$webpVersion" @("CMakeLists.txt")
 Extract-Archive "libavif-$avifVersion" "libavif-$avifVersion" @("CMakeLists.txt")
 Clone-GitTag "libgav1-v$libgav1Version" $libgav1GitUrl "v$libgav1Version" $libgav1GitRev
-Extract-Archive "LibRaw-$librawVersion" "LibRaw-$librawVersion" @("CMakeLists.txt")
+# NOT CMakeLists.txt for LibRaw: the archive does not contain one -- upstream
+# ships autotools (configure, Makefile.am) -- and the one this build uses is
+# WRITTEN BY THIS SCRIPT into the extracted tree further down. Expecting it here
+# fails on a cold cache and then passes on every later run, because by then the
+# generated file is sitting there. libraw/libraw.h is in the archive and is what
+# the build actually consumes.
+Extract-Archive "LibRaw-$librawVersion" "LibRaw-$librawVersion" @("libraw/libraw.h")
 Extract-Archive "lcms$lcms2Version"    "Little-CMS-lcms$lcms2Version" @("CMakeLists.txt")
 
 # Link libgav1 into avif ext dir

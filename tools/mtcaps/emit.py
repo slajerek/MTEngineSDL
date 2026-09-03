@@ -133,7 +133,7 @@ def emit_cmake(vocab, values, canonical, out, include_dir, meta=None):
     lines.append("# the on ones leaves the rest UNDEFINED, and the #ifdef family")
     lines.append('# defaults off while the value style defaults on -- so "absent"')
     lines.append("# means two different things depending on the guard it meets.")
-    flags = enabled_flags(vocab, values)
+    flags = enabled_flags(vocab, values, platform=(meta or {}).get("platform"))
     for flag, value in flags.items():
         lines.append("set(%s %d)" % (flag, value))
     lines.append("")
@@ -224,7 +224,7 @@ def emit_xcconfig(vocab, values, canonical, out, include_dir, meta=None):
     for key in vocab.keys:
         lines.append("%s = %d" % (key, values[key]))
     lines.append("")
-    for flag, value in enabled_flags(vocab, values).items():
+    for flag, value in enabled_flags(vocab, values, platform=(meta or {}).get("platform")).items():
         lines.append("%s = %d" % (flag, value))
     lines.append("")
     # Build-settings mode values -- VALUES only, never defines: decision 0.5
@@ -237,7 +237,8 @@ def emit_xcconfig(vocab, values, canonical, out, include_dir, meta=None):
     for k, v in sorted(store_settings(meta or {}).items()):
         lines.append("%s = %s" % (k, v))
     lines.append("")
-    lines.append("MT_CAPS_DEFINES = %s" % " ".join(app_visible_defines(vocab, values)))
+    lines.append("MT_CAPS_DEFINES = %s" % " ".join(
+        app_visible_defines(vocab, values, platform=(meta or {}).get("platform"))))
     lines.append("MT_CAPS_DEFINES_ENGINE = %s" % " ".join(engine_only_defines(vocab, values)))
     lines.append("MT_CAPS_INCLUDE_DIR = %s" % include_dir)
     lines.append("MT_CAPS_BUILD_DIR = %s" % os.path.dirname(include_dir))
@@ -261,7 +262,7 @@ def emit_props(vocab, values, canonical, out, include_dir, meta=None):
     defines = []
     for key in vocab.keys:
         defines.append("%s=%d" % (key, values[key]))
-    for flag, value in enabled_flags(vocab, values, platform="windows").items():
+    for flag, value in enabled_flags(vocab, values, platform=(meta or {}).get("platform", "windows")).items():
         defines.append("%s=%d" % (flag, value))
     if values[COMMERCIAL_KEY] == 1:
         defines.append("MT_COMMERCIAL_BUILD=1")

@@ -260,6 +260,87 @@ function Complete-MTStore {
     }
 }
 
+$script:MTTarIsBsd = $null
+
+function Test-MTBsdTar {
+    <#
+    .SYNOPSIS
+        Is the `tar` on PATH the Windows built-in BSD tar, rather than GNU tar?
+    .DESCRIPTION
+        The two want opposite things and neither tolerates the other's spelling:
+
+          GNU tar (MSYS2, Git for Windows) applies a host:path remote-shell
+          heuristic to -f AND -C, so "C:\foo" is read as host "C" -- it needs
+          --force-local and the /c/foo POSIX form.
+
+          BSD tar (C:\Windows\System32\tar.exe) rejects --force-local outright
+          and cannot chdir to /c/foo, because that means nothing to a Win32
+          program. It needs the native path and no flag.
+
+        Asked ONCE and cached. The extractors used to try GNU first and fall
+        back, which worked but printed
+
+            tar.exe: Option --force-local is not supported
+            Usage: ...
+
+        before EVERY archive on any machine with the built-in tar first on PATH.
+        That is a red, multi-line failure message emitted on the healthy path,
+        and on 2026-09-03 it did exactly what such noise does: an unrelated
+        extraction check failed four archives later and the tar message was read
+        as its cause.
+    #>
+    if ($null -ne $script:MTTarIsBsd) { return $script:MTTarIsBsd }
+    $line = ''
+    try { $line = (& tar --version 2>&1 | Select-Object -First 1) } catch { $line = '' }
+    $script:MTTarIsBsd = ("$line" -match 'bsdtar')
+    Write-Host ("tar: {0} ({1})" -f $(if ($script:MTTarIsBsd) { 'BSD' } else { 'GNU' }), "$line".Trim())
+    return $script:MTTarIsBsd
+}
+
+function Invoke-MTTarExtract {
+    <#
+    .SYNOPSIS
+        Extract an archive with whichever tar is on PATH, addressed the way that
+        tar understands. See Test-MTBsdTar for why the two differ.
+    .DESCRIPTION
+        The opposite spelling is still tried if the first attempt fails, because
+        a tar that is neither -- busybox, a repackaged build -- must not become a
+        hard failure over a probe. That retry is silent: it is a fallback, not a
+        diagnosis, and printing it is what made this confusing before.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$Archive,
+        [Parameter(Mandatory)][string]$TarFlag,
+        [Parameter(Mandatory)][string]$DestWindows,
+        [Parameter(Mandatory)][string]$DestPosix
+    )
+    if (Test-MTBsdTar) {
+        & tar $TarFlag "$Archive" -C "$DestWindows" 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            & tar --force-local $TarFlag "$Archive" -C "$DestPosix" 2>&1 | Out-Null
+        }
+    } else {
+        & tar --force-local $TarFlag "$Archive" -C "$DestPosix" 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            & tar $TarFlag "$Archive" -C "$DestWindows" 2>&1 | Out-Null
+        }
+    }
+    if ($LASTEXITCODE -ne 0) { throw "Failed to extract $Archive" }
+}
+
+function ConvertTo-MTMsysPath {
+    <#
+    .SYNOPSIS
+        C:\foo\bar -> /c/foo/bar, the form GNU tar and MSYS2 tools expect.
+    #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$Path)
+    $p = $Path -replace '\\', '/'
+    if ($p -match '^([A-Za-z]):(/.*)$') { return "/$($Matches[1].ToLower())$($Matches[2])" }
+    return $p
+}
+
 function Reset-MTStaleCMakeCache {
     <#
     .SYNOPSIS

@@ -838,8 +838,16 @@ class TestEmittedFragments(Base):
         question. So MT_CAP_PHOTO_CODECS=1 alone must NOT turn the library on;
         only MT_PRIVATE_BUILD=1 may. The sibling BSD-family codecs under the
         same capability must be unaffected, which is the half a
-        capability-level workaround would have broken."""
-        pub = self.out_of(self.resolve(self.manifest("MT_CAP_PHOTO_CODECS=1\n")))
+        capability-level workaround would have broken.
+
+        RESOLVED FOR LINUX, and that is the point of the test rather than an
+        incidental fixture choice: macOS and Windows force this flag off for a
+        PLATFORM reason -- they decode HEIF through ImageIO and WIC -- so asking
+        them proves nothing about the distribution gate. Linux is the only
+        platform where the flag is free to move, so it is the only one that can
+        show the gate moving it."""
+        pub = self.out_of(self.resolve(self.manifest("MT_CAP_PHOTO_CODECS=1\n"),
+                                       platform="linux", arch="x86_64"))
         pub_cmake = self.read_at(pub, "MTEngineCapabilities.cmake")
         self.assertIn("set(MT_ENABLE_LIBHEIF 0)", pub_cmake)
         for sibling in ("MT_ENABLE_LIBTIFF", "MT_ENABLE_LIBWEBP", "MT_ENABLE_LIBAVIF"):
@@ -847,7 +855,8 @@ class TestEmittedFragments(Base):
                           "%s is BSD-family and must not be collateral" % sibling)
 
         priv = self.out_of(self.resolve(
-            self.manifest("MT_CAP_PHOTO_CODECS=1\nMT_PRIVATE_BUILD=1\n")))
+            self.manifest("MT_CAP_PHOTO_CODECS=1\nMT_PRIVATE_BUILD=1\n"),
+            platform="linux", arch="x86_64"))
         self.assertIn("set(MT_ENABLE_LIBHEIF 1)", self.read_at(priv, "MTEngineCapabilities.cmake"))
 
     def test_commercial_and_private_together_are_a_configure_error(self):
@@ -1150,6 +1159,68 @@ class TestDepsDir(Base):
             proc = self.resolve(m, "--print", mode)
             self.assertEqual(len(proc.stdout.strip().splitlines()), 1,
                              "%s: %s" % (mode, proc.stdout))
+
+
+class TestHeifIsPlatformDecided(unittest.TestCase):
+    """HEIF's payload is HEVC, and HEVC is patent-encumbered.
+
+    The engine's rule is to call the PLATFORM's decoder wherever one exists, so
+    the patent licence is the operating system's and already paid for on the
+    machine the code runs on -- ImageIO on macOS, WIC on Windows. Only Linux has
+    no system decoder, and only there is libheif linked into our binary.
+
+    That rule lived in a comment and in CImageDataHEIF.cpp's #if ladder, but the
+    table that enforces it named Windows alone, so macOS resolved
+    MT_ENABLE_LIBHEIF=1 and compiled a translation unit its own dispatch can
+    never reach -- asking the machine for a header it does not use, and offering
+    to link an HEVC decoder into a binary whose HEVC licence was Apple's."""
+
+    #: Private build: the distribution gate is open, so anything still off is
+    #: off for a PLATFORM reason, which is what this asserts.
+    def _flags(self, platform):
+        vocab = V.load(None)
+        values = dict((k, 1) for k in vocab.keys)
+        values[R.COMMERCIAL_KEY] = 0
+        values[R.PRIVATE_KEY] = 1
+        return R.enabled_flags(vocab, values, platform=platform)
+
+    def test_only_linux_links_libheif(self):
+        self.assertEqual(0, self._flags("macos")["MT_ENABLE_LIBHEIF"],
+                         "macOS decodes HEIF through ImageIO; linking libheif "
+                         "would put an HEVC decoder in our binary for nothing")
+        self.assertEqual(0, self._flags("windows")["MT_ENABLE_LIBHEIF"],
+                         "Windows decodes HEIF through WIC")
+        self.assertEqual(1, self._flags("linux")["MT_ENABLE_LIBHEIF"],
+                         "Linux has no system HEIF decoder, so this is the one "
+                         "platform where the library is the only way")
+
+    def test_the_distribution_gate_still_beats_the_platform_tables(self):
+        """Even on Linux, a build that is not private must not link it: patent
+        pools attach to DISTRIBUTION, so being free and open settles the
+        copyright question and says nothing about the patent one."""
+        vocab = V.load(None)
+        values = dict((k, 1) for k in vocab.keys)
+        values[R.COMMERCIAL_KEY] = 0
+        values[R.PRIVATE_KEY] = 0
+        self.assertEqual(0, R.enabled_flags(vocab, values, platform="linux")["MT_ENABLE_LIBHEIF"])
+
+    def test_every_fragment_of_one_resolve_agrees(self):
+        """The defect that made this visible: one resolve wrote an xcconfig
+        saying 1 beside a props saying 0, because the emitters guessed the
+        platform instead of being told it. A fragment is written FOR a platform;
+        they cannot disagree."""
+        vocab = V.load(None)
+        values = dict((k, 1) for k in vocab.keys)
+        values[R.COMMERCIAL_KEY] = 0
+        values[R.PRIVATE_KEY] = 1
+        for platform in ("macos", "linux", "windows"):
+            expected = R.enabled_flags(vocab, values, platform=platform)["MT_ENABLE_LIBHEIF"]
+            self.assertEqual(expected, self._flags(platform)["MT_ENABLE_LIBHEIF"])
+        # The two tables are kept apart on purpose; neither may quietly absorb
+        # the other's entry.
+        self.assertIn("MT_ENABLE_LIBHEIF", R.PLATFORM_UNAVAILABLE_FLAGS["windows"])
+        self.assertIn("MT_ENABLE_LIBHEIF", R.PLATFORM_PROVIDES_FLAGS["macos"])
+        self.assertNotIn("macos", R.PLATFORM_UNAVAILABLE_FLAGS)
 
 
 class TestBashThreeTwoSafety(unittest.TestCase):
