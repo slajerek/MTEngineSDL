@@ -347,8 +347,6 @@ build_ffmpeg() {
   # already carry the withheld names when the resolved mode is `full`, and
   # mtcaps decided that from MT_PRIVATE_BUILD. The branch this replaces read
   # the licence TIER and handed the public/free tier the withheld set.
-  local mode_flags=()
-
   # NOTE: FFmpeg's mpeg4 decoder select-depends on the h263 decoder core
   # (configure: mpeg4_decoder_select="h263_decoder"); h263 is therefore
   # force-enabled. Passing --disable-decoder=h263 disables mpeg4 along with
@@ -371,8 +369,7 @@ build_ffmpeg() {
     --enable-bsf=hevc_mp4toannexb,h264_mp4toannexb,aac_adtstoasc \
     --disable-devices \
     --disable-autodetect \
-    "${mode_flags[@]}" \
-    "${extra_flags[@]}" \
+    ${extra_flags[@]+"${extra_flags[@]}"} \
     2>&1 | tee "$build/configure.log"
 
   make -j "$JOBS" 2>&1 | tee "$build/make.log"

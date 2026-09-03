@@ -1152,6 +1152,54 @@ class TestDepsDir(Base):
                              "%s: %s" % (mode, proc.stdout))
 
 
+class TestBashThreeTwoSafety(unittest.TestCase):
+    """macOS ships bash 3.2, and `#!/usr/bin/env bash` picks it whenever a
+    newer one is not first on PATH.
+
+    Under `set -u` that shell treats the expansion of an EMPTY array as an
+    unbound variable, where 4.4 and later do not. So a developer with Homebrew
+    bash never sees it and a stock macOS -- a GitHub runner, a fresh machine --
+    fails, which is exactly how it reached the public mirror: the L4 change
+    removed the branch that filled `mode_flags` and left the array and its
+    expansion behind, dead code that only ever ran on 3.2 and only ever failed.
+
+    The rule enforced here is narrow and mechanical: an array that is declared
+    empty and NEVER appended to must not be expanded. That is the defect, and
+    it is decidable by reading one file."""
+
+    def _scripts(self):
+        out = []
+        for pat in ("platform/*/build-*.sh", "build-*.sh", "platform/caps-lib.sh",
+                    "tools/appbuild/*.sh"):
+            out += glob.glob(os.path.join(ENGINE, pat))
+        return sorted(set(out))
+
+    def test_no_never_filled_array_is_expanded(self):
+        decl = re.compile(r"^\s*(?:local\s+)?([A-Za-z_][A-Za-z0-9_]*)=\(\s*\)\s*$", re.M)
+        offenders = []
+        for path in self._scripts():
+            with io.open(path, encoding="utf-8", errors="replace") as fh:
+                raw = fh.read()
+            # COMMENTS OUT FIRST. The guard is worth explaining where it is
+            # used, and a scan that reads its own documentation as code
+            # reports the file that got it right.
+            text = "\n".join(re.sub(r"#.*$", "", ln) for ln in raw.splitlines())
+            for name in set(decl.findall(text)):
+                # Filled by append, or by a later assignment with elements in
+                # it -- both leave the array non-empty on the path that runs.
+                if re.search(r"\b%s\+=\(" % re.escape(name), text):
+                    continue
+                if re.search(r"\b%s=\(\s*[^)\s]" % re.escape(name), text):
+                    continue
+                # Remove the SAFE form before looking for the unsafe one, so
+                # ${a[@]+"${a[@]}"} does not read as a bare "${a[@]}".
+                probe = text.replace('${%s[@]+"${%s[@]}"}' % (name, name), "")
+                for m in re.finditer(r'"\$\{%s\[@\]\}"' % re.escape(name), probe):
+                    offenders.append("%s: expands %s, which is declared empty and "
+                                     "never filled" % (os.path.relpath(path, ENGINE), name))
+        self.assertEqual([], sorted(set(offenders)), "\n".join(sorted(set(offenders))))
+
+
 class TestBuildUnits(unittest.TestCase):
     """L16. The deps VIEW is keyed by every acquisition capability; a per-unit
     STORE is keyed only by what that unit reads. The narrower key is what makes

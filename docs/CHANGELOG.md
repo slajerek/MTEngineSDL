@@ -20,6 +20,30 @@ stability meaning.
 
 ---
 
+## 3.21.2 — development
+
+Two build fixes, both found by the first continuous-integration run of a
+development branch — the first time any of this was built from a clean clone on
+a machine that is not the author's.
+
+**The codec script failed on stock macOS bash.** macOS ships bash 3.2, where
+expanding an *empty* array under `set -u` is an unbound-variable error; 4.4 and
+later allow it. The 3.21.1 change that moved the decoder policy into the
+vocabulary removed the branch that filled one such array and left the array and
+its expansion behind — dead code that could only ever run on 3.2, and could only
+ever fail there. A machine with a newer bash never saw it. The array is gone,
+and the one that is legitimately empty on a native build now uses the
+`${a[@]+"${a[@]}"}` form. A test decides this class by reading: an array
+declared empty and never filled must not be expanded.
+
+**CMake 4 refuses FreeType.** It removed compatibility with
+`cmake_minimum_required` below 3.5 and will not configure such a project at all;
+the vendored FreeType declares 2.8.12. `CMAKE_POLICY_VERSION_MINIMUM=3.5` is now
+passed to every CMake-configured dependency on Windows, where an unused `-D` on
+an older CMake is a warning rather than an error.
+
+---
+
 ## 3.21.1 — development
 
 Build-system work on top of 3.21, and the first Windows fixes that came out of

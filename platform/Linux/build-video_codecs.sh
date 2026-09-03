@@ -384,8 +384,6 @@ build_ffmpeg() {
   # No mode branch: MT_FFMPEG_DECODERS and MT_FFMPEG_PARSERS already carry the
   # withheld names when the resolved mode is `full`. (Identical note to the
   # macOS script.)
-  local mode_flags=()
-
   # NOTE: FFmpeg's mpeg4 decoder select-depends on the h263 decoder core
   # (configure: mpeg4_decoder_select="h263_decoder"); h263 is therefore
   # force-enabled. Passing --disable-decoder=h263 disables mpeg4 along with
@@ -405,7 +403,6 @@ build_ffmpeg() {
     --enable-bsf=hevc_mp4toannexb,h264_mp4toannexb,aac_adtstoasc \
     --disable-devices \
     --disable-autodetect \
-    "${mode_flags[@]}" \
     2>&1 | tee "$build/configure.log"
   # (No --enable-videotoolbox: that's an Apple-only hwaccel, dropped entirely
   # rather than replaced -- there is no VAAPI equivalent enabled in this

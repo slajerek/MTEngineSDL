@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Shared helpers for the MTEngineSDL Windows build scripts.
 .DESCRIPTION
@@ -658,7 +658,21 @@ function Get-MTCrtCMakeArgs {
     $crtLib = if ($Configuration -eq 'Debug') { 'MultiThreadedDebug' } else { 'MultiThreaded' }
     return @(
         "-DCMAKE_POLICY_DEFAULT_CMP0091=NEW",
-        "-DCMAKE_MSVC_RUNTIME_LIBRARY=$crtLib"
+        "-DCMAKE_MSVC_RUNTIME_LIBRARY=$crtLib",
+        # A FLOOR FOR OLD VENDORED TREES. CMake 4 removed compatibility with
+        # `cmake_minimum_required` below 3.5 and refuses to configure such a
+        # project at all, naming this variable as the way through. FreeType
+        # 2.10.4 declares 2.8.12, so a runner that has moved to CMake 4 -- as
+        # GitHub's windows-latest has -- cannot build the engine's dependencies
+        # without it. Measured 2026-09-03: "Compatibility with CMake < 3.5 has
+        # been removed from CMake", configure aborted.
+        #
+        # Passed to EVERY CMake-configured dependency rather than to FreeType
+        # alone: the same wall stands in front of any tree that is old enough,
+        # and on a CMake that predates the variable an unused -D is a warning
+        # rather than an error -- the same reasoning the FreeType script gives
+        # for its CMAKE_DISABLE_FIND_PACKAGE_* pins.
+        "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
     )
 }
 
