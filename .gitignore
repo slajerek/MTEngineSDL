@@ -9,7 +9,11 @@ other/lib/**/build/
 *.pbxuser
 *.perspectivev3
 *~.nib
-/.gitattributes
+# The ROOT .gitattributes is deliberate Git configuration, not an editor
+# dropping: it pins LF endings for the commit-msg hook so Git for Windows
+# cannot rewrite its shebang into "#!/bin/sh\r". A vendored tree's own copy
+# stays ignored; this one is ours.
+!/.gitattributes
 .vs
 .DS_Store
 Browse.VC.db

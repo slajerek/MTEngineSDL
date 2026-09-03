@@ -24,6 +24,35 @@ have to work out which of the other goes with it. 3.21.5 is absent here for that
 reason: the two had drifted a patch apart and the engine skips a number to come
 back level. A number is cheap; a reader guessing at a pairing is not.
 
+**The engine mints the number; the template only carries it.** A change to the
+template alone gets no number of its own — it ships under whatever number the
+engine currently has, however many template releases have landed on top of it.
+A new number appears here first, and the template follows. This holds for the
+template and nothing else: an application built on this engine versions itself
+however it likes.
+
+---
+
+## 3.21.11 — development
+
+**`MT_VERSION_STRING` says 3.21, and had said 3.19 since that release.** It is
+the one place a user can read a version — the startup banner, the UI debug
+view, and the `appVersion` field of every crash report — and all three had been
+quietly a release and a half out of date, which is worst in the crash report,
+where the number is the first thing anyone diagnosing a fault reads.
+
+It now carries the **minor only**. Patch numbers move faster than a constant is
+worth editing, and what actually separates two builds of the same minor is
+already recorded beside it in every one of those places: `__DATE__` and
+`__TIME__` appear in the banner, in the UI debug view, in the resource manager
+overlay, and in the crash report's `buildInfo` alongside platform and
+architecture. One caveat worth knowing when reading a Linux log: the banner is
+written with `LOGM`, and `GLOBAL_DEBUG_OFF` is set on that platform, so it does
+not appear there at all. The other three places do not go through the log
+macros and are unaffected.
+
+The app template moves to this number with the engine, as it always does.
+
 ---
 
 ## 3.21.10 — development
