@@ -17,6 +17,14 @@
   compiles its OWN two shaders that way, which is upstream's business; ours are
   bytecode only.
 
+  ONE EXCEPTION, and it is not a second path for the same shader. Text a USER
+  types at runtime -- CRenderShaderCustomFragmentD3D11, behind the engine's
+  CreateCustomFragmentShader seam and DummyApp's Shader Toy example -- goes
+  through D3DCompile, because it has no committed bytecode for a second path
+  to disagree with. The compiler is not a new dependency: it is already linked
+  and already used every launch by imgui_impl_dx11's own two shaders. Every
+  shader THIS script lists stays bytecode only.
+
 .PARAMETER Check
   Do not compile. Verify every committed header is up to date with its .hlsl and
   is not a placeholder. This is what the engine's pre-build step runs, and it is

@@ -207,6 +207,72 @@ class TestCommercialModeSemantics(Base):
             mode_of(self.resolve(m, "--set", "MT_PRIVATE_BUILD=1")), "full")
 
 
+    # --- the app-side licence file ------------------------------------------
+    #
+    # LICENSES.txt was generated from the engine's vocabulary alone, so an app
+    # that embeds a font -- or any asset -- shipped a binary containing it and
+    # a licence file omitting it. mtengine-app-licenses.json beside the
+    # manifest closes that, and goes through the SAME two checks a capability
+    # dependency does: field validation always, the commercial deny-list under
+    # MT_COMMERCIAL_BUILD=1.
+
+    def _app_licences_beside(self, manifest, deps):
+        import json
+        path = os.path.join(os.path.dirname(manifest), "mtengine-app-licenses.json")
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump({"dependencies": deps}, f)
+        return path
+
+    def test_app_licences_file_is_emitted(self):
+        """An app-side mtengine-app-licenses.json beside the manifest lands in
+        LICENSES.txt as its own section, with licence and version."""
+        m = self.manifest("MT_CAP_FTXUI=1\n")
+        self._app_licences_beside(m, [{
+            "name": "Planted Font", "licence": "OFL-1.1", "version": "1.0",
+            "provenance": "test fixture", "commercial_safe": True}])
+        proc = self.resolve(m)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        with open(os.path.join(self.out_of(proc), "LICENSES.txt"), encoding="utf-8") as f:
+            text = f.read()
+        self.assertIn("APPLICATION -- declared by the app", text)
+        self.assertIn("Planted Font", text)
+        self.assertIn("licence   : OFL-1.1", text)
+
+    def test_app_licences_commercial_safe_false_aborts_store_build(self):
+        """Gated exactly like a capability dependency: a store build aborts,
+        naming the dep and the file it came from."""
+        m = self.manifest("MT_CAP_FTXUI=1\n")
+        self._app_licences_beside(m, [{
+            "name": "Planted", "licence": "GPL-3.0", "version": "1",
+            "provenance": "test fixture", "commercial_safe": False}])
+        proc = self.resolve(m, *self.STORE)
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("commercial_safe", proc.stderr)
+        self.assertIn("Planted", proc.stderr)
+        self.assertIn("mtengine-app-licenses.json", proc.stderr)
+
+    def test_app_licences_commercial_safe_false_tolerated_in_dev_build(self):
+        """...and a dev build does not abort, exactly as for a capability dep."""
+        m = self.manifest("MT_CAP_FTXUI=1\n")
+        self._app_licences_beside(m, [{
+            "name": "Planted", "licence": "GPL-3.0", "version": "1",
+            "provenance": "test fixture", "commercial_safe": False}])
+        proc = self.resolve(m)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+
+    def test_app_licences_missing_field_is_refused(self):
+        """Field validation is the engine's own: a row without a licence is
+        refused in ANY build, because a missing licence ships a legally
+        incomplete SBOM that looks complete."""
+        m = self.manifest("MT_CAP_FTXUI=1\n")
+        self._app_licences_beside(m, [{
+            "name": "Planted", "version": "1",
+            "provenance": "test fixture", "commercial_safe": True}])
+        proc = self.resolve(m)
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("licence", proc.stderr)
+
+
 class TestVocabulary(Base):
     def test_ships_valid(self):
         """The shipped vocabulary validates. If this fails nothing else matters."""

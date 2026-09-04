@@ -78,6 +78,7 @@ public:
 	virtual CRenderTarget *CreateRenderTarget() override;
 	virtual CMaskedTileShader *CreateMaskedTileShader(bool queued) override;
 	virtual CRenderShader *CreateFlatColorShader(float r, float g, float b, float a) override;
+	virtual CRenderShaderCustomFragment *CreateCustomFragmentShader(const char *name) override;
 
 	// ImGui's Metal default sampler is linear/linear/mip-linear, which is right
 	// for everything except point magnification -- so only that needs a bracket.

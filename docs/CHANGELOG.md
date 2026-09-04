@@ -33,6 +33,142 @@ however it likes.
 
 ---
 
+## 3.21.14 — development
+
+**A view going fullscreen no longer unbalances ImGui's style stack.**
+`CGuiView::PreRenderImGui` pushed two style vars when
+`guiMain->viewFullScreen == this`, while `PostRenderImGui` popped two when
+`guiMain->viewFullScreen != NULL` -- a different question. Going fullscreen
+hides the other views, so nobody was left to mispop except
+`guiMain->currentView`, which `CGuiMain::RenderImGui` draws unconditionally:
+any host whose main view uses the base Pre/Post pair popped two style vars it
+had never pushed, on every frame, and ImGui reported "Calling PopStyleVar()
+too many times!". Under a debugger that stops the process, which reads as a
+freeze rather than as an error.
+
+`PostRenderImGui` now pops exactly what `PreRenderImGui` pushed, latched in
+the view. A latch rather than a matching predicate, because it also holds if
+the flag ever changes between the two calls -- it cannot today, since
+`SetViewFullScreen` defers the assignment to a UI-thread task, but a context
+menu item calling it sits between Pre and Post and nothing else would notice
+if that deferral went away.
+
+An app whose main view does not call the base pair never saw this.
+MTEngineSDLDummyApp's does, which is what a template app is supposed to
+demonstrate, and its Shader Toy output window is the first fullscreen caller
+in the tree.
+
+**A custom fragment shader can now sample four textures.**
+`CRenderShaderCustomFragment` gains `SetChannelTexture(n, handle)` and
+`SetChannelSampler(n, filter, wrap)` — render-thread-only pure stores — and
+the uniform block grows from 48 bytes to 240 to carry ShaderToy's full set:
+`iChannelResolution`, `iChannelTime`, `iFrameRate`, `iDate`, `iSampleRate`,
+plus two of ours, `iChannelUvTransform` and `iChannelWrap`. All three backends
+implement it, and each preamble defines `MAIN_IMAGE` so a host writes one word
+instead of MSL's eleven-parameter signature.
+
+**The `texChannelN` macros go through `mtChannelUV()`**, which flips, wraps
+and scales in that order. The flip is `iChannelUvTransform.z` and defaults to
+on: ShaderToy's `fragCoord` has its origin at the bottom left while a
+texture's `v = 0` is its top row, so an unflipped channel samples every image
+upside down. It is not a workaround for how images are loaded -- they are
+stored top-down, the way ImGui wants them -- and shadertoy.com defaults the
+same per-channel vflip to on for the same reason. Wrapping happens before the
+scale because it has to happen in the image's own 0..1 space, not in the
+padded texture's.
+
+**The channels bind at slots 1..4 on every backend, never 0**: ImGui claims
+slot 0 for its own draw command, after the callback that installs the shader.
+Nothing restores the higher slots afterwards, so `ResetState()` unbinds them —
+on D3D11 that needs a callback of its own, since `BACKUP_DX11_STATE` saves
+pixel resources for slot 0 only.
+
+Three things in the OpenGL path are not interchangeable with the obvious
+alternative, and each is commented where it lives. The sampler units are
+assigned in `SetShaderVars()` rather than after `glLinkProgram`, because the
+base class treats `iChannel0` as its own texture uniform and re-points it at
+unit 0 every frame. Filtering comes from cached sampler objects rather than
+`glTexParameteri`, which would permanently change how that image is filtered
+everywhere else in the application. And the active texture unit is restored to
+0 — removing that breaks nothing visible, which is what makes it dangerous:
+`imgui_impl_opengl3` sets the active unit once per frame, not per draw
+command, so the failure appears later as the wrong texture in an unrelated
+window.
+
+An empty channel gets a 1x1 black texture rather than a null binding: sampling
+an unset slot reads zero in any case, but Metal's validation layer and D3D11's
+debug layer both object on every draw. The MSL preamble repeats the C++
+header's 240-byte `static_assert`, so the two layouts cannot drift apart
+without one of them refusing to build.
+
+## 3.21.13 — development
+
+**`ImGuiColorTextEdit` is vendored** at `src/Engine/Libs/imgui_textedit/` —
+goossens' ground-up rewrite, MIT, unmodified, with the TextDiff widget and its
+BSD-3 `dtl.h` alongside. C++17, STL only, no regex, no boost; GLSL and HLSL
+language definitions built in. It compiles clean against our ImGui 1.93.0 WIP
+in about a second. The engine has never had a syntax-highlighting editor; the
+only one in any host was a dead 2017 copy whose selection was broken.
+
+**`CGuiViewCodeEditor`** — a thin `CGuiView` over it, for a host that wants a
+standalone editor window. Forwards text, language, read-only, palette and
+font; one extension point, `RenderToolbar()`. Its default font is resolved at
+render time, because a host's views are constructed before its fonts load.
+
+**An application can now declare its own licences.** `LICENSES.txt` was
+generated from the engine's vocabulary alone, so a host that embedded a font
+shipped a binary containing it and a licence file omitting it.
+`mtengine-app-licenses.json` beside `mtengine.caps` is read if present,
+emitted as its own section, and gated exactly as a capability dependency is:
+fields validated always, the commercial deny-list under
+`MT_COMMERCIAL_BUILD=1`. Four dependencies that were already shipped and
+undeclared are declared at the same time: the vendored editor, its `dtl`, and
+the **Inter and JetBrains Mono** fonts compiled into every binary — both
+OFL-1.1, which requires attribution on redistribution.
+
+## 3.21.12 — development
+
+**`CRenderBackend::CreateCustomFragmentShader()` — a fragment shader whose
+source arrives at runtime.** A host can now compile and replace shader text
+while it runs, which is what an in-app shader editor needs and what nothing
+here previously offered.
+
+It is implemented on **all three backends**. Until now the engine had a
+ShaderToy-style shader for OpenGL and Metal that no application could reach —
+`CRenderBackend` exposed no factory for it — and none at all for D3D11, which
+is the default backend on Windows. The Metal header had said as much for some
+time: *"an engine facility that works on one backend and silently not the other
+is a trap for whoever picks it up next."*
+
+`CRenderShaderCustomFragment` is a pure interface rather than a `CRenderShader`
+subclass. The OpenGL and Metal implementations derive from their own shader
+base as well, and a shared `CRenderShader` base would have given them two
+copies of it.
+
+- **The compiler's diagnostics are returned, not merely logged.** `LOGError`
+  compiles to nothing under `GLOBAL_DEBUG_OFF`, which is set on Linux, so a
+  host that displayed the log would display an empty panel exactly where a
+  headless CI run is the only way anyone sees the failure.
+- **A failed rebuild keeps the previous program bound**, on every backend, so a
+  host's preview does not go black on a typo.
+- **`GetPreambleLineCount()`** lets a host rebase the compiler's line numbers
+  onto the text its user actually typed. It counts the string rather than
+  stating a number, and the OpenGL count includes the `#version` line the base
+  class prepends.
+- **The uniform block is 48 bytes with one trap**: the MSL struct must say
+  `packed_float3`, because a plain MSL `float3` is 16 bytes and would shift
+  every field after it, silently.
+
+Runtime HLSL compilation here does not contradict the bytecode-only policy in
+`tools/embed-hlsl-shaders.ps1`: that rule guards a shader which *also* has
+committed bytecode, and text typed at runtime has none. The compiler is already
+linked and already used every launch by `imgui_impl_dx11`'s own two shaders.
+That script's header now records the exception.
+
+**Also fixed**: `CRenderShaderOpenGL4::CheckShader` logged with a `%s` and no
+argument — undefined behaviour printing whatever the stack held — while the
+`desc` parameter passed in for exactly that had never been used.
+
 ## 3.21.11 — development
 
 **`MT_VERSION_STRING` says 3.21, and had said 3.19 since that release.** It is

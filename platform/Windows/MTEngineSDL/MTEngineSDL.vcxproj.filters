@@ -1251,6 +1251,42 @@
     <ClCompile Include="..\..\..\src\Engine\Core\Render\CRenderBackend.cpp">
       <Filter>Source Files\src\Engine\Core\Render</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiViewCodeEditor.cpp">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClCompile>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiViewCodeEditor.h">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Libs\imgui_textedit\dtl.h">
+      <Filter>Source Files\src\Engine\Libs\imgui_textedit</Filter>
+    </ClInclude>
+    <ClCompile Include="..\..\..\src\Engine\Libs\imgui_textedit\TextDiff.cpp">
+      <Filter>Source Files\src\Engine\Libs\imgui_textedit</Filter>
+    </ClCompile>
+    <ClInclude Include="..\..\..\src\Engine\Libs\imgui_textedit\TextDiff.h">
+      <Filter>Source Files\src\Engine\Libs\imgui_textedit</Filter>
+    </ClInclude>
+    <ClCompile Include="..\..\..\src\Engine\Libs\imgui_textedit\TextEditor.cpp">
+      <Filter>Source Files\src\Engine\Libs\imgui_textedit</Filter>
+    </ClCompile>
+    <ClInclude Include="..\..\..\src\Engine\Libs\imgui_textedit\TextEditor.h">
+      <Filter>Source Files\src\Engine\Libs\imgui_textedit</Filter>
+    </ClInclude>
+    <ClCompile Include="..\src.Windows\Render\CRenderShaderCustomFragmentD3D11.cpp">
+      <Filter>Source Files\src.Windows\Render</Filter>
+    </ClCompile>
+    <ClInclude Include="..\src.Windows\Render\CRenderShaderCustomFragmentD3D11.h">
+      <Filter>Source Files\src.Windows\Render</Filter>
+    </ClInclude>
+    <ClCompile Include="..\..\..\src\Engine\Core\Render\CRenderShaderCustomFragmentOpenGL4.cpp">
+      <Filter>Source Files\src\Engine\Core\Render</Filter>
+    </ClCompile>
+    <ClInclude Include="..\..\..\src\Engine\Core\Render\CRenderShaderCustomFragmentOpenGL4.h">
+      <Filter>Source Files\src\Engine\Core\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Core\Render\CRenderShaderCustomFragment.h">
+      <Filter>Source Files\src\Engine\Core\Render</Filter>
+    </ClInclude>
     <ClCompile Include="..\src.Windows\Render\CVideoYUVShaderD3D11.cpp">
       <Filter>Source Files\src.Windows\Render</Filter>
     </ClCompile>

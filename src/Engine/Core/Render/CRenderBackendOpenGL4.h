@@ -43,6 +43,7 @@ public:
 
 	virtual CMaskedTileShader *CreateMaskedTileShader(bool queued) override;
 	virtual CRenderShader *CreateFlatColorShader(float r, float g, float b, float a) override;
+	virtual CRenderShaderCustomFragment *CreateCustomFragmentShader(const char *name) override;
 
 	virtual bool ReadTexturePixels(void *texture, int w, int h, unsigned int *outRGBA) override;
 

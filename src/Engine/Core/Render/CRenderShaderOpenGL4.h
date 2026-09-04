@@ -4,6 +4,7 @@
 #include "CRenderBackendOpenGL4.h"
 #include "CRenderShader.h"
 #include <GL/gl3w.h>
+#include <string>
 
 class CRenderShaderOpenGL4 : public CRenderShader
 {
@@ -48,6 +49,16 @@ protected:
 	
 	bool CheckShader(GLuint handle, const char* desc);
 	bool CheckProgram(GLuint handle, const char* desc);
+
+	// The driver's diagnostics from the most recent CompileShaders(), for a
+	// subclass that must RETURN them rather than log them. Cleared at the top
+	// of every compile, appended to by CheckShader/CheckProgram.
+	//
+	// It exists because LOGError is a no-op under GLOBAL_DEBUG_OFF, which is
+	// set on Linux -- so a subclass that showed the log instead would show an
+	// empty panel precisely where a headless CI run is the only way anyone
+	// sees the failure. See CRenderShaderCustomFragment.h.
+	std::string lastCompileLog;
 	
 	CRenderBackendOpenGL4 *renderBackend;
 };

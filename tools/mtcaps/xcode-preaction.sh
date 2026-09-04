@@ -171,6 +171,24 @@ MT_OUT="$(printf '%s\n' "$OUTPUT" | sed -n 's/^out_dir=//p')"
 LIBS_DIR="$(printf '%s\n' "$OUTPUT" | sed -n 's/^deps_dir=//p')"
 [[ -n "$LIBS_DIR" ]] || fail "mtcaps resolve produced no deps_dir"
 
+# The INCLUDE directory, read from the same resolve for the same reason.
+#
+# It is NOT "$MT_OUT/include", and that mistake is what this line exists to
+# stop repeating. mtcaps publishes TWO roots: out_dir, keyed by the engine
+# revision, holds the generated fragments, the stamp and LICENSES.txt;
+# build_dir, keyed by the literal _build, is where emit_all writes
+# MT_Capabilities.h. Pointing the IDE at "$MT_OUT/include" pointed it at a
+# directory nothing ever creates, so every IDE build failed on
+#
+#     fatal error: 'MT_Capabilities.h' file not found
+#
+# while the WRAPPER build was fine -- build-macos.sh passes HEADER_SEARCH_PATHS
+# on the xcodebuild command line and never reads MT_CAPS_INCLUDE_DIR at all.
+# That asymmetry is why this survived: the only path that consults this
+# variable is the one nobody runs in CI.
+BUILD_DIR="$(printf '%s\n' "$OUTPUT" | sed -n 's/^build_dir=//p')"
+[[ -n "$BUILD_DIR" ]] || fail "mtcaps resolve produced no build_dir"
+
 GEN="$MT_OUT/MTEngineCaps.xcconfig"
 [[ -f "$GEN" ]] || fail "generated fragment missing at $GEN"
 
@@ -222,7 +240,7 @@ write_xcconfig() {
         echo "MT_CAPS_APP = $APP_NAME"
         echo "MT_CAPS_DEFINES = $DEFINES"
         echo "MT_CAPS_DEFINES_ENGINE = $extra"
-        echo "MT_CAPS_INCLUDE_DIR = $MT_OUT/include"
+        echo "MT_CAPS_INCLUDE_DIR = $BUILD_DIR/include"
         echo "MT_CAPS_OUT = $MT_OUT"
         # The dependency-archive directory, so the IDE channel links against the
         # SAME archives the acquisition script phases stage into. It is keyed by

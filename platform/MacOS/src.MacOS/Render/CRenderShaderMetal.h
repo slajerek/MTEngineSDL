@@ -2,6 +2,7 @@
 #define _CRenderShaderMetal_h_
 
 #include "CRenderShader.h"
+#include <string>
 
 class CRenderBackendMetal;
 
@@ -75,6 +76,16 @@ protected:
 
 	void *libraryPtr;    // id<MTLLibrary>,             retained
 	void *pipelinePtr;   // id<MTLRenderPipelineState>, retained
+
+	// The compiler's diagnostics from the most recent CompileShaders(), for a
+	// subclass that must RETURN them rather than log them. Cleared at the top
+	// of every compile.
+	//
+	// It exists because LOGError is a no-op under GLOBAL_DEBUG_OFF, which is
+	// set on Linux; the Metal path never runs there, but the seam this serves
+	// is backend-neutral and its contract has to be the same everywhere.
+	// See CRenderShaderCustomFragment.h.
+	std::string lastCompileLog;
 
 	// Latch. Without it a failed compile is retried on every single frame, which
 	// turns one diagnostic into a scrolling wall of them and costs real time.

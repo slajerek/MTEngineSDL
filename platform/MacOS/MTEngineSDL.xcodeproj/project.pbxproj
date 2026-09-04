@@ -441,6 +441,7 @@
 		41A2CE7423A6EBF200B68A26 /* SYS_CommandLine.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 41A2CE7223A6EBF200B68A26 /* SYS_CommandLine.cpp */; };
 		41A2CE7523A6EBF200B68A26 /* SYS_CommandLine.h in Headers */ = {isa = PBXBuildFile; fileRef = 41A2CE7323A6EBF200B68A26 /* SYS_CommandLine.h */; };
 		41A9C0E928553CBC00C66922 /* CRenderBackendMetal.mm in Sources */ = {isa = PBXBuildFile; fileRef = 41A9C0E728553CBC00C66922 /* CRenderBackendMetal.mm */; };
+		0BEBC4C129C027164057EF62 /* CRenderShaderCustomFragmentMetal.mm in Sources */ = {isa = PBXBuildFile; fileRef = 79DB0E0DCF04781B29A97EDD /* CRenderShaderCustomFragmentMetal.mm */; };
 		9B2DD130A1121F156E1C2A9E /* CRenderShaderShaderToyMetal.mm in Sources */ = {isa = PBXBuildFile; fileRef = 3F66FF1EBA31050BC0A4F77E /* CRenderShaderShaderToyMetal.mm */; };
 		9918BDCF7907158F081AD24B /* CRenderShaderMaskedTileMetal.mm in Sources */ = {isa = PBXBuildFile; fileRef = 4EB907181824D41A8CDA9D62 /* CRenderShaderMaskedTileMetal.mm */; };
 		902678A02E98DADAB2234E69 /* CRenderShaderMetal.mm in Sources */ = {isa = PBXBuildFile; fileRef = 83826AACCD35CCC664CE6E4E /* CRenderShaderMetal.mm */; };
@@ -718,6 +719,10 @@
 		41E1CFDC2DDF8434006B32FB /* imgui_stdlib.h in Headers */ = {isa = PBXBuildFile; fileRef = 41E1CFDA2DDF8434006B32FB /* imgui_stdlib.h */; };
 		41E1CFDD2DDF8434006B32FB /* imgui_stdlib.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 41E1CFDB2DDF8434006B32FB /* imgui_stdlib.cpp */; };
 		41E4CA97285343B6007509C3 /* CRenderBackend.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 41E4CA93285343B6007509C3 /* CRenderBackend.cpp */; };
+		B37B279254423FA23574B7A7 /* CGuiViewCodeEditor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 6AC240CC6EDE14A55D535861 /* CGuiViewCodeEditor.cpp */; };
+		2BE79EC8A8164E7335A33AA0 /* TextDiff.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CA5134A475CE09D6272EDE5B /* TextDiff.cpp */; };
+		097304E34B90C8932E69CEB7 /* TextEditor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = EB0CE94640F513A744DFEFB7 /* TextEditor.cpp */; };
+		1A273BC7C2350B351F01D2CB /* CRenderShaderCustomFragmentOpenGL4.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3F83590B4D210977150DDB59 /* CRenderShaderCustomFragmentOpenGL4.cpp */; };
 		35EC122609A6C07012CFEDA4 /* CTestSurfaceEncoding.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B08518B19F8FDC2F255CE17C /* CTestSurfaceEncoding.cpp */; };
 		549F556C554B62B6E8B28510 /* CTestScissorClamp.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F4BF4F7D192F9991FBF29216 /* CTestScissorClamp.cpp */; };
 		537A95FB36E13A182AF484FA /* CTestResidentFunnel.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4F1034DAE412B14FE8EFA3EC /* CTestResidentFunnel.cpp */; };
@@ -1450,6 +1455,8 @@
 		41A2CE7223A6EBF200B68A26 /* SYS_CommandLine.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = SYS_CommandLine.cpp; sourceTree = "<group>"; };
 		41A2CE7323A6EBF200B68A26 /* SYS_CommandLine.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SYS_CommandLine.h; sourceTree = "<group>"; };
 		41A9C0E728553CBC00C66922 /* CRenderBackendMetal.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = CRenderBackendMetal.mm; path = ../../platform/MacOS/src.MacOS/Render/CRenderBackendMetal.mm; sourceTree = SOURCE_ROOT; };
+		79DB0E0DCF04781B29A97EDD /* CRenderShaderCustomFragmentMetal.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = CRenderShaderCustomFragmentMetal.mm; path = ../../platform/MacOS/src.MacOS/Render/CRenderShaderCustomFragmentMetal.mm; sourceTree = SOURCE_ROOT; };
+		7F44E19D9C4388FE211F9656 /* CRenderShaderCustomFragmentMetal.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CRenderShaderCustomFragmentMetal.h; path = ../../platform/MacOS/src.MacOS/Render/CRenderShaderCustomFragmentMetal.h; sourceTree = SOURCE_ROOT; };
 		73C6DEF546E6D65C4BF2F0C8 /* MTShaderToyMetallib.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = MTShaderToyMetallib.h; path = ../../platform/MacOS/src.MacOS/Render/Generated/MTShaderToyMetallib.h; sourceTree = SOURCE_ROOT; };
 		5F11DEC68DEEA3423D7AB73E /* MTMaskedTileMetallib.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = MTMaskedTileMetallib.h; path = ../../platform/MacOS/src.MacOS/Render/Generated/MTMaskedTileMetallib.h; sourceTree = SOURCE_ROOT; };
 		646B2E92D0C0A362ADA1CBC2 /* MTFlatColorMetallib.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = MTFlatColorMetallib.h; path = ../../platform/MacOS/src.MacOS/Render/Generated/MTFlatColorMetallib.h; sourceTree = SOURCE_ROOT; };
@@ -1761,6 +1768,16 @@
 		41E1CFDA2DDF8434006B32FB /* imgui_stdlib.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = imgui_stdlib.h; path = imguiext/imgui_stdlib.h; sourceTree = "<group>"; };
 		41E1CFDB2DDF8434006B32FB /* imgui_stdlib.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = imgui_stdlib.cpp; path = imguiext/imgui_stdlib.cpp; sourceTree = "<group>"; };
 		41E4CA93285343B6007509C3 /* CRenderBackend.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CRenderBackend.cpp; sourceTree = "<group>"; };
+		6AC240CC6EDE14A55D535861 /* CGuiViewCodeEditor.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CGuiViewCodeEditor.cpp; path = ../../src/Engine/GUI/Controls/CGuiViewCodeEditor.cpp; sourceTree = SOURCE_ROOT; };
+		C1457FFC0691C0A8A3136421 /* CGuiViewCodeEditor.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CGuiViewCodeEditor.h; path = ../../src/Engine/GUI/Controls/CGuiViewCodeEditor.h; sourceTree = SOURCE_ROOT; };
+		FD91AF87E73F582022939858 /* dtl.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = dtl.h; path = ../../src/Engine/Libs/imgui_textedit/dtl.h; sourceTree = SOURCE_ROOT; };
+		CA5134A475CE09D6272EDE5B /* TextDiff.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = TextDiff.cpp; path = ../../src/Engine/Libs/imgui_textedit/TextDiff.cpp; sourceTree = SOURCE_ROOT; };
+		DDC274FC19B1032B4C4BAA3C /* TextDiff.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = TextDiff.h; path = ../../src/Engine/Libs/imgui_textedit/TextDiff.h; sourceTree = SOURCE_ROOT; };
+		EB0CE94640F513A744DFEFB7 /* TextEditor.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = TextEditor.cpp; path = ../../src/Engine/Libs/imgui_textedit/TextEditor.cpp; sourceTree = SOURCE_ROOT; };
+		9A87D531F1C3D292158B7EE6 /* TextEditor.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = TextEditor.h; path = ../../src/Engine/Libs/imgui_textedit/TextEditor.h; sourceTree = SOURCE_ROOT; };
+		3F83590B4D210977150DDB59 /* CRenderShaderCustomFragmentOpenGL4.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CRenderShaderCustomFragmentOpenGL4.cpp; path = ../../src/Engine/Core/Render/CRenderShaderCustomFragmentOpenGL4.cpp; sourceTree = SOURCE_ROOT; };
+		937E1FADB42829193772FFB5 /* CRenderShaderCustomFragmentOpenGL4.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CRenderShaderCustomFragmentOpenGL4.h; path = ../../src/Engine/Core/Render/CRenderShaderCustomFragmentOpenGL4.h; sourceTree = SOURCE_ROOT; };
+		09CDB58639ECC2B99FF1493A /* CRenderShaderCustomFragment.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CRenderShaderCustomFragment.h; path = ../../src/Engine/Core/Render/CRenderShaderCustomFragment.h; sourceTree = SOURCE_ROOT; };
 		5DD9F1FA84EB0F69E81BD674 /* MT_SrgbCurve.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = MT_SrgbCurve.h; path = ../../src/Engine/Core/MT_SrgbCurve.h; sourceTree = SOURCE_ROOT; };
 		B08518B19F8FDC2F255CE17C /* CTestSurfaceEncoding.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CTestSurfaceEncoding.cpp; path = ../../src/Engine/Tests/CTestSurfaceEncoding.cpp; sourceTree = SOURCE_ROOT; };
 		CA51F3902553931568EC8C6E /* CTestSurfaceEncoding.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CTestSurfaceEncoding.h; path = ../../src/Engine/Tests/CTestSurfaceEncoding.h; sourceTree = SOURCE_ROOT; };
@@ -3547,6 +3564,16 @@
 				41D5E267239D891200143F1C /* VID_ImageBinding.cpp */,
 				41D5E268239D891200143F1C /* VID_ImageBinding.h */,
 				41E4CA93285343B6007509C3 /* CRenderBackend.cpp */,
+				6AC240CC6EDE14A55D535861 /* CGuiViewCodeEditor.cpp */,
+				C1457FFC0691C0A8A3136421 /* CGuiViewCodeEditor.h */,
+				FD91AF87E73F582022939858 /* dtl.h */,
+				CA5134A475CE09D6272EDE5B /* TextDiff.cpp */,
+				DDC274FC19B1032B4C4BAA3C /* TextDiff.h */,
+				EB0CE94640F513A744DFEFB7 /* TextEditor.cpp */,
+				9A87D531F1C3D292158B7EE6 /* TextEditor.h */,
+				3F83590B4D210977150DDB59 /* CRenderShaderCustomFragmentOpenGL4.cpp */,
+				937E1FADB42829193772FFB5 /* CRenderShaderCustomFragmentOpenGL4.h */,
+				09CDB58639ECC2B99FF1493A /* CRenderShaderCustomFragment.h */,
 				5DD9F1FA84EB0F69E81BD674 /* MT_SrgbCurve.h */,
 				B08518B19F8FDC2F255CE17C /* CTestSurfaceEncoding.cpp */,
 				CA51F3902553931568EC8C6E /* CTestSurfaceEncoding.h */,
@@ -3570,6 +3597,8 @@
 				758555CAA05BE237AEF28F43 /* CRenderTarget.h */,
 				41E4CA96285343B6007509C3 /* CRenderBackend.h */,
 				41A9C0E728553CBC00C66922 /* CRenderBackendMetal.mm */,
+				79DB0E0DCF04781B29A97EDD /* CRenderShaderCustomFragmentMetal.mm */,
+				7F44E19D9C4388FE211F9656 /* CRenderShaderCustomFragmentMetal.h */,
 				73C6DEF546E6D65C4BF2F0C8 /* MTShaderToyMetallib.h */,
 				5F11DEC68DEEA3423D7AB73E /* MTMaskedTileMetallib.h */,
 				646B2E92D0C0A362ADA1CBC2 /* MTFlatColorMetallib.h */,
@@ -4716,6 +4745,7 @@
 				4132603E239E81440061FC82 /* imguial_log.cpp in Sources */,
 				4154FF8A2397A94700EB6387 /* jdtrans.c in Sources */,
 				41A9C0E928553CBC00C66922 /* CRenderBackendMetal.mm in Sources */,
+				0BEBC4C129C027164057EF62 /* CRenderShaderCustomFragmentMetal.mm in Sources */,
 				9B2DD130A1121F156E1C2A9E /* CRenderShaderShaderToyMetal.mm in Sources */,
 				9918BDCF7907158F081AD24B /* CRenderShaderMaskedTileMetal.mm in Sources */,
 				902678A02E98DADAB2234E69 /* CRenderShaderMetal.mm in Sources */,
@@ -4888,6 +4918,10 @@
 				4143A3D829DE45F9006F2318 /* implot_items.cpp in Sources */,
 				41DAE4BB23BA18C90011FEA9 /* nfd_cocoa.m in Sources */,
 				41E4CA97285343B6007509C3 /* CRenderBackend.cpp in Sources */,
+				B37B279254423FA23574B7A7 /* CGuiViewCodeEditor.cpp in Sources */,
+				2BE79EC8A8164E7335A33AA0 /* TextDiff.cpp in Sources */,
+				097304E34B90C8932E69CEB7 /* TextEditor.cpp in Sources */,
+				1A273BC7C2350B351F01D2CB /* CRenderShaderCustomFragmentOpenGL4.cpp in Sources */,
 				35EC122609A6C07012CFEDA4 /* CTestSurfaceEncoding.cpp in Sources */,
 				549F556C554B62B6E8B28510 /* CTestScissorClamp.cpp in Sources */,
 				537A95FB36E13A182AF484FA /* CTestResidentFunnel.cpp in Sources */,

@@ -622,6 +622,7 @@ bool CRenderBackendOpenGL4::CheckOpenGLError()
 
 #include "CMaskedTileShader.h"
 #include "CRenderShaderFlatColorOpenGL4.h"
+#include "CRenderShaderCustomFragmentOpenGL4.h"
 #include "CRenderShaderMaskedTile.h"
 #include "CRenderShaderMaskedTileQueued.h"
 
@@ -684,6 +685,11 @@ CMaskedTileShader *CRenderBackendOpenGL4::CreateMaskedTileShader(bool queued)
 CRenderShader *CRenderBackendOpenGL4::CreateFlatColorShader(float r, float g, float b, float a)
 {
 	return new CRenderShaderFlatColorOpenGL4(this, r, g, b, a);
+}
+
+CRenderShaderCustomFragment *CRenderBackendOpenGL4::CreateCustomFragmentShader(const char *name)
+{
+	return new CRenderShaderCustomFragmentOpenGL4(this, name);
 }
 
 // --- per-draw texture filtering -------------------------------------------

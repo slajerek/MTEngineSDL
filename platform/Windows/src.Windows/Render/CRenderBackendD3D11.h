@@ -119,6 +119,7 @@ public:
 	// --- factories ---------------------------------------------------------
 	virtual CRenderTarget *CreateRenderTarget() override;
 	virtual CRenderShader *CreateFlatColorShader(float r, float g, float b, float a) override;
+	virtual CRenderShaderCustomFragment *CreateCustomFragmentShader(const char *name) override;
 	virtual CVideoYUVConverter *CreateVideoYUVConverter() override;
 
 	// Ported 2026-09-02, when a host application using masked tiles was first

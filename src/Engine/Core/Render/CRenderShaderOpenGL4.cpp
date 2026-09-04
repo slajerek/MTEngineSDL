@@ -52,7 +52,9 @@ void CRenderShaderOpenGL4::CompileShaders()
 
 	if (isCompiled || compileAttemptedAndFailed)
 		return;
-	
+
+	lastCompileLog.clear();
+
 	// Create shaders
 	const char *glslVersionString = renderBackend->GetGlSlVersion();
 	
@@ -260,7 +262,10 @@ bool CRenderShaderOpenGL4::CheckShader(GLuint handle, const char* desc)
 	ASSERT_OPENGL();
 	if ((GLboolean)status == GL_FALSE)
 	{
-		LOGError("CRenderShaderOpenGL4::CheckShader: failed to compile %s");
+		// The %s here carried NO ARGUMENT until 2026-09-04 -- undefined
+		// behaviour that printed whatever the stack held -- while desc, passed
+		// in for exactly this, went unused.
+		LOGError("CRenderShaderOpenGL4::CheckShader: failed to compile %s", desc);
 	}
 	
 	if (log_length > 1)
@@ -270,6 +275,10 @@ bool CRenderShaderOpenGL4::CheckShader(GLuint handle, const char* desc)
 		glGetShaderInfoLog(handle, log_length, nullptr, (GLchar*)buf.begin());
 		ASSERT_OPENGL();
 		LOGError("%s", buf.begin());
+		lastCompileLog += desc;
+		lastCompileLog += ": ";
+		lastCompileLog += buf.begin();
+		lastCompileLog += "\n";
 	}
 	return (GLboolean)status == GL_TRUE;
 }
@@ -293,6 +302,10 @@ bool CRenderShaderOpenGL4::CheckProgram(GLuint handle, const char* desc)
 		glGetProgramInfoLog(handle, log_length, nullptr, (GLchar*)buf.begin());
 		ASSERT_OPENGL();
 		LOGError("%s", buf.begin());
+		lastCompileLog += desc;
+		lastCompileLog += ": ";
+		lastCompileLog += buf.begin();
+		lastCompileLog += "\n";
 	}
 	return (GLboolean)status == GL_TRUE;
 }

@@ -217,7 +217,7 @@ def resolve(vocab, manifest_path, platform, overrides=None):
     return values, provenance
 
 
-def check_commercial_safe(vocab, values, platform=None):
+def check_commercial_safe(vocab, values, platform=None, manifest_path=None):
     """The deny-list (decision 0.2): a MT_COMMERCIAL_BUILD=1 resolve must make
     it impossible to compile in a dependency that is not commercial-safe.
 
@@ -246,6 +246,21 @@ def check_commercial_safe(vocab, values, platform=None):
                 "-- after settling the licence -- flip the vocabulary field."
                 % (dep["name"], dep["licence"], key,
                    "" if gate is None else " via %s" % gate))
+
+    # The APPLICATION's own rows (mtengine-app-licenses.json beside the
+    # manifest) sit under the same guard. They have no capability to turn off:
+    # the app either stops embedding the thing or settles its licence.
+    if manifest_path is not None:
+        from vocab import load_app_licences, APP_LICENCES_FILE
+        for dep in load_app_licences(manifest_path):
+            if dep["commercial_safe"]:
+                continue
+            raise ManifestError(
+                "MT_COMMERCIAL_BUILD=1 would ship %r (licence: %s), which the "
+                "application declares in %s with commercial_safe: false. Stop "
+                "embedding it for the store build, or -- after settling the "
+                "licence -- flip the field."
+                % (dep["name"], dep["licence"], APP_LICENCES_FILE))
 
 
 def canonical_form(vocab, values):

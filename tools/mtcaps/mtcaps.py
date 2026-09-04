@@ -74,7 +74,7 @@ def _resolve_common(args, overrides):
     # The commercial_safe deny-list (decision 0.2) runs on every resolve AND
     # every check -- same code path, so the agreement check cannot pass a
     # configuration the resolve would refuse.
-    R.check_commercial_safe(vocab, values, args.platform)
+    R.check_commercial_safe(vocab, values, args.platform, args.manifest)
     canonical = R.canonical_form(vocab, values)
     return vocab, values, provenance, canonical
 

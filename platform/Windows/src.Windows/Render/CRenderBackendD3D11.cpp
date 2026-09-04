@@ -24,6 +24,7 @@
 #include "Core/Render/CRenderTarget.h"
 #include "Video/CVideoYUVConverter.h"
 #include "CRenderShaderFlatColorD3D11.h"
+#include "CRenderShaderCustomFragmentD3D11.h"
 #include "CRenderShaderMaskedTileD3D11.h"
 #include "CVideoYUVShaderD3D11.h"
 #include "imgui.h"
@@ -2131,6 +2132,13 @@ CRenderShader *CRenderBackendD3D11::CreateFlatColorShader(float r, float g, floa
 	if (gDevice == NULL)
 		return NULL;
 	return new CRenderShaderFlatColorD3D11(this, r, g, b, a);
+}
+
+CRenderShaderCustomFragment *CRenderBackendD3D11::CreateCustomFragmentShader(const char *name)
+{
+	if (gDevice == NULL)
+		return NULL;
+	return new CRenderShaderCustomFragmentD3D11(this, name);
 }
 
 CVideoYUVConverter *CRenderBackendD3D11::CreateVideoYUVConverter()

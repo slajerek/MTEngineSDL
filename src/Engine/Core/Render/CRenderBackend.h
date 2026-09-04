@@ -12,6 +12,7 @@ class CRenderTarget;
 class CMaskedTileShader;
 class CVideoYUVConverter;
 class CRenderShader;
+class CRenderShaderCustomFragment;
 enum VID_DisplayColorGamut : int;
 
 // What the on-screen surface is made of. Backend-neutral on purpose: putting an
@@ -249,6 +250,17 @@ public:
 	//
 	// Caller owns the returned shader and must call CompileShaders() on it.
 	virtual CRenderShader *CreateFlatColorShader(float r, float g, float b, float a) { return NULL; }
+
+	// A fragment shader whose SOURCE is supplied at runtime and can be replaced
+	// while the app runs -- the seam an in-app shader editor draws through.
+	//
+	// Caller owns the result and must call SetFragmentSource() on it, ON THE
+	// RENDER THREAD, before it draws anything.
+	//
+	// Present on EVERY backend deliberately, for the same reason
+	// CreateFlatColorShader gives above: a facility that exists on one backend
+	// and silently not another is a trap for whoever picks it up next.
+	virtual CRenderShaderCustomFragment *CreateCustomFragmentShader(const char *name) { return NULL; }
 
 	// --- per-DRAW texture filtering -------------------------------------
 	//

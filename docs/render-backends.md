@@ -107,6 +107,60 @@ incapable one.
 A worked example of both the picker and the HDR gating is
 `MTEngineSDLDummyApp`, in its Settings menu and its HDR test bench.
 
+## Custom fragment shaders
+
+`CRenderBackend::CreateCustomFragmentShader(name)` returns a
+`CRenderShaderCustomFragment` whose GLSL/MSL/HLSL source is supplied at runtime
+and can be replaced while the app runs. Implemented on **all three** backends,
+for the reason `CreateFlatColorShader` states beside it.
+
+Four things a caller has to know, each of which cost a round to find:
+
+1. **`SetFragmentSource()` is render-thread only**, like every other GPU call
+   here. From an imgui_test_engine `TestFunc` -- which runs on its own
+   coroutine thread -- it does not fail, it crashes.
+2. **The host writes only `mainImage()`.** Each backend prepends a preamble and
+   appends the entry point. `GetPreambleLineCount()` is what lets a host rebase
+   the compiler's line numbers onto the text its user typed; the OpenGL count
+   includes the `#version` line `CRenderShaderOpenGL4::CompileShaders()`
+   prepends.
+3. **`GetCompileErrorLog()` returns the diagnostics; it does not log them.**
+   `LOGError` is a no-op under `GLOBAL_DEBUG_OFF`, which is set on Linux, so a
+   log-only design would show an empty error panel precisely where a headless
+   CI run is the only way anyone sees the failure.
+4. **A failed rebuild keeps the previous program bound**, so a host's preview
+   does not blank on a typo.
+
+The uniform block is 240 bytes and its MSL struct must say `packed_float3` --
+a plain MSL `float3` is 16 bytes and silently shifts every field after it. The
+MSL preamble repeats the C++ header's `static_assert` on that size, so the two
+layouts cannot drift apart without one of them refusing to build.
+
+**Four texture channels**, `iChannel0..3`, set through
+`SetChannelTexture(n, nativeHandle)` and
+`SetChannelSampler(n, filter, wrap)` -- both **render-thread-only pure
+stores**; the binding happens where an encoder or device context exists. They
+bind at slots **1..4 on every backend**, never 0: ImGui claims slot 0 for its
+own draw command, after the user callback that installs the shader. Nothing
+restores the higher slots, so `ResetState()` unbinds them.
+
+The `texChannelN` macros in each preamble call `mtChannelUV()`, which does
+three things in a fixed order: **flip, wrap, scale**. The flip is
+`iChannelUvTransform.z`, on by default -- ShaderToy's `fragCoord` is
+bottom-left while a texture's `v = 0` is its top row, so an unflipped channel
+samples upside down, and shadertoy.com defaults the same toggle on. The wrap
+comes from `iChannelWrap` and is done in the shader because `CSlrImage` pads
+textures to a power of two and hardware repeat would tile the padding; it must
+run before the scale, in the image's own 0..1 space. The scale is
+`iChannelUvTransform.xy`, carrying `defaultTexEndX/Y`. The scale half becomes
+a no-op when `NextPow2` goes.
+
+D3D11 compiles the host's HLSL with `D3DCompile` at `ps_4_0`. That is not the
+second production path `tools/embed-hlsl-shaders.ps1` forbids: its rule guards
+a shader which also has committed bytecode, and runtime text has none.
+
+A worked example is `MTEngineSDLDummyApp`, in `Examples > Shader Toy`.
+
 ## Overrides
 
 `--render-backend=<selection>` beats the config for one run, and is checked

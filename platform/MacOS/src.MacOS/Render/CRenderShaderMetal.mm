@@ -94,6 +94,8 @@ bool CRenderShaderMetal::LoadLibrary()
 		{
 			LOGError("CRenderShaderMetal('%s'): embedded .metallib failed to load: %s", name,
 					 error ? [[error localizedDescription] UTF8String] : "(no error object)");
+			lastCompileLog = error ? [[error localizedDescription] UTF8String]
+								   : "embedded .metallib failed to load";
 			return false;
 		}
 	}
@@ -109,6 +111,9 @@ bool CRenderShaderMetal::LoadLibrary()
 			// single most expensive way to debug this.
 			LOGError("CRenderShaderMetal('%s'): MSL compile failed: %s", name,
 					 error ? [[error localizedDescription] UTF8String] : "(no error object)");
+			// RETURNED, not only logged -- a host's error panel shows this.
+			lastCompileLog = error ? [[error localizedDescription] UTF8String]
+								   : "MSL compile failed (no error object)";
 			return false;
 		}
 	}
@@ -121,6 +126,8 @@ void CRenderShaderMetal::CompileShaders()
 {
 	if (isCompiled || compileFailed)
 		return;
+
+	lastCompileLog.clear();
 
 	@autoreleasepool
 	{
@@ -141,6 +148,11 @@ void CRenderShaderMetal::CompileShaders()
 		{
 			LOGError("CRenderShaderMetal('%s'): library has no '%s'/'%s'", name,
 					 GetVertexFunctionName(), GetFragmentFunctionName());
+			lastCompileLog += "library has no ";
+			lastCompileLog += GetVertexFunctionName();
+			lastCompileLog += "/";
+			lastCompileLog += GetFragmentFunctionName();
+			lastCompileLog += "\n";
 			compileFailed = true;
 			return;
 		}
@@ -188,6 +200,8 @@ void CRenderShaderMetal::CompileShaders()
 		{
 			LOGError("CRenderShaderMetal('%s'): pipeline creation failed: %s", name,
 					 error ? [[error localizedDescription] UTF8String] : "(no error object)");
+			lastCompileLog += error ? [[error localizedDescription] UTF8String]
+								   : "pipeline creation failed";
 			compileFailed = true;
 			return;
 		}

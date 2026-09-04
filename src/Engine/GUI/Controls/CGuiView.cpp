@@ -1542,6 +1542,8 @@ void CGuiView::PreRenderImGui()
 	ImGuiContext& g = *GImGui;
 		
 	bool isFullScreen = (guiMain->viewFullScreen == this);
+	// Latched for PostRenderImGui -- see the member's comment in CGuiView.h.
+	pushedFullScreenStyleVars = isFullScreen;
 	
 	if (isFullScreen)
 	{
@@ -1793,11 +1795,12 @@ void CGuiView::PostRenderImGui()
 		
 	ImGui::End();
 	
-	bool isFullScreen = (guiMain->viewFullScreen != NULL);
-
-	if (isFullScreen)
+	// EXACTLY WHAT PreRenderImGui PUSHED, which is not the same question as
+	// "is a view fullscreen" -- see the member's comment in CGuiView.h.
+	if (pushedFullScreenStyleVars)
 	{
 		ImGui::PopStyleVar(2);
+		pushedFullScreenStyleVars = false;
 	}
 }
 

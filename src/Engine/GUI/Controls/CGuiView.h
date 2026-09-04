@@ -216,6 +216,23 @@ public:
 	bool imGuiWindowSkipFocusCheck;
 	bool imGuiNoWindowPadding;
 	bool imGuiNoScrollbar;
+
+	// WHAT PreRenderImGui ACTUALLY PUSHED, so PostRenderImGui pops that and
+	// nothing else. It is not a cached copy of the fullscreen flag: the two
+	// halves used to test different things -- Pre asked "am I the fullscreen
+	// view", Post asked "is ANY view fullscreen" -- and every view that kept
+	// rendering while another was fullscreen popped two style vars it had
+	// never pushed. The main view is exactly that case, since
+	// CGuiMain::RenderImGui draws currentView unconditionally, so any host
+	// whose main view uses this Pre/Post pair tripped ImGui's "Calling
+	// PopStyleVar() too many times!" on the first fullscreen frame.
+	//
+	// A latch rather than a matching predicate, because it also holds if the
+	// flag ever changes BETWEEN the two calls. It cannot today --
+	// CGuiMain::SetViewFullScreen defers the assignment to a UI-thread task --
+	// but a context menu item calling it sits between Pre and Post, and
+	// nothing else would notice if that deferral went away.
+	bool pushedFullScreenStyleVars = false;
 	ImGuiWindowFlags imGuiExtraWindowFlags = 0;
 	bool imGuiSkipKeyPressWhenIoWantsTextInput;
 	bool imGuiWindowKeepAspectRatio;

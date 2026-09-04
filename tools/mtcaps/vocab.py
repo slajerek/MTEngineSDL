@@ -174,6 +174,36 @@ def _validate_dependency(path, where, dep, owner_enables=None):
                  "and a flag the capability does not emit is never in it" % flag)
 
 
+APP_LICENCES_FILE = "mtengine-app-licenses.json"
+
+
+def load_app_licences(manifest_path):
+    """The application's OWN declared dependencies -- what it embeds that the
+    engine's vocabulary cannot know about (a font, an asset) -- or [] when
+    the file is absent.
+
+    Lives beside the manifest, because the manifest is the one path every
+    mtcaps invocation already receives. Field-validated with the SAME function
+    as vocabulary.json's entries, so an app cannot declare a row the engine
+    would have refused; the commercial deny-list is applied by resolve, with
+    the same MT_COMMERCIAL_BUILD=1 condition it applies to capability rows.
+
+    Before this existed, LICENSES.txt was generated from the vocabulary alone,
+    and an app that embedded a font shipped a binary containing it and a
+    licence file omitting it -- legally incomplete while looking complete."""
+    path = os.path.join(os.path.dirname(os.path.abspath(manifest_path)), APP_LICENCES_FILE)
+    if not os.path.isfile(path):
+        return []
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+    if not isinstance(data, dict) or not isinstance(data.get("dependencies"), list):
+        _err(path, "dependencies", "required, and a list of dependency objects")
+    deps = data["dependencies"]
+    for i, dep in enumerate(deps):
+        _validate_dependency(path, "dependencies[%d]" % i, dep)
+    return deps
+
+
 def _validate(data, path):
     for field in ("version", "core", "capabilities"):
         if field not in data:

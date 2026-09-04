@@ -1,4 +1,5 @@
 #include "CRenderShaderMetal.h"
+#include "CRenderShaderCustomFragmentMetal.h"
 #include "CRenderShaderMaskedTileMetal.h"
 #include "CRenderBackendMetal.h"
 #include "SYS_Main.h"
@@ -1390,6 +1391,15 @@ CRenderShader *CRenderBackendMetal::CreateFlatColorShader(float r, float g, floa
 	if (layer == nil)
 		return NULL;
 	return new CRenderShaderFlatColorMetal(this, r, g, b, a);
+}
+
+CRenderShaderCustomFragment *CRenderBackendMetal::CreateCustomFragmentShader(const char *name)
+{
+	// The layer guard mirrors CreateFlatColorShader's: a shader built before
+	// the layer exists has no colour pixel format to build a pipeline against.
+	if (layer == nil)
+		return NULL;
+	return new CRenderShaderCustomFragmentMetal(this, name);
 }
 
 // --- per-draw texture filtering -------------------------------------------

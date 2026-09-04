@@ -17,7 +17,11 @@
       { "name": "libicc / sRGB profile", "licence": "see src/Engine/Libs/icc", "version": "vendored", "provenance": "core: on the render path, no third-party dependency. NOT the same thing as MT_CAP_COLOR_MANAGEMENT, which is Color/ and lcms2", "commercial_safe": true },
       { "name": "EXIF reader", "licence": "engine source", "version": "vendored", "provenance": "core: Core/CImageData.cpp:21 includes CExifReader.h unconditionally, no third-party dependency", "commercial_safe": true },
       { "name": "i18n", "licence": "engine source", "version": "n/a", "provenance": "core by decision 4 -- c64d is due to be localised", "commercial_safe": true },
-      { "name": "audio (SND, channels, ogg/tremor)", "licence": "BSD-3-Clause (Ogg/Tremor)", "version": "vendored", "provenance": "core: every app has it on, it is on the MT_API.h path, and a key that cannot change the build is configuration without capability", "commercial_safe": true }
+      { "name": "audio (SND, channels, ogg/tremor)", "licence": "BSD-3-Clause (Ogg/Tremor)", "version": "vendored", "provenance": "core: every app has it on, it is on the MT_API.h path, and a key that cannot change the build is configuration without capability", "commercial_safe": true },
+      { "name": "ImGuiColorTextEdit (goossens)", "licence": "MIT", "version": "a20e4493 (2026-08-30)", "provenance": "vendored source in src/Engine/Libs/imgui_textedit; core because it is an ImGui widget every host can reach, with no MT_CAP_* key that could turn it off", "commercial_safe": true },
+      { "name": "dtl (Diff Template Library)", "licence": "BSD-3-Clause", "version": "bundled with ImGuiColorTextEdit a20e4493", "provenance": "src/Engine/Libs/imgui_textedit/dtl.h; used only by the TextDiff widget, which is compiled but has no caller yet", "commercial_safe": true },
+      { "name": "Inter (font)", "licence": "OFL-1.1", "version": "embedded", "provenance": "src/Embedded/Fonts/font_inter_*.cpp, compiled into every binary via CGuiFontManager -- Regular, Bold, Italic, BoldItalic. Was shipped undeclared until 2026-09-04; OFL requires attribution on redistribution", "commercial_safe": true },
+      { "name": "JetBrains Mono (font)", "licence": "OFL-1.1", "version": "embedded", "provenance": "src/Embedded/Fonts/font_jetbrains_mono.cpp, compiled into every binary via CGuiFontManager. Was shipped undeclared until 2026-09-04; OFL requires attribution on redistribution", "commercial_safe": true }
     ]
   },
 
