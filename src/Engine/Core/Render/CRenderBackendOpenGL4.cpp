@@ -396,20 +396,34 @@ void CRenderBackendOpenGL4::UpdateTextureLinearScaling(CSlrImage *image)
 	}
 	
 	glBindTexture(GL_TEXTURE_2D, (GLuint)(intptr_t)image->texturePtr.load(std::memory_order_acquire));
-	if (image->linearScaling)
+
+	// MIN-filter must stay mip-aware on a texture that HAS a mip chain.
+	//
+	// OpenGL4CreateCompressedTexture() sets GL_LINEAR_MIPMAP_LINEAR (or
+	// GL_NEAREST_MIPMAP_LINEAR) plus GL_TEXTURE_MAX_LEVEL when it uploads a
+	// KTX2/UASTC atlas. A flat GL_LINEAR here would silently undo that: the mips
+	// stay uploaded and stop being sampled, so the texture keeps its full memory
+	// cost and loses the minification quality that was the entire point of
+	// cooking it. Mirror the upload path's choice rather than restating it --
+	// the two must not drift.
+	const bool hasMipChain = image->compressedMipCount > 1;
+	if (hasMipChain)
 	{
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
-		ASSERT_OPENGL();
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+						image->linearScaling ? GL_LINEAR_MIPMAP_LINEAR : GL_NEAREST_MIPMAP_LINEAR);
 		ASSERT_OPENGL();
 	}
 	else
 	{
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
-		ASSERT_OPENGL();
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
+		// Unmipped: LINEAR on both branches, exactly as before. Nearest applies
+		// to MAGNIFICATION only -- see the GL PARITY note in CRenderBackendMetal.mm.
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		ASSERT_OPENGL();
 	}
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER,
+					image->linearScaling ? GL_LINEAR : GL_NEAREST);
+	ASSERT_OPENGL();
 }
 
 void CRenderBackendOpenGL4::ReBindTexture(CSlrImage *image)
@@ -525,6 +539,18 @@ EImageGpuFormat CRenderBackendOpenGL4::GetPreferredCompressedFormat()
 	if (cachedCompressedFormat != -1)
 	{
 		return (EImageGpuFormat)cachedCompressedFormat;
+	}
+
+	// PROBE ONLY WITH A CURRENT CONTEXT. glGetIntegerv/glGetStringi without one
+	// is undefined: on some drivers it returns garbage, on others it sets an
+	// error and leaves numExtensions untouched. Either way the loop below would
+	// read nonsense -- and the result is CACHED, so one context-less call would
+	// pin the wrong format for the rest of the process. Answer UNCOMPRESSED and
+	// leave the cache unset, so the first real probe still gets to run.
+	if (SDL_GL_GetCurrentContext() == NULL)
+	{
+		LOGWarning("CRenderBackendOpenGL4::GetPreferredCompressedFormat: no current GL context; reporting UNCOMPRESSED without caching");
+		return IMG_GPU_UNCOMPRESSED;
 	}
 
 	bool hasBptc  = false;

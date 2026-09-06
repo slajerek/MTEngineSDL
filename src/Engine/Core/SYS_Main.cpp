@@ -93,7 +93,7 @@ void SYS_NotImplemented()
 
 void SYS_FatalExit(char *fmt, ... )
 {
-	LOGError("SYS_FatalExit:");
+	LOGFatal("SYS_FatalExit:");
 	char buffer[4096] = {0};
 
     va_list args;
@@ -102,14 +102,16 @@ void SYS_FatalExit(char *fmt, ... )
 	vsnprintf(buffer, 4096, fmt, args);
     va_end(args);
 
-	LOGError(buffer);
+	// "%s", never the text as the format: this is the always-on path now,
+	// and a message containing a '%' would be undefined behaviour.
+	LOGFatal("%s", buffer);
 	
 	abort();
 }
 
 void SYS_FatalExit(const char *fmt, ... )
 {
-	LOGError("SYS_FatalExit:");
+	LOGFatal("SYS_FatalExit:");
 	char buffer[4096] = {0};
 
     va_list args;
@@ -118,14 +120,16 @@ void SYS_FatalExit(const char *fmt, ... )
 	vsnprintf(buffer, 4096, fmt, args);
     va_end(args);
 
-	LOGError(buffer);
+	// "%s", never the text as the format: this is the always-on path now,
+	// and a message containing a '%' would be undefined behaviour.
+	LOGFatal("%s", buffer);
 
 	abort();
 }
 
 void SYS_FatalExit()
 {
-	LOGError("SYS_FatalExit()");
+	LOGFatal("SYS_FatalExit()");
 
 	abort();
 }
@@ -141,7 +145,7 @@ void SYS_ShowError(char *fmt, ... )
 	vsnprintf(buffer, 4096, fmt, args);
 	va_end(args);
 	
-	LOGError(buffer);
+	LOGError("%s", buffer);
 }
 
 void SYS_ShowError(const char *fmt, ... )
@@ -154,7 +158,7 @@ void SYS_ShowError(const char *fmt, ... )
 	vsnprintf(buffer, 4096, fmt, args);
 	va_end(args);
 	
-	LOGError(buffer);
+	LOGError("%s", buffer);
 }
 
 void SYS_CleanExit(char *fmt, ... )
@@ -168,7 +172,7 @@ void SYS_CleanExit(char *fmt, ... )
 	vsnprintf(buffer, 4096, fmt, args);
     va_end(args);
 	
-	LOGError(buffer);
+	LOGError("%s", buffer);
 	
 	exit(0);
 }
@@ -184,7 +188,7 @@ void SYS_CleanExit(const char *fmt, ... )
 	vsnprintf(buffer, 4096, fmt, args);
     va_end(args);
 	
-	LOGError(buffer);
+	LOGError("%s", buffer);
 	
 	exit(0);
 }
@@ -210,7 +214,7 @@ void SYS_Assert(bool condition, const char *fmt, ...)
 		vsnprintf(buffer, 4096, fmt, args);
 		va_end(args);
 		
-		LOGError(buffer);
+		LOGError("%s", buffer);
 		
 		abort();
 	}
@@ -227,7 +231,7 @@ void SYS_AssertCrash(const char *fmt, ...)
 	vsnprintf(buffer, 4096, fmt, args);
 	va_end(args);
 	
-	LOGError(buffer);
+	LOGError("%s", buffer);
 	
 	
 	//abort();

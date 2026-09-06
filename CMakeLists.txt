@@ -109,8 +109,11 @@ if (MT_ENABLE_FTXUI AND NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/other/lib/ftxui/
                         "Run: git -C ${CMAKE_CURRENT_SOURCE_DIR} submodule update --init other/lib/ftxui")
 endif()
 
-#set(CMAKE_BUILD_TYPE Debug)
-set(CMAKE_BUILD_TYPE RelWithDebInfo)
+# A DEFAULT, not a mandate: the app-build driver passes -DCMAKE_BUILD_TYPE
+# from --config (2026-09-05); this only covers a bare configure.
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE RelWithDebInfo)
+endif()
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED On)
@@ -381,6 +384,15 @@ include_directories(
     # FTXUI (submodule, terminal UI for admin dashboard)
     "${CMAKE_CURRENT_SOURCE_DIR}/other/lib/ftxui/include"
 )
+
+# Basis Universal transcoder configuration. NOT capabilities: these say what the
+# VENDORED transcoder is compiled to support; MT_ENABLE_KTX2 is the separate
+# question of whether the engine uses it. Stated rather than inherited because
+# basisu_transcoder.h defaults them to 1 in its own #ifndef -- so KTX2 worked
+# here by a vendored library's default, and the next resync of that library
+# could flip it with nothing in this repository to object. See the matching
+# static_asserts in CImageData.cpp.
+add_definitions(-DBASISD_SUPPORT_KTX2=1 -DBASISD_SUPPORT_KTX2_ZSTD=1)
 
 if (MT_ENABLE_LLAMA_CPP)
     add_definitions(-DMT_ENABLE_LLAMA_CPP=1)
@@ -825,6 +837,7 @@ add_library(MTEngineSDL STATIC
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Tests/CTestRunner.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Tests/CTestSuite.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Tests/CTestI18nEngine.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Tests/CTestKtx2Transcode.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Tests/CTestExifEngine.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Tests/CTestExifMetadataReach.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Tests/CTestJpegMarkers.cpp"

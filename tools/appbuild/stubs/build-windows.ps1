@@ -16,7 +16,13 @@ param(
     [string]$Compiler = 'Clang',
     [switch]$SkipCuda,
     [switch]$SkipDeps,
-    [switch]$NoProd,
+    [switch]$Prod,
+    [ValidateSet('on','off')]
+    [string]$Logs,
+    [ValidateSet('on','off')]
+    [string]$Symbols,
+    [ValidateSet('dev','commercial')]
+    [string]$Tier,
     [switch]$Clean,
     [string[]]$Set,
     [switch]$Gc,
@@ -46,11 +52,14 @@ $driverArgs = @{
     Compiler      = $Compiler
     SkipCuda      = $SkipCuda
     SkipDeps      = $SkipDeps
-    NoProd        = $NoProd
+    Prod          = $Prod
     Clean         = $Clean
     Gc            = $Gc
 }
 if ($Set) { $driverArgs.Set = $Set }
+if ($Logs) { $driverArgs.Logs = $Logs }
+if ($Symbols) { $driverArgs.Symbols = $Symbols }
+if ($Tier) { $driverArgs.Tier = $Tier }
 if ($GcArgs) { $driverArgs.GcArgs = $GcArgs }
 if ($Platform) { $driverArgs.Platform = $Platform }
 & $driver @driverArgs

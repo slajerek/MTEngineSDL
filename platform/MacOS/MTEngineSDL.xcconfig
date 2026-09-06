@@ -28,7 +28,16 @@
 // Platform defines. NOT capabilities and never emitted by mtcaps: MACOS has 74
 // sites in the engine, many with no __APPLE__ fallback, and the generator has no
 // source for it.
-GCC_PREPROCESSOR_DEFINITIONS = $(inherited) MACOS $(MT_CAPS_DEFINES) $(MT_CAPS_DEFINES_ENGINE) $(MT_ENGINE_DEFAULT_CAPS)
+// Basis Universal transcoder configuration. NOT capabilities either: these say
+// what the VENDORED transcoder is compiled to support, and MT_ENABLE_KTX2 is the
+// separate question of whether the engine uses it. Stated rather than inherited
+// because basisu_transcoder.h defaults them to 1 in its own #ifndef -- so KTX2
+// worked here by a vendored library's default, and the next resync of that
+// library could flip it with nothing in this repository to object. See the
+// matching static_asserts in CImageData.cpp.
+MT_BASIS_DEFINES = BASISD_SUPPORT_KTX2=1 BASISD_SUPPORT_KTX2_ZSTD=1
+
+GCC_PREPROCESSOR_DEFINITIONS = $(inherited) MACOS $(MT_BASIS_DEFINES) $(MT_CAPS_DEFINES) $(MT_CAPS_DEFINES_ENGINE) $(MT_ENGINE_DEFAULT_CAPS)
 
 // The engine's own capability defaults, for STANDALONE use only.
 //

@@ -59,7 +59,10 @@ python3 tools/mtcaps/tests/test_mtcaps.py
 
 ## Verbose logging
 
-Comment out `#define GLOBAL_DEBUG_OFF` in `DBG_Log.h`. Without `--log-dir`
+Verbose logging is a build switch: a development build (`./build-<os>.sh`)
+has it on, a final build (`--prod`) off unless you pass `--logs on`. `LOGError`
+and `LOGFatal` are in every build. Never edit `DBG_Log.h` for output; see
+`docs/testing.md`. Without `--log-dir`
 the log goes to the system temp folder, or to `./log/` when that directory
 exists. On Windows, LogConsole.exe displays it live:
 https://sourceforge.net/projects/fastlogconsole/

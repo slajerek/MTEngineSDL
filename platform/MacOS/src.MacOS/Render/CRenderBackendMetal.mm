@@ -750,8 +750,17 @@ EImageGpuFormat CRenderBackendMetal::GetPreferredCompressedFormat()
 	id<MTLDevice> device = layer.device;
 	if (device == nil)
 	{
-		// Layer not yet initialised; return a safe default.
-		return IMG_GPU_ASTC_4x4;
+		// UNVERIFIED device: answer UNCOMPRESSED, which is the only format every
+		// path can actually honour.
+		//
+		// This used to return ASTC_4x4, which is wrong on the very platform this
+		// file mostly runs on: the macOS<11 branch below states outright that
+		// "Apple GPUs do not expose ASTC on macOS". So on an uninitialised layer
+		// the answer named a format macOS cannot sample, and a caller that
+		// believed it would transcode a KTX2 to ASTC and hand Metal a texture it
+		// must reject. UNCOMPRESSED costs memory on a probe that ran too early;
+		// a wrong format costs a broken texture.
+		return IMG_GPU_UNCOMPRESSED;
 	}
 
 #if TARGET_OS_OSX || TARGET_OS_MACCATALYST

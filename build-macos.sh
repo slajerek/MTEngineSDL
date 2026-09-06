@@ -228,6 +228,7 @@ if [[ -n "$MANIFEST" || -n "$APP_NAME" ]]; then
         # reads MT_RELEASE_SYMBOLS for the strip decision.
         "MT_FFMPEG_BUILD_MODE=$(caps_value MT_FFMPEG_BUILD_MODE)"
         "MT_RELEASE_SYMBOLS=$(caps_value MT_RELEASE_SYMBOLS)"
+        "MT_DEBUG_LOGS=$(caps_value MT_DEBUG_LOGS)"
         # The decoder policy itself (L4): the codec script used to carry its
         # own copy of these lists, and so did the other two platforms, so a
         # name added in one was invisible to the rest and to the scanner.

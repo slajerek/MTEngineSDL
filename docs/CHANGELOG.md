@@ -33,6 +33,114 @@ however it likes.
 
 ---
 
+## 3.21.15 — development
+
+**One `DBG_Log.h`, and debug logging decided by the build.** The three
+per-platform headers had three different level maps and a hardcoded
+`GLOBAL_DEBUG_OFF` -- on for Linux, off elsewhere -- and on Linux it wrapped
+the whole logger, so a crash there printed nothing. Now one header in
+`src/Engine/Core/` with one level map (persisted as `LogLevel2`; an older
+saved mask is ignored rather than misread), the logger always compiled on
+every platform, and `MT_DEBUG_LOGS` -- a `mtcaps` build-settings key that is
+also a value-style define -- gating only the verbose macros. Linux gains the
+file sink and `--log-dir` the other two platforms had.
+
+Windows `LOG_Init` now records the path it opened, so `LOG_GetLogFilePath()`
+returns it there as on macOS and Linux; the buffer was declared and never
+filled, which the first Windows run of `CTestLoggingAlwaysOn` caught.
+
+**`LOGError` and `LOGFatal` are never off.** They compile in every build and
+reach stderr (macOS, Linux) or the log file and the debugger (Windows) whatever
+the level mask says. `SYS_FatalExit` logs through `LOGFatal("%s", …)` -- the
+text was being passed as the format. Windows' `LogConsole.exe` is looked up
+beside the executable, not in the working directory, the pipe wait is bounded,
+and a `LOGError` before `LOG_Init` no longer dereferences a NULL mutex.
+
+**Four build switches, the same on every platform**: `--config debug|release`
+(`--debug`/`--release` still work), `--logs on|off`, `--symbols on|off`,
+`--tier dev|commercial`. A development build is `logs=on symbols=on`; `--prod`
+defaults both to off, and an explicit switch beats that -- `--prod --logs on`
+is the diagnostic package for an issue that appears only when deployed.
+`--symbols on` with `--tier commercial` is refused. Linux finally passes
+`--config` to CMake (it was parsed and ignored; `RelWithDebInfo` was hardcoded).
+
+**The compressed-texture path's four unmet acceptance criteria, closed.**
+These were written down as required when the KTX2 pipeline landed and then not
+done; each is small, and each was silent.
+
+`CRenderBackendOpenGL4::UpdateTextureLinearScaling` set `GL_TEXTURE_MIN_FILTER`
+to a flat `GL_LINEAR` on both branches, which is the NON-mipmapped filter.
+`OpenGL4CreateCompressedTexture` had carefully set `GL_LINEAR_MIPMAP_LINEAR`
+and `GL_TEXTURE_MAX_LEVEL` when uploading a KTX2/UASTC atlas, and this undid
+it: the mips stayed resident and stopped being sampled, so a cooked texture
+kept its full memory cost and lost the minification quality it was cooked for.
+It now mirrors the upload path, keyed on `compressedMipCount > 1`. Reachable
+only through `CSlrImage::SetLinearScaling()`, which has no caller in the engine
+or in any app today -- so this was a landmine rather than a live defect, and is
+now defused before the first caller finds it.
+
+`CRenderBackendOpenGL4::GetPreferredCompressedFormat` called
+`glGetIntegerv(GL_NUM_EXTENSIONS, ...)` with no current-context guard and then
+CACHED the answer. Without a context that call is undefined -- garbage on some
+drivers, untouched on others -- so a single early probe could pin the wrong
+format for the life of the process. It now returns `IMG_GPU_UNCOMPRESSED` and
+declines to cache when `SDL_GL_GetCurrentContext()` is NULL, leaving the first
+real probe free to run.
+
+`CRenderBackendMetal::GetPreferredCompressedFormat` returned `IMG_GPU_ASTC_4x4`
+for an uninitialised `layer.device`, commented "a safe default". It is not one
+on macOS: the macOS<11 branch twelve lines below states that Apple GPUs do not
+expose ASTC on macOS at all, so the fallback named a format the platform cannot
+sample. Now `IMG_GPU_UNCOMPRESSED`.
+
+`BASISD_SUPPORT_KTX2` and `BASISD_SUPPORT_KTX2_ZSTD` were defined by no build
+system. KTX2 worked on `basisu_transcoder.h`'s own `#ifndef` default of 1 -- a
+vendored library's choice that a resync could reverse, removing the whole
+compressed-texture pipeline with nothing in this repository to object and no
+build failure to notice. Now stated in `platform/MacOS/MTEngineSDL.xcconfig`,
+in all four `PreprocessorDefinitions` of the Windows project, and in
+`CMakeLists.txt`, with `static_assert`s in `CImageData.cpp` so a platform that
+loses the define fails to compile instead of quietly losing KTX2.
+
+**`CTestKtx2Transcode` -- engine-owned KTX2 coverage.** The only KTX2 test was
+an app's. This one tests the layer below: that the vendored transcoder is
+compiled with KTX2 support and that both gates -- the engine's
+`KTX2_ReadHeaderForDispatch` preflight and `basist::ktx2_transcoder::init` --
+REJECT malformed and truncated containers rather than passing them on. Those
+four steps need no fixture. When an app ships one, it also transcodes it to
+RGBA32 (chosen over BC7/ASTC so the test exercises the transcoder rather than
+the host GPU) and asserts the output is not uniformly zero. When no app ships
+one it reports SKIPPED, never a pass.
+
+Its fixture lookup goes through `CTest::ResolveProjectPath` rather than a raw
+relative path, the rule the rest of the suite adopted in the same week. An
+absent PROJECT ROOT fails the test rather than skipping it: a skip there would
+downgrade the test to its fixture-free half on a bad working directory, which
+is the hollow green `ResolveProjectPath` exists to remove. An absent FIXTURE
+still skips -- that is an app not shipping one, not a broken run.
+
+**A development build no longer packages; `--prod` is the final build.**
+`tools/appbuild/app-build-*` produced `platform/<P>/prod/<arch>/` on every
+build unless told not to, copying `assets/` each time -- and one sibling app's
+assets are measured in gigabytes. The default is now the binary and nothing
+else; `--prod` (`-Prod`) makes the package. `--no-prod` is rejected with the
+new name rather than accepted as a no-op.
+
+**`CTest::ResolveProjectPath()`** -- the one way a test reaches a fixture. It
+returns `<project root>/<relative>`, the root being `MT_TEST_PROJECT_DIR` when
+set, otherwise the nearest ancestor of the directory the process started in
+that holds `mtengine.caps` or `.git`. So a test opens the same
+`tests/data/x` whether the binary runs from the git root (a development
+build) or from the package (a final build), and nothing is ever copied to
+make that true. Resolved eagerly in `CTestSuite`'s constructor, because some
+hosts change their working directory at runtime. `CTestSuite` itself no
+longer writes `test_list.txt` at a cwd-relative path -- it goes beside the
+results file -- which was the one thing the engine wrote into a package.
+
+**`docs/testing.md`** is the procedure for every application on this engine:
+the two builds, the working directory, the runner contract, the final-build
+steps. Each application's own guidance points at it.
+
 ## 3.21.14 — development
 
 **A view going fullscreen no longer unbalances ImGui's style stack.**

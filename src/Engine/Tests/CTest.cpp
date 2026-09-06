@@ -2,6 +2,14 @@
 #include "CTest.h"
 #include "DBG_Log.h"
 
+#include <cstdlib>
+#include <filesystem>
+
+// The directory the process started in, captured by SYS_InitFileSystem on
+// every platform. Declared here rather than through the per-platform
+// SYS_FileSystem.h, the way other engine-neutral code reaches these globals.
+extern char *gCPathToCurrentDirectory;
+
 CTest::CTest()
 {
 	currentStep = 0;
@@ -59,4 +67,56 @@ void CTest::TestCompleted(bool success, const char *summary)
 	{
 		callback->OnTestCompleted(this, success, summary);
 	}
+}
+
+// --- the project root ---------------------------------------------------------
+
+static std::string FindProjectRoot()
+{
+	namespace fs = std::filesystem;
+
+	const char *fromEnv = getenv("MT_TEST_PROJECT_DIR");
+	if (fromEnv != NULL && fromEnv[0] != '\0')
+		return std::string(fromEnv);
+
+	std::error_code ec;
+	fs::path dir;
+	if (gCPathToCurrentDirectory != NULL && gCPathToCurrentDirectory[0] != '\0')
+		dir = fs::path(gCPathToCurrentDirectory);
+	else
+		dir = fs::current_path(ec);
+	if (ec || dir.empty())
+		return std::string();
+
+	// mtengine.caps marks an app root; .git marks any checkout, and it is a
+	// FILE in a worktree, so "exists" rather than "is_directory". Sixteen
+	// levels is far more than platform/<P>/prod/<arch>/ needs and bounds a
+	// walk that starts somewhere unexpected.
+	for (int depth = 0; depth < 16; depth++)
+	{
+		std::error_code ec2;
+		if (fs::exists(dir / "mtengine.caps", ec2) || fs::exists(dir / ".git", ec2))
+			return dir.string();
+		fs::path parent = dir.parent_path();
+		if (parent == dir)
+			break;
+		dir = parent;
+	}
+	return std::string();
+}
+
+const std::string &CTest::ProjectRootPath()
+{
+	static const std::string root = FindProjectRoot();
+	return root;
+}
+
+std::string CTest::ResolveProjectPath(const char *relative)
+{
+	const std::string &root = ProjectRootPath();
+	if (root.empty() || relative == NULL)
+		return std::string();
+	if (relative[0] == '\0')
+		return root;
+	return (std::filesystem::path(root) / relative).string();
 }

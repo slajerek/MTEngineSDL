@@ -823,6 +823,7 @@
 		B1C2D3E4F5A6B7C8D9E0F1A3 /* CTestRunner.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F6 /* CTestRunner.cpp */; };
 		B1C2D3E4F5A6B7C8D9E0F1A4 /* CTestSuite.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F8 /* CTestSuite.cpp */; };
 		B1C2D3E4F5A6B7C8D9E0F1A5 /* CTestI18nEngine.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1FA /* CTestI18nEngine.cpp */; };
+		B1C2D3E4F5A6B7C8D9E0F2A5 /* CTestKtx2Transcode.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E2FA /* CTestKtx2Transcode.cpp */; };
 		A0E1F00000000000000000F3 /* CTestExifEngine.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A0E1F00000000000000000F1 /* CTestExifEngine.cpp */; };
 		A0E1F00000000000000000FA /* CTestExifMetadataReach.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A0E1F00000000000000000FB /* CTestExifMetadataReach.cpp */; };
 		B0E1FA0000000000000000A3 /* RawTestFixtures.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B0E1FA0000000000000000A1 /* RawTestFixtures.cpp */; };
@@ -848,6 +849,7 @@
 		C1D2E3F4A5B6C7D8E9F0A1B4 /* CTestRunner.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F5 /* CTestRunner.h */; };
 		C1D2E3F4A5B6C7D8E9F0A1B5 /* CTestSuite.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F7 /* CTestSuite.h */; };
 		C1D2E3F4A5B6C7D8E9F0A1B6 /* CTestI18nEngine.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F9 /* CTestI18nEngine.h */; };
+		C1D2E3F4A5B6C7D8E9F0A2B6 /* CTestKtx2Transcode.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E2F9 /* CTestKtx2Transcode.h */; };
 		C3BF29054846FED34F5443D2 /* imgui_te_exporters.h in Headers */ = {isa = PBXBuildFile; fileRef = 6214FCE73133E41773F7CF0F /* imgui_te_exporters.h */; };
 		C805FF32061A8302FBEA1ABA /* imgui_te_coroutine.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AEF3DA3AB8BBA123B34E43FA /* imgui_te_coroutine.cpp */; };
 		CBEB06217B4F180F3870FA48 /* CRegistryServer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A2A2304E0CE31E0C46C8FB89 /* CRegistryServer.cpp */; };
@@ -1757,7 +1759,7 @@
 		41DAE4AC23BA18C90011FEA9 /* CSlrFileFromResources.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = CSlrFileFromResources.mm; path = src.MacOS/CSlrFileFromResources.mm; sourceTree = "<group>"; };
 		41DAE4AD23BA18C90011FEA9 /* CSlrFileFromTemp.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CSlrFileFromTemp.h; path = src.MacOS/CSlrFileFromTemp.h; sourceTree = "<group>"; };
 		41DAE4AE23BA18C90011FEA9 /* CSlrFileFromTemp.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = CSlrFileFromTemp.mm; path = src.MacOS/CSlrFileFromTemp.mm; sourceTree = "<group>"; };
-		41DAE4AF23BA18C90011FEA9 /* DBG_Log.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = DBG_Log.h; path = src.MacOS/DBG_Log.h; sourceTree = "<group>"; };
+		41DAE4AF23BA18C90011FEA9 /* DBG_Log.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DBG_Log.h; sourceTree = "<group>"; };
 		41DAE4B023BA18C90011FEA9 /* gl3w.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = gl3w.c; path = src.MacOS/gl3w.c; sourceTree = "<group>"; };
 		41DAE4B123BA18C90011FEA9 /* SYS_MacOS.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = SYS_MacOS.mm; path = src.MacOS/SYS_MacOS.mm; sourceTree = "<group>"; };
 		41DAE4B223BA18C90011FEA9 /* SYS_Memory.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SYS_Memory.h; path = src.MacOS/SYS_Memory.h; sourceTree = "<group>"; };
@@ -1896,7 +1898,9 @@
 		A1B2C3D4E5F6A7B8C9D0E1F7 /* CTestSuite.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CTestSuite.h; path = ../../src/Engine/Tests/CTestSuite.h; sourceTree = SOURCE_ROOT; };
 		A1B2C3D4E5F6A7B8C9D0E1F8 /* CTestSuite.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CTestSuite.cpp; path = ../../src/Engine/Tests/CTestSuite.cpp; sourceTree = SOURCE_ROOT; };
 		A1B2C3D4E5F6A7B8C9D0E1F9 /* CTestI18nEngine.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CTestI18nEngine.h; path = ../../src/Engine/Tests/CTestI18nEngine.h; sourceTree = SOURCE_ROOT; };
+		A1B2C3D4E5F6A7B8C9D0E2F9 /* CTestKtx2Transcode.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CTestKtx2Transcode.h; path = ../../src/Engine/Tests/CTestKtx2Transcode.h; sourceTree = SOURCE_ROOT; };
 		A1B2C3D4E5F6A7B8C9D0E1FA /* CTestI18nEngine.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CTestI18nEngine.cpp; path = ../../src/Engine/Tests/CTestI18nEngine.cpp; sourceTree = SOURCE_ROOT; };
+		A1B2C3D4E5F6A7B8C9D0E2FA /* CTestKtx2Transcode.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CTestKtx2Transcode.cpp; path = ../../src/Engine/Tests/CTestKtx2Transcode.cpp; sourceTree = SOURCE_ROOT; };
 		A0E1F00000000000000000F1 /* CTestExifEngine.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CTestExifEngine.cpp; path = ../../src/Engine/Tests/CTestExifEngine.cpp; sourceTree = SOURCE_ROOT; };
 		A0E1F00000000000000000F2 /* CTestExifEngine.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CTestExifEngine.h; path = ../../src/Engine/Tests/CTestExifEngine.h; sourceTree = SOURCE_ROOT; };
 		A0E1F00000000000000000FB /* CTestExifMetadataReach.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CTestExifMetadataReach.cpp; path = ../../src/Engine/Tests/CTestExifMetadataReach.cpp; sourceTree = SOURCE_ROOT; };
@@ -2355,7 +2359,6 @@
 				41DAE4AE23BA18C90011FEA9 /* CSlrFileFromTemp.mm */,
 				41DAE4AD23BA18C90011FEA9 /* CSlrFileFromTemp.h */,
 				41DAE4A223BA18C90011FEA9 /* DBG_Log.mm */,
-				41DAE4AF23BA18C90011FEA9 /* DBG_Log.h */,
 				41DAE4B023BA18C90011FEA9 /* gl3w.c */,
 				41DAE4B123BA18C90011FEA9 /* SYS_MacOS.mm */,
 				41DAE4A023BA18C90011FEA9 /* SYS_MacOS.h */,
@@ -2494,6 +2497,7 @@
 				41D5E294239D891200143F1C /* CSlrString.h */,
 				41D5E24E239D891200143F1C /* SYS_Main.cpp */,
 				41D5E261239D891200143F1C /* SYS_Main.h */,
+				41DAE4AF23BA18C90011FEA9 /* DBG_Log.h */,
 				41D5E24F239D891200143F1C /* RES_ResourceManager.cpp */,
 				41D5E2A3239D891200143F1C /* RES_ResourceManager.h */,
 				41D5E252239D891200143F1C /* SYS_Startup.cpp */,
@@ -3870,7 +3874,9 @@
 				A1B2C3D4E5F6A7B8C9D0E1F7 /* CTestSuite.h */,
 				A1B2C3D4E5F6A7B8C9D0E1F8 /* CTestSuite.cpp */,
 				A1B2C3D4E5F6A7B8C9D0E1F9 /* CTestI18nEngine.h */,
+				A1B2C3D4E5F6A7B8C9D0E2F9 /* CTestKtx2Transcode.h */,
 				A1B2C3D4E5F6A7B8C9D0E1FA /* CTestI18nEngine.cpp */,
+				A1B2C3D4E5F6A7B8C9D0E2FA /* CTestKtx2Transcode.cpp */,
 				A0E1F00000000000000000F1 /* CTestExifEngine.cpp */,
 				A0E1F00000000000000000F2 /* CTestExifEngine.h */,
 				A0E1F00000000000000000FB /* CTestExifMetadataReach.cpp */,
@@ -3962,6 +3968,7 @@
 				C1D2E3F4A5B6C7D8E9F0A1B4 /* CTestRunner.h in Headers */,
 				C1D2E3F4A5B6C7D8E9F0A1B5 /* CTestSuite.h in Headers */,
 				C1D2E3F4A5B6C7D8E9F0A1B6 /* CTestI18nEngine.h in Headers */,
+				C1D2E3F4A5B6C7D8E9F0A2B6 /* CTestKtx2Transcode.h in Headers */,
 				C0DEFACE0000000000000204 /* CTestLlamaAvailability.h in Headers */,
 				4173997D23A4E67B008764F9 /* mztools.h in Headers */,
 				41D5E227239D890700143F1C /* CGuiRadio.h in Headers */,
@@ -4544,6 +4551,7 @@
 				B1C2D3E4F5A6B7C8D9E0F1A3 /* CTestRunner.cpp in Sources */,
 				B1C2D3E4F5A6B7C8D9E0F1A4 /* CTestSuite.cpp in Sources */,
 				B1C2D3E4F5A6B7C8D9E0F1A5 /* CTestI18nEngine.cpp in Sources */,
+				B1C2D3E4F5A6B7C8D9E0F2A5 /* CTestKtx2Transcode.cpp in Sources */,
 				A0E1F00000000000000000F3 /* CTestExifEngine.cpp in Sources */,
 				A0E1F00000000000000000FA /* CTestExifMetadataReach.cpp in Sources */,
 				B0E1FA0000000000000000A3 /* RawTestFixtures.cpp in Sources */,

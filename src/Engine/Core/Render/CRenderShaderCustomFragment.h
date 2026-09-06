@@ -149,7 +149,8 @@ public:
 	virtual bool SetFragmentSource(const char *mainImageSource) = 0;
 
 	// The driver's diagnostics, verbatim. RETURNED, NOT LOGGED, and that is not
-	// a style preference: LOGError is a no-op under GLOBAL_DEBUG_OFF, which
+	// a style preference: LOGError used to be a no-op under GLOBAL_DEBUG_OFF (errors are always
+// on since 2026-09-05, but a host still has to SHOW the text), which
 	// platform/Linux/src.Linux/DBG_Log.h sets and expands to `do {} while (0)`.
 	// An error panel fed by the log would be empty precisely on the platform
 	// where a headless CI run is the only way anyone ever sees the failure.

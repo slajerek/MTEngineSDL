@@ -1,14 +1,13 @@
 #ifndef _CGuiViewDebugLog_h_
 #define _CGuiViewDebugLog_h_
 
-// Note, when GLOBAL_DEBUG_OFF is false, i.e. we have logging capabilities
+// Note, when MT_DEBUG_LOGS is 1, i.e. the verbose log macros are live,
 // then we can log messages also to debug log view by setting USE_DEBUG_LOG_TO_VIEW
 // We can skip logging messages to view, leaving only default console,
 // and then we have only options to switch/remember which levels to print in log
 
 void SYS_InitApplicationGuiLogger();
 
-#if !defined(GLOBAL_DEBUG_OFF)
 #include "CGuiView.h"
 
 // Logger code is based on ImGui's example from imgui_demo
@@ -40,6 +39,5 @@ public:
 };
 
 extern CGuiViewDebugLog *guiViewDebugLog;
-#endif
 
 #endif 

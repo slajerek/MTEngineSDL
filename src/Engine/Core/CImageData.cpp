@@ -25,6 +25,26 @@
 #include "stb_image.h"
 #include "VID_Main.h"           // gRenderBackend + (transitively, via CRenderBackend.h) EImageGpuFormat.h
 #include "basisu_transcoder.h"  // KTX2/UASTC transcoder
+
+// The transcoder must actually have been BUILT with KTX2 support, and every
+// build system must SAY so rather than inherit it.
+//
+// basisu_transcoder.h defaults both of these to 1 in its own #ifndef, so for a
+// long time KTX2 worked here on a vendored library's default that this
+// repository never stated. A resync of basis_universal that flipped either
+// default would have removed the whole compressed-texture pipeline silently:
+// ktx2_transcoder would simply not be declared, or Zstd supercompression would
+// stop decoding, and the first symptom would be cooked assets failing to load
+// at runtime rather than anything failing to build.
+//
+// These asserts turn that into a compile error, on whichever platform lost the
+// define. Set in platform/MacOS/MTEngineSDL.xcconfig, the four
+// PreprocessorDefinitions in platform/Windows/MTEngineSDL/MTEngineSDL.vcxproj,
+// and add_definitions() in CMakeLists.txt.
+static_assert(BASISD_SUPPORT_KTX2 == 1,
+              "BASISD_SUPPORT_KTX2 must be 1: CImageData::LoadKTX2 needs basist::ktx2_transcoder");
+static_assert(BASISD_SUPPORT_KTX2_ZSTD == 1,
+              "BASISD_SUPPORT_KTX2_ZSTD must be 1: the cooker emits Zstd-supercompressed UASTC");
 #include "CKTX2Loader.h"
 
 #if defined(ANDROID)

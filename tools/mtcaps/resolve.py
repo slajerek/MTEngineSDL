@@ -6,7 +6,7 @@ import re
 import subprocess
 
 from errors import ManifestError
-from vocab import COMMERCIAL_KEY, PLATFORMS, PRIVATE_KEY, SYMBOLS_KEY
+from vocab import COMMERCIAL_KEY, DEBUG_LOGS_KEY, PLATFORMS, PRIVATE_KEY, SYMBOLS_KEY
 
 # bash `source` is the binding constraint on key spelling and it is stricter than
 # PowerShell's ConvertFrom-StringData or CMake's file(STRINGS). A key must be a
@@ -89,7 +89,7 @@ def resolve(vocab, manifest_path, platform, overrides=None):
     overrides = dict(overrides or {})
     entries = parse_manifest(manifest_path)
 
-    known = set(vocab.keys) | {COMMERCIAL_KEY, PRIVATE_KEY, SYMBOLS_KEY}
+    known = set(vocab.keys) | {COMMERCIAL_KEY, PRIVATE_KEY, SYMBOLS_KEY, DEBUG_LOGS_KEY}
 
     # --- rung 2: explicit manifest keys, suffixed beating unsuffixed -----------
     explicit = {}
@@ -121,6 +121,11 @@ def resolve(vocab, manifest_path, platform, overrides=None):
     # them; decision 0.5) -- the COMMERCIAL forcing below is what protects the
     # store artifact, not this default.
     values[SYMBOLS_KEY] = 1
+    # Debug logs: default ON -- a development build wants them, and "on" is the
+    # safe direction (a forgotten switch shows as verbose output, never as a
+    # silent binary). The build driver passes --set MT_DEBUG_LOGS=0 for a
+    # --prod package; nothing here forces it.
+    values[DEBUG_LOGS_KEY] = 1
     provenance = {key: "default" for key in values}
 
     for key, value in resolved_explicit.items():
@@ -283,7 +288,7 @@ def canonical_form(vocab, values):
         agreement check must cover it, and a UAT and a store artifact must
         never share one $MT_OUT.
     """
-    keys = sorted(list(vocab.keys) + [COMMERCIAL_KEY, PRIVATE_KEY, SYMBOLS_KEY])
+    keys = sorted(list(vocab.keys) + [COMMERCIAL_KEY, PRIVATE_KEY, SYMBOLS_KEY, DEBUG_LOGS_KEY])
     return ";".join("%s=%d" % (k, values[k]) for k in keys)
 
 
@@ -461,6 +466,9 @@ def app_visible_defines(vocab, values, platform=None):
     # Presence-style, same rule and same reason as the licence flag above.
     if values[PRIVATE_KEY] == 1:
         out.append("MT_PRIVATE_BUILD=1")
+    # VALUE-style, always present: DBG_Log.h reads `#if MT_DEBUG_LOGS`, and a
+    # value of 0 has to reach the compiler as 0, not as absence.
+    out.append("%s=%d" % (DEBUG_LOGS_KEY, values[DEBUG_LOGS_KEY]))
     return sorted(set(out))
 
 

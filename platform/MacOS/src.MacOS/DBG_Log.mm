@@ -38,7 +38,8 @@
 // replace all sprintf with stb_sprintf
 #include "stb_sprintf.h"
 
-#if !defined (GLOBAL_DEBUG_OFF)
+// The logger is ALWAYS compiled; MT_DEBUG_LOGS gates only the verbose macros
+// in DBG_Log.h. See that header.
 
 #define LOGGER_LOG_TO_FILE
 //#define LOGGER_FORCE_LOG_FULL
@@ -68,7 +69,8 @@ void LOG_UnlockMutex(void);
 
 pthread_mutex_t loggerMutex;
 
-static unsigned int logger_currentLogLevel = -1;
+static unsigned int logger_currentLogLevel = DBGLVL_DEFAULT_MASK;
+static char logger_filePath[4096] = {0};
 
 static bool logger_showTimestamp = true;
 static bool logger_showFileName = false;
@@ -113,10 +115,13 @@ void LOG_Init(void)
     NSLog(@"logger file path=%@", path);
 
 	fpLog = fopen([path fileSystemRepresentation], "wb");
+	if (fpLog != NULL)
+		snprintf(logger_filePath, sizeof(logger_filePath), "%s", [path fileSystemRepresentation]);
 #endif
 	
-	LOG_SetLevel(DBGLVL_MAIN, true);
-	LOG_SetLevel(DBGLVL_DEBUG, true);
+	// ONE default, the same on every platform: DBGLVL_DEFAULT_MASK in DBG_Log.h.
+	logger_currentLogLevel = DBGLVL_DEFAULT_MASK;
+LOG_SetLevel(DBGLVL_DEBUG, true);
 	LOG_SetLevel(DBGLVL_DEBUG2, true);
 	LOG_SetLevel(DBGLVL_TODO, true);
 	LOG_SetLevel(DBGLVL_ERROR, true);
@@ -180,6 +185,11 @@ int  LOG_GetCurrentLogLevel()
 	return logger_currentLogLevel;
 }
 
+const char *LOG_GetLogFilePath(void)
+{
+	return logger_filePath;
+}
+
 void LOG_Shutdown(void)
 {
 	fprintf(stderr, "LOG_Shutdown: bye\n");
@@ -206,7 +216,14 @@ void LOG_UnlockMutex(void)
 
 int _LOGGER(unsigned int level, const char *fileName, unsigned int lineNum, const char *functionName, const char *format, ...)
 {
-	if (logThisLevel(level) == false)
+	// FATAL and ERROR are the always-on path: never filtered by MT_DEBUG_LOGS
+	// and never by the level mask. Everything else needs both.
+	const bool alwaysOn = (level & (DBGLVL_FATAL | DBGLVL_ERROR)) != 0;
+#if !MT_DEBUG_LOGS
+	if (!alwaysOn)
+		return 0;
+#endif
+	if (!alwaysOn && !logThisLevel(level))
 		return 0;
 
 	static char buffer[BUFSIZE];
@@ -233,7 +250,7 @@ int _LOGGER(unsigned int level, const char *fileName, unsigned int lineNum, cons
 		
 #ifdef LOGGER_LOG_TO_FILE
         if (fpLog)
-            fprintf(fpLog, buffer);
+            fprintf(fpLog, "%s", buffer);
 #endif
 
 #if defined(USE_DEBUG_LOG_TO_VIEW)
@@ -249,7 +266,7 @@ int _LOGGER(unsigned int level, const char *fileName, unsigned int lineNum, cons
 
 #ifdef LOGGER_LOG_TO_FILE
         if (fpLog)
-            fprintf(fpLog, buffer);
+            fprintf(fpLog, "%s", buffer);
 #endif
 		
 #if defined(USE_DEBUG_LOG_TO_VIEW)
@@ -268,7 +285,7 @@ int _LOGGER(unsigned int level, const char *fileName, unsigned int lineNum, cons
 
 #ifdef LOGGER_LOG_TO_FILE
             if (fpLog)
-                fprintf(fpLog, buffer);
+                fprintf(fpLog, "%s", buffer);
 #endif
 
 #if defined(USE_DEBUG_LOG_TO_VIEW)
@@ -283,7 +300,7 @@ int _LOGGER(unsigned int level, const char *fileName, unsigned int lineNum, cons
 
 #ifdef LOGGER_LOG_TO_FILE
             if (fpLog)
-                fprintf(fpLog, buffer);
+                fprintf(fpLog, "%s", buffer);
 #endif
 
 #if defined(USE_DEBUG_LOG_TO_VIEW)
@@ -300,7 +317,7 @@ int _LOGGER(unsigned int level, const char *fileName, unsigned int lineNum, cons
 
 #ifdef LOGGER_LOG_TO_FILE
         if (fpLog)
-			fprintf(fpLog, buffer);
+			fprintf(fpLog, "%s", buffer);
 #endif
 
 #if defined(USE_DEBUG_LOG_TO_VIEW)
@@ -354,7 +371,14 @@ int _LOGGER(unsigned int level, const char *fileName, unsigned int lineNum, cons
 
 int _LOGGER(unsigned int level, const char *fileName, unsigned int lineNum, const char *functionName, const NSString *format, ...)
 {
-	if (logThisLevel(level) == false)
+	// FATAL and ERROR are the always-on path: never filtered by MT_DEBUG_LOGS
+	// and never by the level mask. Everything else needs both.
+	const bool alwaysOn = (level & (DBGLVL_FATAL | DBGLVL_ERROR)) != 0;
+#if !MT_DEBUG_LOGS
+	if (!alwaysOn)
+		return 0;
+#endif
+	if (!alwaysOn && !logThisLevel(level))
 		return 0;
 
 	LOG_LockMutex();
@@ -484,6 +508,16 @@ bool logThisLevel(unsigned int level)
 
 const char *getLevelStr(unsigned int level)
 {
+	if (level == DBGLVL_FATAL)
+		return "[FATAL]";
+	if (level == DBGLVL_PAINT)
+		return "[PAINT]";
+	if (level == DBGLVL_ADS)
+		return "[ADS]  ";
+	if (level == DBGLVL_WEBSERVICE)
+		return "[WEBSV]";
+	if (level == DBGLVL_DATABASE)
+		return "[DB]   ";
 	if (level == DBGLVL_MAIN)
 		return "[MAIN ]";
 	if (level == DBGLVL_DEBUG)
@@ -549,15 +583,4 @@ const char *getLevelStr(unsigned int level)
 }
 
 
-#else
-// GLOBAL_DEBUG_OFF
-
-void LOG_Init(void) {}
-void LOG_SetLevel(unsigned int level, bool isOn) {}
-void LOG_SetCurrentLogLevel(int level) {}
-void LOG_BackupCurrentLogLevel() {}
-void LOG_RestoreBackupLogLevel() {}
-void LOG_Shutdown(void) {}
-
-#endif
 

@@ -1888,8 +1888,8 @@
     <ClInclude Include="..\src.Windows\DBG_ConStream.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\src.Windows\DBG_Log.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="..\..\..\src\Engine\Core\DBG_Log.h">
+      <Filter>Source Files\src\Engine\Core</Filter>
     </ClInclude>
     <ClInclude Include="..\src.Windows\dirent.h">
       <Filter>Header Files</Filter>

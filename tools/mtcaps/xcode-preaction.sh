@@ -219,7 +219,7 @@ FLAG_SETTINGS="$(grep -E '^(MT_ENABLE_|MT_CAP_|MT_CAMERA_CAPTURE_ENABLED)[A-Z0-9
 # `commercial` silently built and linked a patent-encumbered FFmpeg -- on the
 # one path that runs no licence scan. The nine tier-vs-mode branches fixed
 # alongside this do not reach it; only publishing the value does.
-MODE_SETTINGS="$(grep -E '^(MT_FFMPEG_[A-Z_]*|MT_STORE_[A-Z0-9_]*|MT_RELEASE_SYMBOLS) = .+$' "$GEN" || true)"
+MODE_SETTINGS="$(grep -E '^(MT_FFMPEG_[A-Z_]*|MT_STORE_[A-Z0-9_]*|MT_RELEASE_SYMBOLS|MT_DEBUG_LOGS) = .+$' "$GEN" || true)"
 
 write_xcconfig() {
     local path="$1" which="$2" extra="$3"

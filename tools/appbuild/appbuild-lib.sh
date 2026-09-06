@@ -93,11 +93,13 @@ mt_appbuild_check_stub() {
 # load anything -- "where you launched it from" does.
 #
 # The release package is the directory laid out to satisfy that: the binary,
-# assets/, LICENSES.txt and any runtime DLLs together. A test that runs the
-# binary out of the build tree with the repo root as its CWD only works for an
-# app whose repo root happens to have assets/ in it; an app that needs assets
-# cannot start at all that way. Hence the rule, from the maintainer 2026-09-02:
-# apps are built to prod and the tests run FROM there.
+# assets/, LICENSES.txt and any runtime DLLs together. It is produced only by
+# a FINAL build (--prod) and tested from with tests/run_test.sh --package. A
+# DEVELOPMENT build runs and is tested from the git root, which holds assets/
+# and every payload directory as tracked -- every app starts there (measured
+# 2026-09-05, all four). The rule of 2026-09-02, "tests run from prod", was
+# reversed by the maintainer on 2026-09-05 once the copy it implied was
+# measured at 17 GB for one app: docs/testing.md is the procedure.
 #
 # NO ARCH MAPPING, deliberately. The obvious implementation reads `uname -m`
 # and maps it to the directory the driver used -- but that mapping differs per

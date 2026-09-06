@@ -68,6 +68,11 @@ REQUIRED_CAP_FIELDS = (
     "app_visible", "dependencies", "commercial", "symbols",
 )
 SYMBOLS_KEY = "MT_RELEASE_SYMBOLS"
+# Debug logging at compile time. A build-settings mode key like the symbols
+# key, but -- unlike it -- ALSO a value-style preprocessor define, because
+# DBG_Log.h gates its verbose macros on `#if MT_DEBUG_LOGS`. 1 for a
+# development build, 0 for a --prod package unless the caller overrides.
+DEBUG_LOGS_KEY = "MT_DEBUG_LOGS"
 
 REQUIRED_DEP_FIELDS = ("name", "licence", "version", "provenance")
 
@@ -248,6 +253,11 @@ def _validate(data, path):
             _err(path, key,
                  "MT_RELEASE_SYMBOLS is not a capability. It is a build-settings "
                  "mode key (unification plan, decision 0.5)")
+
+        if key == DEBUG_LOGS_KEY:
+            _err(path, key,
+                 "MT_DEBUG_LOGS is not a capability. It is a build-settings mode "
+                 "key the build driver sets (--logs on|off)")
 
         cap = caps[key]
         if not isinstance(cap, dict):

@@ -23,10 +23,21 @@
 #
 # Usage (from the app stub):
 #   tools/appbuild/app-build-macos.sh --app-dir <dir> [--debug|--release]
-#       [--clean] [--skip-deps] [--no-prod] [--gc [gc-args...]]
+#       [--clean] [--skip-deps] [--prod] [--gc [gc-args...]]
 #       [--set KEY=VALUE ...]
-#   --no-prod skips stage 8, the release package. The package is what a
-#   release ships; a dev loop does not need it rebuilt every time.
+#   --prod adds stage 8, the release package under platform/MacOS/prod/. A
+#   DEVELOPMENT build -- the default -- produces no package and copies no
+#   assets: it runs, and is tested, from the git root. A FINAL build passes
+#   --prod, is tested from the package with tests/run_test.sh --package, and
+#   is what ships. The procedure is docs/testing.md.
+#   --config debug|release   optimisation (aliases: --debug, --release)
+#   --logs on|off            debug logging compiled in (MT_DEBUG_LOGS); on by
+#                            default, OFF by default under --prod
+#   --symbols on|off         debug symbols in the shipped binary
+#                            (MT_RELEASE_SYMBOLS); on by default, OFF under --prod
+#   --tier dev|commercial    licence tier (MT_COMMERCIAL_BUILD); dev by default
+#   An explicit switch beats what --prod implies: `--prod --logs on` is a
+#   diagnostic package. --symbols on with --tier commercial is refused.
 #   --set forwards a capability override to mtcaps (rung 1, persisted to
 #   overrides.caps so `check` re-resolves identically). It is how a store
 #   build is made -- `--set MT_COMMERCIAL_BUILD=1 --set MT_PRIVATE_BUILD=0` --
@@ -46,7 +57,10 @@ APP_DIR=""
 CONFIGURATION="Release"
 CLEAN=false
 SKIP_DEPS=false
-NO_PROD=false
+MAKE_PROD=false
+LOGS=""
+SYMBOLS=""
+TIER=""
 CAPS_SETS=()
 
 while [[ $# -gt 0 ]]; do
@@ -54,10 +68,18 @@ while [[ $# -gt 0 ]]; do
         --app-dir)   APP_DIR="${2:-}"; [[ -n "$APP_DIR" ]] || { echo "ERROR: --app-dir needs a value" >&2; exit 2; }; shift ;;
         --debug)     CONFIGURATION="Debug" ;;
         --release)   CONFIGURATION="Release" ;;
+        --config)    v="$(echo "${2:-}" | tr 'A-Z' 'a-z')"; case "$v" in debug) CONFIGURATION="Debug" ;; release) CONFIGURATION="Release" ;; *) echo "ERROR: --config needs debug or release" >&2; exit 2 ;; esac; shift ;;
+        --logs)      case "${2:-}" in on|off) LOGS="$2" ;; *) echo "ERROR: --logs needs on or off" >&2; exit 2 ;; esac; shift ;;
+        --symbols)   case "${2:-}" in on|off) SYMBOLS="$2" ;; *) echo "ERROR: --symbols needs on or off" >&2; exit 2 ;; esac; shift ;;
+        --tier)      case "${2:-}" in dev|commercial) TIER="$2" ;; *) echo "ERROR: --tier needs dev or commercial" >&2; exit 2 ;; esac; shift ;;
         --clean)     CLEAN=true; SKIP_DEPS=true ;;
         --gc)        shift; exec python3 "$ENGINE_DIR/tools/appbuild/mtengine-gc.py" "$@" ;;
         --skip-deps) SKIP_DEPS=true ;;
-        --no-prod)   NO_PROD=true ;;
+        --prod)      MAKE_PROD=true ;;
+        # The old default was to package on every build and --no-prod opted
+        # out. Rejected rather than accepted as a no-op: a script still
+        # passing it must fail loudly, not quietly build something else.
+        --no-prod)   echo "ERROR: --no-prod is gone. A build makes no package unless you pass --prod (see docs/testing.md)." >&2; exit 2 ;;
         --set)       [[ -n "${2:-}" ]] || { echo "ERROR: --set needs KEY=VALUE" >&2; exit 2; }; CAPS_SETS+=("--set" "$2"); shift ;;
         --incremental) : ;;  # compatibility no-op: incremental IS the default
         -h|--help)   sed -n '2,28p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
@@ -104,6 +126,29 @@ export MT_BUILD_LOCK_KIND=cli
 "$ENGINE_DIR/tools/mtcaps/build-lock.sh" acquire "$MT_APP_NAME"
 trap '"$ENGINE_DIR/tools/mtcaps/build-lock.sh" release "$MT_APP_NAME" || true' EXIT
 
+
+# ---------------------------------------------------------------------------
+# THE FOUR SWITCHES, the same on every platform (maintainer, 2026-09-05):
+#   --config debug|release   optimisation            default release
+#   --logs on|off            MT_DEBUG_LOGS           default on;  --prod: off
+#   --symbols on|off         MT_RELEASE_SYMBOLS      default on;  --prod: off
+#   --tier dev|commercial    MT_COMMERCIAL_BUILD     default dev
+# An explicit switch always beats what --prod implies. A diagnostic package
+# for an issue that appears only when deployed is `--prod --logs on`.
+# ---------------------------------------------------------------------------
+if [[ -z "$LOGS" ]];    then LOGS=$([[ "$MAKE_PROD" == "true" ]] && echo off || echo on); fi
+if [[ -z "$SYMBOLS" ]]; then SYMBOLS=$([[ "$MAKE_PROD" == "true" ]] && echo off || echo on); SYMBOLS_EXPLICIT=false; else SYMBOLS_EXPLICIT=true; fi
+[[ -n "$TIER" ]] || TIER=dev
+# A store build is stripped, full stop. resolve's commercial forcing yields to
+# an explicit --set, so the refusal has to happen here.
+if [[ "$TIER" == "commercial" && "$SYMBOLS_EXPLICIT" == "true" && "$SYMBOLS" == "on" ]]; then
+    echo "ERROR: --symbols on cannot be combined with --tier commercial: a store build never ships symbols." >&2; exit 2
+fi
+CAPS_SETS+=("--set" "MT_DEBUG_LOGS=$([[ "$LOGS" == "on" ]] && echo 1 || echo 0)")
+if [[ "$SYMBOLS" == "off" ]]; then CAPS_SETS+=("--set" "MT_RELEASE_SYMBOLS=0"); fi
+if [[ "$TIER" == "commercial" ]]; then CAPS_SETS+=("--set" "MT_COMMERCIAL_BUILD=1" "--set" "MT_PRIVATE_BUILD=0"); fi
+echo "Build: config=$(echo "$CONFIGURATION" | tr 'A-Z' 'a-z') logs=$LOGS symbols=$SYMBOLS tier=$TIER prod=$([[ "$MAKE_PROD" == "true" ]] && echo yes || echo no)"
+
 MT_CONFIG_FLAG=$([[ "$CONFIGURATION" == "Debug" ]] && echo "--debug" || echo "--release")
 
 # ---------------------------------------------------------------------------
@@ -119,7 +164,7 @@ done < <(bash "$ENGINE_DIR/build-macos.sh" $MT_CONFIG_FLAG \
              ${CAPS_SETS[@]+"${CAPS_SETS[@]}"})
 [[ ${#MT_SETTINGS[@]} -gt 0 ]] || { echo "ERROR: the engine wrapper returned no capability settings." >&2; exit 1; }
 
-MT_OUT=""; MT_CAPS_LIBS_DIR=""; MT_CAPS_RESOLVED=""; MT_FFMPEG_BUILD_MODE=""; MT_RELEASE_SYMBOLS=""
+MT_OUT=""; MT_CAPS_LIBS_DIR=""; MT_CAPS_RESOLVED=""; MT_FFMPEG_BUILD_MODE=""; MT_RELEASE_SYMBOLS=""; MT_DEBUG_LOGS=""
 for s in "${MT_SETTINGS[@]}"; do
     case "$s" in
         MT_CAPS_OUT=*)          MT_OUT="${s#MT_CAPS_OUT=}" ;;
@@ -127,6 +172,7 @@ for s in "${MT_SETTINGS[@]}"; do
         MT_CAPS_RESOLVED=*)     MT_CAPS_RESOLVED="${s#MT_CAPS_RESOLVED=}" ;;
         MT_FFMPEG_BUILD_MODE=*) MT_FFMPEG_BUILD_MODE="${s#MT_FFMPEG_BUILD_MODE=}" ;;
         MT_RELEASE_SYMBOLS=*)   MT_RELEASE_SYMBOLS="${s#MT_RELEASE_SYMBOLS=}" ;;
+        MT_DEBUG_LOGS=*)        MT_DEBUG_LOGS="${s#MT_DEBUG_LOGS=}" ;;
     esac
 done
 for v in MT_OUT MT_CAPS_LIBS_DIR MT_CAPS_RESOLVED; do
@@ -144,7 +190,7 @@ echo "  out     : $MT_OUT"
 echo "  deps    : $MT_CAPS_LIBS_DIR"
 # tier and ffmpeg mode are different axes; printing the tier as "mode" beside
 # the real mode made two names for one label and hid the disagreement.
-echo "  tier    : $([ "$COMMERCIAL" = 1 ] && echo commercial || echo non-commercial), ffmpeg=$MT_FFMPEG_BUILD_MODE, symbols=$MT_RELEASE_SYMBOLS"
+echo "  tier    : $([ "$COMMERCIAL" = 1 ] && echo commercial || echo non-commercial), ffmpeg=$MT_FFMPEG_BUILD_MODE, symbols=$MT_RELEASE_SYMBOLS, logs=${MT_DEBUG_LOGS:-1}"
 
 # ---------------------------------------------------------------------------
 # 4. dependencies: submodule init (the ONLY init path -- decision 0.6a) and
@@ -257,7 +303,7 @@ fi
 #    Windows package puts the document next to the executable; this does the
 #    same next to the bundle.
 # ---------------------------------------------------------------------------
-if [[ "$NO_PROD" != "true" ]]; then
+if [[ "$MAKE_PROD" == "true" ]]; then
     PROD_DIR="$APP_DIR/platform/MacOS/prod/$(uname -m)"
     # The tier in the artifact name, as on Windows (-nc for non-commercial).
     # A reader with two builds in front of them can tell which is which.

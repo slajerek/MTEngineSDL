@@ -33,6 +33,31 @@ public:
 	// Time when test started running (set by suite)
 	time_t startTime = 0;
 
+	// ---- WHERE FIXTURES ARE -----------------------------------------------
+	//
+	// THE PROJECT ROOT: the directory the repository is checked out in. A test
+	// opens every fixture through ResolveProjectPath("tests/...") and never
+	// by a raw relative path, because the binary runs from TWO places -- the
+	// git root for a development build, platform/<P>/prod/<arch>/ for a
+	// final one -- and a literal "tests/data/x" is right in exactly one of
+	// them. Nothing is ever copied to make the other one work.
+	//
+	// Found by, in order: MT_TEST_PROJECT_DIR (the runner exports it);
+	// otherwise a walk up from the directory the process STARTED in
+	// (gCPathToCurrentDirectory, captured by SYS_InitFileSystem -- not the
+	// live cwd, which some hosts change at runtime) to the nearest directory
+	// holding mtengine.caps or .git. Resolved once, eagerly, by CTestSuite's
+	// constructor, and cached.
+	//
+	// "" when no root is found. A caller must FAIL the test then, never skip:
+	// a bad working directory that produced a hollow green is the failure
+	// mode this exists to remove.
+	static const std::string &ProjectRootPath();
+
+	// "<root>/<relative>", or "" when there is no root. Does NOT check that
+	// the file exists -- that is the caller's assertion, with its own message.
+	static std::string ResolveProjectPath(const char *relative);
+
 	// Test grouping: "core" for engine/app-core tests, or a plugin name
 	// (e.g. "Remapper", "Fire", "GoatTracker") for plugin tests. Set by the
 	// per-plugin registrars. Used for grouped listing/reporting (see

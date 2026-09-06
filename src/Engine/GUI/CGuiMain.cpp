@@ -636,9 +636,7 @@ CGuiMain::CGuiMain()
 #endif
 	
 	// this is MTEngineSDL debug log
-#if !defined(GLOBAL_DEBUG_OFF)
 	AddView(guiViewDebugLog);
-#endif
 
 	layoutManager->LoadLayouts();
 }

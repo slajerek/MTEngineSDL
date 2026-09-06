@@ -308,7 +308,7 @@ esac
 # -DMT_CAPS_LIBS_DIR is passed UNCONDITIONALLY, outside MT_CAPS_ARGS: that array
 # is empty on a standalone build, and CMake needs the directory on both paths --
 # the archives it links exist either way, only the key differs.
-cmake "$SCRIPT_DIR" ${GGML_ARCH_ARGS} -DMT_CAPS_LIBS_DIR="$MT_CAPS_LIBS_DIR" \
+cmake "$SCRIPT_DIR" ${GGML_ARCH_ARGS} -DCMAKE_BUILD_TYPE="${MT_BUILD_TYPE:-RelWithDebInfo}" -DMT_CAPS_LIBS_DIR="$MT_CAPS_LIBS_DIR" \
       "${MT_CAPS_ARGS[@]+"${MT_CAPS_ARGS[@]}"}" ${CMAKE_EXTRA_ARGS:-}
 make -j"$(nproc)" MTEngineSDL
 

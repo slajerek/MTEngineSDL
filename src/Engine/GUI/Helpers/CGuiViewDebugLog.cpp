@@ -1,6 +1,5 @@
 #include "DBG_Log.h"
 #include "SYS_Defs.h"
-#if !defined(GLOBAL_DEBUG_OFF)
 
 #include "CGuiViewDebugLog.h"
 #include "CGuiMain.h"
@@ -17,7 +16,10 @@ void SYS_InitApplicationGuiLogger()
 
 	u32 defaultLogLevel = LOG_GetCurrentLogLevel();
 	int logLevel;
-	gApplicationDefaultConfig->GetInt("LogLevel", &logLevel, (int)defaultLogLevel);
+	// LogLevel2, not LogLevel: the bit values changed when the three level maps
+	// became one (2026-09-05), so a mask saved by an older build means something
+	// else now and is ignored rather than misread.
+	gApplicationDefaultConfig->GetInt("LogLevel2", &logLevel, (int)defaultLogLevel);
 	LOG_SetCurrentLogLevel((u32)logLevel);
 }
 
@@ -56,7 +58,7 @@ void CGuiViewDebugLog::RenderLevelSwitch(u32 level, const char *name)
 	{
 		LOG_SetLevel(level, isSetLevel);
 		int logLevel = LOG_GetCurrentLogLevel();
-		gApplicationDefaultConfig->SetInt("LogLevel", &logLevel);
+		gApplicationDefaultConfig->SetInt("LogLevel2", &logLevel);
 	}
 }
 
@@ -222,10 +224,3 @@ void CGuiViewDebugLog::RenderContextMenuItems()
 }
 
 
-#else
-
-void SYS_InitApplicationGuiLogger()
-{
-}
-
-#endif

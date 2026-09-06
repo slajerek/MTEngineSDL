@@ -19,7 +19,8 @@
 #include "SYS_FileSystem.h"
 #include <cstring>
 
-#if !defined(GLOBAL_DEBUG_OFF)
+// The logger is ALWAYS compiled; MT_DEBUG_LOGS gates only the verbose macros
+// in DBG_Log.h. See that header.
 
 #if defined(USE_DEBUG_LOG_TO_VIEW)
 #include "CGuiViewDebugLog.h"
@@ -52,8 +53,9 @@
  */
 
 
-static int logger_currentLogLevel;
-CSlrMutex *loggerMutex;
+static int logger_currentLogLevel = (int)DBGLVL_DEFAULT_MASK;
+CSlrMutex *loggerMutex = NULL;
+static char logger_filePath[4096] = {0};
 
 #ifdef LOG_FILE
 FILE *fpLog = NULL;
@@ -83,7 +85,7 @@ bool LOG_IsSetLevel(unsigned int level)
 #ifndef DEBUG_OFF
 #ifdef FULL_LOG
 
-bool logThisLevel(int level)
+bool logThisLevel(unsigned int level)
 {
 	return true;
 }
@@ -92,7 +94,7 @@ bool logThisLevel(int level)
 
 bool shouldLog = true;
 
-bool logThisLevel(int level)
+bool logThisLevel(unsigned int level)
 {
 	if (shouldLog == false)
 		return false;
@@ -104,7 +106,7 @@ bool logThisLevel(int level)
 
 #else
 
-bool logThisLevel(int level)
+bool logThisLevel(unsigned int level)
 {
 //	if (level == DBGLVL_DEBUG) return true;
 	return false;
@@ -114,6 +116,16 @@ bool logThisLevel(int level)
 
 const char *getLevelStr(int level)
 {
+	if (level == DBGLVL_FATAL)
+		return "[FATAL]";
+	if (level == DBGLVL_PAINT)
+		return "[PAINT]";
+	if (level == DBGLVL_ADS)
+		return "[ADS]  ";
+	if (level == DBGLVL_WEBSERVICE)
+		return "[WEBSV]";
+	if (level == DBGLVL_WARN)
+		return "[WARN] ";
 	if (level == DBGLVL_MAIN)
 		return "[MAIN] ";
 	if (level == DBGLVL_DEBUG)
@@ -164,19 +176,22 @@ const char *getLevelStr(int level)
 // NSLog((@"%s [Line %d] " fmt), __PRETTY_FUNCTION__, __LINE__, ##__VA_ARGS__);
 
 //#define USE_COUT
-CLogByteBuffer *logEventsBuffer;
+CLogByteBuffer *logEventsBuffer = NULL;
 
 void DBG_SendLog(int debugLevel, char *message);
 
 char logBuf[512];
-HANDLE pipeHandle;
+HANDLE pipeHandle = INVALID_HANDLE_VALUE;
 
 void LOG_Init(void)
 {
-	loggerMutex = new CSlrMutex("loggerMutex");
+	if (loggerMutex == NULL)
+		loggerMutex = new CSlrMutex("loggerMutex");
 
-	LOG_SetLevel(DBGLVL_MAIN, true);
-	LOG_SetLevel(DBGLVL_DEBUG, true);
+	// ONE default, the same on every platform: DBGLVL_DEFAULT_MASK in DBG_Log.h.
+	logger_currentLogLevel = (int)DBGLVL_DEFAULT_MASK;
+
+LOG_SetLevel(DBGLVL_DEBUG, true);
 	LOG_SetLevel(DBGLVL_DEBUG2, true);
 	LOG_SetLevel(DBGLVL_TODO, true);
 	LOG_SetLevel(DBGLVL_ERROR, true);
@@ -274,6 +289,12 @@ void LOG_Init(void)
 
 		fpLog = SYS_OpenFile(logBuf, "wb");
 	}
+
+	// What LOG_GetLogFilePath() returns. macOS and Linux record theirs the
+	// same way; this platform declared the buffer and never filled it, so
+	// the path came back empty and CTestLoggingAlwaysOn failed at step 1.
+	if (fpLog != NULL)
+		snprintf(logger_filePath, sizeof(logger_filePath), "%s", logBuf);
 #endif
 
 #ifdef WIN_CONSOLE
@@ -302,7 +323,28 @@ void LOG_Init(void)
 //	sprintf(logBuf, " %d \"MTEngine\" \"MTEngine log console (" __DATE__ " " __TIME__ ")\"");
 	sprintf(logBuf, " %d \"MTEngine\" \"MTEngine log console\"", processId);
 
-    if(CreateProcess("LogConsole.exe",     // Application name
+	// BESIDE THE EXECUTABLE, never the current directory: the cwd is the git
+	// root for a development build and a package for a final one, and neither
+	// holds the console. Legacy fallback: platform\Windows\_RUNTIME_ relative to
+	// the exe's own directory, where it has always lived.
+	char consolePath[MAX_PATH * 2] = {0};
+	{
+		char exeDir[MAX_PATH] = {0};
+		DWORD n = GetModuleFileNameA(NULL, exeDir, MAX_PATH);
+		if (n > 0 && n < MAX_PATH)
+		{
+			char *slash = strrchr(exeDir, '\\');
+			if (slash) *slash = 0;
+			snprintf(consolePath, sizeof(consolePath), "%s\\LogConsole.exe", exeDir);
+			if (GetFileAttributesA(consolePath) == INVALID_FILE_ATTRIBUTES)
+				snprintf(consolePath, sizeof(consolePath), "%s\\..\\..\\..\\_RUNTIME_\\LogConsole.exe", exeDir);
+			if (GetFileAttributesA(consolePath) == INVALID_FILE_ATTRIBUTES)
+				consolePath[0] = 0;
+		}
+	}
+
+    if(consolePath[0] == 0 ||
+       CreateProcess(consolePath,          // Application name
                      logBuf,                 // Application arguments
                      0,
                      0,
@@ -322,7 +364,9 @@ void LOG_Init(void)
 		// connect to pipe
 		sprintf(logBuf, "\\\\.\\pipe\\logconsole%d", processId);
 	
-		while(true)
+		// BOUNDED: a console that started but never opened its pipe used to
+		// hang the process here forever. Two seconds, then log without it.
+		for (int attempt = 0; attempt < 130; attempt++)
 		{
 			pipeHandle = CreateFile(logBuf,
 						GENERIC_READ | GENERIC_WRITE,
@@ -368,25 +412,30 @@ void LOG_Shutdown(void)
 	_LOGF(DBGLVL_MAIN, "closing stdlib & logfile\nbye!\n");
 	
 #ifdef LOG_FILE
-	fclose(fpLog);
+	if (fpLog != NULL)
+		fclose(fpLog);
+	fpLog = NULL;
 #endif
 
+}
+
+const char *LOG_GetLogFilePath(void)
+{
+	return logger_filePath;
 }
 
 void LOG_LockMutex()
 {
-#ifdef WIN_CONSOLE
-	//m_Log << "LOCK" << endl;
-#endif
-	loggerMutex->Lock();
+	// A LOGError before LOG_Init (a crash handler, a static initialiser) must
+	// not dereference a NULL mutex; it logs unlocked instead.
+	if (loggerMutex != NULL)
+		loggerMutex->Lock();
 }
 
 void LOG_UnlockMutex()
 {
-#ifdef WIN_CONSOLE
-	//m_Log << "UNLOCK" << endl;
-#endif
-	loggerMutex->Unlock();
+	if (loggerMutex != NULL)
+		loggerMutex->Unlock();
 }
 
 int a = 3;	// some stupid workaround for Microsoft's shitty compiler
@@ -409,6 +458,8 @@ void DBG_SendLog(int debugLevel, char *message)
 #endif
 
 #ifdef LOG_CONSOLE
+	if (logEventsBuffer == NULL)
+		logEventsBuffer = new CLogByteBuffer(8192);
 	logEventsBuffer->Clear();
 	logEventsBuffer->putInt(debugLevel);
 	logEventsBuffer->putInt(tmeCurrent.wYear);
@@ -427,14 +478,26 @@ void DBG_SendLog(int debugLevel, char *message)
 	sizeBuf[0] = (unsigned char)((logEventsBuffer->index) >> 8);
 	sizeBuf[1] = (unsigned char)(logEventsBuffer->index);
 
-	DWORD b;
-	WriteFile(pipeHandle, sizeBuf, 2, &b, NULL);
-	WriteFile(pipeHandle, logEventsBuffer->data, logEventsBuffer->index, &b, NULL);
-	FlushFileBuffers(pipeHandle);
+	if (pipeHandle != INVALID_HANDLE_VALUE)
+	{
+		DWORD b;
+		WriteFile(pipeHandle, sizeBuf, 2, &b, NULL);
+		WriteFile(pipeHandle, logEventsBuffer->data, logEventsBuffer->index, &b, NULL);
+		FlushFileBuffers(pipeHandle);
+	}
 #endif
+
+	// FATAL and ERROR also go to the debugger, always: this is what a
+	// developer sees in Visual Studio's Output pane for a build with logs off.
+	if (debugLevel == DBGLVL_FATAL || debugLevel == DBGLVL_ERROR)
+	{
+		OutputDebugStringA(message);
+		OutputDebugStringA("\n");
+	}
 
 #ifdef LOG_FILE
 	//03:22:07,127 000010B4 [DEBUG] CGuiList::CGuiList done
+	if (fpLog != NULL)
 	fprintf(fpLog, "%02d:%02d:%02d,%03d %8.8X %s %s\n", 
 		tmeCurrent.wHour, tmeCurrent.wMinute, tmeCurrent.wSecond, tmeCurrent.wMilliseconds,
 		threadId, getLevelStr(debugLevel), message);
@@ -481,7 +544,7 @@ void LOGT(int level, const char *what)
 	_LOGF(level, what);
 }
 
-void _LOGF(int level, char *fmt, ... )
+void _LOGF(unsigned int level, char *fmt, ... )
 {
     char buffer[BUFSIZE] = {0};
 
@@ -499,14 +562,14 @@ void _LOGF(int level, char *fmt, ... )
 	
 }
 
-void _LOGF(int level, std::string what)
+void _LOGF(unsigned int level, std::string what)
 {
 	if (!logThisLevel(level))
 		return;
 	_LOGF(level, what.c_str());
 }
 
-void _LOGF(int level, const char *fmt, ... )
+void _LOGF(unsigned int level, const char *fmt, ... )
 {
 	if (!logThisLevel(level))
 		return;
@@ -528,7 +591,14 @@ void _LOGF(int level, const char *fmt, ... )
 
 int _LOGGER(unsigned int level, const char *fileName, unsigned int lineNum, const char *functionName, const char *format, ...)
 {
-	if (!logThisLevel(level))
+	// FATAL and ERROR are the always-on path: never filtered by MT_DEBUG_LOGS
+	// and never by the level mask. Everything else needs both.
+	const bool alwaysOn = (level & (DBGLVL_FATAL | DBGLVL_ERROR)) != 0;
+#if !MT_DEBUG_LOGS
+	if (!alwaysOn)
+		return 0;
+#endif
+	if (!alwaysOn && !logThisLevel(level))
 		return 0;
 
 	char buffer[BUFSIZE] = {0};
@@ -606,13 +676,3 @@ void SYS_Errorf(const char *fmt, ... )
  
 */
 
-#else
-
-void LOG_Init(void) {}
-void LOG_SetLevel(unsigned int level, bool isOn) {}
-void LOG_BackupCurrentLogLevel() {}
-void LOG_RestoreBackupLogLevel() {}
-void LOG_SetCurrentLogLevel(int level) {}
-void LOG_Shutdown(void) {}
-
-#endif

@@ -32,6 +32,17 @@ using namespace std;
 // is being measured. --results-file wins, then
 // MT_TEST_RESULTS, then the historical relative default so that every existing
 // invocation keeps behaving as it did.
+// THE HARNESS'S OWN PROGRESS LINES ARE NOT A LOG LEVEL. In a --logs off build
+// every LOGS above compiles to nothing, and a headless run that crashed then
+// names no test at all -- the results file is never written, and the log
+// holds only the crash. So with MT_DEBUG_LOGS=0 these go to stderr directly;
+// with it on they stay LOGS, as before, so the two never double up.
+#if MT_DEBUG_LOGS
+#define MT_TEST_PROGRESS(...) LOGS(__VA_ARGS__)
+#else
+#define MT_TEST_PROGRESS(...) do { fprintf(stderr, "[TEST] " __VA_ARGS__); fprintf(stderr, "\n"); fflush(stderr); } while (0)
+#endif
+
 const char *MT_TestResultsPath()
 {
 	static string resolved;
@@ -94,6 +105,13 @@ CTestSuite::CTestSuite()
 	exitOnCompletion = false;
 	stopOnFirstFailure = false;
 	requireFixtures = (getenv("PC_REQUIRE_FIXTURES") != NULL);
+
+	// EAGERLY, before any test runs: the walk starts from the directory the
+	// process began in, and a host that later changes its cwd (a command-line
+	// option, a plugin, a jukebox) must not be able to make a first lazy call
+	// latch the wrong root. See CTest::ProjectRootPath.
+	if (CTest::ProjectRootPath().empty())
+		LOGError("CTestSuite: no project root found (no mtengine.caps or .git above the start directory, and MT_TEST_PROJECT_DIR unset) -- fixture paths will not resolve");
 }
 
 CTestSuite::~CTestSuite()
@@ -185,8 +203,14 @@ void CTestSuite::ListTestsFromCLI(CTestSuite *suite)
 
 	suite->RegisterTests();
 
-	const char *outPath = "tests/results/test_list.txt";
-	FILE *f = fopen(outPath, "w");
+	// BESIDE THE RESULTS FILE, not at a cwd-relative path: a final build runs
+	// from prod/, and this list was the one thing the engine itself wrote
+	// into a release package.
+	std::string outPath = MT_TestResultsPath();
+	size_t slash = outPath.find_last_of("/\\");
+	outPath = (slash == std::string::npos) ? std::string("test_list.txt")
+										   : outPath.substr(0, slash + 1) + "test_list.txt";
+	FILE *f = fopen(outPath.c_str(), "w");
 	for (auto &t : suite->tests)
 	{
 		// Prefix on stdout so the orchestrator can parse past log noise; the
@@ -201,14 +225,14 @@ void CTestSuite::ListTestsFromCLI(CTestSuite *suite)
 		fclose(f);
 	fflush(stdout);
 
-	LOGM("CTestSuite: listed %d tests to %s", (int)suite->tests.size(), outPath);
+	LOGM("CTestSuite: listed %d tests to %s", (int)suite->tests.size(), outPath.c_str());
 	LOG_Shutdown();
 	std::_Exit(0);
 }
 
 void CTestSuite::Run()
 {
-	LOGS("CTestSuite::Run: Starting test suite with %d tests", (int)tests.size());
+	MT_TEST_PROGRESS("CTestSuite::Run: Starting test suite with %d tests", (int)tests.size());
 	isRunning = true;
 	currentTestIndex = -1;
 	suiteStartTime = time(NULL);
@@ -221,12 +245,12 @@ void CTestSuite::StartTimeoutWatchdog()
 {
 	if (!useTimeoutWatchdogThread)
 	{
-		LOGS("CTestSuite: Timeout watchdog disabled (single-threaded completion)");
+		MT_TEST_PROGRESS("CTestSuite: Timeout watchdog disabled (single-threaded completion)");
 		return;
 	}
 
 	std::thread watchdog([this]() {
-		LOGS("CTestSuite: Timeout watchdog started (per-test=%ds, suite=%ds)", defaultTestTimeoutSeconds, suiteTimeoutSeconds);
+		MT_TEST_PROGRESS("CTestSuite: Timeout watchdog started (per-test=%ds, suite=%ds)", defaultTestTimeoutSeconds, suiteTimeoutSeconds);
 		while (isRunning)
 		{
 			SYS_Sleep(1000);
@@ -271,7 +295,7 @@ void CTestSuite::StartTimeoutWatchdog()
 
 void CTestSuite::Cancel()
 {
-	LOGS("CTestSuite::Cancel");
+	MT_TEST_PROGRESS("CTestSuite::Cancel");
 	isRunning = false;
 
 	if (currentTestIndex >= 0 && currentTestIndex < (int)tests.size())
@@ -307,7 +331,7 @@ void CTestSuite::RunNextTest()
 
 		if (currentTestIndex >= (int)tests.size())
 		{
-			LOGS("CTestSuite: All tests completed");
+			MT_TEST_PROGRESS("CTestSuite: All tests completed");
 			CTestRunner::isTestPending = false;
 			isRunning = false;
 
@@ -359,7 +383,7 @@ void CTestSuite::RunNextTest()
 		}
 
 		CTest *test = tests[currentTestIndex].get();
-		LOGS("CTestSuite: Running test %d/%d: %s", currentTestIndex + 1, (int)tests.size(), test->GetName());
+		MT_TEST_PROGRESS("CTestSuite: Running test %d/%d: %s", currentTestIndex + 1, (int)tests.size(), test->GetName());
 		test->startTime = time(NULL);
 
 		dispatchingTest = true;
@@ -375,18 +399,18 @@ void CTestSuite::RunNextTest()
 
 void CTestSuite::OnTestStepCompleted(CTest *test, int stepId, bool success, const char *message)
 {
-	LOGS("CTestSuite: [%s] Step %d %s: %s", test->GetName(), stepId, success ? "OK" : "FAILED", message);
+	MT_TEST_PROGRESS("CTestSuite: [%s] Step %d %s: %s", test->GetName(), stepId, success ? "OK" : "FAILED", message);
 }
 
 void CTestSuite::OnTestCompleted(CTest *test, bool success, const char *summary)
 {
-	LOGS("CTestSuite: [%s] Completed %s: %s", test->GetName(), success ? "OK" : "FAILED", summary);
+	MT_TEST_PROGRESS("CTestSuite: [%s] Completed %s: %s", test->GetName(), success ? "OK" : "FAILED", summary);
 
 	results.push_back({test->GetName(), success, test->WasSkipped(), test->GetRequiredGap(), summary});
 
 	if (!success && stopOnFirstFailure)
 	{
-		LOGS("CTestSuite: Test failed, stopping suite (--stop-on-first-failure)");
+		MT_TEST_PROGRESS("CTestSuite: Test failed, stopping suite (--stop-on-first-failure)");
 		CTestRunner::isTestPending = false;
 		isRunning = false;
 
@@ -416,7 +440,7 @@ void CTestSuite::OnTestCompleted(CTest *test, bool success, const char *summary)
 	{
 		// Continue-on-failure (default): keep running so one pass surfaces every
 		// failure instead of hiding the tests after the first failing one.
-		LOGS("CTestSuite: [%s] FAILED - continuing to next test", test->GetName());
+		MT_TEST_PROGRESS("CTestSuite: [%s] FAILED - continuing to next test", test->GetName());
 	}
 
 	RunNextTest();

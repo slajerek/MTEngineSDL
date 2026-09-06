@@ -15,10 +15,12 @@
     modes) -> symbols contract (PDB to $MT_OUT\symbols; never shipped at
     MT_RELEASE_SYMBOLS=0) -> prod deploy with LICENSES.txt.
 
-    The deploy stage is what ships the licence document, and -NoProd skips
-    the stage. "Always" therefore means "whenever a package is produced" --
-    a dev loop that skips the package skips the document with it, and a
-    release does not skip the package.
+    The deploy stage is what ships the licence document, and it runs only
+    with -Prod. A DEVELOPMENT build -- the default -- produces no package and
+    copies no assets: it runs, and is tested, from the git root. A FINAL build
+    passes -Prod and is tested from the package with tests\run_test.ps1
+    -Package. "Always" therefore means "whenever a package is produced". The
+    procedure is docs\testing.md.
 .PARAMETER AppDir
     The app repo root (the stub passes $PSScriptRoot).
 #>
@@ -27,11 +29,27 @@ param(
     [ValidateSet('x64','ARM64')]
     [string]$Platform,
     [ValidateSet('Debug','Release')]
+    [Alias('Config')]
     [string]$Configuration = 'Release',
+    # THE FOUR SWITCHES, the same on every platform (maintainer, 2026-09-05).
+    # -Logs on|off: MT_DEBUG_LOGS, on by default, OFF by default under -Prod.
+    # -Symbols on|off: MT_RELEASE_SYMBOLS, on by default, OFF under -Prod.
+    # -Tier dev|commercial: MT_COMMERCIAL_BUILD. An explicit switch beats what
+    # -Prod implies; -Symbols on with -Tier commercial is refused.
+    [ValidateSet('on','off')]
+    [string]$Logs,
+    [ValidateSet('on','off')]
+    [string]$Symbols,
+    [ValidateSet('dev','commercial')]
+    [string]$Tier = 'dev',
     [ValidateSet('Clang','MSVC')]
     [string]$Compiler = 'Clang',
     [switch]$SkipCuda,
     [switch]$SkipDeps,
+    [switch]$Prod,
+    # The old default packaged on every build and -NoProd opted out. Kept as
+    # a parameter so a caller still passing it fails with the new name
+    # instead of silently building something else.
     [switch]$NoProd,
     [switch]$Clean,
     # Capability overrides forwarded to mtcaps (rung 1, persisted to
@@ -44,6 +62,18 @@ param(
     [Parameter(ValueFromRemainingArguments)][string[]]$GcArgs
 )
 
+if ($NoProd) { throw '-NoProd is gone. A build makes no package unless you pass -Prod (see docs\testing.md).' }
+$symbolsExplicit = [bool]$Symbols
+if (-not $Logs)    { $Logs    = if ($Prod) { 'off' } else { 'on' } }
+if (-not $Symbols) { $Symbols = if ($Prod) { 'off' } else { 'on' } }
+if ($Tier -eq 'commercial' -and $symbolsExplicit -and $Symbols -eq 'on') {
+    throw '-Symbols on cannot be combined with -Tier commercial: a store build never ships symbols.'
+}
+[string[]]$Set = @($Set | Where-Object { $_ })
+$Set += "MT_DEBUG_LOGS=$(if ($Logs -eq 'on') { 1 } else { 0 })"
+if ($Symbols -eq 'off') { $Set += 'MT_RELEASE_SYMBOLS=0' }
+if ($Tier -eq 'commercial') { $Set += 'MT_COMMERCIAL_BUILD=1'; $Set += 'MT_PRIVATE_BUILD=0' }
+Write-Host "Build: config=$($Configuration.ToLower()) logs=$Logs symbols=$Symbols tier=$Tier prod=$(if ($Prod) { 'yes' } else { 'no' })" -ForegroundColor Cyan
 $ErrorActionPreference = 'Stop'
 
 $mtDir = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
@@ -236,10 +266,12 @@ $commercial = $env:COMMERCIAL
 $mtResolvedFlags = Get-Content (Join-Path $mtOutRoot 'MTEngineCaps.xcconfig')
 $releaseSymbols = (($mtResolvedFlags | Where-Object { $_ -match '^MT_RELEASE_SYMBOLS = ([01])$' } | Select-Object -First 1) -replace '^MT_RELEASE_SYMBOLS = ', '')
 if (-not $releaseSymbols) { $releaseSymbols = '1' }
+$debugLogs = (($mtResolvedFlags | Where-Object { $_ -match '^MT_DEBUG_LOGS = ([01])$' } | Select-Object -First 1) -replace '^MT_DEBUG_LOGS = ', '')
+if (-not $debugLogs) { $debugLogs = '1' }
 Write-Host "Capabilities: $appName -> $mtOutRoot" -ForegroundColor Cyan
 Write-Host "  deps: $mtLibsDir"
 # tier and ffmpeg mode are different axes; see app-build-macos.sh.
-Write-Host "  tier: $(if ($commercial -eq '1') { 'commercial' } else { 'non-commercial' }), ffmpeg=$ffmpegMode, symbols=$releaseSymbols" -ForegroundColor Cyan
+Write-Host "  tier: $(if ($commercial -eq '1') { 'commercial' } else { 'non-commercial' }), ffmpeg=$ffmpegMode, symbols=$releaseSymbols, logs=$debugLogs" -ForegroundColor Cyan
 [string[]]$mtCapsArgs = @("/p:MTOutRoot=$mtOutRoot", "/p:MTCapsApp=$appName",
                           "/p:MTCapsLibsDir=$mtLibsDir",
                           "/p:MTBuildRoot=$mtBuildRoot")
@@ -368,7 +400,7 @@ if (Test-Path $appCache) {
 }
 
 # --- prod deploy --------------------------------------------------------------
-if (-not $NoProd) {
+if ($Prod) {
     $exeBase = [System.IO.Path]::GetFileNameWithoutExtension($conf['MT_WINDOWS_EXE'])
     $prodExeName = if ($env:COMMERCIAL -eq '1') { "$exeBase.exe" } else { "$exeBase-nc.exe" }
     $prodDir = "$appDir\platform\Windows\prod\$Platform"

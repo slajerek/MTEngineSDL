@@ -8,9 +8,13 @@
 #include <pthread.h>
 #include <sys/time.h>
 #include <sys/stat.h>
+#include <unistd.h>
 #include "SYS_Main.h"
 
-#if !defined(GLOBAL_DEBUG_OFF)
+// The logger is ALWAYS compiled; MT_DEBUG_LOGS gates only the verbose macros
+// in DBG_Log.h. Until 2026-09-05 this whole file was inside
+// #if !defined(GLOBAL_DEBUG_OFF), which on this platform was on by default --
+// so a crash printed nothing at all.
 
 #if defined(USE_DEBUG_LOG_TO_VIEW)
 #include "CGuiViewDebugLog.h"
@@ -19,11 +23,14 @@
 #define MAX_BUFFER_LENGTH	40960
 
 #define USE_COLOR_CONSOLE
-//#define LOG_FILE
+// A file sink, as on macOS and Windows -- this platform never had one, so a
+// headless run's errors existed only on a stdout nobody captured.
+#define LOG_FILE
 //#define DEBUG_OFF
 //#define FULL_LOG
 
-static int logger_currentLogLevel = 0;
+static int logger_currentLogLevel = (int)DBGLVL_DEFAULT_MASK;
+static char logger_filePath[4096] = {0};
 pthread_mutex_t loggerMutex;
 
 bool LOG_IsSetLevel(unsigned int level)
@@ -82,6 +89,14 @@ bool logThisLevel(unsigned int level)
 
 const char *getLevelStr(unsigned int level)
 {
+	if (level == DBGLVL_FATAL)
+		return "[FATAL]";
+	if (level == DBGLVL_PAINT)
+		return "[PAINT]";
+	if (level == DBGLVL_ADS)
+		return "[ADS]  ";
+	if (level == DBGLVL_WEBSERVICE)
+		return "[WEBSV]";
 	if (level == DBGLVL_MAIN)
 		return "[MAIN] ";
 	if (level == DBGLVL_INFO)
@@ -147,18 +162,14 @@ const char *getLevelStr(unsigned int level)
 
 void DBG_SendLog(int debugLevel, char *message);
 
-char logBuf[512];
+char logBuf[4096];
 
 void LOG_Init(void)
 {
 	pthread_mutex_init(&loggerMutex, NULL);
 
-	LOG_SetLevel(DBGLVL_MAIN, true);
-	LOG_SetLevel(DBGLVL_DEBUG, true);
-	LOG_SetLevel(DBGLVL_DEBUG2, true);
-	LOG_SetLevel(DBGLVL_TODO, true);
-	LOG_SetLevel(DBGLVL_ERROR, true);
-	LOG_SetLevel(DBGLVL_WARN, true);
+	// ONE default, the same on every platform: DBGLVL_DEFAULT_MASK in DBG_Log.h.
+	logger_currentLogLevel = (int)DBGLVL_DEFAULT_MASK;
 
 #ifdef LOG_FILE
 	time_t rawtime;
@@ -166,18 +177,62 @@ void LOG_Init(void)
 	time ( &rawtime );
 	timeinfo = localtime ( &rawtime );
 
-	sprintf(logBuf, "./log/MTEngine-%02d%02d%02d-%02d%02d.txt", (timeinfo->tm_year-100), (timeinfo->tm_mon+1), timeinfo->tm_mday,
-												timeinfo->tm_hour, timeinfo->tm_min);
+	// --log-dir <path>, read from /proc/self/cmdline: LOG_Init runs before
+	// SYS_SetCommandLineArguments in every platform's main(), so the engine's
+	// own argv copy is not there yet. macOS reads NSProcessInfo and Windows
+	// __argv for the same reason.
+	char logDir[3072] = {0};
+	{
+		FILE *cl = fopen("/proc/self/cmdline", "rb");
+		if (cl != NULL)
+		{
+			static char cmdline[65536];
+			size_t n = fread(cmdline, 1, sizeof(cmdline) - 1, cl);
+			fclose(cl);
+			cmdline[n] = 0;
+			const char *p = cmdline, *end = cmdline + n;
+			const char *prev = NULL;
+			while (p < end)
+			{
+				if (prev != NULL && strcmp(prev, "--log-dir") == 0)
+				{
+					snprintf(logDir, sizeof(logDir), "%s", p);
+					break;
+				}
+				prev = p;
+				p += strlen(p) + 1;
+			}
+		}
+	}
+	if (logDir[0] == 0)
+	{
+		// ${XDG_CACHE_HOME:-~/.cache}/MTEngine -- never the cwd, which is the
+		// git root for a development build and a release package for a final
+		// one, and neither wants a log/ directory appearing in it.
+		const char *xdg = getenv("XDG_CACHE_HOME");
+		const char *home = getenv("HOME");
+		if (xdg != NULL && xdg[0] != 0)
+			snprintf(logDir, sizeof(logDir), "%s/MTEngine", xdg);
+		else if (home != NULL && home[0] != 0)
+			snprintf(logDir, sizeof(logDir), "%s/.cache/MTEngine", home);
+		else
+			snprintf(logDir, sizeof(logDir), "/tmp/MTEngine");
+	}
+	mkdir(logDir, 0750);
+
+	snprintf(logBuf, sizeof(logBuf), "%s/MTEngine-%02d%02d%02d-%02d%02d%02d-%d.txt", logDir,
+			 (timeinfo->tm_year-100), (timeinfo->tm_mon+1), timeinfo->tm_mday,
+			 timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec, (int)getpid());
 
 	fpLog = fopen(logBuf, "wb");
-
-	if (fpLog == NULL)
-	{
-		mkdir("./log/", 0750);
-		fpLog = fopen(logBuf, "wb");
-	}
-
+	if (fpLog != NULL)
+		snprintf(logger_filePath, sizeof(logger_filePath), "%s", logBuf);
 #endif
+}
+
+const char *LOG_GetLogFilePath(void)
+{
+	return logger_filePath;
 }
 
 static int backupLogLevel = 0;
@@ -347,7 +402,7 @@ void DBG_SendLog(int debugLevel, char *message)
 	//03:22:07,127 000010B4 [DEBUG] CGuiList::CGuiList done
 	if (fpLog != NULL)
 	{
-		fprintf(fpLog, buf);
+		fprintf(fpLog, "%s", buf);
 		fflush(fpLog);
 	}
 #endif
@@ -357,7 +412,7 @@ void DBG_SendLog(int debugLevel, char *message)
 			guiViewDebugLog->AddLog(buf);
 #endif
 
-	fprintf(stdout, buf);
+	fprintf(stdout, "%s", buf);
 	fflush(stdout);
 
 }
@@ -437,7 +492,14 @@ void _LOGF(unsigned int level, const char *fmt, ... )
 
 int _LOGGER(unsigned int level, const char *fileName, unsigned int lineNum, const char *functionName, const char *format, ...)
 {
-	if (!logThisLevel(level))
+	// FATAL and ERROR are the always-on path: never filtered by MT_DEBUG_LOGS
+	// and never by the level mask. Everything else needs both.
+	const bool alwaysOn = (level & (DBGLVL_FATAL | DBGLVL_ERROR)) != 0;
+#if !MT_DEBUG_LOGS
+	if (!alwaysOn)
+		return 0;
+#endif
+	if (!alwaysOn && !logThisLevel(level))
 		return 0;
 
     char buffer[MAX_BUFFER_LENGTH] = {0};
@@ -445,7 +507,7 @@ int _LOGGER(unsigned int level, const char *fileName, unsigned int lineNum, cons
     va_list args;
 
     va_start(args, format);
-    vsprintf(buffer, format, args);
+    vsnprintf(buffer, sizeof(buffer), format, args);
     va_end(args);
 
 	LOG_LockMutex();
@@ -497,11 +559,4 @@ void SYS_Errorf(const char *fmt, ... )
 	LOG_UnlockMutex();
 }
 
-#else
-
-void LOG_Init(void) {}
-void LOG_SetLevel(unsigned int level, bool isOn) {}
-void LOG_Shutdown(void) {}
-
-#endif
 

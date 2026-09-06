@@ -22,17 +22,13 @@
 #include "SYS_Platform.h"
 #include "SYS_MiniDump.h"
 #include "MT_VERSION.h"
-#if !defined(GLOBAL_DEBUG_OFF)
 #include "CGuiViewDebugLog.h"
-#endif
 
 int main(int argc, char* argv[])
 {
 	SYS_InstallCrashHandler();
 	LOG_Init();
-#if !defined(GLOBAL_DEBUG_OFF)
 	guiViewDebugLog = new CGuiViewDebugLog("Debug Log", 50, 50, -1, 200, 200);
-#endif
 	LOGM("MTEngineSDL v" MT_VERSION_STRING " compiled on " __DATE__ " " __TIME__);
 
 	SYS_SetCommandLineArguments(argc, (const char**) argv);

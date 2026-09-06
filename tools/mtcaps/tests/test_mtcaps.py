@@ -505,11 +505,12 @@ class TestCanonicalForm(Base):
         m = self.manifest("MT_CAP_LLM=0\n")
         values, _ = R.resolve(self.vocab, m, "macos")
         s = R.canonical_form(self.vocab, values)
-        # +3: every capability, plus the THREE mode keys (MT_COMMERCIAL_BUILD,
-        # MT_PRIVATE_BUILD, MT_RELEASE_SYMBOLS -- decision 0.5). Each is
+        # +4: every capability, plus the FOUR mode keys (MT_COMMERCIAL_BUILD,
+        # MT_PRIVATE_BUILD, MT_RELEASE_SYMBOLS -- decision 0.5 -- and
+        # MT_DEBUG_LOGS, 2026-09-05). Each is
         # carried as 0/1 rather than by presence, because the agreement check
         # has to tell "off" from "unset" for a mode flag.
-        self.assertEqual(len(s.split(";")), len(self.vocab.keys) + 3)
+        self.assertEqual(len(s.split(";")), len(self.vocab.keys) + 4)
 
     def test_os_suffixes_are_resolved_away(self):
         m = self.manifest("MT_CAP_PHOTO_CODECS__LINUX=0\n")
@@ -1526,7 +1527,8 @@ class TestDepsKey(unittest.TestCase):
     #: licence keys and the FFmpeg mode derived from them. deps_form carries
     #: MT_COMMERCIAL_BUILD and MT_PRIVATE_BUILD explicitly.
     MODE_KEYS = frozenset({"MT_COMMERCIAL_BUILD", "MT_PRIVATE_BUILD",
-                           "MT_FFMPEG_BUILD_MODE", "MT_RELEASE_SYMBOLS"})
+                           "MT_FFMPEG_BUILD_MODE", "MT_RELEASE_SYMBOLS",
+                           "MT_DEBUG_LOGS"})
 
     @staticmethod
     def _strip_comments(text, is_ps1):
@@ -1598,6 +1600,7 @@ class TestDepsKey(unittest.TestCase):
         base[R.COMMERCIAL_KEY] = 0
         base[R.PRIVATE_KEY] = 1
         base[V.SYMBOLS_KEY if hasattr(V, "SYMBOLS_KEY") else "MT_RELEASE_SYMBOLS"] = 1
+        base[R.DEBUG_LOGS_KEY] = 1
         same = dict(base); same["MT_CAP_MIDI"] = 0
         moved = dict(base); moved["MT_CAP_VIDEO_PLAYBACK"] = 0
         self.assertEqual(R.deps_form(vocab, base), R.deps_form(vocab, same))
@@ -1637,6 +1640,7 @@ class TestFFmpegPolicy(unittest.TestCase):
         base = dict((k, 1) for k in vocab.keys)
         base[R.COMMERCIAL_KEY] = 0
         base[R.SYMBOLS_KEY] = 1
+        base[R.DEBUG_LOGS_KEY] = 1
 
         private = dict(base); private[R.PRIVATE_KEY] = 1
         public = dict(base); public[R.PRIVATE_KEY] = 0
@@ -1667,6 +1671,7 @@ class TestFFmpegPolicy(unittest.TestCase):
         values[R.COMMERCIAL_KEY] = 0
         values[R.PRIVATE_KEY] = 0
         values[R.SYMBOLS_KEY] = 1
+        values[R.DEBUG_LOGS_KEY] = 1
         emitted = emit.ffmpeg_policy(vocab, values)["MT_FFMPEG_DECODERS"].split()
         for name in self.policy()["decoders_withheld"]:
             self.assertNotIn(name, emitted,

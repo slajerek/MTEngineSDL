@@ -81,7 +81,9 @@ protected:
 	// subclass that must RETURN them rather than log them. Cleared at the top
 	// of every compile.
 	//
-	// It exists because LOGError is a no-op under GLOBAL_DEBUG_OFF, which is
+	// It exists because LOGError used to be a no-op under GLOBAL_DEBUG_OFF (since 2026-09-05
+	// errors are always on; the returned log stays, because a host must SHOW
+	// the text, not only have it printed), which was
 	// set on Linux; the Metal path never runs there, but the seam this serves
 	// is backend-neutral and its contract has to be the same everywhere.
 	// See CRenderShaderCustomFragment.h.
