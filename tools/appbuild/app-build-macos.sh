@@ -8,7 +8,9 @@
 # app:
 #
 #   1. read <app-dir>/mtengine-app.conf (the app's parameters)
-#   2. take the build lock (tools/mtcaps/build-lock.sh)
+#   2. take THIS APP's build lock (tools/mtcaps/build-lock.sh) -- not a
+#      checkout-wide one: a CLI build collides with nothing an Xcode build of a
+#      DIFFERENT app touches, so the two now run together
 #   3. resolve the capability set ONCE (via the engine wrapper's
 #      --print-settings; every later engine call runs pre-resolved)
 #   4. acquire dependencies (engine wrapper --deps-only, pre-resolved:
@@ -179,6 +181,74 @@ for v in MT_OUT MT_CAPS_LIBS_DIR MT_CAPS_RESOLVED; do
     [[ -n "${!v}" ]] || { echo "ERROR: --print-settings carried no $v" >&2; exit 1; }
 done
 export MT_CAPS_LIBS_DIR
+
+# ---------------------------------------------------------------------------
+# THE MT_ENABLE_* FLAGS, from the fragment of the SAME resolve.
+#
+# This driver used to know only the six keys parsed above. The flags were
+# passed straight through to xcodebuild and never bound to a shell variable, so
+# `${MT_ENABLE_FFMPEG:-1}` in this file read the DEFAULT, always, on every app
+# -- including c64d, which resolves MT_CAP_VIDEO_PLAYBACK=0 and links no FFmpeg
+# at all. Any gate written against that would have passed by accident today and
+# broken the moment the flag could differ, which it now can (Plan A Task 1).
+#
+# Linux has done this since it was written (app-build-linux.sh), which is why
+# `${MT_ENABLE_FFMPEG:-1}` already means what it says there. Same call, same
+# fragment, one mechanism on both platforms -- rather than adding a seventh key
+# to the parse loop above, which would bind the one flag somebody remembered
+# and leave the rest still lying.
+# shellcheck source=/dev/null
+source "$ENGINE_DIR/platform/caps-lib.sh"
+mt_caps_read_flags "$MT_OUT/MTEngineCapabilities.cmake"
+
+# ---------------------------------------------------------------------------
+# WHAT XCODE IS TOLD THE LIBS DIR IS -- a stable path, not the keyed one.
+#
+# The engine's Xcode project declares every capability archive as a script
+# phase OUTPUT under $(MT_CAPS_LIBS_DIR):
+#
+#     outputPaths = ( "$(MT_CAPS_LIBS_DIR)/libmbedtls_bundle.a", ... )
+#
+# and that directory is content-addressed by the caps hash. So each distinct
+# capability set gives Xcode a DIFFERENT set of declared outputs, XCBuild
+# records them in build.db for stale-file removal, and on the next build with
+# another caps set the previous ones are "no longer produced" -- stale. It then
+# tries to delete them, finds them under $MTENGINE_BUILD_ROOT rather than under
+# SRCROOT or DerivedData, and reports
+#
+#     warning: Stale file '<...>/libs/libmbedtls_bundle.a' is located outside
+#              of the allowed root paths.
+#
+# The entry can never be retired, because the mechanism that would retire it is
+# the one refusing to act -- so the warnings accumulate, one per archive per
+# caps set ever built, for the life of the DerivedData. Measured before this
+# change: 17 distinct buckets recorded in MTEngineSDLDummyApp's build.db, and 8
+# of an app's 9 already pointing at directories that no longer exist.
+#
+# So Xcode gets ONE path that never varies, per app and configuration, and that
+# path is a symlink to whichever keyed directory this build resolved to. The
+# archives are still built into, and shared from, the keyed store -- the script
+# phases write through the link -- so nothing about the dependency cache
+# changes. Only what Xcode records changes, and it now records the same path
+# every time.
+#
+# The link name carries the app and configuration because two apps, or the same
+# app in Debug and Release, resolve to different keyed directories and must not
+# fight over one link.
+MT_CAPS_LIBS_REAL="$MT_CAPS_LIBS_DIR"
+MT_CAPS_LIBS_LINK="$(dirname "$(dirname "$MT_CAPS_LIBS_REAL")")/_xcode-${MT_APP_NAME}-${CONFIGURATION}"
+if ln -sfn "$MT_CAPS_LIBS_REAL" "$MT_CAPS_LIBS_LINK" 2>/dev/null; then
+    for i in "${!MT_SETTINGS[@]}"; do
+        case "${MT_SETTINGS[$i]}" in
+            MT_CAPS_LIBS_DIR=*) MT_SETTINGS[$i]="MT_CAPS_LIBS_DIR=$MT_CAPS_LIBS_LINK" ;;
+        esac
+    done
+else
+    # A filesystem that cannot symlink is not a reason to fail the build; it
+    # only means the warnings come back.
+    echo "WARNING: could not create $MT_CAPS_LIBS_LINK -- Xcode will record the" >&2
+    echo "         keyed deps path and emit stale-file warnings after a caps change." >&2
+fi
 export MT_FFMPEG_BUILD_MODE
 case "$MT_CAPS_RESOLVED" in
     *MT_COMMERCIAL_BUILD=1*) export COMMERCIAL=1 ;;
@@ -218,22 +288,68 @@ if [[ "$CLEAN" == "true" ]]; then
     echo "Clean complete."
     exit 0
 fi
-# shellcheck disable=SC2086
-xcodebuild "${XCODE_ARGS[@]}" "${MT_SETTINGS[@]}" MT_CAPS_WRAPPER=1 ${MTENGINE_XCODE_ARGS:-} build
-
-# Ask the build where the product is -- never search DerivedData.
+# Ask the build where the product is -- never search DerivedData. Asked BEFORE
+# the build, not after, because the embedded-dylib guard below needs the path
+# while the bundle still holds the PREVIOUS build's copies. It costs nothing
+# extra: this query used to run here anyway, just a few lines later.
 BUILT_PRODUCTS_DIR=$(xcodebuild "${XCODE_ARGS[@]}" "${MT_SETTINGS[@]}" MT_CAPS_WRAPPER=1 \
     -showBuildSettings 2>/dev/null \
     | awk -F' = ' '/ BUILT_PRODUCTS_DIR = /{gsub(/^[ \t]+|[ \t]+$/, "", $2); print $2; exit}')
 APP_BUNDLE="$BUILT_PRODUCTS_DIR/$MT_MACOS_SCHEME.app"
+
+# ---------------------------------------------------------------------------
+# EMBEDDED DYLIBS ARE REPLACED, NEVER OVERWRITTEN IN PLACE.
+#
+# Xcode's copy-files phase writes over the dylib already in
+# Contents/Frameworks, which REUSES ITS INODE. macOS caches a code signature
+# against the vnode, so when the bytes change but the inode does not, dyld
+# refuses the library at the next launch:
+#
+#   Library not loaded: @rpath/libavutil.59.dylib
+#   ... fcntl(fd, F_ADDFILESIGS_RETURN) failed with errno=37   [EALREADY]
+#
+# The app then dies at exec, before main, before the crash reporter exists --
+# so it leaves no crash report, and nothing on screen points at the cause.
+#
+# It bites whenever two builds embed DIFFERENT bytes at the same path, which
+# is exactly what alternating licence tiers does: --tier commercial rebuilds
+# FFmpeg in commercial mode, and the next development build copies the full
+# dylibs back over those same inodes. Measured here three times, once by a
+# maintainer who simply ran the app after a prod build and saw it die.
+#
+# So when the dependency set changes, the whole directory goes and the copy
+# phase recreates it with fresh inodes. Keyed on MT_CAPS_LIBS_DIR because that
+# path carries the caps hash, which is what changes when the tier or any
+# capability does.
+FW_STAMP="$BUILT_PRODUCTS_DIR/.mt-embedded-libs-$MT_MACOS_SCHEME"
+if [[ -d "$APP_BUNDLE/Contents/Frameworks" ]] \
+   && [[ "$(cat "$FW_STAMP" 2>/dev/null)" != "$MT_CAPS_LIBS_DIR" ]]; then
+    echo "Embedded libraries: dependency set changed, replacing them (stale-inode signature guard)"
+    rm -rf "$APP_BUNDLE/Contents/Frameworks"
+fi
+
+# shellcheck disable=SC2086
+xcodebuild "${XCODE_ARGS[@]}" "${MT_SETTINGS[@]}" MT_CAPS_WRAPPER=1 ${MTENGINE_XCODE_ARGS:-} build
+
+mkdir -p "$BUILT_PRODUCTS_DIR" 2>/dev/null || true
+printf '%s\n' "$MT_CAPS_LIBS_DIR" > "$FW_STAMP" 2>/dev/null || true
 APP_BINARY="$APP_BUNDLE/Contents/MacOS/$MT_MACOS_SCHEME"
 [[ -f "$APP_BINARY" ]] || { echo "ERROR: build reported success but no binary at $APP_BINARY" >&2; exit 1; }
 
 # ---------------------------------------------------------------------------
 # 6. licence gate -- generic, engine-owned, runs for every app.
 # ---------------------------------------------------------------------------
-FFMPEG_ON=0
-case "$MT_CAPS_RESOLVED" in *MT_CAP_VIDEO_PLAYBACK=1*) FFMPEG_ON=1 ;; esac
+# KEYED ON THE FLAG, NOT THE CAPABILITY.
+#
+# This used to read `case $MT_CAPS_RESOLVED in *MT_CAP_VIDEO_PLAYBACK=1*)`, and
+# MT_CAPS_RESOLVED is canonical_form, which structurally cannot carry an
+# MT_ENABLE_*. So it could not see an FFmpeg-less build at all: it would demand
+# a .ffmpeg-build-mode marker from a build that deliberately has no FFmpeg and
+# exit 1. Video-on/FFmpeg-off is the whole point of the programme, so the gate
+# has to ask about FFmpeg. The flag is in scope because this driver now reads
+# the emitted fragment (engine 29212704); the :-1 is a belt-and-braces default
+# matching "absent means on" everywhere else, not the working path.
+FFMPEG_ON="${MT_ENABLE_FFMPEG:-1}"
 if [[ "$FFMPEG_ON" == "1" ]]; then
     MARKER="$MT_CAPS_LIBS_DIR/.ffmpeg-build-mode"
     MARKER_MODE="$(cat "$MARKER" 2>/dev/null || echo missing)"
@@ -249,6 +365,28 @@ if [[ "$FFMPEG_ON" == "1" ]]; then
             && SCAN_DIR="$APP_BUNDLE/Contents/Frameworks"
         bash "$SCRIPT_DIR/scan-forbidden-symbols.sh" --mode "$MT_FFMPEG_BUILD_MODE" --libs "$SCAN_DIR"
     fi
+fi
+
+# ---------------------------------------------------------------------------
+# 6b. THE POSITIVE HALF of the licence gate.
+#
+# Everything above checks WHICH DECODERS are inside a libavcodec that is
+# present. Nothing checked the claim this programme actually makes: that a
+# distributed build contains no FFmpeg at all. scan-capability-symbols.sh's
+# `forbidden_when_off` cannot -- it runs only when MT_CAP_VIDEO_PLAYBACK is 0,
+# and a store build has it at 1.
+#
+# RUN IN BOTH DIRECTIONS, ON EVERY BUILD, and that is deliberate. A gate that
+# only ever executes in the rare configuration is a gate nobody has tested; this
+# one asserts the ordinary truth on every ordinary build, so it is exercised
+# constantly and its failure mode is known. It was proven to fail before it was
+# trusted: on an FFmpeg-on bundle `--expect absent` reports 19 matches including
+# nine staged dylibs.
+# ---------------------------------------------------------------------------
+if [[ "$FFMPEG_ON" == "1" ]]; then
+    bash "$SCRIPT_DIR/scan-no-ffmpeg.sh" --binary "$APP_BINARY" --bundle "$APP_BUNDLE" --expect present
+else
+    bash "$SCRIPT_DIR/scan-no-ffmpeg.sh" --binary "$APP_BINARY" --bundle "$APP_BUNDLE" --expect absent
 fi
 
 
@@ -284,7 +422,63 @@ if [[ "${MT_RELEASE_SYMBOLS:-1}" == "0" ]]; then
     # the local symbols too, which is what a distributed artifact sheds.
     strip -Sx "$APP_BINARY"
     AFTER=$(nm "$APP_BINARY" 2>/dev/null | wc -l | tr -d ' ')
-    codesign -f -s - "$APP_BUNDLE" 2>/dev/null || true
+    # RE-SIGN THE EXECUTABLE, AND FAIL IF IT DOES NOT WORK.
+    #
+    # strip invalidates the ad-hoc signature Xcode applied, and on Apple
+    # silicon an invalid signature is not a warning: the kernel SIGKILLs the
+    # process at exec, before main, with no output at all -- the caller sees
+    # "Killed: 9" and an empty log, with nothing pointing at the signature. So
+    # this step is not cosmetic, and its failure must not be swallowed, which
+    # it was by `2>/dev/null || true` for as long as this driver has existed.
+    #
+    # SIGNED OUTSIDE THE BUNDLE, THEN COPIED BACK. That looks roundabout and is
+    # the only arrangement that works; the two obvious ones both fail:
+    #
+    #   - `codesign` on ANY path inside a bundle operates on the BUNDLE, not on
+    #     the file named. Pointed at Contents/MacOS/<app> it exits 1 with "code
+    #     object is not signed at all / In subcomponent:
+    #     .../Frameworks/libswresample.<v>.dylib", because a bundle cannot be
+    #     sealed while its nested code is unsigned -- and leaves the app
+    #     stripped and unsigned. That is the original bug.
+    #
+    #   - Signing those nested dylibs first fixes THIS build and breaks the
+    #     NEXT one. Measured: Xcode's copy-files phase does not re-copy a dylib
+    #     whose timestamp and size are unchanged, so the signatures survive
+    #     into a later development build and dyld then refuses them --
+    #     "Library not loaded: @rpath/libavutil.59.dylib ... fcntl(fd,
+    #     F_ADDFILESIGS_RETURN) failed with errno=37". A whole suite run died
+    #     that way. Never sign an artefact a later incremental build will reuse.
+    #
+    # A lone Mach-O outside any bundle has no nested code to seal, so signing
+    # it succeeds; the signature is embedded in the file and travels with the
+    # bytes when it is copied back. strip touched exactly one file, and exactly
+    # one file is re-signed.
+    # SIGNED AND VERIFIED WHILE IT IS STILL A LONE MACH-O, then copied back.
+    #
+    # Both halves have to happen outside the bundle, and for the same reason:
+    # codesign given ANY path inside a bundle acts on the BUNDLE. Signing there
+    # fails on the unsigned nested dylibs; verifying there fails on whatever
+    # else the bundle root holds -- one app stages assets/, data/ and
+    # cache/ beside Contents/, and codesign calls that "unsealed contents
+    # present in the bundle root" and exits 1 even when the executable is
+    # perfectly signed. Neither complaint is about the thing strip touched.
+    #
+    # A lone Mach-O has no bundle, no nested code and no seal, so both
+    # operations mean exactly what they say. The signature is embedded in the
+    # file and travels with the bytes when it is copied back.
+    SIGN_TMP_DIR="$(mktemp -d)"
+    SIGN_TMP="$SIGN_TMP_DIR/$(basename "$APP_BINARY")"
+    if ! cp "$APP_BINARY" "$SIGN_TMP" \
+       || ! codesign -f -s - "$SIGN_TMP" \
+       || ! codesign --verify "$SIGN_TMP"; then
+        rm -rf "$SIGN_TMP_DIR"
+        echo "ERROR: the stripped executable could not be re-signed and verified." >&2
+        echo "       On Apple silicon it would be killed at exec with no output." >&2
+        echo "       Not shipping it." >&2
+        exit 1
+    fi
+    cp "$SIGN_TMP" "$APP_BINARY"
+    rm -rf "$SIGN_TMP_DIR"
     echo "Symbols: STRIPPED for distribution ($BEFORE -> $AFTER nm lines); dSYM retained at $SYMBOLS_DIR"
 else
     echo "Symbols: kept in the binary (MT_RELEASE_SYMBOLS=$MT_RELEASE_SYMBOLS); dSYM at $SYMBOLS_DIR"

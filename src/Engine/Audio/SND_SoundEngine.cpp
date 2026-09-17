@@ -79,6 +79,16 @@ void SDLCALL playCallback(void *udata, SDL_AudioStream *stream, int additional_a
 //	LOGD("playCallback completed");
 }
 
+u32 SND_GetEngineSampleRate()
+{
+	// Before SND_Init() there is no engine, but callers still need a truthful
+	// answer -- returning 0 here would make every seconds-to-samples conversion
+	// divide by zero rather than fail visibly.
+	if (gSoundEngine == NULL)
+		return SOUND_SAMPLE_RATE;
+	return gSoundEngine->engineSampleRate;
+}
+
 void SND_Init()
 {
 	LOGA("SND_Init");
@@ -123,6 +133,10 @@ void SND_Shutdown()
 
 CSoundEngine::CSoundEngine()
 {
+	// Established here and read everywhere via SND_GetEngineSampleRate(). The
+	// macro is the initial value; the variable is the source of truth.
+	this->engineSampleRate = SOUND_SAMPLE_RATE;
+
 	this->mutex = new CSlrMutex("CSoundEngine");
 	
 #if defined(WRITE_AUDIO_OUT_TO_FILE)
@@ -264,7 +278,9 @@ bool CSoundEngine::SetOutputAudioDevice(const char *deviceName)
 	// Set the audio format
 	SDL_AudioSpec wanted;
 	memset(&wanted, 0x00, sizeof(SDL_AudioSpec));
-	wanted.freq = 44100;
+	// ONE declaration. This used to be a bare 44100 literal sitting next to an
+	// unrelated SOUND_SAMPLE_RATE macro; the two could drift silently.
+	wanted.freq = (int)this->engineSampleRate;
 	wanted.format = SDL_AUDIO_S16LE;
 	wanted.channels = 2;    // 1 = mono, 2 = stereo
 

@@ -34,8 +34,8 @@
       "implies": ["MT_CAP_HTTP", "MT_CAP_HTTPS"],
       "implies_note": "HTTPS, not merely HTTP, and it is settled rather than assumed: CLlamaModelManager.cpp:228 builds EVERY model URL as https://huggingface.co/..., and httplib::Client on an https:// host without TLS support fails at runtime. LLM=1 HTTPS=0 would build, link and be unable to fetch any model -- the succeeds-and-lies shape #3.4 abolishes. There is no plain-HTTP model source in the tree, so splitting the downloader would buy a configuration nothing uses.",
       "enables": ["MT_ENABLE_LLAMA_CPP"],
-      "app_visible": false,
-      "app_visible_note": "No app guards on MT_ENABLE_LLAMA_CPP. Measured by grepping all four app src/ trees.",
+      "app_visible": true,
+      "app_visible_note": "Corrected from false on 2026-09-06. The measurement behind the old value -- no app GUARDS on MT_ENABLE_LLAMA_CPP -- was true and is the wrong test. The right one is FFmpeg's: a flag is app-visible if it appears in a header app TUs include. GUI/Helpers/CGuiViewLlamaModelLoader.h is now guarded on MT_ENABLE_LLAMA_CPP (it owns a CLlamaModelDownloader, which owns a CFileDownloader, which needs httplib), and the template includes that header inside its own `#if MT_CAP_LLM`. With the flag engine-only the header declared nothing in an app TU while the app believed the capability was on, and the app failed to compile against an incomplete type.",
       "dependencies": [
         { "name": "llama.cpp", "licence": "MIT", "version": "submodule other/lib/llama.cpp", "provenance": "git submodule", "size_mb": 598, "commercial_safe": true }
       ],
@@ -63,13 +63,11 @@
       "app_visible": true,
       "app_visible_note": "MT_ENABLE_FFMPEG appears in Video/CVideoSourceFFmpeg.h:10, a header app TUs include, AND one host app guards on it 40 times in its own src/. Both routes to app-visible are exercised by this one flag. MT_ENABLE_WEBM_VPX (added 2026-08-31, unification plan Phase 2) gates the legacy nestegg/vpx/opus lane -- CVideoSourceWebMVpx compiled unconditionally before, which made MT_CAP_VIDEO_PLAYBACK=0 an engine-blocked configuration: the link died on opus_*/vpx_* against the stub archive.",
       "conditional_headers": [
-        "Video/CAudioDecoderAACMF.h:17", "Video/CAudioDecoderWMAMF.h:23",
-        "Video/CVideoDecoderWMVMF.h:22", "Video/CVideoDecoderHEVCVT.h:11",
-        "Video/CVideoDecoderHEVCMF.h:16", "Video/CVideoFrameExtractor.h:10",
-        "Video/CVideoSourceFFmpeg.h:10", "Video/MFComThreadGuard.h:16"
+        "Video/CVideoFrameExtractor.h:10", "Video/CVideoSourceFFmpeg.h:10"
       ],
+      "conditional_headers_note": "Was eight entries; six of them stopped being conditional in fd75d490/da10184f and only their explanatory COMMENTS still name MT_ENABLE_FFMPEG. Trimmed 2026-09-10 to the two that really are gated. The six OS-native decoder headers -- AACMF, WMAMF, WMVMF, HEVCVT, HEVCMF, MFComThreadGuard -- are now platform-only on purpose: each survives precisely when FFmpeg does not, which is what makes an OS-decode store build possible. Listing them here claimed the opposite.",
       "dependencies": [
-        { "name": "FFmpeg", "licence": "LGPL-2.1 (GPL components excluded)", "version": "see platform/*/build-video_codecs.*", "provenance": "downloaded tarball", "commercial_safe": true },
+        { "flag": "MT_ENABLE_FFMPEG", "name": "FFmpeg", "licence": "LGPL-2.1 (GPL components excluded)", "version": "7.1.2", "provenance": "downloaded tarball", "licence_url": "https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html", "source_url": "https://ffmpeg.org/releases/ffmpeg-7.1.2.tar.xz", "commercial_safe": false, "note": "THE FLAG AND THE FALSE ARE BOTH LOAD-BEARING, and neither was here before 2026-09-10. Without `flag` this row was emitted into LICENSES.txt even at MT_ENABLE_FFMPEG=0, so a store build shipping no FFmpeg still declared one -- a false statement to users, made by the build (tracker 3.9). commercial_safe was `true`, which flatly contradicted the store rule this programme exists to satisfy (tracker 3.4): LGPL-2.1 #6 cannot be discharged inside a signed, receipt-checked, library-validated store bundle, and shipping it as a dylib does NOT discharge it. With both fields present the deny-list means what it says -- MT_COMMERCIAL_BUILD=1 with MT_ENABLE_FFMPEG=1 now REFUSES TO RESOLVE, and a commercial build must set MT_ENABLE_FFMPEG=0. It fires for none of the four apps' shipped manifests, which all resolve MT_COMMERCIAL_BUILD=0. The version is the real one now rather than 'see platform/*/build-video_codecs.*', which meant the library a user may exercise their #6(b) right to replace could not be identified from the document granting it (tracker 3.2)." },
         { "flag": "MT_ENABLE_WEBM_VPX", "name": "libvpx", "licence": "BSD-3-Clause", "version": "see build-video_codecs", "provenance": "downloaded tarball", "commercial_safe": true },
         { "flag": "MT_ENABLE_WEBM_VPX", "name": "opus", "licence": "BSD-3-Clause", "version": "see build-video_codecs", "provenance": "downloaded tarball", "commercial_safe": true },
         { "flag": "MT_ENABLE_WEBM_VPX", "name": "nestegg", "licence": "ISC", "version": "vendored", "provenance": "vendored source", "commercial_safe": true }
@@ -96,7 +94,7 @@
         "demuxers": ["asf", "avi", "matroska", "mov", "mpegps", "mpegts", "mpegvideo"],
         "demuxers_note": "Identical in both modes -- asf demuxing is licensing-safe under Microsoft's Open Specification Promise -- and none select-depends on another demuxer."
       },
-      "symbols": { "forbidden_when_off": "av_|avcodec_|avformat_|vpx_|opus_", "required_when_on": "avcodec_" }
+      "symbols": { "forbidden_when_off": "[^A-Za-z0-9]av_|avcodec_|avformat_|vpx_|opus_", "required_when_on": "avcodec_", "symbols_note": "The leading alternative is [^A-Za-z0-9]av_ and NOT a bare av_, which was a false positive with teeth: the patterns are grep -E against whole nm lines, so `av_` matched miniaudio's ma_dr_wav_alaw_to_f32 and every other ma_dr_wav_* symbol, and MT_CAP_VIDEO_PLAYBACK=0 failed the capability matrix from the day miniaudio landed -- for a library that has nothing to do with video. A symbol-start class fixes it without narrowing what is actually forbidden: nm writes _av_free on macOS and av_free elsewhere, and both are preceded by a non-alphanumeric." }
     },
 
     "MT_CAP_PHOTO_CODECS": {
@@ -234,7 +232,8 @@
       "kind": "engine-compiled",
       "implies": [],
       "enables": ["MT_ENABLE_ENET"],
-      "app_visible": false,
+      "app_visible": true,
+      "app_visible_note": "Corrected from false on 2026-09-06, for the same reason as MT_CAP_HTTP. One host includes enet.h directly and drives ENet portable SOCKET calls from eight of its own transport files, and a game names ENetPeer in one of its headers.",
       "dependencies": [
         { "name": "ENet", "licence": "MIT", "version": "vendored", "provenance": "vendored source", "commercial_safe": true }
       ],
@@ -251,8 +250,9 @@
       "kind": "engine-compiled",
       "implies": ["MT_CAP_NET_TRANSPORT", "MT_CAP_HTTP"],
       "implies_note": "Gating NET_GAME without these gates nothing, and its acceptance criterion then passes vacuously.",
-      "enables": [],
-      "app_visible": false,
+      "enables": ["MT_ENABLE_NET_GAME"],
+      "app_visible": true,
+      "app_visible_note": "A game guards its own lobby and dashboard on the net-game stack, and the flag below is new, so it is app-visible from the start rather than corrected later.",
       "dependencies": [],
       "acquisition": {},
       "artefacts": {},
@@ -267,10 +267,11 @@
       "kind": "engine-compiled",
       "implies": [],
       "enables": ["MT_ENABLE_HTTPLIB"],
-      "app_visible": false,
-      "ownership_note": "MT_CAP_HTTP OWNS cpp-httplib. MT_CAP_LLM depends on it and must not own it: Tools/NetGame/CFileDownloader.cpp is a shared consumer independent of any LLM, so leaving httplib inside the llama.cpp submodule makes a plain HTTP-only app pay for a 598 MB dependency to download a file.",
+      "app_visible": true,
+      "app_visible_note": "Corrected from false on 2026-09-06. THREE of the four apps include httplib.h directly -- the template's file-downloader example, one host's REST client, and a game's lobby, asset-sync and eight test files -- so an engine-only flag was simply wrong. It mattered the moment the capability got real guards: engine_only_defines() keeps such a flag out of MT_CAPS_DEFINES, the app xcconfigs read only that, and the Windows ide-defines-app.txt omits it, so an app-side `#if MT_ENABLE_HTTPLIB` evaluated to 0 on macOS and Windows however the capability resolved -- while Linux mt_apply_capabilities marks every define PUBLIC and got it right. A guard that disagrees across platforms is worse than no guard.",
+      "ownership_note": "MT_CAP_HTTP OWNS cpp-httplib. MT_CAP_LLM depends on it and must not own it: Tools/NetGame/CFileDownloader.cpp is a shared consumer independent of any LLM, so leaving httplib inside the llama.cpp submodule makes a plain HTTP-only app pay for a 598 MB dependency to download a file. #5.3 done 2026-09-09: cpp-httplib is vendored under other/lib/cpp-httplib, copied verbatim from the llama.cpp vendor tree and independent of the llama.cpp submodule; the two engine wrapper includes (src/Engine/Libs/httplib/httplib.h and httplib_vendor.cpp) point there.",
       "dependencies": [
-        { "name": "cpp-httplib", "licence": "MIT", "version": "currently reached through other/lib/llama.cpp/vendor/cpp-httplib; #5.3 vendors it as an engine-owned dependency", "provenance": "vendored (via submodule today)", "commercial_safe": true }
+        { "name": "cpp-httplib", "licence": "MIT", "version": "0.40.0", "provenance": "vendored under other/lib/cpp-httplib (engine-owned, independent of llama.cpp)", "commercial_safe": true }
       ],
       "acquisition": {},
       "artefacts": {},
@@ -321,18 +322,32 @@
 
     "MT_CAP_MUSIC_PLAYER": {
       "short": "MUSIC_PLAYER",
-      "description": "Music player and playlists. Used by one host app today.",
+      "description": "Music player and playlists: Ogg via Tremor, MP3/FLAC/WAV via miniaudio, AAC/ALAC via the OS decoder where one exists.",
       "default": 1,
       "kind": "engine-compiled",
       "implies": [],
       "implies_note": "It does NOT imply an AUDIO capability: audio is CORE and has no vocabulary key, so an implication onto it would make mtcaps exit 2 on an unknown key. The coupling is real and is stated here as prose: the music player needs the core audio path, which is always present.",
-      "enables": [],
+      "enables": ["MT_ENABLE_MUSIC_PLAYER"],
       "app_visible": false,
-      "dependencies": [],
+      "dependencies": [
+        {
+          "flag": "MT_ENABLE_MUSIC_PLAYER",
+          "name": "miniaudio",
+          "licence": "public domain (or MIT-0, at the user's choice)",
+          "version": "0.11.25",
+          "provenance": "vendored source",
+          "commercial_safe": true,
+          "note": "Decode-only: compiled with MA_NO_DEVICE_IO and friends, so none of its playback backends is built. Supplies dr_mp3, dr_flac and dr_wav, which is what makes MP3/FLAC/WAV store-safe."
+        }
+      ],
       "acquisition": {},
       "artefacts": {},
       "commercial": { "effect": "none" },
-      "symbols": { "forbidden_when_off": "", "required_when_on": "" }
+      "symbols": {
+        "forbidden_when_off": "ma_decoder_|CSlrMusicFileMiniaudio",
+        "required_when_on": "ma_decoder_",
+        "symbols_note": "Was empty in both directions -- the capability was declared and guarded nothing, so nothing could be asserted about it either. ma_decoder_ is the honest marker: miniaudio is compiled decode-only and its decoder entry points are what a music-player build links that a non-music build must not. CSlrMusicFile* are the engine's own classes and appear only when the player is compiled in. CSlrMusicFileResampled WAS listed here and is not any more; the removal is a CORRECTION, not a relaxation. Since the 2026-09-10 resampling refactor it is CSlrMusicFileOgg's base class, and Ogg is CORE -- it is present at MT_CAP_MUSIC_PLAYER=0 today (46 symbols, measured) and always was. A pattern that forbids a core class's base forbids the core class, so it failed the matrix the moment the refactor landed and said nothing true when it passed."
+      }
     },
 
     "MT_CAP_MIDI": {
@@ -461,6 +476,69 @@
       "artefacts": {},
       "commercial": { "effect": "none" },
       "symbols": { "forbidden_when_off": "tmt_", "required_when_on": "tmt_" }
+    },
+
+    "MT_CAP_OPENCV": {
+      "short": "OPENCV",
+      "description": "OpenCV 5 core, imgproc, geometry and features, built from the pinned source tarball. Images cross the engine boundary through src/Engine/OpenCV/MT_OpenCV.h.",
+      "default": 0,
+      "kind": "engine-compiled",
+      "implies": [],
+      "implies_note": "Nothing, deliberately. The bridge reads and writes CImageData and never asks a codec to open a file, so an app that wants OpenCV to see a JPEG turns MT_CAP_PHOTO_CODECS on as well -- rather than an implication hiding a 40 MB codec bundle behind a vision capability.",
+      "enables": ["MT_ENABLE_OPENCV"],
+      "app_visible": true,
+      "app_visible_note": "Apps include OpenCV headers directly and gate their own views on MT_CAP_OPENCV; the engine supplies only the CImageData <-> cv::Mat bridge.",
+      "note": "THE FIRST CAPABILITY WHOSE DEFAULT IS 0. Every other capability defaults to 1 and its acquisition script spells the fallback ${MT_ENABLE_X:-1}, so a bare engine clone builds everything. OpenCV must not: turning it on downloads 154 MB of tarballs and builds a second computer-vision library, and only two of the five apps want it. Its script therefore spells the fallback :-0, the standalone xcconfig and CMake defaults say 0, and absent means OFF.",
+      "naming_note": "It keeps the library name. There is no engine feature to abstract -- the engine's own OpenCV surface is one bridge header, and every host that turns this on calls the cv:: API directly -- so the library name IS the capability.",
+      "dependencies": [
+        { "name": "OpenCV", "licence": "Apache-2.0", "version": "5.0.0", "provenance": "source tarball https://github.com/opencv/opencv/archive/refs/tags/5.0.0.tar.gz, sha256 b0528f5a1d379d59d4701cb28c36e22214cc51cf64594e5b56f2d3e6c0233095 pinned in platform/*/build-opencv.*; downloaded only when MT_ENABLE_OPENCV=1", "size_mb": 82, "commercial_safe": true }
+      ],
+      "acquisition": { "linux": "platform/Linux/build-opencv.sh", "macos": "platform/MacOS/build-opencv.sh", "windows": "platform/Windows/build-opencv.ps1" },
+      "artefacts": { "linux": "libmt_opencv.a", "macos": "libmt_opencv.a", "windows": "mt_opencv.lib" },
+      "commercial": { "effect": "none" },
+      "symbols": { "forbidden_when_off": "_ZN2cv|@cv@@", "required_when_on": "_ZN2cv3Mat|Mat@cv@@" }
+    },
+
+    "MT_CAP_OPENCV_NONFREE": {
+      "short": "OPENCV_NONFREE",
+      "description": "opencv_contrib xfeatures2d built with OPENCV_ENABLE_NONFREE: SURF (patented) plus FREAK, BRIEF and DAISY, which left the main repository in 5.0.",
+      "default": 0,
+      "kind": "dependency-only",
+      "implies": ["MT_CAP_OPENCV"],
+      "enables": ["MT_ENABLE_OPENCV_NONFREE"],
+      "app_visible": true,
+      "note": "SIFT IS NOT HERE. Its patent expired in 2020, it moved into the main repository in 4.4, and in 5.0 it lives in the features module -- so MT_CAP_OPENCV alone gives SIFT, ORB, BRISK, FAST, MSER and SimpleBlobDetector. What this capability adds is SURF, still patented and still compiled only under OPENCV_ENABLE_NONFREE, together with the descriptors that moved to contrib in 5.0.",
+      "ownership_note": "One build unit and one archive serve both capabilities: it is a single CMake configure, so the per-unit store is keyed by both keys and a flip here rebuilds rather than reusing a tree configured without contrib.",
+      "dependencies": [
+        { "name": "opencv_contrib (xfeatures2d)", "licence": "Apache-2.0; SURF is patent-encumbered and may not be distributed commercially without a licence", "version": "5.0.0", "provenance": "source tarball https://github.com/opencv/opencv_contrib/archive/refs/tags/5.0.0.tar.gz, sha256 c58f6344170c39abf187c56f3843b59cab1fd3e89cf19ba2ce25dc061659b27f pinned in platform/*/build-opencv.*; downloaded only when MT_ENABLE_OPENCV_NONFREE=1", "size_mb": 72, "commercial_safe": false, "flag": "MT_ENABLE_OPENCV_NONFREE" }
+      ],
+      "acquisition": { "linux": "platform/Linux/build-opencv.sh", "macos": "platform/MacOS/build-opencv.sh", "windows": "platform/Windows/build-opencv.ps1" },
+      "artefacts": { "linux": "libmt_opencv.a", "macos": "libmt_opencv.a", "windows": "mt_opencv.lib" },
+      "commercial": { "effect": "capability-off", "note": "A commercial build must not carry a patented algorithm, so resolve turns this off before the fragments, LICENSES.txt and the out_dir hash are written, and the symbol gate proves the binary defines no xfeatures2d symbol." },
+      "symbols": { "forbidden_when_off": "xfeatures2d", "required_when_on": "xfeatures2d" }
+    },
+
+    "MT_CAP_YOLO": {
+      "short": "YOLO",
+      "description": "Object detection: OpenCV 5's dnn module, an ONNX model catalogue and a downloader. Ships no model weights.",
+      "default": 0,
+      "kind": "engine-compiled",
+      "implies": ["MT_CAP_OPENCV", "MT_CAP_HTTP", "MT_CAP_HTTPS"],
+      "implies_note": "OPENCV because the detector IS OpenCV's dnn module. HTTPS as well as HTTP because every catalogue URL is https://huggingface.co/..., and httplib::Client on an https host without TLS support fails at runtime -- the same pairing, for the same reason, that MT_CAP_LLM carries.",
+      "enables": ["MT_ENABLE_YOLO"],
+      "app_visible": true,
+      "app_visible_note": "The template guards its own model-selector and camera-demo views on MT_CAP_YOLO, and includes engine headers that are guarded on MT_ENABLE_YOLO.",
+      "note": "IT OWNS NO SCRIPT OF ITS OWN, but it does own the ARCHIVE'S CONTENT. build-opencv.* already produces libmt_opencv.a; this capability makes that one configure add `dnn` and bundled protobuf to it -- 45 MB with, 16.6 MB without, measured. So it names the same acquisition scripts and artefacts as MT_CAP_OPENCV and keys the deps bucket alongside it: resolve.deps_key_capabilities says a key that carries less REUSES A WRONG ARCHIVE, and two different archives at one path is exactly what an empty acquisition table would have produced.",
+      "ownership_note": "It also joins the opencv build unit's `reads`, so the per-unit store is keyed by all three OpenCV-family capabilities. One CMake configure serves them all.",
+      "dependencies": [
+        { "name": "OpenCV dnn module", "licence": "Apache-2.0", "version": "5.0.0", "provenance": "a module of the OpenCV tarball MT_CAP_OPENCV already pins; built only when MT_ENABLE_YOLO=1", "commercial_safe": true },
+        { "name": "protobuf (bundled by OpenCV)", "licence": "BSD-3-Clause", "version": "bundled in opencv 5.0.0 3rdparty", "provenance": "BUILD_PROTOBUF=ON; ONNX parsing needs it. No download: it is inside the pinned tarball, and WITH_ONNXRUNTIME stays off because that is what would fetch something", "commercial_safe": true },
+        { "name": "MLAS (bundled by OpenCV, from ONNX Runtime)", "licence": "MIT", "version": "bundled in opencv 5.0.0 3rdparty", "provenance": "a CMake OBJECT library rather than an archive; see platform/*/build-opencv.* for how it reaches the merge", "commercial_safe": true }
+      ],
+      "acquisition": { "linux": "platform/Linux/build-opencv.sh", "macos": "platform/MacOS/build-opencv.sh", "windows": "platform/Windows/build-opencv.ps1" },
+      "artefacts": { "linux": "libmt_opencv.a", "macos": "libmt_opencv.a", "windows": "mt_opencv.lib" },
+      "commercial": { "effect": "none", "note": "No model weights are shipped, so nothing here is patent- or copyleft-encumbered. The catalogue lists Apache-2.0 models only, and a test enforces that; every Ultralytics YOLO is AGPL-3.0, which obliges the WHOLE application to be open-sourced, so those are reachable only by a user browsing to their own file, where the choice and the obligation are theirs." },
+      "symbols": { "forbidden_when_off": "_ZN2cv3dnn|@dnn@cv@@", "required_when_on": "_ZN2cv3dnn" }
     }
   }
 }

@@ -85,7 +85,9 @@ def _compute_out(args, vocab, values, canonical, engine_options):
     mode = "commercial" if values[V.COMMERCIAL_KEY] == 1 else "full"
     backend = R.backend_hash(engine_options)
     chash = R.caps_hash(canonical)
-    out = R.out_dir(root, args.app, rev, args.platform, args.arch, args.config,
+    # rev is still resolved and reported (emit.py stamps it into the generated
+    # fragments) but is NOT a path segment any more -- see R.out_dir.
+    out = R.out_dir(root, args.app, args.platform, args.arch, args.config,
                     mode, backend, chash)
     build = R.build_dir(root, args.app, args.platform, args.arch, args.config,
                         mode, backend, chash)

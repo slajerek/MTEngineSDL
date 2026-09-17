@@ -188,6 +188,7 @@ const char *CServerGame::GetStatusName()
 	{
 		case STARTING:  return "STARTING";
 		case RUNNING:   return "RUNNING";
+		case STOPPING:  return "STOPPING";
 		case SUSPENDED: return "SUSPENDED";
 		case FINISHED:  return "FINISHED";
 	}

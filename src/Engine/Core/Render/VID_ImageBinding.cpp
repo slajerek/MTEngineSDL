@@ -11,6 +11,8 @@
 #include "CRenderBackend.h"
 #include "VID_Main.h"
 #include <time.h>
+#include <atomic>
+#include <chrono>
 #include <list>
 #include <vector>
 #include "SYS_Threading.h"
@@ -49,6 +51,62 @@ std::list<CBindingImageData *> imageBindings;
 static std::vector<unsigned int> deferredTextureDeletes;
 
 CSlrMutex* bindingMutex = NULL;
+
+// ---------------------------------------------------------------------------
+// Frame-budget throttle (see VID_ImageBinding.h for the whole rationale)
+// ---------------------------------------------------------------------------
+// Atomic only for defensive publication: both are set from the render thread
+// and read from the render thread. Default OFF -- unthrottled, as before.
+static std::atomic<bool>  bindThrottleEnabled{false};
+static std::atomic<float> bindThrottleFactor{1.0f};
+
+// When the previous VID_BindImages() returned. Render-thread only.
+//
+// The gap between that stamp and the next call IS the rest of the frame:
+// VID_BindImages runs at the top of VID_Render, so everything between one
+// return and the next entry is the app's own frame work plus the present. That
+// is why the whole throttle fits in this file with no hook in the frame loop --
+// the one number it needs, it can measure itself. Stamped on EVERY call,
+// throttled or not, so flipping the throttle on does not start it off with a
+// stale multi-second gap.
+static double bindPrevEndSec = -1.0;
+
+static double VID_BindNowSec()
+{
+	using namespace std::chrono;
+	return duration_cast<duration<double>>(
+			steady_clock::now().time_since_epoch()).count();
+}
+
+void VID_SetImageBindingThrottle(bool enabled, float frameBudgetFactor)
+{
+	if (!(frameBudgetFactor >= 0.1f))   // also catches NaN
+		frameBudgetFactor = 0.1f;
+	bindThrottleEnabled.store(enabled, std::memory_order_relaxed);
+	bindThrottleFactor.store(frameBudgetFactor, std::memory_order_relaxed);
+}
+
+bool VID_IsImageBindingThrottleEnabled()
+{
+	return bindThrottleEnabled.load(std::memory_order_relaxed);
+}
+
+double VID_ComputeBindBudgetSec(double targetFps, float frameBudgetFactor,
+								double prevFrameRestSec)
+{
+	if (!(targetFps > 0.0))
+		return 0.0;
+	if (!(frameBudgetFactor >= 0.1f))
+		frameBudgetFactor = 0.1f;
+	// No previous call to measure against (first frame, or the clock went
+	// backwards): charge nothing for the rest of the frame.
+	if (!(prevFrameRestSec > 0.0))
+		prevFrameRestSec = 0.0;
+
+	const double framePeriod = 1.0 / targetFps;
+	const double budget = framePeriod * (double)frameBudgetFactor - prevFrameRestSec;
+	return (budget > 0.0) ? budget : 0.0;
+}
 
 void VID_InitImageBindings()
 {
@@ -255,6 +313,22 @@ bool VID_BindImages()
 
 	VID_LockImageBindingMutex();
 
+	// Frame budget for this call (see the header). Computed BEFORE the queue is
+	// touched, from the gap since the previous call -- i.e. what the rest of the
+	// last frame cost -- so the deadline below caps the whole FRAME, not the
+	// binding step alone.
+	const bool   bindThrottle = bindThrottleEnabled.load(std::memory_order_relaxed);
+	const double bindStartSec = VID_BindNowSec();
+	double bindDeadlineSec = 0.0;
+	if (bindThrottle)
+	{
+		bindDeadlineSec = bindStartSec +
+			VID_ComputeBindBudgetSec(VID_GetTargetFPS(),
+									 bindThrottleFactor.load(std::memory_order_relaxed),
+									 (bindPrevEndSec < 0.0) ? -1.0 : (bindStartSec - bindPrevEndSec));
+	}
+	int bindProcessed = 0;
+
 	// Deferred GL texture deletions (VID_PostDeleteGLTexture): safe here --
 	// the previous frame's draw lists have been executed and this frame's
 	// have not been recorded yet, so no recorded ImDrawCmd can still
@@ -291,6 +365,15 @@ bool VID_BindImages()
 
 		while(!imageBindings.empty())
 		{
+			// Frame-budget stop. Checked BEFORE claiming the next entry, and
+			// never before the FIRST one -- the one-per-frame progress
+			// guarantee, without which a frame already slower than the budget
+			// would bind nothing, forever. The queue keeps its order: whatever
+			// is left simply waits for the next frame.
+			if (bindThrottle && bindProcessed > 0 && VID_BindNowSec() >= bindDeadlineSec)
+				break;
+			bindProcessed++;
+
 			CBindingImageData *bindingData = imageBindings.front();
 
 			const char *path = bindingData->image->ResourceGetPath();
@@ -357,6 +440,10 @@ bool VID_BindImages()
 			LOGR("VID_BindImages: image %s", bindModeDebugText);
 		}
 	}
+
+	// Unconditional: the next call's "rest of the frame" measurement must be
+	// valid the very first time the throttle is switched on, not one frame later.
+	bindPrevEndSec = VID_BindNowSec();
 
 	VID_UnlockImageBindingMutex();
 

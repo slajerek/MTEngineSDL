@@ -3,13 +3,15 @@
 // CAudioDecoderAACMF.cpp method-for-method; divergences are marked WMA-DIVERGENCE.
 #include "CAudioDecoderWMAMF.h"
 
-#if defined(_WIN32) && (!defined(MT_ENABLE_FFMPEG) || (MT_ENABLE_FFMPEG))
+// Platform only -- the gate no longer includes MT_ENABLE_FFMPEG. See the
+// header and MT_MediaPacket.h: this decoder is the destination of the FFmpeg
+// removal and must not be switched off by it.
+#if defined(_WIN32)
 
 #include "DBG_Log.h"
 #include "MFComThreadGuard.h"
 
 extern "C" {
-#include <libavcodec/avcodec.h>
 }
 
 #include <cstring>
@@ -34,14 +36,14 @@ namespace
 	// three tags are stable ABI (WAVE_FORMAT_MSAUDIO1/WMAUDIO2/WMAUDIO3),
 	// while the SDK's per-flavor GUID *names* have shifted across header
 	// generations.
-	GUID WmaSubtypeForCodecId(int avCodecId)
+	GUID WmaSubtypeForCodecId(EMediaCodecId codecId)
 	{
 		unsigned int waveTag;
-		switch (avCodecId)
+		switch (codecId)
 		{
-			case AV_CODEC_ID_WMAV1:  waveTag = 0x0160; break; // WAVE_FORMAT_MSAUDIO1 (WMA v1)
-			case AV_CODEC_ID_WMAV2:  waveTag = 0x0161; break; // WAVE_FORMAT_WMAUDIO2 (WMA v2 / "standard")
-			case AV_CODEC_ID_WMAPRO: waveTag = 0x0162; break; // WAVE_FORMAT_WMAUDIO3 (WMA Pro)
+			case EMediaCodecId::WMAV1:  waveTag = 0x0160; break; // WAVE_FORMAT_MSAUDIO1 (WMA v1)
+			case EMediaCodecId::WMAV2:  waveTag = 0x0161; break; // WAVE_FORMAT_WMAUDIO2 (WMA v2 / "standard")
+			case EMediaCodecId::WMAPRO: waveTag = 0x0162; break; // WAVE_FORMAT_WMAUDIO3 (WMA Pro)
 			default:                 waveTag = 0x0161; break;
 		}
 		GUID subtype = MFAudioFormat_Base;
@@ -111,7 +113,7 @@ void CAudioDecoderWMAMF::Teardown()
 // ============================================================================
 // Init -- WAVEFORMATEX-style params + codec-private extradata -> IMFTransform
 // ============================================================================
-bool CAudioDecoderWMAMF::Init(int avCodecId, const u8 *extradata, int extradataSize,
+bool CAudioDecoderWMAMF::Init(EMediaCodecId codecId, const u8 *extradata, int extradataSize,
 							  int channels, int sampleRate, int blockAlign, int avgBytesPerSec)
 {
 	EnsureComInitializedForThisThread();
@@ -126,7 +128,7 @@ bool CAudioDecoderWMAMF::Init(int avCodecId, const u8 *extradata, int extradataS
 		return false;
 	}
 
-	const GUID inputSubtype = WmaSubtypeForCodecId(avCodecId);
+	const GUID inputSubtype = WmaSubtypeForCodecId(codecId);
 	decoderMFT = CreateWmaDecoderMFT(inputSubtype);
 	if (!decoderMFT)
 	{
@@ -361,4 +363,4 @@ bool CAudioDecoderWMAMF::DecodePacket(const u8 *data, int size, std::vector<s16>
 	return true; // true regardless of whether outPCM ended up empty (priming), per class contract
 }
 
-#endif // _WIN32 && MT_ENABLE_FFMPEG
+#endif // _WIN32

@@ -200,6 +200,10 @@ void VID_ResetClipping();
 
 void VID_ResetLogicClock();
 void VID_SetFPS(float fps);
+// The frame rate the engine is PACED FOR (60 by default), not the rate it is
+// achieving. VID_ImageBinding's frame-budget throttle derives one frame period
+// from this, which is why it needed exporting.
+double VID_GetTargetFPS();
 
 float VID_GetScreenWidth();
 float VID_GetScreenHeight();
@@ -355,5 +359,8 @@ void VID_SetMainWindowTitle(const char *title);
 
 void VID_LockRenderMutex();
 void VID_UnlockRenderMutex();
+// How many times the CALLING thread currently holds the render mutex.
+// Used by the imgui_test_engine coroutine bridge; see CImGuiTestEngine.cpp.
+int VID_GetRenderMutexDepth();
 
 #endif

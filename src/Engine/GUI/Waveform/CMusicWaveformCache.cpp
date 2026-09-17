@@ -1,4 +1,13 @@
 #include "CMusicWaveformCache.h"
+// SYS_Defs.h, NOT <strings.h>: the header is POSIX and does not exist on
+// MSVC, so the Windows build stopped at this line. strcasecmp below is the
+// only thing it was here for, and SYS_Defs.h is where this engine already
+// answers that -- `#define strcasecmp(s1, s2) _stricmp(s1, s2)` under WIN32,
+// and <string.h> everywhere else. Same include, in the same position, as
+// CImageData.cpp, which calls strcasecmp on all three platforms.
+#include "SYS_Defs.h"
+#include "CSlrMusicFileResampled.h"
+#include "MT_MusicFileFactory.h"
 
 #include "tremor-ivorbiscodec.h"
 #include "tremor-ivorbisfile.h"
@@ -29,7 +38,12 @@ struct SWaveformCacheFileHeader
 };
 
 constexpr std::array<char, 4> kWaveformCacheMagic = {'M', 'W', 'H', 'F'};
-constexpr uint32_t kWaveformCacheVersion = 1;
+// BUMPED to 2 on 2026-09-10. Sidecars written before that were built only
+// from .ogg through LoadFromOggFile; the general streaming path can produce a
+// different envelope for the same track (different decoder, different frame
+// boundaries), so an old sidecar must be rebuilt rather than trusted. The
+// version field already exists for exactly this -- no new header field.
+constexpr uint32_t kWaveformCacheVersion = 2;
 
 template <typename T>
 bool WriteValue(std::ofstream &out, const T &value)
@@ -78,6 +92,79 @@ bool CMusicWaveformCache::BuildFromInterleavedPcm16(const int16_t *samples, size
 	FillMissingBuckets(hasData);
 	sourceFrameCount = frameCount;
 	sourceChannels = channels;
+	return true;
+}
+
+bool CMusicWaveformCache::LoadFromMusicFile(const std::string &filePath, size_t envelopePoints)
+{
+	if (filePath.empty() || envelopePoints == 0)
+		return false;
+
+	// .ogg keeps its own path: it predates this, it works, and it reads through
+	// libvorbis directly rather than through the mixer's decoder classes.
+	if (filePath.size() > 4 &&
+		strcasecmp(filePath.c_str() + filePath.size() - 4, ".ogg") == 0)
+		return LoadFromOggFile(filePath, envelopePoints);
+
+	CSlrMusicFile *music = MusicFile_Open(filePath.c_str(), NULL);
+	if (music == nullptr)
+		return false;
+	CSlrMusicFileResampled *src = dynamic_cast<CSlrMusicFileResampled *>(music);
+	if (src == nullptr)
+	{
+		delete music;
+		return false;
+	}
+
+	const uint64_t totalFrames = src->GetLengthSamples();
+	if (totalFrames == 0)
+	{
+		delete music;
+		return false;
+	}
+
+	// Same bucket shape and same fill rule as BuildFromInterleavedPcm16, so the
+	// two producers are interchangeable to every consumer -- but STREAMED. A
+	// lossless FLAC or ALAC album track is tens of megabytes of PCM, and that
+	// builder wants all of it resident at once. This is why the item said the
+	// difference between the two builders decides the design.
+	minEnvelope.assign(envelopePoints, 1.0f);
+	maxEnvelope.assign(envelopePoints, -1.0f);
+	std::vector<uint8_t> hasData(envelopePoints, 0);
+
+	const u32 kChunk = 8192;
+	std::vector<s16> buf((size_t)kChunk * 2);   // the analysis reader is always stereo
+	uint64_t frame = 0;
+
+	while (frame < totalFrames)
+	{
+		u32 got = src->ReadAnalysisFrames(buf.data(), kChunk);
+		if (got == 0)
+			break;                               // short file, or a decoder that stopped early
+		for (u32 i = 0; i < got && frame < totalFrames; i++, frame++)
+		{
+			const double sum = (double)buf[(size_t)i * 2 + 0] + (double)buf[(size_t)i * 2 + 1];
+			float mono = (float)(sum / (32767.0 * 2.0));
+			mono = std::clamp(mono, -1.0f, 1.0f);
+
+			size_t bucket = (size_t)((frame * (uint64_t)envelopePoints) / totalFrames);
+			if (bucket >= envelopePoints)
+				bucket = envelopePoints - 1;
+
+			minEnvelope[bucket] = std::min(minEnvelope[bucket], mono);
+			maxEnvelope[bucket] = std::max(maxEnvelope[bucket], mono);
+			hasData[bucket] = 1;
+		}
+	}
+
+	// A decoder that stopped early leaves later buckets empty; FillMissingBuckets
+	// is the same interpolation the in-memory builder relies on, so a partial
+	// read degrades to a flat tail rather than to noise.
+	FillMissingBuckets(hasData);
+	sourceFrameCount = (size_t)frame;
+	sourceChannels = src->GetSourceChannels();
+
+	delete music;
 	return true;
 }
 

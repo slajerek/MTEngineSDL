@@ -1,3 +1,9 @@
+// CAPABILITY GUARD (MT_ENABLE_NET_GAME). The file stays in all three build lists and
+// compiles to nothing when the capability is off -- an Xcode PBXBuildFile
+// cannot be conditioned on a build setting, so the condition lives here.
+// MT_CAP_NET_GAME implies NET_TRANSPORT and HTTP, so this whole stack rides on one flag -- which did not exist until 2026-09-06 (enables was an empty list).
+#if MT_ENABLE_NET_GAME
+
 #include "CRegistryServer.h"
 #include "MT_NetGameAuthDomains.h"
 #include "NET_Main.h"
@@ -11,7 +17,7 @@
 CRegistryServer::CRegistryServer(int port, const string &internalSecret)
 {
 	mutex = new CSlrMutex("CRegistryServerMutex");
-	internalSecretHash = NetGameInternalSecretToHash(internalSecret);
+	internalVerifier = NetGameInternalMakeVerifier(internalSecret);
 	hasClusterConfig = false;
 	adminCommandSeq = 0;
 	adminCommandTimeoutSeconds = 20;
@@ -58,7 +64,7 @@ CRegistryServer::~CRegistryServer()
 void CRegistryServer::Start()
 {
 	netServer->StartServer();
-	if (internalSecretHash.empty())
+	if (!internalVerifier.valid)
 		LOGWarning("CRegistryServer: internal secret not configured; all connections will be rejected");
 	LOGM("CRegistryServer: started on port %d", netServer->serverPort);
 }
@@ -81,14 +87,13 @@ void CRegistryServer::Shutdown()
 
 u8 CRegistryServer::NetServerAuthorize(CNetClientData *clientData, string userName, vector<u8> passwordHash)
 {
-	// Internal service — require shared secret.
-	if (!NetGameInternalSecretMatches(internalSecretHash, passwordHash))
-	{
+	// Internal service — PW2 challenge-response against the shared secret.
+	u8 result = NetGameInternalAuthorize(internalVerifier, clientData, passwordHash);
+	if (result == NET_SERVER_CALLBACK_AUTHORIZE_WRONG_PASSWORD)
 		LOGWarning("CRegistryServer::NetServerAuthorize: rejecting %s (invalid internal secret)", userName.c_str());
-		return NET_SERVER_CALLBACK_AUTHORIZE_WRONG_PASSWORD;
-	}
-	LOGD("CRegistryServer::NetServerAuthorize: accepted %s", userName.c_str());
-	return NET_SERVER_CALLBACK_AUTHORIZE_CORRECT;
+	else if (result == NET_SERVER_CALLBACK_AUTHORIZE_CORRECT)
+		LOGD("CRegistryServer::NetServerAuthorize: accepted %s", userName.c_str());
+	return result;
 }
 
 void CRegistryServer::NetServerCallbackClientConnected(CNetClientData *clientData)
@@ -2655,3 +2660,5 @@ void CRegistryServer::ForceDrainAllGames()
 	}
 	mutex->Unlock();
 }
+
+#endif // MT_ENABLE_NET_GAME

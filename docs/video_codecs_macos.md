@@ -27,8 +27,24 @@ The cache stamp is:
 
 ### FFmpeg is a second, dynamic output
 
-FFmpeg is deliberately **not** merged into `libmt_video_codecs.a` -- shipping it
-as a dylib is what discharges the LGPL obligation. The five libraries are built
+FFmpeg is deliberately **not** merged into `libmt_video_codecs.a`: LGPL-2.1 #6
+requires that a user be able to relink the work with a modified copy of the
+library, and a static archive forecloses that outright, so a dylib is the only
+form in which the obligation is even *addressable*.
+
+**It does not, by itself, discharge that obligation, and this document used to
+say it did.** That sentence was wrong and it was load-bearing -- it appeared in
+five places across this programme and was the stated reason a store build was
+thought compliant. Inside a signed, notarised, library-validated store bundle
+the user cannot replace the dylib: the hardened runtime rejects it. #6(b)'s
+replaceability is removed by the distribution channel, not by the link mode. The
+resolution is not a better link mode but no FFmpeg at all in anything
+distributed -- which is what `MT_ENABLE_FFMPEG=0` exists to produce, and why
+FFmpeg is `commercial_safe: false` in the vocabulary. See
+`MTEngineSDLDummyApp/claude/MEDIA-CODECS-PROGRESS.md` (items 3.2, 3.4, 3.5, C.9).
+
+A dylib remains the right form for the **private, non-distributed** build this
+script serves. The five libraries are built
 into `other/lib/video-codecs/install/lib/` and **also staged next to the
 archive**:
 

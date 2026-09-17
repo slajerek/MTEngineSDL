@@ -218,7 +218,38 @@ if [[ -n "$MANIFEST" || -n "$APP_NAME" ]]; then
         "MT_CAPS_APP=$APP_NAME"
         "MT_CAPS_DEFINES=$(caps_value MT_CAPS_DEFINES)"
         "MT_CAPS_DEFINES_ENGINE=$(caps_value MT_CAPS_DEFINES_ENGINE)"
-        "HEADER_SEARCH_PATHS=\$(inherited) \"$(caps_value MT_CAPS_INCLUDE_DIR)\""
+        # THIS BUILD'S include dir FIRST, ahead of $(inherited), and the order
+        # is the whole point rather than a preference.
+        #
+        # $(inherited) carries the target's own $(MT_CAPS_INCLUDE_DIR), which an
+        # Xcode build resolves through .mtengine-ide/<App>/caps.xcconfig -- a
+        # file the IDE pre-action wrote during some EARLIER build and that a
+        # wrapper build deliberately does not rewrite. With $(inherited) first,
+        # every translation unit found that stale MT_Capabilities.h before this
+        # build's own, so the compile saw a previous run's capability set while
+        # the link got this run's archives.
+        #
+        # Measured, and worse than it sounds: it made the capability matrix
+        # unsound on macOS. Each variant compiled against the PREVIOUS variant's
+        # header, so a variant that turned a capability off still compiled its
+        # code in -- and the first symptom was an OpenCV include failing to
+        # resolve in a build that had OpenCV switched off.
+        # Passed as the VALUE the targets already read, not as an override of
+        # the whole list. Both projects' HEADER_SEARCH_PATHS begin with
+        # $(MT_CAPS_INCLUDE_DIR), and a command-line setting outranks the
+        # xcconfig -- so the stale value never enters the list at all, which is
+        # a stronger fix than out-ordering it.
+        #
+        # It used to prepend the path as HEADER_SEARCH_PATHS="<path>"
+        # $(inherited). That fixed the staleness above but left the caps include
+        # in the list TWICE, because $(inherited) already starts with
+        # $(MT_CAPS_INCLUDE_DIR). The -I list a wrapper build compiled with
+        # therefore differed from the one an Xcode build compiled with, on every
+        # translation unit -- and XCBuild signs each compile task with its
+        # command line, so alternating the two channels recompiled the WHOLE
+        # project every time, in both directions. Measured 2026-09-09 on c64d,
+        # where it was costing a full rebuild after every wrapper run.
+        "MT_CAPS_INCLUDE_DIR=$(caps_value MT_CAPS_INCLUDE_DIR)"
         "MT_CAPS_OUT=$MT_OUT"
         "MT_CAPS_LIBS_DIR=$MT_CAPS_LIBS_DIR"
         "MT_CAPS_RESOLVED=$MT_CAPS_RESOLVED"
@@ -245,10 +276,13 @@ if [[ -n "$MANIFEST" || -n "$APP_NAME" ]]; then
     if [[ ${#MTCAPS_FLAG_SETTINGS[@]} -gt 0 ]]; then
         MTCAPS_SETTINGS+=("${MTCAPS_FLAG_SETTINGS[@]}")
     fi
-    # HEADER_SEARCH_PATHS carries $(inherited) and is the one setting passed
-    # directly: measured, a bare assignment replaces the engine's own list --
-    # which is substantial -- so getting it wrong breaks every include rather than
-    # just the capability header.
+    # Nothing here assigns HEADER_SEARCH_PATHS. A bare assignment would replace
+    # the engine's own list -- which is substantial -- and an assignment carrying
+    # $(inherited) duplicates the capability include, which is what used to make
+    # every wrapper build invalidate the IDE's incremental state and vice versa.
+    # The capability include reaches the compile through MT_CAPS_INCLUDE_DIR,
+    # exactly as it does on the IDE path, so both channels produce the same
+    # compile command and share the build cache.
 
     if [[ "$PRINT_SETTINGS" == "true" ]]; then
         printf '%s\n' "${MTCAPS_SETTINGS[@]}"
@@ -330,12 +364,11 @@ mt_caps_init_submodules "$SCRIPT_DIR"
 # where every other dependency on every other platform already lived. It gained
 # a stamp in the move: the inline version re-ran `make` on every invocation.
 # ---------------------------------------------------------------------------
-# THE BUILD LOCK, taken here because THIS script is what writes inside the
-# checkout: `make` runs in the vendored uSockets source tree below, which all
-# four apps share. (The staged result no longer lands in the checkout -- it goes
-# to $MT_CAPS_OUT/libs -- but the source-tree `make` still needs it.) Running this
-# script directly is documented usage, so it cannot rely on an app's wrapper
-# having taken the lock.
+# THE BUILD LOCK, taken here for standalone engine builds as well as app-driven
+# ones. Dependency outputs and work directories now live outside the checkout and
+# have per-store locks, but this script is still a documented entry point and
+# shares output roots with nested Xcode/script phases. It cannot rely on an app's
+# wrapper having taken the lock.
 #
 # When an app's build-macos.sh IS the caller, it already holds the lock and this
 # passes straight through -- the passthrough is keyed on process ancestry, and

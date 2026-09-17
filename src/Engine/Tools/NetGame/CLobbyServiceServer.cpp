@@ -1,3 +1,9 @@
+// CAPABILITY GUARD (MT_ENABLE_NET_GAME). The file stays in all three build lists and
+// compiles to nothing when the capability is off -- an Xcode PBXBuildFile
+// cannot be conditioned on a build setting, so the condition lives here.
+// MT_CAP_NET_GAME implies NET_TRANSPORT and HTTP, so this whole stack rides on one flag -- which did not exist until 2026-09-06 (enables was an empty list).
+#if MT_ENABLE_NET_GAME
+
 #include "CLobbyServiceServer.h"
 #include "NET_Main.h"
 #include "SYS_Funct.h"
@@ -13,7 +19,7 @@ CLobbyServiceServer::CLobbyServiceServer(int port, const string &internalSecret)
 	this->heartbeatTimeoutSeconds = 15;
 	this->heartbeatWarningSeconds = 8;
 	mutex = new CSlrMutex("CLobbyServiceServerMutex");
-	internalSecretHash = NetGameInternalSecretToHash(internalSecret);
+	internalVerifier = NetGameInternalMakeVerifier(internalSecret);
 
 	netServer = new CNetServer(port);
 	netPackets = new CNetGamePackets();
@@ -39,7 +45,7 @@ CLobbyServiceServer::~CLobbyServiceServer()
 void CLobbyServiceServer::Start()
 {
 	netServer->StartServer();
-	if (internalSecretHash.empty())
+	if (!internalVerifier.valid)
 		LOGWarning("CLobbyServiceServer: internal secret not configured; all connections will be rejected");
 	LOGM("CLobbyServiceServer: started on port %d", netServer->serverPort);
 }
@@ -69,14 +75,12 @@ u8 CLobbyServiceServer::NetServerAuthorize(CNetClientData *clientData, string us
 		return NET_SERVER_CALLBACK_AUTHORIZE_WRONG_PASSWORD;
 	}
 
-	if (!NetGameInternalSecretMatches(internalSecretHash, passwordHash))
-	{
+	u8 result = NetGameInternalAuthorize(internalVerifier, clientData, passwordHash);
+	if (result == NET_SERVER_CALLBACK_AUTHORIZE_WRONG_PASSWORD)
 		LOGWarning("CLobbyServiceServer::NetServerAuthorize: rejecting %s (invalid internal secret)", userName.c_str());
-		return NET_SERVER_CALLBACK_AUTHORIZE_WRONG_PASSWORD;
-	}
-
-	LOGD("CLobbyServiceServer::NetServerAuthorize: accepted %s", userName.c_str());
-	return NET_SERVER_CALLBACK_AUTHORIZE_CORRECT;
+	else if (result == NET_SERVER_CALLBACK_AUTHORIZE_CORRECT)
+		LOGD("CLobbyServiceServer::NetServerAuthorize: accepted %s", userName.c_str());
+	return result;
 }
 
 void CLobbyServiceServer::NetServerCallbackClientConnected(CNetClientData *clientData)
@@ -460,3 +464,5 @@ void CLobbyServiceServer::SendJson(CNetClientData *clientData, json sendJson)
 	netServer->IssuePacket(clientData, packet);
 	delete packet;
 }
+
+#endif // MT_ENABLE_NET_GAME

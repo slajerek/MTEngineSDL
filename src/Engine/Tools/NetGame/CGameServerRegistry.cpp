@@ -1,3 +1,9 @@
+// CAPABILITY GUARD (MT_ENABLE_NET_GAME). The file stays in all three build lists and
+// compiles to nothing when the capability is off -- an Xcode PBXBuildFile
+// cannot be conditioned on a build setting, so the condition lives here.
+// MT_CAP_NET_GAME implies NET_TRANSPORT and HTTP, so this whole stack rides on one flag -- which did not exist until 2026-09-06 (enables was an empty list).
+#if MT_ENABLE_NET_GAME
+
 #include "CGameServerRegistry.h"
 #include "CLobbyServiceServer.h"
 #include "CRegistryClient.h"
@@ -254,12 +260,21 @@ void CGameServerRegistry::RegistryAllocateGameServerResult(const string &gameId,
 		CServerGame *game = getGameCallback(gameId);
 		if (game)
 		{
-			game->serverAddress = address;
-			game->serverPort = port;
-			game->isRemoteProcess = true;
-			game->remoteNodeId = nodeId;
-			game->status = CServerGame::RUNNING;
-			game->lastActivityTime = time(NULL);
+			if (game->status == CServerGame::STOPPING)
+			{
+				// A stop is in flight for this record (see CServerGame::Status);
+				// do not clobber it with an unrelated allocation result.
+				LOGWarning("CGameServerRegistry::RegistryAllocateGameServerResult: gameId=%s is STOPPING; ignoring remote allocation result", gameId.c_str());
+			}
+			else
+			{
+				game->serverAddress = address;
+				game->serverPort = port;
+				game->isRemoteProcess = true;
+				game->remoteNodeId = nodeId;
+				game->status = CServerGame::RUNNING;
+				game->lastActivityTime = time(NULL);
+			}
 		}
 		gamesManager->mutex->Unlock();
 	}
@@ -267,3 +282,5 @@ void CGameServerRegistry::RegistryAllocateGameServerResult(const string &gameId,
 	if (onAllocationResult)
 		onAllocationResult(gameId, accepted, nodeId, address, port, reason);
 }
+
+#endif // MT_ENABLE_NET_GAME

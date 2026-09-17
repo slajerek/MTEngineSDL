@@ -256,10 +256,34 @@
     <Filter Include="Source Files\src\Engine\System">
       <UniqueIdentifier>{2b95c714-8ae6-4f03-b1d8-70c6ea25419b}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\src\Engine\Tests">
+      <UniqueIdentifier>{920b3576-c6b1-4d82-ad92-4224f0c52867}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\src\Engine\OpenCV">
+      <UniqueIdentifier>{dcda3e66-176a-4832-a91b-1eecf1fb4b40}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\src\Engine\OpenCV">
+      <UniqueIdentifier>{19b148cd-1fbf-45ae-8f44-95c6dbcc111e}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\Engine\Audio\WAV\SND_WavReader.cpp">
       <Filter>Source Files\src\Engine\Audio\WAV</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\OpenCV\MT_OpenCV.cpp">
+      <Filter>Source Files\src\Engine\OpenCV</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\OpenCV\MT_YoloDetector.cpp">
+      <Filter>Source Files\src\Engine\OpenCV</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\OpenCV\CYoloModelManager.cpp">
+      <Filter>Source Files\src\Engine\OpenCV</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestYoloDetector.cpp">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestOpenCVBridge.cpp">
+      <Filter>Source Files\src\Engine\Tests</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\Audio\CAudioChannel.cpp">
       <Filter>Source Files\src\Engine\Audio</Filter>
@@ -280,6 +304,21 @@
       <Filter>Source Files\src\Engine\Audio</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\Audio\CSlrMusicFileOgg.cpp">
+      <Filter>Source Files\src\Engine\Audio</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Audio\CSlrMusicFileMiniaudio.cpp">
+      <Filter>Source Files\src\Engine\Audio</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Audio\CSlrMusicFileResampled.cpp">
+      <Filter>Source Files\src\Engine\Audio</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Audio\MT_MusicFileFactory.cpp">
+      <Filter>Source Files\src\Engine\Audio</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Audio\CSlrMusicFileMFAudio.cpp">
+      <Filter>Source Files\src\Engine\Audio</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Libs\miniaudio\miniaudio_impl.c">
       <Filter>Source Files\src\Engine\Audio</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\Audio\CSlrMusicSwitcher.cpp">
@@ -1361,6 +1400,12 @@
     <ClInclude Include="..\..\..\src\Engine\Tests\CTestScissorClamp.h">
       <Filter>Source Files\src\Engine\Tests</Filter>
     </ClInclude>
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestTextEditorMutation.cpp">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClCompile>
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestTextEditorMutation.h">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClInclude>
     <ClCompile Include="..\..\..\src\Engine\Tests\CTestResidentFunnel.cpp">
       <Filter>Source Files\src\Engine\Tests</Filter>
     </ClCompile>
@@ -1619,6 +1664,30 @@
     <ClCompile Include="..\..\..\src\Engine\Tests\CTest.cpp">
       <Filter>Source Files\src\Engine\Tests</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Audio\MT_AudioResampler.cpp">
+      <Filter>Source Files\src\Engine\Audio</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestWebMVpxLane.cpp">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestAviLane.cpp">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestVideoSourceAVF.cpp">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestMusicFormats.cpp">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestMusicResampling.cpp">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestAudioResampler.cpp">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestEngineSampleRate.cpp">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\Tests\CTestI18nEngine.cpp">
       <Filter>Source Files\src\Engine\Tests</Filter>
     </ClCompile>
@@ -1829,6 +1898,12 @@
     <ClCompile Include="..\..\..\src\Engine\Video\CVideoDecoderHEVCVT.cpp">
       <Filter>Source Files\src\Engine\Video</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Video\CVideoSourceMediaFoundation.cpp">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Video\IVideoPacketDecoder.cpp">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\Video\CVideoDecoderHEVCMF.cpp">
       <Filter>Source Files\src\Engine\Video</Filter>
     </ClCompile>
@@ -1845,6 +1920,27 @@
       <Filter>Source Files\src\Engine\Video</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\Video\AacAscParser.cpp">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Video\MT_AnnexB.cpp">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Video\MT_Mp4vEsds.cpp">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Video\MT_AudioFrames.cpp">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Video\CAudioConverterApple.cpp">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Video\CAudioDecoderCompressedApple.cpp">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Video\CAudioDecoderCompressedMF.cpp">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Video\CVideoSourceAvi.cpp">
       <Filter>Source Files\src\Engine\Video</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\Engine\Video\CVideoFrameExtractor.cpp">
@@ -1869,6 +1965,21 @@
   <ItemGroup>
     <ClInclude Include="..\src.Windows\CLogByteBuffer.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\OpenCV\MT_OpenCV.h">
+      <Filter>Header Files\src\Engine\OpenCV</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\OpenCV\MT_YoloDetector.h">
+      <Filter>Header Files\src\Engine\OpenCV</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\OpenCV\CYoloModelManager.h">
+      <Filter>Header Files\src\Engine\OpenCV</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestYoloDetector.h">
+      <Filter>Header Files\src\Engine\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestOpenCVBridge.h">
+      <Filter>Header Files\src\Engine\Tests</Filter>
     </ClInclude>
     <ClInclude Include="..\src.Windows\CSlrFileFromDocuments.h">
       <Filter>Header Files</Filter>
@@ -3019,6 +3130,24 @@
     <ClInclude Include="..\..\..\src\Engine\Tests\CTest.h">
       <Filter>Source Files\src\Engine\Tests</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Audio\MT_AudioResampler.h">
+      <Filter>Source Files\src\Engine\Audio</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestWebMVpxLane.h">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestAviLane.h">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestMusicResampling.h">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestAudioResampler.h">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestEngineSampleRate.h">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\Tests\CTestI18nEngine.h">
       <Filter>Source Files\src\Engine\Tests</Filter>
     </ClInclude>
@@ -3229,6 +3358,9 @@
     <ClInclude Include="..\..\..\src\Engine\Video\CVideoSourceFFmpeg.h">
       <Filter>Source Files\src\Engine\Video</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Video\MT_MediaPacket.h">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\Video\IVideoPacketDecoder.h">
       <Filter>Source Files\src\Engine\Video</Filter>
     </ClInclude>
@@ -3260,6 +3392,30 @@
       <Filter>Source Files\src\Engine\Video</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\Video\AacAscParser.h">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Video\MT_AnnexB.h">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Video\MT_Mp4vEsds.h">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Video\MT_AudioFrames.h">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Video\CAudioConverterApple.h">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Video\CAudioDecoderCompressedApple.h">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Video\CAudioDecoderCompressedMF.h">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Video\CAudioDecoderCompressedNative.h">
+      <Filter>Source Files\src\Engine\Video</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Engine\Video\CVideoSourceAvi.h">
       <Filter>Source Files\src\Engine\Video</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\Video\CVideoFrameExtractor.h">

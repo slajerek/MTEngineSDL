@@ -1,4 +1,6 @@
 #include "CGuiViewMusicPlaylist.h"
+#include "CSlrMusicFileNative.h"
+#include "MT_MusicFileFactory.h"
 
 #include "IconsFontAwesome_c.h"
 #include "SYS_Threading.h"
@@ -72,7 +74,7 @@ public:
 			success = cache->LoadFromBinaryFile(sidecarPath, sourceInfo);
 		if (!success)
 		{
-			success = cache->LoadFromOggFile(filePath, sourceInfo.envelopePointCount);
+			success = cache->LoadFromMusicFile(filePath, sourceInfo.envelopePointCount);
 			if (success && !sidecarPath.empty())
 				cache->SaveToBinaryFile(sidecarPath, sourceInfo);
 		}
@@ -156,7 +158,24 @@ std::string CGuiViewMusicPlaylist::GetTrackTitleFromPath(const std::string &trac
 CGuiViewMusicPlaylist::CGuiViewMusicPlaylist(const char *name, float posX, float posY, float posZ, float sizeX, float sizeY)
 : CGuiView(name, posX, posY, posZ, sizeX, sizeY)
 {
+	// The formats the playlist can actually open. Ogg goes to Tremor;
+	// mp3/flac/wav go to miniaudio (public domain, store-safe). Keep this in
+	// step with CPlaylistPlaybackManager's gate -- offering a format the
+	// manager refuses is a file picker that opens nothing.
 	trackExtensions.push_back(new CSlrString("ogg"));
+#if !defined(MT_CAP_MUSIC_PLAYER) || MT_CAP_MUSIC_PLAYER
+	trackExtensions.push_back(new CSlrString("mp3"));
+	trackExtensions.push_back(new CSlrString("flac"));
+	trackExtensions.push_back(new CSlrString("wav"));
+#endif
+#ifdef MT_HAVE_NATIVE_MUSIC
+	// AAC/ALAC through the OS decoder. Offered only where that exists -- Linux
+	// has no media API, so listing .m4a there would be a picker that opens
+	// nothing.
+	trackExtensions.push_back(new CSlrString("m4a"));
+	trackExtensions.push_back(new CSlrString("aac"));
+	trackExtensions.push_back(new CSlrString("opus"));
+#endif
 	playlistExtensions.push_back(new CSlrString("json"));
 }
 
@@ -179,6 +198,33 @@ CGuiViewMusicPlaylist::~CGuiViewMusicPlaylist()
 }
 
 // ─── Main render ────────────────────────────────────────────────────────────────
+
+void CGuiViewMusicPlaylist::RenderAacAvailabilityNotice()
+{
+	const char *installUrl = MusicFile_GetAacInstallUrl();
+	if (installUrl == NULL)
+	{
+		// Either AAC decodes here, or it is missing for a reason the user
+		// cannot act on (a Linux build has no OS decoder at all). Both are
+		// silence: a notice you cannot act on is noise in every session.
+		return;
+	}
+	const char *key = MusicFile_GetAacUnavailableReasonKey();
+	if (key == NULL)
+		return;
+
+	// Muted, not an error colour. Nothing has failed at this instant; this is
+	// a statement about what this machine cannot open.
+	ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+	ImGui::TextUnformatted(L(key,
+		"AAC (.m4a/.aac) cannot be played on this PC: Windows is missing the media features."));
+	ImGui::PopStyleColor();
+	ImGui::SameLine();
+	// TextLinkOpenURL goes through ShellExecuteW on Windows, which is what
+	// makes an ms-settings: URL open Settings rather than a browser.
+	ImGui::TextLinkOpenURL(L("engine.music.aac.install_link", "Open Windows optional features"),
+						   installUrl);
+}
 
 void CGuiViewMusicPlaylist::RenderImGui()
 {
@@ -448,6 +494,8 @@ void CGuiViewMusicPlaylist::RenderImGui()
 		}
 		ImGui::EndPopup();
 	}
+
+	RenderAacAvailabilityNotice();
 
 	RenderKeyboardNavigation();
 	RenderPlaylistTable();

@@ -121,6 +121,16 @@ void SYS_KillThread(CSlrThread *thread)
 //	SDL_KillThread(thread);
 }
 
+void SYS_JoinThread(CSlrThread *run)
+{
+	if (run == NULL || run->thread == NULL)
+		return;
+
+	SDL_WaitThread(run->thread, NULL);
+	run->thread = NULL;
+	run->isRunning = false;
+}
+
 void SYS_SetThreadPriority(float priority)
 {
 //#if defined(IOS) || defined(MACOS)

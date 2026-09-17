@@ -23,7 +23,7 @@
 #ifdef __APPLE__
 
 #include "SYS_Defs.h"
-#include <AudioToolbox/AudioToolbox.h>
+#include "CAudioConverterApple.h"
 #include <string>
 #include <vector>
 
@@ -46,20 +46,20 @@ public:
 	bool DecodePacket(const u8 *data, int size, std::vector<s16> &outPCM,
 					  int &outChannels, u32 &outSampleRate);
 
-	const std::string &GetErrorReason() const { return errorReason; }
+	const std::string &GetErrorReason() const
+	{
+		return errorReason.empty() ? converter.GetErrorReason() : errorReason;
+	}
 
 private:
 	void Teardown();
 
-	AudioConverterRef converter = nullptr;   // AudioToolbox C API -- plain .cpp is fine
+	// THE CONVERTER IS SHARED CODE NOW (CAudioConverterApple), because the AVI
+	// lane needs the identical machinery for MP3/MP2/AC-3. What stays here is
+	// what is actually AAC: the AudioSpecificConfig parse, the SBR rate
+	// decision, and the per-packet ADTS strip.
+	CAudioConverterApple converter;
 	std::string errorReason;
-
-	// Learned from the converter's actual output stream description right
-	// after AudioConverterNew() (kAudioConverterCurrentOutputStreamDescription)
-	// -- never hardcoded, since HE-AAC's SBR sample-rate doubling is decided
-	// inside the converter, not by us.
-	int outputChannels = 0;
-	u32 outputSampleRate = 0;
 	int inputChannels = 0;   // compressed-side channel count, from hand-parsing the ASC
 };
 

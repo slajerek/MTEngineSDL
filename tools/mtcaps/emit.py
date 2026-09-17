@@ -601,10 +601,25 @@ def emit_licenses(vocab, values, canonical, out, meta):
     A("ENABLED CAPABILITIES")
     A("-" * 72)
     A("")
+    # A DEPENDENCY WHOSE GATING FLAG RESOLVED TO 0 IS NOT SHIPPED, so it must
+    # not be declared. Until 2026-09-10 this loop never consulted `flag`, and
+    # the consequence was not cosmetic: an MT_ENABLE_FFMPEG=0 store build --
+    # the entire point of the media-codecs programme -- still printed an FFmpeg
+    # LGPL-2.1 entry into the licence document it ships to users, for a library
+    # that is not in the bundle. A licence document that names something absent
+    # is wrong in the direction that matters: it invites a #6(b) replacement
+    # request against a file nobody can point at (tracker 3.9).
+    dep_flags = enabled_flags(vocab, values, platform=(meta or {}).get("platform"))
+
+    def dep_is_shipped(dep):
+        gate = dep.get("flag")
+        return gate is None or dep_flags.get(gate, 0) == 1
+
     any_dep = False
     for key in on:
         cap = vocab.get(key)
-        deps = cap["dependencies"]
+        deps = [d for d in cap["dependencies"] if dep_is_shipped(d)]
+        withheld_deps = [d for d in cap["dependencies"] if not dep_is_shipped(d)]
         A("  %s -- %s" % (key, cap["description"]))
         if not deps:
             A("      (no third-party dependency)")
@@ -614,6 +629,17 @@ def emit_licenses(vocab, values, canonical, out, meta):
             A("          licence   : %s" % dep["licence"])
             A("          version   : %s" % dep["version"])
             A("          provenance: %s" % dep["provenance"])
+            # #6(b) requires that the library be IDENTIFIABLE and its source
+            # obtainable. Printed when the vocabulary knows them; absent rather
+            # than invented when it does not.
+            if dep.get("source_url"):
+                A("          source    : %s" % dep["source_url"])
+            if dep.get("licence_url"):
+                A("          licence at: %s" % dep["licence_url"])
+        # Stated, not silent. A reader comparing two builds' documents should
+        # be able to see that the difference is intended.
+        for dep in withheld_deps:
+            A("      (%s is NOT in this build -- %s=0)" % (dep["name"], dep["flag"]))
         comm = cap["commercial"]
         if comm["effect"] != "none" and values[COMMERCIAL_KEY] == 1:
             withheld = comm.get("forbidden_decoders_commercial", [])

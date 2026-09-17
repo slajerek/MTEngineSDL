@@ -9,6 +9,19 @@ option(MT_ENABLE_LLAMA_CPP "Enable llama.cpp integration" ON)
 option(MT_LLAMA_CUDA "Enable llama.cpp CUDA backend" OFF)
 option(MT_LLAMA_VULKAN "Enable llama.cpp Vulkan backend" OFF)
 option(MT_ENABLE_MBEDTLS "Enable mbedTLS HTTPS support (cpp-httplib)" ON)
+
+# THE THREE THAT HAD NO OPTION AT ALL. MT_ENABLE_HTTPLIB and MT_ENABLE_ENET
+# have existed in the vocabulary since the programme started and were never
+# declared here, so a standalone `cmake` with no MT_CAPS_FRAGMENT left them
+# undefined -- which a value-style `#if` reads as 0. Harmless only while
+# nothing guarded on them; the moment the guards land, an undeclared flag
+# silently compiles HTTP and ENet out of a plain engine build.
+#
+# MT_ENABLE_NET_GAME is new (2026-09-06). MT_CAP_NET_GAME had `enables: []`,
+# so the 32 sources of Tools/NetGame had no flag to be gated on at all.
+option(MT_ENABLE_HTTPLIB "Enable cpp-httplib (HTTP client and server)" ON)
+option(MT_ENABLE_ENET "Enable ENet reliable-UDP transport" ON)
+option(MT_ENABLE_NET_GAME "Enable the net-game stack (Tools/NetGame)" ON)
 option(MT_ENABLE_FTXUI "Enable FTXUI terminal UI library" ON)
 option(MT_ENABLE_LIBTIFF "Enable TIFF support via libtiff" ON)
 option(MT_ENABLE_LIBWEBP "Enable WebP support via libwebp" ON)
@@ -29,6 +42,15 @@ option(MT_ENABLE_LCMS2 "Enable colour management via Little CMS" ON)
 # option() so a STANDALONE build -- no manifest, no fragment -- still gets them,
 # and they are declared BEFORE the fragment include so the fragment overrides.
 option(MT_ENABLE_IMGUI_TEST_ENGINE "Enable the imgui_test_engine harness" ON)
+
+# THE ONLY TWO OFF BY DEFAULT. Every option above is ON so a bare engine build
+# has everything; these two would download 154 MB of OpenCV tarballs and build
+# a second computer-vision library for the three apps that never call it. The
+# vocabulary says the same thing and mtcaps passes -DMT_ENABLE_OPENCV=1
+# explicitly when an app asks for it.
+option(MT_ENABLE_OPENCV "Enable OpenCV 5 (core, imgproc, geometry, features)" OFF)
+option(MT_ENABLE_OPENCV_NONFREE "Enable opencv_contrib xfeatures2d with SURF" OFF)
+option(MT_ENABLE_YOLO "Enable object detection (OpenCV dnn + ONNX models)" OFF)
 option(MT_CAMERA_CAPTURE_ENABLED "Enable live camera capture" ON)
 
 # ---------------------------------------------------------------------------
@@ -369,6 +391,7 @@ include_directories(
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Tools/NetGame"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Tools/Undo"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Video"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/OpenCV"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/libvpx"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/libopus"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Sci/Llama"
@@ -538,6 +561,12 @@ add_library(MTEngineSDL STATIC
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Audio/CPianoKeyboard.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Audio/CSlrMusicFile.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Audio/CSlrMusicFileOgg.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Audio/CSlrMusicFileResampled.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Audio/MT_MusicFileFactory.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Audio/CSlrMusicFileAVFAudio.mm"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Audio/CSlrMusicFileMFAudio.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Audio/CSlrMusicFileMiniaudio.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/miniaudio/miniaudio_impl.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Audio/CSlrMusicSwitcher.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Audio/CSlrMusicPlaylistController.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Audio/CSlrMusicPlaylistPersistence.cpp"
@@ -568,6 +597,7 @@ add_library(MTEngineSDL STATIC
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/Render/CRenderShaderCustomFragmentOpenGL4.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Tests/CTestSurfaceEncoding.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Tests/CTestScissorClamp.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Tests/CTestTextEditorMutation.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Tests/CTestResidentFunnel.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Tests/CTestImageDataFloat.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Tests/MT_ShaderProbe.cpp"
@@ -836,8 +866,22 @@ add_library(MTEngineSDL STATIC
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Tests/CTest.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Tests/CTestRunner.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Tests/CTestSuite.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Audio/MT_AudioResampler.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Tests/CTestWebMVpxLane.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Tests/CTestAviLane.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Tests/CTestVideoSourceAVF.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Tests/CTestMusicFormats.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Tests/CTestMusicResampling.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Tests/CTestAudioResampler.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Tests/CTestEngineSampleRate.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Tests/CTestI18nEngine.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Tests/CTestKtx2Transcode.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Tests/CTestOpenCVBridge.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Tests/CTestYoloDetector.cpp"
+
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/OpenCV/MT_OpenCV.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/OpenCV/MT_YoloDetector.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/OpenCV/CYoloModelManager.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Tests/CTestExifEngine.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Tests/CTestExifMetadataReach.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Tests/CTestJpegMarkers.cpp"
@@ -861,8 +905,23 @@ add_library(MTEngineSDL STATIC
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Tools/Undo/CUndoManager.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Tools/Undo/ImGuiUndo.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Video/CVideoPlayer.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Video/MT_AnnexB.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Video/MT_Mp4vEsds.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Video/MT_AudioFrames.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Video/CAudioConverterApple.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Video/CAudioDecoderCompressedApple.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Video/CAudioDecoderCompressedMF.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Video/CVideoSourceAvi.cpp"
+    # The Matroska lane. It was in the Xcode and Visual Studio projects and in
+    # NEITHER list here, so on Linux CTestWebMVpxLane.cpp compiled (it is in
+    # this list) against a class that was never built -- an undefined-symbol
+    # link at MT_ENABLE_WEBM_VPX=1, which is the default. The whole TU is
+    # guarded on that flag, so at 0 it still contributes nothing.
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Video/CVideoSourceWebMVpx.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Video/CVideoSourceFFmpeg.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Video/IVideoPacketDecoder.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Video/CVideoSourceAVFoundation.mm"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Video/CVideoSourceMediaFoundation.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Video/CVideoDecoderHEVCVT.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Video/CVideoDecoderHEVCMF.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Video/CVideoDecoderWMVMF.cpp"
@@ -1127,6 +1186,24 @@ if (MT_ENABLE_FTXUI)
     add_dependencies(MTEngineSDL ftxui_archive)
 endif()
 
+# OpenCV. PUBLIC include directory, unlike the other bundles: an app that turns
+# this capability on writes cv:: code of its own and needs the headers, and the
+# archive itself is what MT_CAP_GATED_LIBS on the app side links.
+if (MT_ENABLE_OPENCV)
+    set(MT_OPENCV_LIB "${MT_CAPS_LIBS_DIR}/libmt_opencv.a")
+    set(MT_OPENCV_INCLUDE "${MT_CAPS_LIBS_DIR}/opencv/include")
+    if (NOT EXISTS "${MT_OPENCV_LIB}")
+        message(FATAL_ERROR "MT_ENABLE_OPENCV is on but ${MT_OPENCV_LIB} is missing -- run platform/Linux/build-opencv.sh")
+    endif()
+    add_custom_target(opencv_archive DEPENDS "${MT_OPENCV_LIB}")
+    add_library(opencv_bundle STATIC IMPORTED GLOBAL)
+    set_target_properties(opencv_bundle PROPERTIES IMPORTED_LOCATION "${MT_OPENCV_LIB}")
+    add_dependencies(opencv_bundle opencv_archive)
+    target_include_directories(MTEngineSDL PUBLIC "${MT_OPENCV_INCLUDE}")
+    target_link_libraries(MTEngineSDL PRIVATE opencv_bundle)
+    add_dependencies(MTEngineSDL opencv_archive)
+endif()
+
 # Camera on Linux: NO libv4l2 LINK, and that is a measurement rather than an
 # omission.
 #
@@ -1205,6 +1282,34 @@ if(MT_ENABLE_FFMPEG)
     target_include_directories(MTEngineSDL PRIVATE "${MT_FFMPEG_INSTALL_DIR}/include")
     target_compile_definitions(MTEngineSDL PUBLIC MT_ENABLE_FFMPEG=1)
 endif()
+
+# The three above, and PUBLIC because all three are app_visible: an app's own
+# translation units guard on them too, and on this platform that propagation is
+# what mt_apply_capabilities does for a resolved build. This is its standalone
+# counterpart.
+#
+# BOTH directions are emitted, unlike FFmpeg's `=1`-only line. A value-style
+# `#if` on an undefined macro is already 0, so emitting only the on case would
+# work -- but the generated fragment emits every flag in both directions, and a
+# standalone build that disagrees with a resolved one about how OFF is spelled
+# is exactly the drift this programme exists to remove.
+# YOLO gets its own if/else rather than joining the loop below: that loop is
+# named for the three networking flags, and MT_ENABLE_OPENCV deliberately stays
+# out of it as well. PUBLIC because the capability is app_visible -- the
+# template's own views guard on it.
+if(MT_ENABLE_YOLO)
+    target_compile_definitions(MTEngineSDL PUBLIC MT_ENABLE_YOLO=1)
+else()
+    target_compile_definitions(MTEngineSDL PUBLIC MT_ENABLE_YOLO=0)
+endif()
+
+foreach(_mt_net_flag MT_ENABLE_HTTPLIB MT_ENABLE_ENET MT_ENABLE_NET_GAME)
+    if(${_mt_net_flag})
+        target_compile_definitions(MTEngineSDL PUBLIC ${_mt_net_flag}=1)
+    else()
+        target_compile_definitions(MTEngineSDL PUBLIC ${_mt_net_flag}=0)
+    endif()
+endforeach()
 
 # Commercial/store build (2026-07-18 WMV spec, guard #4): compiles in the
 # edition-unsupported refusal for WMV/VC-1/WMA software decode in

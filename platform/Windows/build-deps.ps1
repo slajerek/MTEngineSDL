@@ -137,10 +137,24 @@ if ($LASTEXITCODE -ne 0) { Write-Error "uSockets build failed"; exit 1 }
 # through $(MTCapsLibsDir), the caps-keyed bucket.
 
 Write-Host "`n=== Building llama.cpp ($Platform $Configuration $Compiler) ===" -ForegroundColor Cyan
-& "$scriptDir\build-llama-cpp.ps1" -OutLibDir $OutLibDir -Platform $Platform -Configuration $Configuration -Compiler $Compiler -SkipCuda:($SkipCuda -or ($Platform -eq 'ARM64'))
+# -MTOutRoot IS THE DIRECTORY -CapsFile CAME FROM. The CUDA plugin is the one
+# dependency built by MSBuild rather than CMake, so it goes through
+# Directory.Build.props, which imports MTEngineCaps.props from $(MTOutRoot) and
+# ERRORS when a non-empty MTOutRoot has no props beside it. Nothing exported
+# that root to the dependency scripts, so the plugin build had no way to name
+# it -- and the app's out root is exactly where mtcaps wrote both the xcconfig
+# handed to -CapsFile and the props. Deriving it here keeps the two in step by
+# construction instead of by a second resolve.
+$mtOutRootForDeps = if ($CapsFile) { Split-Path -Parent (Resolve-Path $CapsFile).Path } else { '' }
+& "$scriptDir\build-llama-cpp.ps1" -OutLibDir $OutLibDir -Platform $Platform -Configuration $Configuration -Compiler $Compiler -MTOutRoot $mtOutRootForDeps -SkipCuda:($SkipCuda -or ($Platform -eq 'ARM64'))
 
 Write-Host "`n=== Building FTXUI ($Platform $Configuration $Compiler) ===" -ForegroundColor Cyan
 & "$scriptDir\build-ftxui.ps1" -OutLibDir $OutLibDir -Platform $Platform -Configuration $Configuration -Compiler $Compiler
+
+# OpenCV. Gated inside the script and DEFAULT OFF, unlike every other
+# dependency here: with MT_ENABLE_OPENCV unset this writes a stub and returns
+# in milliseconds, downloading nothing.
+& "$scriptDir\build-opencv.ps1" -OutLibDir $OutLibDir -Platform $Platform -Configuration $Configuration -Compiler $Compiler
 
 Write-Host "`n=== Building mbedTLS ($Platform $Configuration $Compiler) ===" -ForegroundColor Cyan
 & "$scriptDir\build-mbedtls.ps1" -OutLibDir $OutLibDir -Platform $Platform -Configuration $Configuration -Compiler $Compiler

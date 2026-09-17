@@ -1,3 +1,9 @@
+// CAPABILITY GUARD (MT_ENABLE_NET_GAME). The file stays in all three build lists and
+// compiles to nothing when the capability is off -- an Xcode PBXBuildFile
+// cannot be conditioned on a build setting, so the condition lives here.
+// MT_CAP_NET_GAME implies NET_TRANSPORT and HTTP, so this whole stack rides on one flag -- which did not exist until 2026-09-06 (enables was an empty list).
+#if MT_ENABLE_NET_GAME
+
 #include "CLobbyLink.h"
 #include "CNetGameServer.h"
 #include "CNetPacket.h"
@@ -25,9 +31,9 @@ CLobbyLink::CLobbyLink(const string &lobbyAddress, int lobbyServicePort,
 	// Create a CNetClient connecting to the lobby service port
 	// Use "gameserver-{serverId}" as the login name, shared secret
 	string loginName = "gameserver-" + serverId;
-	vector<u8> secretHash = NetGameInternalSecretToHash(internalSecret);
+	vector<u8> authData = NetGameInternalClientAuthData(internalSecret);
 
-	netClient = new CNetClient(lobbyAddress.c_str(), lobbyServicePort, 0, loginName, secretHash);
+	netClient = new CNetClient(lobbyAddress.c_str(), lobbyServicePort, 0, loginName, authData);
 	netPackets = new CNetGamePackets();
 	netClient->AddClientCallback(this);
 	netClient->AddPacketCallback(netPackets);
@@ -55,8 +61,10 @@ void CLobbyLink::Disconnect()
 	isRegistered = false;
 }
 
-void CLobbyLink::Shutdown()
+bool CLobbyLink::Shutdown()
 {
+	bool stopped = true;
+
 	if (netClient)
 	{
 		netClient->RemoveClientCallback(this);
@@ -69,9 +77,18 @@ void CLobbyLink::Shutdown()
 				break;
 			SYS_Sleep(20);
 		}
+
+		stopped = !netClient->isRunning;
+		if (!stopped)
+		{
+			LOGError("CLobbyLink::Shutdown: network thread did not stop in time for gameId=%s", gameId.c_str());
+		}
 	}
+
 	isConnected = false;
 	isRegistered = false;
+
+	return stopped;
 }
 
 void CLobbyLink::Update()
@@ -281,3 +298,5 @@ void CLobbyLink::SendJson(json sendJson)
 	netClient->IssuePacket(true, packet);
 	delete packet;
 }
+
+#endif // MT_ENABLE_NET_GAME

@@ -114,9 +114,25 @@ void SYS_InitFileSystem()
 	
 	
 	/// get settings folder
-	paths = NSSearchPathForDirectoriesInDomains(NSLibraryDirectory, NSUserDomainMask, YES);		//NSApplicationSupportDirectory,
-	NSString *settingsDirectory = [paths firstObject];
-	directoryURL = [NSURL fileURLWithPath:[settingsDirectory stringByAppendingPathComponent:bundleId] isDirectory:YES];
+	//
+	// MT_SETTINGS_DIR redirects it wholesale. An automated run MUST use it:
+	// the app rewrites layouts.dat, imgui.ini and settings.dat on every
+	// shutdown, so a test run pointed at the real folder overwrites the
+	// user's workspace -- which is exactly what happened on 2026-09-08.
+	// tests/run_test.sh sets it; anything invoking the binary directly has to
+	// set it too.
+	const char *settingsDirOverride = getenv("MT_SETTINGS_DIR");
+	if (settingsDirOverride != NULL && settingsDirOverride[0] != 0)
+	{
+		directoryURL = [NSURL fileURLWithPath:[NSString stringWithUTF8String:settingsDirOverride] isDirectory:YES];
+		NSLog(@"Settings folder redirected by MT_SETTINGS_DIR to: %@", [directoryURL path]);
+	}
+	else
+	{
+		paths = NSSearchPathForDirectoriesInDomains(NSLibraryDirectory, NSUserDomainMask, YES);		//NSApplicationSupportDirectory,
+		NSString *settingsDirectory = [paths firstObject];
+		directoryURL = [NSURL fileURLWithPath:[settingsDirectory stringByAppendingPathComponent:bundleId] isDirectory:YES];
+	}
 	
 //	NSLog(@"Create settings folder at: %@", directoryURL);
 	[[NSFileManager defaultManager] createDirectoryAtURL:directoryURL withIntermediateDirectories:YES attributes:nil error:&error];
@@ -439,7 +455,9 @@ std::vector<CFileItem *> *SYS_GetFilesInFolder(char *folderPath, std::list<char 
 					{
 						char *extension = *itExtensions;
 						
-						if (!strcmp(extension, fileExtension))
+						// Case-insensitive: a caller asking for "ins" means
+						// Snare.ins, Snare.INS and Snare.Ins alike.
+						if (!strcasecmp(extension, fileExtension))
 						{
 							//LOGD("adding");
 							//LOGD(fname);
@@ -592,6 +610,37 @@ void SYS_DialogOpenFile(CSystemFileDialogCallback *callback, std::list<CSlrStrin
 			VID_SetMainWindowAlwaysOnTopTemporary(SYS_windowAlwaysOnTopBeforeFileDialog);
 			VID_SetVSyncScreenRefresh(true);
 
+			// Give the SDL window its key status back.
+			//
+			// The sheet is a separate NSWindow and it takes key status from ours
+			// while it is up. The activateIgnoringOtherApps at the end of this
+			// function runs when the sheet is PRESENTED, not when it is
+			// dismissed, so nothing hands key status back -- the app stays
+			// visibly frontmost and receives no key events at all until the user
+			// clicks it.
+			//
+			// That is invisible from inside ImGui, which goes on drawing the
+			// last focused window's title-bar highlight: that highlight is our
+			// own rendering, not a statement about OS focus. So the window looks
+			// focused, typing does nothing, and one click fixes it -- which is
+			// exactly how this was reported in RetroDebugger's GoatTracker
+			// pattern editor after loading a song.
+			//
+			// Order matters. Doing this inline does NOT work: the completion
+			// handler runs while the sheet is still being ordered out, so its
+			// dismissal takes key status away again immediately afterwards.
+			// Dismiss the panel explicitly, then re-activate on the NEXT main
+			// queue turn, when the sheet is really gone. SDL_RaiseWindow (via
+			// VID_RaiseMainWindow) is what makes SDL itself treat the window as
+			// having input focus again; the AppKit calls alone leave SDL's own
+			// notion of keyboard focus behind.
+			[panel orderOut:nil];
+			dispatch_async(dispatch_get_main_queue(), ^{
+				[mainWindow makeKeyAndOrderFront:nil];
+				[NSApp activateIgnoringOtherApps:YES];
+				VID_RaiseMainWindow();
+			});
+
 			if (result == NSModalResponseOK)
 			{
 				std::vector<CSlrString *> selectedPaths;
@@ -713,6 +762,38 @@ void SYS_DialogSaveFile(CSystemFileDialogCallback *callback, std::list<CSlrStrin
 			 LOGD("SYS_DialogSaveFile: dialog result=%d", result);
 			 
 			 VID_SetMainWindowAlwaysOnTopTemporary(SYS_windowAlwaysOnTopBeforeFileDialog);
+
+			// Give the SDL window its key status back.
+			//
+			// The sheet is a separate NSWindow and it takes key status from ours
+			// while it is up. The activateIgnoringOtherApps at the end of this
+			// function runs when the sheet is PRESENTED, not when it is
+			// dismissed, so nothing hands key status back -- the app stays
+			// visibly frontmost and receives no key events at all until the user
+			// clicks it.
+			//
+			// That is invisible from inside ImGui, which goes on drawing the
+			// last focused window's title-bar highlight: that highlight is our
+			// own rendering, not a statement about OS focus. So the window looks
+			// focused, typing does nothing, and one click fixes it -- which is
+			// exactly how this was reported in RetroDebugger's GoatTracker
+			// pattern editor after loading a song.
+			//
+			// Order matters. Doing this inline does NOT work: the completion
+			// handler runs while the sheet is still being ordered out, so its
+			// dismissal takes key status away again immediately afterwards.
+			// Dismiss the panel explicitly, then re-activate on the NEXT main
+			// queue turn, when the sheet is really gone. SDL_RaiseWindow (via
+			// VID_RaiseMainWindow) is what makes SDL itself treat the window as
+			// having input focus again; the AppKit calls alone leave SDL's own
+			// notion of keyboard focus behind.
+			[panel orderOut:nil];
+			dispatch_async(dispatch_get_main_queue(), ^{
+				[mainWindow makeKeyAndOrderFront:nil];
+				[NSApp activateIgnoringOtherApps:YES];
+				VID_RaiseMainWindow();
+			});
+
 			 VID_SetVSyncScreenRefresh(true);
 
 			 if (result == NSModalResponseOK)
@@ -987,7 +1068,7 @@ char *SYS_GetFileExtension(const char *fileName)
 		if (fileName[i] == SYS_FILE_SYSTEM_PATH_SEPARATOR)
 		{
 			// no extension separator
-			char *buf = new char[1];
+			char *buf = (char*)malloc(1);
 			buf[0] = 0x00;
 			return buf;
 		}
@@ -1000,12 +1081,12 @@ char *SYS_GetFileExtension(const char *fileName)
 	
 	if (index == -1)
 	{
-		char *empty = new char[1];
+		char *empty = (char*)malloc(1);
 		empty[0] = 0x00;
 		return empty;
 	}
 	
-	char *buf = new char[strlen(fileName)-index+1];
+	char *buf = (char*)malloc(strlen(fileName)-index+1);
 	int z = 0;
 	for (int i = index; i < strlen(fileName); i++)
 	{
@@ -1272,5 +1353,27 @@ void SYS_OpenURLInBrowser(const char *url)
 	if (result == -1)
 	{
 		LOGError("SYS_OpenURLInBrowser: failed to open url %s", url);
+	}
+}
+
+void SYS_ShowFileInFileManager(const char *filePath)
+{
+	if (filePath == NULL || filePath[0] == 0)
+		return;
+
+	// NSWorkspace rather than `open -R`: no shell, so a path containing a
+	// space or a quote needs no escaping and cannot be split into arguments.
+	NSString *path = [NSString stringWithUTF8String:filePath];
+	if (path == nil)
+	{
+		LOGError("SYS_ShowFileInFileManager: path is not valid UTF-8");
+		return;
+	}
+
+	// selectFile: with an empty root selects the item inside its parent
+	// window, which is what "Show in Finder" means for both files and folders.
+	if ([[NSWorkspace sharedWorkspace] selectFile:path inFileViewerRootedAtPath:@""] == NO)
+	{
+		LOGError("SYS_ShowFileInFileManager: failed to reveal %s", filePath);
 	}
 }

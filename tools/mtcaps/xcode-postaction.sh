@@ -8,8 +8,8 @@
 # MEASURED, and both halves matter:
 #
 #   * a post-action DOES run under `xcodebuild -scheme`, not only in Xcode.app --
-#     so this one releaser serves both channels, exactly as the pre-action's
-#     acquire does;
+#     so wrapper builds reach this script too, but they do not own the IDE
+#     channel and leave their app-lock release to the wrapper's EXIT trap;
 #   * a post-action does NOT run when the build FAILS. So this is the HAPPY PATH
 #     ONLY. It is never the thing that guarantees the lock is freed -- that is
 #     build-lock.sh's owner-process liveness check, which breaks the lock of a
@@ -29,6 +29,9 @@ if [[ -z "$APP_NAME" ]]; then
     exit 0
 fi
 
+# Beside the five repos, the same place the pre-action takes it from.
+IDE_LOCK_DIR="$(cd "$SCRIPT_DIR/../../.." && pwd)/.mtengine-ide/ide-channel.lock"
+
 # `env -u MT_BUILD_LOCK_PID`, and this is load-bearing.
 #
 # The wrapper EXPORTS its own pid so build-lock.sh can recognise it as the owner.
@@ -42,21 +45,30 @@ fi
 # which IS what the pre-action recorded in the IDE channel, so a genuine IDE
 # release still works, and is NOT the wrapper's pid, so a CLI build correctly
 # declines and leaves the release to the wrapper's own EXIT trap.
-env -u MT_BUILD_LOCK_PID "$SCRIPT_DIR/build-lock.sh" release "$APP_NAME" || true
+# BOTH LOCKS, in the reverse of the order the pre-action took them: the IDE
+# channel first, then this app's. Releasing the app lock while still holding the
+# IDE one would let a CLI build of the same app start against a DerivedData an
+# IDE build has not finished with.
+#
+# A CLI build declines both, exactly as before -- see the pid note above -- and
+# leaves them to the wrapper's own EXIT trap.
 
-# DELETE THE SHARED ENGINE XCCONFIG, so it exists only while a build needs it.
+# DELETE THE SHARED ENGINE XCCONFIG while the IDE-channel lock is still held, so
+# it exists only while a build needs it and the next IDE build cannot have its
+# freshly-written file removed by this post-action after it acquires the lock.
 #
-# It is written by the pre-action and read by the engine target, both inside this
-# build -- nothing needs it afterwards. Leaving it lying around is what let one
-# app's set leak into a LATER build that no pre-action ran for: a standalone
-# `xcodebuild -scheme MTEngineSDL`, an `xcodebuild -target` invocation, or a
-# contributor opening the engine on a machine where an app was once built. All
-# three then compiled against some app's manifest instead of the engine's own
-# defaults, silently.
-#
-# A failed build still leaves it (post-actions do not run then), which is why the
-# backstop also detects the leftover rather than trusting this cleanup.
+# Wrapper builds deliberately never own the IDE channel. Their pre-action exits
+# before writing this file, and the build uses command-line settings instead, so
+# deleting here would destroy a concurrent Xcode.app build's channel state.
 IDE_SHARED_FILE="$(cd "$SCRIPT_DIR/../../.." && pwd)/.mtengine-ide/_current/engine.xcconfig"
-rm -f "$IDE_SHARED_FILE" 2>/dev/null || true
+if [[ "${MT_CAPS_WRAPPER:-0}" != "1" ]] \
+   && env -u MT_BUILD_LOCK_PID MTENGINE_LOCK_DIR="$IDE_LOCK_DIR" \
+        "$SCRIPT_DIR/build-lock.sh" owns "$APP_NAME"; then
+    rm -f "$IDE_SHARED_FILE" 2>/dev/null || true
+fi
+
+env -u MT_BUILD_LOCK_PID MTENGINE_LOCK_DIR="$IDE_LOCK_DIR" \
+    "$SCRIPT_DIR/build-lock.sh" release "$APP_NAME" || true
+env -u MT_BUILD_LOCK_PID "$SCRIPT_DIR/build-lock.sh" release "$APP_NAME" || true
 
 exit 0

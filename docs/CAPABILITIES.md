@@ -16,14 +16,16 @@ within two capabilities, which is why this one is not hand-written.
 | `MT_CAP_DEVELOP` | 1 | engine-compiled | `MT_CAP_RAW` | — | no |
 | `MT_CAP_FTXUI` | 1 | dependency-only | — | `MT_ENABLE_FTXUI` | yes |
 | `MT_CAP_GAMEPADS` | 1 | engine-compiled | — | `MT_ENABLE_GAMEPADS` | no |
-| `MT_CAP_HTTP` | 1 | engine-compiled | — | `MT_ENABLE_HTTPLIB` | no |
+| `MT_CAP_HTTP` | 1 | engine-compiled | — | `MT_ENABLE_HTTPLIB` | yes |
 | `MT_CAP_HTTPS` | 1 | engine-compiled | `MT_CAP_HTTP` | `MT_ENABLE_MBEDTLS` | yes |
 | `MT_CAP_KTX2` | 1 | engine-compiled | — | `MT_ENABLE_KTX2` | no |
-| `MT_CAP_LLM` | 1 | engine-compiled | `MT_CAP_HTTP`, `MT_CAP_HTTPS` | `MT_ENABLE_LLAMA_CPP` | no |
+| `MT_CAP_LLM` | 1 | engine-compiled | `MT_CAP_HTTP`, `MT_CAP_HTTPS` | `MT_ENABLE_LLAMA_CPP` | yes |
 | `MT_CAP_MIDI` | 1 | engine-compiled | — | `MT_ENABLE_RTMIDI` | no |
 | `MT_CAP_MUSIC_PLAYER` | 1 | engine-compiled | — | — | no |
-| `MT_CAP_NET_GAME` | 1 | engine-compiled | `MT_CAP_NET_TRANSPORT`, `MT_CAP_HTTP` | — | no |
-| `MT_CAP_NET_TRANSPORT` | 1 | engine-compiled | — | `MT_ENABLE_ENET` | no |
+| `MT_CAP_NET_GAME` | 1 | engine-compiled | `MT_CAP_NET_TRANSPORT`, `MT_CAP_HTTP` | `MT_ENABLE_NET_GAME` | yes |
+| `MT_CAP_NET_TRANSPORT` | 1 | engine-compiled | — | `MT_ENABLE_ENET` | yes |
+| `MT_CAP_OPENCV` | 0 | engine-compiled | — | `MT_ENABLE_OPENCV` | yes |
+| `MT_CAP_OPENCV_NONFREE` | 0 | dependency-only | `MT_CAP_OPENCV` | `MT_ENABLE_OPENCV_NONFREE` | yes |
 | `MT_CAP_PHOTO_CODECS` | 1 | engine-compiled | — | `MT_ENABLE_LIBTIFF`, `MT_ENABLE_LIBWEBP`, `MT_ENABLE_LIBAVIF`, `MT_ENABLE_LIBHEIF` | yes |
 | `MT_CAP_RAW` | 1 | engine-compiled | — | `MT_ENABLE_LIBRAW` | no |
 | `MT_CAP_TERMINAL` | 1 | engine-compiled | — | `MT_ENABLE_LIBTMT` | no |
@@ -31,6 +33,7 @@ within two capabilities, which is why this one is not hand-written.
 | `MT_CAP_UNDO` | 1 | engine-compiled | — | `MT_ENABLE_UNDO` | no |
 | `MT_CAP_VIDEO_PLAYBACK` | 1 | engine-compiled | — | `MT_ENABLE_FFMPEG`, `MT_ENABLE_WEBM_VPX` | yes |
 | `MT_CAP_WEBSOCKETS` | 1 | dependency-only | — | `MT_ENABLE_UWEBSOCKETS` | no |
+| `MT_CAP_YOLO` | 0 | engine-compiled | `MT_CAP_OPENCV`, `MT_CAP_HTTP`, `MT_CAP_HTTPS` | `MT_ENABLE_YOLO` | yes |
 
 ## What each capability costs
 
@@ -39,12 +42,14 @@ within two capabilities, which is why this one is not hand-written.
 | `MT_CAP_CAMERA` | libv4l2 | LGPL-2.1 | system | system package (Linux only) |
 | `MT_CAP_COLOR_MANAGEMENT` | Little CMS (lcms2) | MIT | see build-image_codecs | downloaded tarball (Linux/Windows), part of the image-codec bundle |
 | `MT_CAP_FTXUI` | FTXUI | MIT | submodule other/lib/ftxui | git submodule |
-| `MT_CAP_HTTP` | cpp-httplib | MIT | currently reached through other/lib/llama.cpp/vendor/cpp-httplib; #5.3 vendors it as an engine-owned dependency | vendored (via submodule today) |
+| `MT_CAP_HTTP` | cpp-httplib | MIT | 0.40.0 | vendored under other/lib/cpp-httplib (engine-owned, independent of llama.cpp) |
 | `MT_CAP_HTTPS` | mbedTLS | Apache-2.0 or GPL-2.0 | submodule other/lib/mbedtls | git submodule |
 | `MT_CAP_KTX2` | basis_universal | Apache-2.0 | vendored | vendored source |
 | `MT_CAP_LLM` | llama.cpp | MIT | submodule other/lib/llama.cpp | git submodule |
 | `MT_CAP_MIDI` | RtMidi | MIT-like (RtMidi licence) | vendored | vendored source |
 | `MT_CAP_NET_TRANSPORT` | ENet | MIT | vendored | vendored source |
+| `MT_CAP_OPENCV` | OpenCV | Apache-2.0 | 5.0.0 | source tarball https://github.com/opencv/opencv/archive/refs/tags/5.0.0.tar.gz, sha256 b0528f5a1d379d59d4701cb28c36e22214cc51cf64594e5b56f2d3e6c0233095 pinned in platform/*/build-opencv.*; downloaded only when MT_ENABLE_OPENCV=1 |
+| `MT_CAP_OPENCV_NONFREE` | opencv_contrib (xfeatures2d) | Apache-2.0; SURF is patent-encumbered and may not be distributed commercially without a licence | 5.0.0 | source tarball https://github.com/opencv/opencv_contrib/archive/refs/tags/5.0.0.tar.gz, sha256 c58f6344170c39abf187c56f3843b59cab1fd3e89cf19ba2ce25dc061659b27f pinned in platform/*/build-opencv.*; downloaded only when MT_ENABLE_OPENCV_NONFREE=1 |
 | `MT_CAP_PHOTO_CODECS` | libtiff | libtiff (BSD-like) | see build-image_codecs | downloaded tarball |
 | `MT_CAP_PHOTO_CODECS` | libwebp | BSD-3-Clause | see build-image_codecs | downloaded tarball |
 | `MT_CAP_PHOTO_CODECS` | libavif | BSD-2-Clause | see build-image_codecs | downloaded tarball |
@@ -60,6 +65,9 @@ within two capabilities, which is why this one is not hand-written.
 | `MT_CAP_VIDEO_PLAYBACK` | nestegg | ISC | vendored | vendored source |
 | `MT_CAP_WEBSOCKETS` | uSockets | Apache-2.0 | VENDORED at other/lib/uSockets with a local ARM64 fix (listenAddr = NULL, src/bsd.c:484, :602). Pristine upstream leaves that pointer uninitialised -- cloning upstream over it silently produces a broken archive. | vendored source, NOT a submodule and NOT a sibling checkout |
 | `MT_CAP_WEBSOCKETS` | uWebSockets | Apache-2.0 | vendored | vendored source |
+| `MT_CAP_YOLO` | OpenCV dnn module | Apache-2.0 | 5.0.0 | a module of the OpenCV tarball MT_CAP_OPENCV already pins; built only when MT_ENABLE_YOLO=1 |
+| `MT_CAP_YOLO` | protobuf (bundled by OpenCV) | BSD-3-Clause | bundled in opencv 5.0.0 3rdparty | BUILD_PROTOBUF=ON; ONNX parsing needs it. No download: it is inside the pinned tarball, and WITH_ONNXRUNTIME stays off because that is what would fetch something |
+| `MT_CAP_YOLO` | MLAS (bundled by OpenCV, from ONNX Runtime) | MIT | bundled in opencv 5.0.0 3rdparty | a CMake OBJECT library rather than an archive; see platform/*/build-opencv.* for how it reaches the merge |
 
 ## How a switched-off dependency is actually skipped
 
@@ -160,6 +168,10 @@ legally incomplete SBOM while looking complete.
 | EXIF reader | engine source | vendored | core: Core/CImageData.cpp:21 includes CExifReader.h unconditionally, no third-party dependency |
 | i18n | engine source | n/a | core by decision 4 -- c64d is due to be localised |
 | audio (SND, channels, ogg/tremor) | BSD-3-Clause (Ogg/Tremor) | vendored | core: every app has it on, it is on the MT_API.h path, and a key that cannot change the build is configuration without capability |
+| ImGuiColorTextEdit (goossens) | MIT | a20e4493 (2026-08-30) | vendored source in src/Engine/Libs/imgui_textedit; core because it is an ImGui widget every host can reach, with no MT_CAP_* key that could turn it off |
+| dtl (Diff Template Library) | BSD-3-Clause | bundled with ImGuiColorTextEdit a20e4493 | src/Engine/Libs/imgui_textedit/dtl.h; used only by the TextDiff widget, which is compiled but has no caller yet |
+| Inter (font) | OFL-1.1 | embedded | src/Embedded/Fonts/font_inter_*.cpp, compiled into every binary via CGuiFontManager -- Regular, Bold, Italic, BoldItalic. Was shipped undeclared until 2026-09-04; OFL requires attribution on redistribution |
+| JetBrains Mono (font) | OFL-1.1 | embedded | src/Embedded/Fonts/font_jetbrains_mono.cpp, compiled into every binary via CGuiFontManager. Was shipped undeclared until 2026-09-04; OFL requires attribution on redistribution |
 
 ## Commercial-mode effects
 
@@ -198,9 +210,10 @@ Two further mode rules ride along:
 
 | Capability | Effect | Withheld in a commercial build |
 |---|---|---|
+| `MT_CAP_OPENCV_NONFREE` | capability-off | — |
 | `MT_CAP_PHOTO_CODECS` | variant | heif |
 | `MT_CAP_TEST_ENGINE` | capability-off | — |
-| `MT_CAP_VIDEO_PLAYBACK` | variant | hevc, wmv1, wmv2, wmv3, vc1, wmav1, wmav2, wmapro, msmpeg4v1, msmpeg4v2, msmpeg4v3, aac, eac3 |
+| `MT_CAP_VIDEO_PLAYBACK` | variant | — |
 
 ## Distribution tiers
 
@@ -280,7 +293,9 @@ Gamepad support: the SDL gamepad layer and Core/GamePads.
 
 Plain HTTP client (cpp-httplib) and the shared file downloader.
 
-*MT_CAP_HTTP OWNS cpp-httplib. MT_CAP_LLM depends on it and must not own it: Tools/NetGame/CFileDownloader.cpp is a shared consumer independent of any LLM, so leaving httplib inside the llama.cpp submodule makes a plain HTTP-only app pay for a 598 MB dependency to download a file.*
+*Corrected from false on 2026-09-06. THREE of the four apps include httplib.h directly -- the template's file-downloader example, one host's REST client, and a game's lobby, asset-sync and eight test files -- so an engine-only flag was simply wrong. It mattered the moment the capability got real guards: engine_only_defines() keeps such a flag out of MT_CAPS_DEFINES, the app xcconfigs read only that, and the Windows ide-defines-app.txt omits it, so an app-side `#if MT_ENABLE_HTTPLIB` evaluated to 0 on macOS and Windows however the capability resolved -- while Linux mt_apply_capabilities marks every define PUBLIC and got it right. A guard that disagrees across platforms is worse than no guard.*
+
+*MT_CAP_HTTP OWNS cpp-httplib. MT_CAP_LLM depends on it and must not own it: Tools/NetGame/CFileDownloader.cpp is a shared consumer independent of any LLM, so leaving httplib inside the llama.cpp submodule makes a plain HTTP-only app pay for a 598 MB dependency to download a file. #5.3 done 2026-09-09: cpp-httplib is vendored under other/lib/cpp-httplib, copied verbatim from the llama.cpp vendor tree and independent of the llama.cpp submodule; the two engine wrapper includes (src/Engine/Libs/httplib/httplib.h and httplib_vendor.cpp) point there.*
 
 ### `MT_CAP_HTTPS`
 
@@ -300,7 +315,7 @@ Local large-language-model inference via llama.cpp, plus model discovery and dow
 
 *HTTPS, not merely HTTP, and it is settled rather than assumed: CLlamaModelManager.cpp:228 builds EVERY model URL as https://huggingface.co/..., and httplib::Client on an https:// host without TLS support fails at runtime. LLM=1 HTTPS=0 would build, link and be unable to fetch any model -- the succeeds-and-lies shape #3.4 abolishes. There is no plain-HTTP model source in the tree, so splitting the downloader would buy a configuration nothing uses.*
 
-*No app guards on MT_ENABLE_LLAMA_CPP. Measured by grepping all four app src/ trees.*
+*Corrected from false on 2026-09-06. The measurement behind the old value -- no app GUARDS on MT_ENABLE_LLAMA_CPP -- was true and is the wrong test. The right one is FFmpeg's: a flag is app-visible if it appears in a header app TUs include. GUI/Helpers/CGuiViewLlamaModelLoader.h is now guarded on MT_ENABLE_LLAMA_CPP (it owns a CLlamaModelDownloader, which owns a CFileDownloader, which needs httplib), and the template includes that header inside its own `#if MT_CAP_LLM`. With the flag engine-only the header declared nothing in an app TU while the app believed the capability was on, and the app failed to compile against an incomplete type.*
 
 ### `MT_CAP_MIDI`
 
@@ -318,9 +333,33 @@ Networked-game session layer (Tools/NetGame).
 
 *Gating NET_GAME without these gates nothing, and its acceptance criterion then passes vacuously.*
 
+*A game guards its own lobby and dashboard on the net-game stack, and the flag below is new, so it is app-visible from the start rather than corrected later.*
+
 ### `MT_CAP_NET_TRANSPORT`
 
 Reliable UDP transport (ENet) and Core/Net.
+
+*Corrected from false on 2026-09-06, for the same reason as MT_CAP_HTTP. One host includes enet.h directly and drives ENet portable SOCKET calls from eight of its own transport files, and a game names ENetPeer in one of its headers.*
+
+### `MT_CAP_OPENCV`
+
+OpenCV 5 core, imgproc, geometry and features, built from the pinned source tarball. Images cross the engine boundary through src/Engine/OpenCV/MT_OpenCV.h.
+
+*Nothing, deliberately. The bridge reads and writes CImageData and never asks a codec to open a file, so an app that wants OpenCV to see a JPEG turns MT_CAP_PHOTO_CODECS on as well -- rather than an implication hiding a 40 MB codec bundle behind a vision capability.*
+
+*Apps include OpenCV headers directly and gate their own views on MT_CAP_OPENCV; the engine supplies only the CImageData <-> cv::Mat bridge.*
+
+*It keeps the library name. There is no engine feature to abstract -- the engine's own OpenCV surface is one bridge header, and every host that turns this on calls the cv:: API directly -- so the library name IS the capability.*
+
+*THE FIRST CAPABILITY WHOSE DEFAULT IS 0. Every other capability defaults to 1 and its acquisition script spells the fallback ${MT_ENABLE_X:-1}, so a bare engine clone builds everything. OpenCV must not: turning it on downloads 154 MB of tarballs and builds a second computer-vision library, and only two of the five apps want it. Its script therefore spells the fallback :-0, the standalone xcconfig and CMake defaults say 0, and absent means OFF.*
+
+### `MT_CAP_OPENCV_NONFREE`
+
+opencv_contrib xfeatures2d built with OPENCV_ENABLE_NONFREE: SURF (patented) plus FREAK, BRIEF and DAISY, which left the main repository in 5.0.
+
+*SIFT IS NOT HERE. Its patent expired in 2020, it moved into the main repository in 4.4, and in 5.0 it lives in the features module -- so MT_CAP_OPENCV alone gives SIFT, ORB, BRISK, FAST, MSER and SimpleBlobDetector. What this capability adds is SURF, still patented and still compiled only under OPENCV_ENABLE_NONFREE, together with the descriptors that moved to contrib in 5.0.*
+
+*One build unit and one archive serve both capabilities: it is a single CMake configure, so the per-unit store is keyed by both keys and a flip here rebuilds rather than reusing a tree configured without contrib.*
 
 ### `MT_CAP_PHOTO_CODECS`
 
@@ -361,4 +400,16 @@ Video decoding and playback: FFmpeg, libvpx, opus, nestegg, and the platform har
 WebSocket server/client via uWebSockets on uSockets.
 
 *Gated in Phase 4, not Phase 3: the uSockets consolidation in #5.4b rewrites the same archive this capability gates, so gating it first would gate a copy that is about to move.*
+
+### `MT_CAP_YOLO`
+
+Object detection: OpenCV 5's dnn module, an ONNX model catalogue and a downloader. Ships no model weights.
+
+*OPENCV because the detector IS OpenCV's dnn module. HTTPS as well as HTTP because every catalogue URL is https://huggingface.co/..., and httplib::Client on an https host without TLS support fails at runtime -- the same pairing, for the same reason, that MT_CAP_LLM carries.*
+
+*The template guards its own model-selector and camera-demo views on MT_CAP_YOLO, and includes engine headers that are guarded on MT_ENABLE_YOLO.*
+
+*IT OWNS NO SCRIPT OF ITS OWN, but it does own the ARCHIVE'S CONTENT. build-opencv.* already produces libmt_opencv.a; this capability makes that one configure add `dnn` and bundled protobuf to it -- 45 MB with, 16.6 MB without, measured. So it names the same acquisition scripts and artefacts as MT_CAP_OPENCV and keys the deps bucket alongside it: resolve.deps_key_capabilities says a key that carries less REUSES A WRONG ARCHIVE, and two different archives at one path is exactly what an empty acquisition table would have produced.*
+
+*It also joins the opencv build unit's `reads`, so the per-unit store is keyed by all three OpenCV-family capabilities. One CMake configure serves them all.*
 

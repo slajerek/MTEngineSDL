@@ -1,10 +1,24 @@
 #include "CVideoPlayer.h"
+#include "CVideoSourceAvi.h"
 #include "CVideoTransferFunctions.h"
 #include "MT_SrgbCurve.h"   // SrgbExtendedEncode -- one definition, shared with the poster lane
 #include "Core/Render/VID_Main.h"
 #include "Core/Render/CRenderBackend.h"
 #include "CVideoAudioChannel.h"
 #include "CVideoSourceWebMVpx.h"
+// The OS video tier: one of these per platform, same shape, same contract.
+#if defined(__APPLE__) && (!defined(MT_CAP_VIDEO_PLAYBACK) || MT_CAP_VIDEO_PLAYBACK)
+#include "CVideoSourceAVFoundation.h"
+#define MT_OS_VIDEO_SOURCE CVideoSourceAVFoundation
+#elif defined(_WIN32) && (!defined(MT_CAP_VIDEO_PLAYBACK) || MT_CAP_VIDEO_PLAYBACK)
+#include "CVideoSourceMediaFoundation.h"
+#define MT_OS_VIDEO_SOURCE CVideoSourceMediaFoundation
+#endif
+#ifdef MT_OS_VIDEO_SOURCE
+#define MT_HAVE_AVF_SOURCE 1
+#else
+#define MT_HAVE_AVF_SOURCE 0
+#endif
 #if MT_ENABLE_FFMPEG
 #include "CVideoSourceFFmpeg.h"
 #endif
@@ -70,35 +84,152 @@ CVideoPlayer::~CVideoPlayer()
 
 IVideoSource *CVideoPlayer::CreateAndOpenSource(const char *filePath, std::string &outErrorReason)
 {
-	IVideoSource *src;
-	// Same routing Open() has always done: the legacy nestegg/vpx source
-	// only for alpha-channel VP9 webm (the only path decoding the alpha
-	// plane), FFmpeg for everything else, legacy-only without FFmpeg.
-#if MT_ENABLE_FFMPEG && MT_ENABLE_WEBM_VPX
+	// THE ROUTING CHAIN, and its ORDER IS THE DESIGN.
+	//
+	//     1. the alpha-VP9 WebM probe -- which only the Matroska lane decodes
+	//     2. the OS lane              -- AVFoundation / Media Foundation
+	//     3. the Matroska lane        -- WebM and .mkv, demuxed by nestegg
+	//     4. the AVI lane             -- RIFF, demuxed by us
+	//     5. FFmpeg                   -- LAST, and only where it exists
+	//
+	// FFmpeg is never preferred for a format another tier can open, even when
+	// it is present and would work. That is what makes a private build a valid
+	// test of the store build: the fallback fires only for containers the store
+	// build cannot support anyway (MPEG-PS, and MKV/AVI holding a codec no OS
+	// decodes), so every format they share takes the IDENTICAL path in both. Invert the order and the
+	// shipped path is exercised by nobody -- silently, with nothing in the build
+	// or the tests noticing.
+	//
+	// The chain is a RUNTIME decision now, not the compile-time #if ladder it
+	// used to be. That ladder sent every file -- .mp4 included -- to the
+	// VP9-only WebM lane as soon as FFmpeg was compiled out, which is why a
+	// store build could not play anything at all.
+	IVideoSource *src = nullptr;
+
+#if MT_ENABLE_WEBM_VPX && MT_ENABLE_FFMPEG
+	// Alpha VP9 is the WebM lane's exclusive capability: nothing else in the
+	// engine decodes the alpha plane. The probe lives on CVideoSourceFFmpeg and
+	// so is only available where FFmpeg is -- without it, WebM still routes to
+	// the lane below, it simply is not asked about alpha first.
 	if (CVideoSourceFFmpeg::ProbeIsAlphaVP9WebM(filePath))
-		src = new CVideoSourceWebMVpx();
-	else
-		src = new CVideoSourceFFmpeg();
-#elif MT_ENABLE_FFMPEG
-	src = new CVideoSourceFFmpeg();
-#elif MT_ENABLE_WEBM_VPX
-	src = new CVideoSourceWebMVpx();
-#else
-	// MT_CAP_VIDEO_PLAYBACK=0: no source exists. Fail the open, do not crash.
-	outErrorReason = "video playback is not compiled into this build";
-	return nullptr;
-#endif
-	if (!src->Open(filePath))
 	{
-		// Copy the reason unconditionally (even if empty) -- behavior-
-		// preserving vs the pre-refactor inline block, which never invented
-		// a fallback reason. Downstream consumers supply their own
-		// user-facing fallback for empty reasons.
+		src = new CVideoSourceWebMVpx();
+		if (src->Open(filePath))
+			return src;
 		outErrorReason = src->GetErrorReason();
 		delete src;
 		return nullptr;
 	}
-	return src;
+#endif
+
+// WHY THE OS TIER IS TRIED FIRST ONLY WHERE FFmpeg IS ABSENT, for now.
+//
+// The store build has no FFmpeg, so this IS its video path and the order is
+// moot there. In a private build both exist, and preferring the OS lane changed
+// three measured behaviours in the test suite -- all of them cases where
+// AVFoundation is arguably BETTER but differs from what the tests pin:
+//
+//   * a coarse seek lands EXACTLY on the requested time, where FFmpeg lands on
+//     the preceding keyframe (CTestVideoSeek case 23 asserts the keyframe);
+//   * the first-frame poster time therefore differs;
+//   * CTestVideoOrientationWrite's round-trip through a freshly patched tkhd
+//     disagrees on display dimensions -- NOT explained by asset caching, which
+//     was measured and ruled out, and NOT yet explained at all. It is the one
+//     that writes to a user's file, so it is the one that must not be guessed.
+//
+// Flipping this default is deliberately a separate change from introducing the
+// source, so that "the store build plays video" and "the private build changes
+// behaviour" cannot fail together. The engine's own CTestVideoSourceAVF drives
+// this source directly in EVERY build, so the OS path is covered meanwhile
+// rather than resting on a routing preference nobody exercises.
+#if MT_HAVE_AVF_SOURCE && !MT_ENABLE_FFMPEG
+	// THE STORE PATH. AVFoundation demuxes and decodes MP4/MOV/M4V/3GP through
+	// codecs Apple licenses, so this carries H.264, HEVC, ProRes, MJPEG and
+	// MPEG-2 -- plus the audio, decoded to LPCM by the OS -- with no licence
+	// question of ours. Tried before FFmpeg deliberately; see the note above.
+	if (MT_OS_VIDEO_SOURCE::CanProbablyOpen(filePath))
+	{
+		src = new MT_OS_VIDEO_SOURCE();
+		if (src->Open(filePath))
+			return src;
+		// NOT a hard failure: fall through to the tiers below. A .mov holding a
+		// codec AVFoundation will not decode is exactly the case FFmpeg still
+		// covers in a private build, and refusing here would lose a file that
+		// used to play.
+		LOGD("CVideoPlayer::CreateAndOpenSource: the OS source declined '%s' (%s); trying the remaining tiers",
+			 filePath, src->GetErrorReason().c_str());
+		outErrorReason = src->GetErrorReason();
+		delete src;
+		src = nullptr;
+	}
+#endif
+
+#if MT_ENABLE_WEBM_VPX
+	// THE MATROSKA LANE: .webm and .mkv, demuxed by nestegg (ISC) in every
+	// tier. VP9+Opus decode from permissive royalty-free code; H.264/HEVC+AAC
+	// decode through the OS, which is what gives .mkv a store-safe path at all
+	// (tracker 3.10). Open() refuses a file whose codecs neither covers, so a
+	// private build still falls through to FFmpeg below.
+	if (src == nullptr && CVideoSourceWebMVpx::CanProbablyOpen(filePath))
+	{
+		src = new CVideoSourceWebMVpx();
+		if (src->Open(filePath))
+			return src;
+		outErrorReason = src->GetErrorReason();
+		delete src;
+		src = nullptr;
+	}
+#endif
+
+	// THE AVI LANE: RIFF demuxed by us, every codec decoded by the OS.
+	// Deliberately AFTER the OS tier -- on Windows, Media Foundation's own
+	// AVI source may open the file better than this can, and it should get
+	// first refusal. Open() refuses a file whose codecs no OS decoder covers
+	// (DivX 3, Annex-B H.264), which is what lets FFmpeg below still catch it
+	// in a private build.
+	if (src == nullptr && CVideoSourceAvi::CanProbablyOpen(filePath))
+	{
+		src = new CVideoSourceAvi();
+		if (src->Open(filePath))
+			return src;
+		LOGD("CVideoPlayer::CreateAndOpenSource: the AVI lane declined '%s' (%s)",
+			 filePath, src->GetErrorReason().c_str());
+		outErrorReason = src->GetErrorReason();
+		delete src;
+		src = nullptr;
+	}
+
+#if MT_ENABLE_FFMPEG
+	// LAST. Present only in a non-distributed build, and reached only for what
+	// the tiers above could not open -- MPEG-PS, WMV/VC-1, DivX 3, Annex-B
+	// H.264-in-AVI, and any codec the OS declines.
+	if (src == nullptr)
+	{
+		src = new CVideoSourceFFmpeg();
+		if (src->Open(filePath))
+			return src;
+		outErrorReason = src->GetErrorReason();
+		delete src;
+		src = nullptr;
+	}
+#endif
+
+	if (outErrorReason.empty())
+	{
+#if MT_HAVE_AVF_SOURCE || MT_ENABLE_WEBM_VPX || MT_ENABLE_FFMPEG
+		// A recognised build that simply has no tier for this container. The
+		// token is what the UI branches on; the sentence after it is what the
+		// user reads, and it says which formats DO work rather than only what
+		// failed -- a bare "unsupported" leaves someone with a folder of .mkv
+		// no idea whether the app or the file is at fault.
+		outErrorReason = std::string(IVideoSource::kVideoErrorTokenEditionUnsupported) +
+						 "This edition plays MP4, MOV and WebM. This file's container "
+						 "(or the codec inside it) is not one the operating system can open.";
+#else
+		outErrorReason = "video playback is not compiled into this build";
+#endif
+	}
+	return nullptr;
 }
 
 void CVideoPlayer::SetPreopenedSource(IVideoSource *src)

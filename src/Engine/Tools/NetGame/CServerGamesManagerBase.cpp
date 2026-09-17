@@ -1,3 +1,9 @@
+// CAPABILITY GUARD (MT_ENABLE_NET_GAME). The file stays in all three build lists and
+// compiles to nothing when the capability is off -- an Xcode PBXBuildFile
+// cannot be conditioned on a build setting, so the condition lives here.
+// MT_CAP_NET_GAME implies NET_TRANSPORT and HTTP, so this whole stack rides on one flag -- which did not exist until 2026-09-06 (enables was an empty list).
+#if MT_ENABLE_NET_GAME
+
 #include "CServerGamesManagerBase.h"
 #include "CServerGame.h"
 #include "CNetGameServer.h"
@@ -78,6 +84,20 @@ CServerGame *CServerGamesManagerBase::StartGameServer(const string &gameId)
 		LOGD("CServerGamesManagerBase::StartGameServer: gameId=%s already running on port %d", gameId.c_str(), game->serverPort);
 		mutex->Unlock();
 		return game;
+	}
+
+	if (game->status == CServerGame::STOPPING)
+	{
+		// A stop is in flight (gameServer==NULL but the record isn't free
+		// yet -- see the STOPPING comment on CServerGame::Status). Refuse
+		// rather than start a second server that the stopper's re-validate
+		// block wouldn't expect. Normal callers go through
+		// EnsureServerRunning(), which already waits this out; this guard
+		// covers direct callers (e.g. a freshly created game never hits
+		// this, but the check is here for defense in depth).
+		LOGWarning("CServerGamesManagerBase::StartGameServer: gameId=%s is STOPPING; refusing to start a second server", gameId.c_str());
+		mutex->Unlock();
+		return NULL;
 	}
 
 	// REMOTE_NODE mode: request allocation from Registry
@@ -245,19 +265,55 @@ void CServerGamesManagerBase::StopGameServer(const string &gameId)
 
 	CServerGame *game = it->second;
 
+	if (game->status == CServerGame::STOPPING)
+	{
+		// Another StopGameServer()/UpdateIdleServers() call already owns
+		// this record's stop and released the mutex for its blocking
+		// network stop (gameServer==NULL here, but the record is not free).
+		// Falling through to the tail below would clear a STOPPING marker
+		// this call does not own -- overwriting status and ReleasePort()ing
+		// a port that owning call may be about to RetainZombiePort(). Log
+		// and back off; the owning call's own re-validate block finishes
+		// this record.
+		LOGWarning("CServerGamesManagerBase::StopGameServer: gameId=%s is already STOPPING (another call owns it); ignoring this call", gameId.c_str());
+		mutex->Unlock();
+		return;
+	}
+
+	// Captured under the same hold that found the record, before any branch
+	// below overwrites status with STOPPING: the tail restores FINISHED rather
+	// than SUSPENDED when this record had already finished (see the in-process
+	// branch's own prevStatus comment). For the plain path (neither branch
+	// taken) this is just today's `status != FINISHED` rule spelled out.
+	CServerGame::Status prevStatus = game->status;
+
 	if (game->isRemoteProcess && game->processId > 0)
 	{
-		// Separate process mode: send shutdown via registry, then kill if needed
+		// Separate process mode: send shutdown via registry, then kill if needed.
+		//
+		// This branch unlocks and relocks the manager mutex up to 50 times in
+		// the wait loop below, so it gets the SAME discipline as the in-process
+		// branch (final-review I-4): STOPPING marked under the hold that checked
+		// the record (EnsureServerRunning()/StartGameServer() treat STOPPING as
+		// busy, so nothing restarts this record while we are unlocked), and the
+		// record re-looked-up BY ID after every relock -- `game` is not a stable
+		// pointer across an unlock, and a record erased and deleted during those
+		// up-to-5 seconds would leave it dangling for `game->processId = 0`.
 		LOGM("CServerGamesManagerBase::StopGameServer: gameId=%s shutting down remote process pid=%d", gameId.c_str(), game->processId);
+
+		int processId = game->processId;
+		game->status = CServerGame::STOPPING;
 
 		if (registry)
 			registry->RequestShutdown(gameId, "stop_requested");
 
 		// Wait for process to exit (up to 5 seconds)
 		bool exited = false;
+		bool recordGone = false;
+		bool lostRace = false;
 		for (int i = 0; i < 50; i++)
 		{
-			if (CProcessSpawner::TryWait(game->processId, nullptr))
+			if (CProcessSpawner::TryWait(processId, nullptr))
 			{
 				exited = true;
 				break;
@@ -265,13 +321,41 @@ void CServerGamesManagerBase::StopGameServer(const string &gameId)
 			mutex->Unlock();
 			SYS_Sleep(100);
 			mutex->Lock();
+
+			it = games.find(gameId);
+			if (it == games.end())
+			{
+				recordGone = true;
+				break;
+			}
+			game = it->second;
+			if (game->status != CServerGame::STOPPING)
+			{
+				// Only the call that set the marker may act on the record.
+				lostRace = true;
+				break;
+			}
+		}
+
+		if (recordGone)
+		{
+			LOGWarning("CServerGamesManagerBase::StopGameServer: gameId=%s record disappeared while stopping the remote process; nothing left to update", gameId.c_str());
+			mutex->Unlock();
+			return;
+		}
+
+		if (lostRace)
+		{
+			LOGWarning("CServerGamesManagerBase::StopGameServer: gameId=%s status changed to %s while stopping outside the lock; leaving the record alone (a restart or FinishGame() likely won the race)", gameId.c_str(), game->GetStatusName());
+			mutex->Unlock();
+			return;
 		}
 
 		if (!exited)
 		{
 			LOGM("CServerGamesManagerBase::StopGameServer: gameId=%s process did not exit, killing", gameId.c_str());
-			CProcessSpawner::Kill(game->processId);
-			CProcessSpawner::TryWait(game->processId, nullptr);
+			CProcessSpawner::Kill(processId);
+			CProcessSpawner::TryWait(processId, nullptr);
 		}
 
 		game->processId = 0;
@@ -279,26 +363,159 @@ void CServerGamesManagerBase::StopGameServer(const string &gameId)
 	}
 	else if (game->gameServer)
 	{
-		// In-process mode: direct shutdown
+		// In-process mode: snapshot and detach the server from `game` while
+		// still holding the mutex, then release the mutex before the
+		// blocking stop below. The game server's own network thread calls
+		// back into GetGame()/FinishGame() (the app-side game server
+		// implementation), which take this same `mutex` -- holding it here across
+		// Shutdown()/StopServer() would be a lock inversion that guarantees
+		// the 5s cap expires (that is what run A's single "leaking game
+		// server" firing actually was, not scheduling luck).
+		CNetGameServer *server = game->gameServer;
+		int port = game->serverPort;
+		game->gameServer = NULL;
+
+		// Capture the pre-stop status under this same lock, before
+		// overwriting it with STOPPING, so the re-validate block below can
+		// restore FINISHED rather than SUSPENDED when this record had
+		// already finished (FinishGame() sets FINISHED then defers the stop
+		// via pendingStops -- ProcessPendingStops() calls us next). Without
+		// this, ArchiveFinishedGame()'s "if (status == FINISHED)" gate
+		// (ProcessPendingStops()) never passes for an in-process game, the
+		// record stays visible as SUSPENDED, and a finished game would stay
+		// rejoinable. (Captured at the top of this function now that the
+		// remote branch above needs it too -- same value: nothing between
+		// there and here touches game->status on this path.)
+
+		// Mark the record STOPPING before unlocking: EnsureServerRunning()/
+		// StartGameServer()/the remote-allocation path all treat STOPPING as
+		// busy and refuse to (re)start a second server for this record while
+		// gameServer==NULL but the record isn't actually free -- without
+		// this a rejoin landing in the unlocked window below could start a
+		// second live server that the re-validate block then clobbered.
+		game->status = CServerGame::STOPPING;
+
+		mutex->Unlock();
+
 		LOGM("CServerGamesManagerBase::StopGameServer: gameId=%s saving state and stopping", gameId.c_str());
 
-		// Shutdown lobbyLink first (stops network thread)
-		if (game->gameServer->lobbyLink)
+		// Shutdown lobbyLink first (stops network thread). CLobbyLink holds a
+		// raw gameServer pointer its callbacks dereference (HandleUpdateTokens,
+		// HandleSaveState, HandleKickPlayer) -- if its network thread refuses
+		// to stop in time, it may still be executing one of those, so neither
+		// lobbyLink nor gameServer may be deleted: the whole game server is
+		// leaked instead of risking a use-after-free.
+		bool lobbyLinkStopped = true;
+		if (server->lobbyLink)
 		{
-			game->gameServer->lobbyLink->Shutdown();
-			delete game->gameServer->lobbyLink;
-			game->gameServer->lobbyLink = NULL;
+			lobbyLinkStopped = server->lobbyLink->Shutdown();
+			if (lobbyLinkStopped)
+			{
+				delete server->lobbyLink;
+				server->lobbyLink = NULL;
+			}
+			else
+			{
+				LOGError("CServerGamesManagerBase::StopGameServer: gameId=%s lobbyLink network thread did not stop in time; leaking game server to avoid a use-after-free", gameId.c_str());
+			}
 		}
 
-		game->gameServer->SaveState();
-		game->gameServer->Shutdown();
-		delete game->gameServer;
-		game->gameServer = NULL;
+		// Always save and always ask the game server's own network thread to
+		// stop, regardless of the lobbyLink outcome -- only the delete below
+		// is withheld on failure. Gating these on lobbyLinkStopped would lose
+		// the save and leave this thread running forever whenever only the
+		// lobbyLink failed to stop.
+		server->SaveState();
+		bool serverStopped = server->Shutdown();
+		if (!serverStopped)
+		{
+			LOGError("CServerGamesManagerBase::StopGameServer: gameId=%s network thread did not stop in time; leaking game server to avoid a use-after-free", gameId.c_str());
+		}
+
+		bool leaked = !lobbyLinkStopped || !serverStopped;
+		if (!leaked)
+		{
+			delete server;
+		}
+
+		mutex->Lock();
+
+		// Re-validate: the game may have been removed from `games` while we
+		// were stopping its server outside the lock, or -- since gameServer
+		// was NULL and status was STOPPING for the whole window -- a rejoin
+		// could have raced EnsureServerRunning()/StartGameServer() into
+		// starting a brand-new server for this record (they now refuse to
+		// while STOPPING, but only mutate the record here if it is still
+		// marked STOPPING by this very call: if something else already
+		// claimed it, leave it alone and only do our own port bookkeeping
+		// below, or we would clobber a live restart).
+		it = games.find(gameId);
+		if (it != games.end())
+		{
+			game = it->second;
+			if (game->status == CServerGame::STOPPING)
+			{
+				game->serverPort = 0;
+				// Restore FINISHED rather than SUSPENDED if that is what
+				// this record was before we marked it STOPPING (see the
+				// prevStatus comment above) -- never RUNNING, which
+				// prevStatus can also be and which would make this record
+				// look live with no server. ArchiveFinishedGame() needs to
+				// see FINISHED; a finished game must not be resumable.
+				game->status = (prevStatus == CServerGame::FINISHED) ? CServerGame::FINISHED : CServerGame::SUSPENDED;
+				game->connectedPlayerCount = 0;
+				game->connectionTokens.clear();
+				SaveGameRecord(game);
+			}
+			else
+			{
+				// Lost the race (e.g. FinishGame() ran on the game server's
+				// own thread during the unlocked window and overwrote
+				// STOPPING with FINISHED, or -- in tests -- a second
+				// concurrent stopper claimed it first). Do not touch status
+				// or the other fields; whoever holds the record now owns
+				// it. Still zero serverPort if it still names the port we
+				// just detached, so a later fresh StopGameServer() call
+				// falling through to its plain tail can't ReleasePort() a
+				// port we may be about to RetainZombiePort() below --
+				// erasing it from usedPorts while a leaked thread might
+				// still hold its socket.
+				if (game->serverPort == port)
+				{
+					game->serverPort = 0;
+				}
+				LOGWarning("CServerGamesManagerBase::StopGameServer: gameId=%s status changed to %s while stopping outside the lock; leaving the record alone (a restart or FinishGame() likely won the race)", gameId.c_str(), game->GetStatusName());
+			}
+		}
+
+		if (leaked)
+		{
+			// A still-running thread may still hold this port's ENet socket
+			// (CNetServer only calls enet_host_destroy() from inside its own
+			// ThreadRun(), CNetServer.cpp:322) -- retain it instead of
+			// handing it to the next AllocatePort() call.
+			RetainZombiePort(port);
+			LOGError("CServerGamesManagerBase::StopGameServer: gameId=%s port %d retained (zombie) until the leaked server's thread exits", gameId.c_str(), port);
+		}
+		else
+		{
+			ReleasePort(port);
+		}
+
+		mutex->Unlock();
+		return;
 	}
 
 	ReleasePort(game->serverPort);
 	game->serverPort = 0;
-	game->status = CServerGame::SUSPENDED;
+	// A game that FINISHED while (or before) it was being stopped stays
+	// FINISHED so ArchiveFinishedGame() still picks it up and nobody can
+	// rejoin it; everything else parks as SUSPENDED (task-3b re-review 3).
+	// Read prevStatus, not the live field: the remote branch above legitimately
+	// leaves STOPPING here (its own marker, still owned by this call), and a
+	// bare `status != FINISHED` test would then downgrade a finished remote game
+	// to SUSPENDED and leave it rejoinable (final-review I-4).
+	game->status = (prevStatus == CServerGame::FINISHED) ? CServerGame::FINISHED : CServerGame::SUSPENDED;
 	game->connectedPlayerCount = 0;
 	game->connectionTokens.clear();
 
@@ -376,6 +593,40 @@ CServerGame *CServerGamesManagerBase::EnsureServerRunning(const string &gameId)
 			mutex->Unlock();
 		}
 		LOGError("CServerGamesManagerBase::EnsureServerRunning: timeout waiting for gameId=%s to start", gameId.c_str());
+		return NULL;
+	}
+
+	if (game->status == CServerGame::STOPPING)
+	{
+		// A stop is in flight for this record (StopGameServer()/
+		// UpdateIdleServers() detached the server and released this mutex
+		// for their blocking network stop, up to ~7s in the failure case
+		// this task exists for). Starting a second server here would race
+		// the stopper's re-validate block; wait for it to clear instead,
+		// same shape as the STARTING wait above. Once it clears (normally
+		// back to SUSPENDED), retry from the top -- a single recursive call
+		// picks up whatever state the stop left behind.
+		mutex->Unlock();
+		for (int i = 0; i < 150; i++) // 150 * 50ms = 7.5s, covers StopServer()'s 5s cap plus lobbyLink's 2s plus margin
+		{
+			SYS_Sleep(50);
+			mutex->Lock();
+			auto it2 = games.find(gameId);
+			if (it2 == games.end())
+			{
+				LOGWarning("CServerGamesManagerBase::EnsureServerRunning: gameId=%s removed while a stop was in flight", gameId.c_str());
+				mutex->Unlock();
+				return NULL;
+			}
+			game = it2->second;
+			if (game->status != CServerGame::STOPPING)
+			{
+				mutex->Unlock();
+				return EnsureServerRunning(gameId);
+			}
+			mutex->Unlock();
+		}
+		LOGWarning("CServerGamesManagerBase::EnsureServerRunning: gameId=%s stop still in flight after timeout; refusing to start (client can retry)", gameId.c_str());
 		return NULL;
 	}
 
@@ -471,23 +722,62 @@ void CServerGamesManagerBase::UpdateIdleServers()
 			&& (game->gameServer != NULL || game->isRemoteProcess);
 		if (!stillIdle)
 		{
+			bool wasStopping = (game->status == CServerGame::STOPPING);
 			mutex->Unlock();
+
+			if (wasStopping)
+			{
+				// A concurrent caller (another thread's UpdateIdleServers(),
+				// or ProcessPendingStops()/StopGameServer()) is already
+				// hibernating this exact game -- gameServer==NULL and
+				// status==STOPPING is not "reactivated", it is "already
+				// being handled". Wait for that stop to clear instead of
+				// silently racing ahead of it: a caller that identified
+				// this game as idle should be able to rely on it actually
+				// being hibernated by the time this function returns.
+				for (int i = 0; i < 150; i++) // 150 * 50ms = 7.5s, matches EnsureServerRunning's STOPPING wait
+				{
+					SYS_Sleep(50);
+					mutex->Lock();
+					auto it2 = games.find(gameId);
+					bool stillStopping = (it2 != games.end() && it2->second->status == CServerGame::STOPPING);
+					mutex->Unlock();
+					if (!stillStopping)
+						break;
+				}
+			}
+
 			continue;
 		}
 
 		LOGM("CServerGamesManagerBase::UpdateIdleServers: hibernating idle game %s", game->gameId.c_str());
 
+		// Captured under the same hold that re-checked the record, before any
+		// branch below overwrites status with STOPPING -- see the identical
+		// comment in StopGameServer().
+		CServerGame::Status prevStatus = game->status;
+
 		if (game->isRemoteProcess && game->processId > 0)
 		{
+			// Same discipline as StopGameServer()'s remote branch
+			// (final-review I-4): STOPPING marked before the first unlock so
+			// nothing restarts this record while we wait, and the record
+			// re-looked-up by id after every relock -- `game` is not a stable
+			// pointer across an unlock.
+			int processId = game->processId;
+			game->status = CServerGame::STOPPING;
+
 			// Send shutdown via registry
 			if (registry)
-				registry->RequestShutdown(game->gameId, "idle_hibernate");
+				registry->RequestShutdown(gameId, "idle_hibernate");
 
 			// Give process time to exit, then force kill
 			bool exited = false;
+			bool recordGone = false;
+			bool lostRace = false;
 			for (int i = 0; i < 30; i++)
 			{
-				if (CProcessSpawner::TryWait(game->processId, nullptr))
+				if (CProcessSpawner::TryWait(processId, nullptr))
 				{
 					exited = true;
 					break;
@@ -495,12 +785,39 @@ void CServerGamesManagerBase::UpdateIdleServers()
 				mutex->Unlock();
 				SYS_Sleep(100);
 				mutex->Lock();
+
+				it = games.find(gameId);
+				if (it == games.end())
+				{
+					recordGone = true;
+					break;
+				}
+				game = it->second;
+				if (game->status != CServerGame::STOPPING)
+				{
+					lostRace = true;
+					break;
+				}
+			}
+
+			if (recordGone)
+			{
+				LOGWarning("CServerGamesManagerBase::UpdateIdleServers: gameId=%s record disappeared while stopping the remote process; nothing left to update", gameId.c_str());
+				mutex->Unlock();
+				continue;
+			}
+
+			if (lostRace)
+			{
+				LOGWarning("CServerGamesManagerBase::UpdateIdleServers: gameId=%s status changed to %s while stopping outside the lock; leaving the record alone (a restart or FinishGame() likely won the race)", gameId.c_str(), game->GetStatusName());
+				mutex->Unlock();
+				continue;
 			}
 
 			if (!exited)
 			{
-				CProcessSpawner::Kill(game->processId);
-				CProcessSpawner::TryWait(game->processId, nullptr);
+				CProcessSpawner::Kill(processId);
+				CProcessSpawner::TryWait(processId, nullptr);
 			}
 
 			game->processId = 0;
@@ -508,18 +825,144 @@ void CServerGamesManagerBase::UpdateIdleServers()
 		}
 		else if (game->gameServer)
 		{
-			// In-process: direct shutdown
-			if (game->gameServer->lobbyLink)
+			// In-process: snapshot and detach the server from `game` while
+			// still holding the mutex, then release the mutex before the
+			// blocking stop below -- same lock-inversion hazard as
+			// StopGameServer(): the game server's own network thread calls
+			// back into GetGame()/FinishGame(), which take this same
+			// `mutex`, so holding it across Shutdown()/StopServer() would
+			// guarantee the 5s cap expires.
+			CNetGameServer *server = game->gameServer;
+			int port = game->serverPort;
+			game->gameServer = NULL;
+
+			// Capture the pre-stop status under this same lock -- see the
+			// identical comment in StopGameServer() -- so the re-validate
+			// block below can restore FINISHED rather than SUSPENDED if
+			// this record had already finished by the time we re-lock
+			// (FinishGame() can race in on the game server's own thread
+			// during the unlocked window below, same as it can for
+			// StopGameServer()). Captured at the top of this iteration now
+			// that the remote branch above needs it too -- same value:
+			// nothing between there and here touches game->status on this
+			// path.
+
+			// Mark STOPPING before unlocking -- see the identical comment in
+			// StopGameServer(): without this, a rejoin landing in the
+			// unlocked window below could start a second live server for
+			// this record that the re-validate block would then clobber.
+			game->status = CServerGame::STOPPING;
+
+			mutex->Unlock();
+
+			// Shutdown lobbyLink first (stops network thread). CLobbyLink
+			// holds a raw gameServer pointer its callbacks dereference, so
+			// if its network thread refuses to stop in time, neither
+			// lobbyLink nor gameServer may be deleted -- the whole game
+			// server is leaked instead of risking a use-after-free.
+			bool lobbyLinkStopped = true;
+			if (server->lobbyLink)
 			{
-				game->gameServer->lobbyLink->Disconnect();
-				delete game->gameServer->lobbyLink;
-				game->gameServer->lobbyLink = NULL;
+				lobbyLinkStopped = server->lobbyLink->Shutdown();
+				if (lobbyLinkStopped)
+				{
+					delete server->lobbyLink;
+					server->lobbyLink = NULL;
+				}
+				else
+				{
+					LOGError("CServerGamesManagerBase::UpdateIdleServers: gameId=%s lobbyLink network thread did not stop in time; leaking game server to avoid a use-after-free", gameId.c_str());
+				}
 			}
 
-			game->gameServer->SaveState();
-			game->gameServer->Shutdown();
-			delete game->gameServer;
-			game->gameServer = NULL;
+			// Always save and always ask the game server's own network
+			// thread to stop, regardless of the lobbyLink outcome -- only
+			// the delete below is withheld on failure.
+			server->SaveState();
+			bool serverStopped = server->Shutdown();
+			if (!serverStopped)
+			{
+				LOGError("CServerGamesManagerBase::UpdateIdleServers: gameId=%s network thread did not stop in time; leaking game server to avoid a use-after-free", gameId.c_str());
+			}
+
+			bool leaked = !lobbyLinkStopped || !serverStopped;
+			if (!leaked)
+			{
+				delete server;
+			}
+
+			mutex->Lock();
+
+			// Re-validate: the game may have been removed from `games`
+			// while we were stopping its server outside the lock, or --
+			// since gameServer was NULL and status was STOPPING for the
+			// whole window -- a rejoin could have raced a restart in. Only
+			// mutate the record if it is still marked STOPPING by this very
+			// call; otherwise leave it alone (a restart won) and only do
+			// our own port bookkeeping. Capture locals -- `it`/`games` must
+			// not be touched again once we unlock below.
+			it = games.find(gameId);
+			bool stillPresent = (it != games.end());
+			bool wonRace = false;
+			if (stillPresent)
+			{
+				game = it->second;
+				if (game->status == CServerGame::STOPPING)
+				{
+					wonRace = true;
+
+					// Upload snapshot to shared storage before marking SUSPENDED
+					UploadSnapshot(game->gameId);
+
+					game->serverPort = 0;
+					// Restore FINISHED rather than SUSPENDED if that is what
+					// this record was before we marked it STOPPING (see the
+					// prevStatus comment above) -- never RUNNING.
+					// ArchiveFinishedGame() needs to see FINISHED; a
+					// finished game must not be resumable.
+					game->status = (prevStatus == CServerGame::FINISHED) ? CServerGame::FINISHED : CServerGame::SUSPENDED;
+					game->connectedPlayerCount = 0;
+					game->connectionTokens.clear();
+					SaveGameRecord(game);
+				}
+				else
+				{
+					// Lost the race -- see the identical comment in
+					// StopGameServer(). Zero serverPort if it still names
+					// the port we just detached, so a later fresh
+					// StopGameServer() call's plain tail can't
+					// ReleasePort() a port we may be about to
+					// RetainZombiePort() below.
+					if (game->serverPort == port)
+					{
+						game->serverPort = 0;
+					}
+					LOGWarning("CServerGamesManagerBase::UpdateIdleServers: gameId=%s status changed to %s while stopping outside the lock; leaving the record alone (a restart or FinishGame() likely won the race)", gameId.c_str(), game->GetStatusName());
+				}
+			}
+
+			if (leaked)
+			{
+				// A still-running thread may still hold this port's ENet
+				// socket -- retain it instead of handing it to the next
+				// AllocatePort() call.
+				RetainZombiePort(port);
+				LOGError("CServerGamesManagerBase::UpdateIdleServers: gameId=%s port %d retained (zombie) until the leaked server's thread exits", gameId.c_str(), port);
+			}
+			else
+			{
+				ReleasePort(port);
+			}
+
+			mutex->Unlock();
+
+			if (wonRace)
+			{
+				// Notify subclass outside mutex (lobby can update player game lists, etc.)
+				OnGamePaused(game);
+			}
+
+			continue;
 		}
 
 		// Upload snapshot to shared storage before marking SUSPENDED
@@ -527,7 +970,12 @@ void CServerGamesManagerBase::UpdateIdleServers()
 
 		ReleasePort(game->serverPort);
 		game->serverPort = 0;
-		game->status = CServerGame::SUSPENDED;
+		// Keep FINISHED, exactly as StopGameServer()'s plain tail does: an
+		// unconditional SUSPENDED here left a finished remote game rejoinable
+		// and out of ArchiveFinishedGame()'s reach (final-review I-4). Read
+		// prevStatus, not the live field -- the remote branch above legitimately
+		// leaves its own STOPPING marker on the record.
+		game->status = (prevStatus == CServerGame::FINISHED) ? CServerGame::FINISHED : CServerGame::SUSPENDED;
 		game->connectedPlayerCount = 0;
 		game->connectionTokens.clear();
 
@@ -836,6 +1284,18 @@ bool CServerGamesManagerBase::CanPlayerJoinGame(int playerProfileId)
 
 void CServerGamesManagerBase::ArchiveFinishedGame(CServerGame *game)
 {
+	// Defense in depth: a record mid-stop (see CServerGame::Status) must
+	// never be archived out from under the stop that is about to
+	// re-validate and mutate it. The current caller (ProcessPendingStops())
+	// already only calls this when status==FINISHED, which STOPPING can
+	// never be at the same time, but this guard makes the function safe to
+	// call from anywhere in the future.
+	if (game->status == CServerGame::STOPPING)
+	{
+		LOGWarning("CServerGamesManagerBase::ArchiveFinishedGame: gameId=%s is STOPPING; refusing to archive", game->gameId.c_str());
+		return;
+	}
+
 	namespace fs = std::filesystem;
 
 	string gamesFolder = string(gPathToResources) + "data/games/";
@@ -1027,3 +1487,21 @@ void CServerGamesManagerBase::ReleasePort(int port)
 {
 	usedPorts.erase(port);
 }
+
+void CServerGamesManagerBase::RetainZombiePort(int port)
+{
+	// A leaked game server's network thread may still hold the ENet socket
+	// bound to this port (CNetServer only calls enet_host_destroy() from
+	// inside its own ThreadRun(), CNetServer.cpp:322-330-ish), so
+	// AllocatePort() must keep treating it as in use. Re-insert into
+	// usedPorts (not just assert it's already there) so this function is
+	// correct standing alone, regardless of what any future caller did to
+	// usedPorts before reaching here. zombiePorts is separate bookkeeping.
+	if (port > 0)
+	{
+		usedPorts.insert(port);
+		zombiePorts.insert(port);
+	}
+}
+
+#endif // MT_ENABLE_NET_GAME

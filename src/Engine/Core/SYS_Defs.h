@@ -23,7 +23,6 @@
 
 #define MAX_STRING_LENGTH 8192
 
-#define OPENCV_TRAITS_ENABLE_DEPRECATED
 
 // do not show any UI
 //#define MODE_HEADLESS

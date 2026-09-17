@@ -1,5 +1,12 @@
+// CAPABILITY GUARD (MT_ENABLE_HTTPLIB). The file stays in all three build lists and
+// compiles to nothing when the capability is off -- an Xcode PBXBuildFile
+// cannot be conditioned on a build setting, so the condition lives here.
+// MT_CAP_HTTP declared this removable and nothing enforced it: MT_ENABLE_HTTPLIB appeared in no source at all.
+#if MT_ENABLE_HTTPLIB
+
 #include "CAssetServer.h"
 
+#include "NetGameListenPolicy.h"
 #include "SYS_Crypto.h"
 #include "SYS_FileSystem.h"
 
@@ -19,8 +26,9 @@ namespace fs = std::filesystem;
 CAssetServer::CAssetServer(int port)
 {
 	this->port = port;
-	this->listenInterface = "0.0.0.0";
+	this->listenInterface = "127.0.0.1";
 	this->useSSL = false;
+	this->allowPlaintext = false;
 	this->authServicePort = 14880;
 	this->authServiceAddress = "localhost";
 	this->isRunning = false;
@@ -350,8 +358,41 @@ bool CAssetServer::ValidateToken(const std::string &token, int &outProfileId, st
 	}
 	mutexTokenCache->Unlock();
 
-	// Validate via auth service HTTP call
-	httplib::Client authClient(authServiceAddress, SYS_ApplyPortOffset(authServicePort));
+	// Validate via auth service HTTP call.
+	//
+	// Scheme-aware: the two-argument httplib::Client(host, port) constructor is
+	// ALWAYS plaintext, and this hop carries the client's bearer session token.
+	// A production auth service is started with --ssl, so a plaintext POST here
+	// never returns 200 and every asset request 401s (final-review C-1); worse,
+	// against a plaintext auth service it would put the token on the wire in
+	// clear. Build the URL from authServiceUseTls instead.
+	std::string authBaseUrl = (authServiceUseTls ? "https://" : "http://")
+		+ authServiceAddress + ":" + std::to_string(SYS_ApplyPortOffset(authServicePort));
+	httplib::Client authClient(authBaseUrl);
+	if (!authClient.is_valid())
+	{
+		// e.g. https requested in a build without mbedTLS, or an unparseable host.
+		LOGError("CAssetServer: auth client init failed for %s", authBaseUrl.c_str());
+		return false;
+	}
+	// Certificate verification stays ON. authServiceCaCertPath only ADDS a trust
+	// anchor (private CA / self-signed fixture); with it empty the system store
+	// is used. There is deliberately no "skip verification" switch.
+	//
+	// set_ca_cert_path() only EXISTS under CPPHTTPLIB_SSL_ENABLED -- cpp-httplib
+	// declares it inside that guard -- so the call has to be compiled out in a
+	// build without an SSL backend, or every such build fails here. MT_CAP_HTTPS=0
+	// with MT_CAP_HTTP=1 is a real configuration (RetroDebugger is one): this file
+	// rides on MT_ENABLE_HTTPLIB, which does not imply TLS. Guarded on the
+	// httplib macro rather than MT_ENABLE_MBEDTLS because that is precisely the
+	// condition under which the member is declared.
+	//
+	// Nothing is lost when it is off: an https:// URL cannot be served by a
+	// client built without SSL, so is_valid() above has already returned.
+#ifdef CPPHTTPLIB_SSL_ENABLED
+	if (authServiceUseTls && !authServiceCaCertPath.empty())
+		authClient.set_ca_cert_path(authServiceCaCertPath.c_str());
+#endif
 	authClient.set_connection_timeout(5, 0);
 	authClient.set_read_timeout(5, 0);
 
@@ -389,14 +430,52 @@ bool CAssetServer::ValidateToken(const std::string &token, int &outProfileId, st
 
 // ── HTTP Server ────────────────────────────────────────────────────────
 
-void CAssetServer::Start()
+bool CAssetServer::Start()
 {
 	if (isRunning)
-		return;
+		return true;
+
+	// A TLS asset server must not hand a client's bearer token to a REMOTE auth
+	// service in clear. Loopback is exempt (the token never leaves the machine);
+	// anything else with useSSL on and authServiceUseTls off is a misconfiguration
+	// that would silently downgrade the credential hop, so refuse to start
+	// (final-review C-1).
+	if (useSSL && !authServiceUseTls && !NetGameIsLoopbackInterface(authServiceAddress))
+	{
+		LOGError("CAssetServer: refusing to start -- TLS listener but plaintext auth hop to %s (bearer tokens would go out in clear); pass --auth-tls", authServiceAddress.c_str());
+		return false;
+	}
 
 	RebuildManifests();
 
-	httplib::Server *server = new httplib::Server();
+	httplib::Server *server = NULL;
+	if (useSSL)
+	{
+#if MT_ENABLE_MBEDTLS
+		httplib::SSLServer *ssl = new httplib::SSLServer(sslCertPath.c_str(), sslKeyPath.c_str());
+		if (!ssl->is_valid())
+		{
+			LOGError("CAssetServer: TLS init failed (cert=%s key=%s)", sslCertPath.c_str(), sslKeyPath.c_str());
+			delete ssl;
+			return false;
+		}
+		server = ssl;
+#else
+		LOGError("CAssetServer: built without mbedTLS, --ssl unavailable");
+		return false;
+#endif
+	}
+	else
+	{
+		if (!NetGameIsLoopbackInterface(listenInterface) && !allowPlaintext)
+		{
+			LOGError("CAssetServer: refusing plaintext HTTP on %s (use --ssl, or --allow-plaintext for a trusted network)", listenInterface.c_str());
+			return false;
+		}
+		if (!NetGameIsLoopbackInterface(listenInterface))
+			LOGWarning("CAssetServer: PLAINTEXT on %s — assets are exposed on the wire", listenInterface.c_str());
+		server = new httplib::Server();
+	}
 	httpServer = server;
 
 	// ── Health check (no auth) ──
@@ -616,17 +695,39 @@ void CAssetServer::Start()
 		}
 	});
 
-	// Start server in background thread
+	// Bind SYNCHRONOUSLY, before returning true: listen() inside the thread would
+	// report a failed bind (port in use, interface unavailable) only as a missing
+	// log line, while Start() had already returned true and the caller logged
+	// "started" (final-review Minor 2). bind_to_port() gives us the answer here;
+	// listen_after_bind() then runs the accept loop in the thread.
+	int actualPort = SYS_ApplyPortOffset(port);
+	if (!server->bind_to_port(listenInterface, actualPort))
+	{
+		LOGError("CAssetServer: bind failed on %s:%d (base %d)", listenInterface.c_str(), actualPort, port);
+		delete server;
+		httpServer = nullptr;
+		return false;
+	}
+
+	// Start server in background thread. The thread handle is KEPT (a member,
+	// not detached) so Shutdown() can join it before deleting the server object
+	// its route lambdas are still inside.
 	isRunning = true;
-	thread serverThread([server, this]() {
-		int actualPort = SYS_ApplyPortOffset(port);
-		LOGM("CAssetServer: listening on %s:%d (base %d)", listenInterface.c_str(), actualPort, port);
-		server->listen(listenInterface, actualPort);
+	serverThread = thread([server, this, actualPort]() {
+		LOGM("CAssetServer: %s server listening on %s:%d (base %d)",
+			 useSSL ? "https" : "http", listenInterface.c_str(), actualPort, port);
+		server->listen_after_bind();
 		LOGM("CAssetServer: stopped");
 	});
-	serverThread.detach();
 
-	LOGM("CAssetServer: started");
+	// Wait until the accept loop is actually running. httplib::Server::stop()
+	// is a no-op while is_running_ is still false, so a Shutdown() that raced
+	// the thread's entry into listen_after_bind() would leave it looping
+	// forever and join() would hang.
+	server->wait_until_ready();
+
+	LOGM("CAssetServer: started (%s://%s)", useSSL ? "https" : "http", listenInterface.c_str());
+	return true;
 }
 
 void CAssetServer::Shutdown()
@@ -640,7 +741,12 @@ void CAssetServer::Shutdown()
 	if (server)
 	{
 		server->stop();
-		SYS_Sleep(100);
+		// JOIN, do not sleep-and-hope: every route lambda captures `this` and
+		// runs on that thread, so deleting the server (or this object) while
+		// listen_after_bind() is still unwinding is a use-after-free
+		// (final-review Minor 1).
+		if (serverThread.joinable())
+			serverThread.join();
 		delete server;
 		httpServer = nullptr;
 	}
@@ -648,3 +754,5 @@ void CAssetServer::Shutdown()
 	isRunning = false;
 	LOGM("CAssetServer: shutdown complete");
 }
+
+#endif // MT_ENABLE_HTTPLIB

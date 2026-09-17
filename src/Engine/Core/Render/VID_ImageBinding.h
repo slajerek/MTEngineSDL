@@ -53,4 +53,62 @@ void VID_LoadImageAsync(char *fileName, CSlrImage **destination, bool linearScal
 void VID_LoadImageAsyncNoWait(char *fileName, CSlrImage **destination, bool linearScaling, bool fromResources);
 bool VID_BindImages();
 
+// ---------------------------------------------------------------------------
+// Frame-budget throttle for VID_BindImages()
+// ---------------------------------------------------------------------------
+// OFF by default, and off is bit-for-bit the historical behaviour: the whole
+// queue is drained inside one frame, however long that takes.
+//
+// WHY IT EXISTS. Every binding is a full glTexImage2D of a decoded image. A
+// photo cache filling four decode workers at once therefore lands several
+// full-resolution uploads in ONE frame -- a 100ms+ frame. A still picture
+// survives that; a PLAYING VIDEO does not. Its clock is audio-driven, so the
+// stall does not slow the clip down, it makes Update()'s catch-up scan
+// consume-drop every frame the stall ran past. That is the visible stutter over
+// the first seconds after a folder opens.
+//
+// WHAT ON MEANS. The drain stops as soon as this frame's time budget is spent
+// and resumes on the next frame. The budget is
+//
+//     one target frame period (1 / VID_GetTargetFPS()) * frameBudgetFactor
+//     MINUS whatever the rest of the previous frame already cost
+//
+// so the ceiling is the WHOLE FRAME, not the binding step in isolation -- which
+// is the only version of the rule that actually keeps the next frame on time.
+// factor 1.0 (the default) = never overrun the frame period; 1.10 = 10% overrun
+// tolerated. Values below 0.1 are clamped: a budget of zero would leave nothing
+// but the one-per-frame progress guarantee below.
+//
+// The cost of ON is throughput: fewer images bound per frame. Nothing is lost,
+// only deferred -- the pixels are already in RAM, waiting, which is exactly
+// where they were sitting anyway.
+//
+// GUARANTEES
+//  * At least one queue entry is processed per call, whatever the budget says.
+//    Without it a frame already slower than the budget would never bind
+//    anything and images would never appear at all.
+//  * The queue stays strictly FIFO. A DEALLOC/DESTROY queued BEHIND a deferred
+//    binding waits with it, so its memory is released a frame or two later than
+//    it used to be. Running those ahead is NOT an option: DESTROY deletes the
+//    CSlrImage, and a still-queued binding for that same image would dangle.
+//  * Deferred glDeleteTextures (VID_PostDeleteGLTexture) are never throttled --
+//    they are cheap, and they are the one thing that must happen at this exact
+//    point in the frame.
+//  * VID_WaitForImageBindingFinished() (RES_LoadResourcesAsync's blocking
+//    drain, from a loader thread) still terminates: the progress guarantee
+//    above means the render loop retires at least one entry per frame, so a
+//    throttled queue drains slower but never stalls.
+//
+// Call from the render thread, once per frame, from whatever knows the answer
+// (for a media app: "is a clip playing right now").
+void VID_SetImageBindingThrottle(bool enabled, float frameBudgetFactor = 1.0f);
+bool VID_IsImageBindingThrottleEnabled();
+
+// The throttle's arithmetic, as a pure function: seconds of binding this call
+// may spend. Exposed so it can be pinned by a unit test without a live frame
+// loop. A negative prevFrameRestSec (no previous call to measure from) counts
+// as zero; the result never goes below zero.
+double VID_ComputeBindBudgetSec(double targetFps, float frameBudgetFactor,
+								double prevFrameRestSec);
+
 #endif //_VID_IMAGE_BINDING_

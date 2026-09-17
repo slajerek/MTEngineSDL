@@ -151,6 +151,38 @@ By hand, from the root. Where a development binary is:
 * `MT_TEST_RUN_DIR` pins the working directory outright and exists for tests
   *of* the runner.
 
+### 4a. A UI test runs on the coroutine thread, not the main thread
+
+A `TestFunc` executes on imgui_test_engine's coroutine thread. The **main**
+thread dispatches it from inside `ImGui::EndFrame()` -- i.e. from the middle of
+`VID_Render()` -- and then blocks until the test yields. So a UI test is not
+running "on the main thread", however much it looks like it.
+
+`VID_Render()` holds the render mutex (which *is* `guiMain`'s mutex) across the
+whole frame. Calling app code from a test that locks `guiMain` therefore parks
+on a mutex only the blocked main thread can release: the app hangs with no
+output and the runner reports "results file not found". The mutex being
+recursive does not save it -- recursion is per-thread, and this is a different
+thread.
+
+`CImGuiTestEngine.cpp` wraps the coroutine interface so the main thread hands
+that lock back for the duration of each dispatch and takes it again afterwards.
+The test then locks and unlocks normally, which keeps real mutual exclusion
+against the emulation threads rather than papering over it. This is test-build
+only; nothing changes in a production build.
+
+Two things still follow for test authors:
+
+* **Set up preconditions by calling the app directly; drive the UI for the
+  thing under test.** `ctx->MenuClick(...)` exercises the real user path, but
+  it only works if the item is reachable in whatever layout the run loaded, so
+  it is a poor way to get an emulator started before the actual assertions. A
+  direct call is deterministic and, since the bridge above, safe.
+* **A hang with no output is this bug until proven otherwise.** Diagnose it with
+  a stack sample (`sample <pid>`), not by guessing: the main thread will be in
+  `Coroutine_ImplStdThread_Run` and the "Dear ImGui Test Thread" in
+  `__psynch_mutexwait`.
+
 ## 5. Fixtures: `CTest::ResolveProjectPath()`
 
 A test opens every fixture through the resolver and never by a literal path:
@@ -251,6 +283,33 @@ job's own output, since the harness writes `[TEST]` lines to stderr.
 | the build says `logs=off` but you wanted output | `--prod` defaulted it | `--prod --logs on` |
 | CI green locally red, or vice versa | different `logs`/`config` leg | reproduce with the same switches; the driver prints them |
 
+## 9a. White-box tests reach internals through `friend`, never `#define private public`
+
+A test that has to see a class's internals declares itself a friend of that
+class. It does **not** wrap the include in
+`#define protected public` / `#define private public`.
+
+That trick is not portable, and the way it fails is expensive: the Itanium C++
+ABI (macOS, Linux) does not encode member access in a mangled name, so the trick
+links there and looks correct. The MSVC ABI *does* encode it -- `Q` for public,
+`I` for protected, `A` for private -- so the mutated header makes the test
+reference `public:` manglings of every out-of-line member it reaches, including
+the ones it reaches indirectly through the class's own public inline wrappers.
+Nothing defines those symbols. The result is a link error in the *app*, naming
+functions that plainly exist:
+
+```
+lld-link : error : undefined symbol: public: void __cdecl TextEditor::selectAll(void)
+```
+
+`dumpbin /SYMBOLS` on the defining object settles it in one line: the definition
+is `?selectAll@TextEditor@@IEAAXXZ` (`I`), the reference wants `Q`.
+
+`CTestTextEditorMutation` is the worked example -- it needs four protected data
+members of `TextEditor` and nothing else, so one `friend class` declaration in
+the header replaces the macros. Found 2026-09-09, the first time that test was
+compiled on Windows.
+
 ## 10. Never do this
 
 * Never edit `DBG_Log.h` (or any source) to turn logging on or off.
@@ -264,3 +323,5 @@ job's own output, since the harness writes `[TEST]` lines to stderr.
 * Never pass `--no-prod` or `-NoProd`; never zip a `prod/` that was not
   produced by the build you are shipping.
 * Never treat a `SKIPPED` test as a pass, or a missing fixture as a skip.
+* Never reach a class's internals with `#define private public` at the include
+  site -- see #9a. Declare the test a `friend`.

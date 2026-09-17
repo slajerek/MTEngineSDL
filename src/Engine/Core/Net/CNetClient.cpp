@@ -1,3 +1,10 @@
+// CAPABILITY GUARD (MT_ENABLE_ENET). The file stays in all three build lists and
+// compiles to nothing when the capability is off -- the guard-the-body,
+// keep-the-file idiom, which exists because an Xcode PBXBuildFile cannot be
+// conditioned on a build setting the way a CMake or MSBuild item can.
+// MT_CAP_NET_TRANSPORT declared this removable and nothing enforced it: MT_ENABLE_ENET appeared in no source, so the code shipped whatever the manifest said.
+#if MT_ENABLE_ENET
+
 /*
  *
  *  MTEngine framework (c) 2009 Marcin Skoczylas
@@ -79,6 +86,61 @@ void CNetClient::SetClientLoginDetails(std::string clientLoginName, vector<u8> p
 	UnlockMutex();
 }
 
+void CNetClient::SetAuthDataProvider(std::function<std::vector<u8>()> provider)
+{
+	// Clearing is the lifetime-critical direction: route it through
+	// ClearAuthDataProvider() so every existing SetAuthDataProvider(nullptr)
+	// call site (destructors, Disconnect()) also gets the wait-for-in-flight
+	// guarantee (final-review I-2).
+	if (!provider)
+	{
+		ClearAuthDataProvider();
+		return;
+	}
+
+	// Assigning a std::function while ThreadRun is concurrently copying or
+	// invoking the previous one is undefined behavior -- serialize the
+	// assignment against ThreadRun's own locked copy (see the call site in
+	// ThreadRun, and the header comment on this method).
+	LockMutex();
+	authDataProvider = provider;
+	UnlockMutex();
+}
+
+void CNetClient::ClearAuthDataProvider()
+{
+	LockMutex();
+	authDataProvider = nullptr;
+	bool onNetThread = netThreadIdValid && (netThreadId == std::this_thread::get_id());
+	int inFlight = authProviderCallsInFlight;
+	UnlockMutex();
+
+	if (inFlight == 0)
+		return;
+
+	if (onNetThread)
+	{
+		// We ARE the in-flight call. Waiting would be waiting on ourselves.
+		LOGWarning("CNetClient::ClearAuthDataProvider: called from the network thread while a provider call is in flight; not waiting");
+		return;
+	}
+
+	// Bounded poll: the provider's own worst case is a 3s connect + 3s read
+	// HTTPS round trip, so 10s is comfortably above it without ever hanging a
+	// UI/shutdown thread forever.
+	for (int i = 0; i < 1000; i++)
+	{
+		SYS_Sleep(10);
+		LockMutex();
+		inFlight = authProviderCallsInFlight;
+		UnlockMutex();
+		if (inFlight == 0)
+			return;
+	}
+
+	LOGError("CNetClient::ClearAuthDataProvider: a provider call was still in flight after 10s; giving up the wait");
+}
+
 void CNetClient::Connect()
 {
 	this->status = NET_CLIENT_STATUS_CONNECTING;
@@ -93,6 +155,14 @@ void CNetClient::Connect()
 void CNetClient::ThreadRun(void *data)
 {
 	LOGD("CNetClient::ThreadRun: thread started");
+
+	// Publish this thread's id so ClearAuthDataProvider() can tell a call made
+	// from inside a provider (on this thread) from one made by the UI thread,
+	// and skip the wait rather than deadlock on itself.
+	LockMutex();
+	netThreadId = std::this_thread::get_id();
+	netThreadIdValid = true;
+	UnlockMutex();
 
 	strcpy(threadName, "Net-Client");
 
@@ -168,8 +238,51 @@ void CNetClient::ThreadRun(void *data)
 
 		//enet_peer_ping_interval(peer, 1);
 
+		// Give the caller a chance to refresh auth data (e.g. fetch a fresh
+		// single-use lobby ticket over HTTPS) right before it is sent. The
+		// std::function itself is only ever assigned via SetAuthDataProvider()
+		// (under packetMutex), so copy it out under the same lock before
+		// calling it -- the CALL stays outside the lock (it is a blocking
+		// round trip by design, and must never run inside the
+		// LockMutex()/UnlockMutex() region below that assembles the authorize
+		// packet), but the copy itself must not race a concurrent
+		// SetAuthDataProvider() from another thread.
+		// The in-flight counter is bumped under the SAME lock as the copy and
+		// dropped under the lock after the call returns, so
+		// ClearAuthDataProvider() can wait out a call that is already running
+		// with a `this`-capturing lambda (final-review I-2).
 		LockMutex();
-		
+		std::function<std::vector<u8>()> provider = authDataProvider;
+		if (provider)
+			authProviderCallsInFlight++;
+		UnlockMutex();
+
+		std::vector<u8> fresh;
+		if (provider)
+		{
+			// The decrement must happen even if the provider throws, or every
+			// later ClearAuthDataProvider() would burn its full 10s wait.
+			try {
+				fresh = provider();
+			} catch (...) {
+				LockMutex();
+				authProviderCallsInFlight--;
+				UnlockMutex();
+				throw;
+			}
+			LockMutex();
+			authProviderCallsInFlight--;
+			UnlockMutex();
+		}
+
+		// passwordHash is written from other threads only under packetMutex
+		// (SetClientLoginDetails, the PW2 response snapshot below) -- write
+		// the provider's result the same way, inside this lock, rather than
+		// racing those writers with an unlocked assignment.
+		LockMutex();
+		if (!fresh.empty())
+			passwordHash = fresh;
+
 		// login / authorize packet
 		byteBufferReliableOut->Reset();
 		byteBufferReliableOut->PutByte(NET_PACKET_TYPE_AUTHORIZE);
@@ -726,3 +839,5 @@ void CNetClientCallback::NetClientProcessPacket(CNetPacket *packet)
 void CNetClientCallback::NetClientLogic(CNetClient *netClient)
 {
 }
+
+#endif // MT_ENABLE_ENET

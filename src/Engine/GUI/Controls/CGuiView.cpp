@@ -108,6 +108,15 @@ void CGuiView::Init(const char *name, float posX, float posY, float posZ, float 
 
 	fullScreenSizeX = -1;
 	fullScreenSizeY = -1;
+
+	// Zero = "reserve nothing", which is what makes the fullscreen path
+	// identical for every view that never asks. These are read on the render
+	// thread each frame, so leaving them uninitialised would put stack garbage
+	// straight into the window geometry.
+	fullScreenInsetLeft   = 0.0f;
+	fullScreenInsetRight  = 0.0f;
+	fullScreenInsetTop    = 0.0f;
+	fullScreenInsetBottom = 0.0f;
 	
 	// this is to determine if layout parameters were rendered this frame, if yes then we'll skip render
 	previousRenderedFrameWithLayoutParameters = 0;
@@ -1480,6 +1489,17 @@ void CGuiView::SetFullScreenViewSize(float sx, float sy)
 	this->fullScreenSizeY = sy;
 }
 
+void CGuiView::SetFullScreenInsets(float left, float right, float top, float bottom)
+{
+	// Clamped at the setter as well as at the use site: a negative inset would
+	// GROW the fullscreen rect past the work area, which is not a reservation
+	// and is not what any caller means by one.
+	this->fullScreenInsetLeft   = left   > 0.0f ? left   : 0.0f;
+	this->fullScreenInsetRight  = right  > 0.0f ? right  : 0.0f;
+	this->fullScreenInsetTop    = top    > 0.0f ? top    : 0.0f;
+	this->fullScreenInsetBottom = bottom > 0.0f ? bottom : 0.0f;
+}
+
 void CGuiView::CalcAspectRatio(float aspectRatio, ImVec2 viewportSize, ImVec2 *adjustedPos, ImVec2 *adjustedSize)
 {
 	float vW = (float) viewportSize.x;
@@ -1552,8 +1572,30 @@ void CGuiView::PreRenderImGui()
 		ImVec2 realFullScreenPos;
 		ImVec2 realFullScreenSize;
 		float aspectRatio = (float) imGuiWindowKeepAspectRatio ? imGuiWindowAspectRatio : this->fullScreenSizeX / (float) this->fullScreenSizeY;
-		CalcAspectRatio(aspectRatio, viewport->WorkSize, &realFullScreenPos, &realFullScreenSize);
-		
+
+		// The area a fullscreen view may use: the viewport work area minus
+		// whatever the app reserved along each edge (SetFullScreenInsets).
+		// All four default to 0, so a view that sets none of them lands on
+		// exactly the rect it did before these existed -- the subtraction is
+		// the identity and the position offset is zero.
+		//
+		// Order matters: the insets come off BEFORE CalcAspectRatio and go
+		// back onto the position AFTER it. Aspect has to be solved inside the
+		// reduced area; solving it on the full screen and then sliding the
+		// result would keep the full-screen DIMENSIONS and merely move them.
+		ImVec2 fullScreenArea = viewport->WorkSize;
+		fullScreenArea.x -= (fullScreenInsetLeft + fullScreenInsetRight);
+		fullScreenArea.y -= (fullScreenInsetTop  + fullScreenInsetBottom);
+		// CalcAspectRatio divides by the height, so an inset wider than the
+		// screen must not reach it: that is a zero or negative extent, and the
+		// NaN it produces propagates into the window geometry.
+		if (fullScreenArea.x < 1.0f) fullScreenArea.x = 1.0f;
+		if (fullScreenArea.y < 1.0f) fullScreenArea.y = 1.0f;
+
+		CalcAspectRatio(aspectRatio, fullScreenArea, &realFullScreenPos, &realFullScreenSize);
+		realFullScreenPos.x += fullScreenInsetLeft;
+		realFullScreenPos.y += fullScreenInsetTop;
+
 		ImGui::SetNextWindowPos(realFullScreenPos);
 		ImGui::SetNextWindowSize(realFullScreenSize);
 		ImGui::SetNextWindowViewport(viewport->ID);

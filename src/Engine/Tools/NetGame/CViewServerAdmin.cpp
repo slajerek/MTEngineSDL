@@ -1,3 +1,9 @@
+// CAPABILITY GUARD (MT_ENABLE_NET_GAME). The file stays in all three build lists and
+// compiles to nothing when the capability is off -- an Xcode PBXBuildFile
+// cannot be conditioned on a build setting, so the condition lives here.
+// MT_CAP_NET_GAME implies NET_TRANSPORT and HTTP, so this whole stack rides on one flag -- which did not exist until 2026-09-06 (enables was an empty list).
+#if MT_ENABLE_NET_GAME
+
 #include "CViewServerAdmin.h"
 #include "CGuiMain.h"
 #include "CNetLobbyServer.h"
@@ -252,17 +258,19 @@ void CViewServerAdmin::RenderImGui()
 			vector<CServerGame *> allGames = gamesManager->GetAllGames();
 
 			// Summary counters
-			int runningCount = 0, startingCount = 0, suspendedCount = 0;
+			int runningCount = 0, startingCount = 0, suspendedCount = 0, stoppingCount = 0;
 			for (const auto *game : allGames)
 			{
 				switch (game->status)
 				{
 					case CServerGame::RUNNING:   runningCount++;   break;
 					case CServerGame::STARTING:  startingCount++;  break;
+					case CServerGame::STOPPING:  stoppingCount++;  break;
 					case CServerGame::SUSPENDED: suspendedCount++; break;
+					case CServerGame::FINISHED:  break; // archived/removed promptly; not summarized here
 				}
 			}
-			Text("%d running, %d starting, %d suspended", runningCount, startingCount, suspendedCount);
+			Text("%d running, %d starting, %d stopping, %d suspended", runningCount, startingCount, stoppingCount, suspendedCount);
 
 			// Port pool summary
 			int usedPorts = 0;
@@ -350,8 +358,14 @@ void CViewServerAdmin::RenderImGui()
 							case CServerGame::RUNNING:
 								TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "RUNNING");
 								break;
+							case CServerGame::STOPPING:
+								TextColored(ImVec4(1.0f, 0.5f, 0.0f, 1.0f), "STOPPING");
+								break;
 							case CServerGame::SUSPENDED:
 								TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "SUSPENDED");
+								break;
+							case CServerGame::FINISHED:
+								TextColored(ImVec4(0.5f, 0.5f, 1.0f, 1.0f), "FINISHED");
 								break;
 						}
 
@@ -430,3 +444,5 @@ void CViewServerAdmin::DeactivateView()
 {
 	LOGG("CViewServerAdmin::DeactivateView()");
 }
+
+#endif // MT_ENABLE_NET_GAME

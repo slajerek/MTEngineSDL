@@ -1,3 +1,10 @@
+// CAPABILITY GUARD (MT_ENABLE_ENET). The file stays in all three build lists and
+// compiles to nothing when the capability is off -- the guard-the-body,
+// keep-the-file idiom, which exists because an Xcode PBXBuildFile cannot be
+// conditioned on a build setting the way a CMake or MSBuild item can.
+// MT_CAP_NET_TRANSPORT declared this removable and nothing enforced it: MT_ENABLE_ENET appeared in no source, so the code shipped whatever the manifest said.
+#if MT_ENABLE_ENET
+
 /*
  *
  *  MTEngine framework (c) 2009 Marcin Skoczylas
@@ -27,10 +34,12 @@ CNetServer::CNetServer(CNetServerCallback *serverCallback, CNetPacketCallback *p
 void CNetServer::Init(CNetServerCallback *serverCallback, CNetPacketCallback *packetCallback, int serverPort)
 {
 	this->packetMutex = new CSlrMutex("CNetServer");
-	
+	this->clientsMutex = new CSlrMutex("CNetServerClients");
+
 	this->status = NET_SERVER_STATUS_OFFLINE;
-	
+
 	this->serverPort = serverPort;
+	this->bindAddress = "";
 
 	this->AddServerCallback(serverCallback);
 	this->AddPacketCallback(packetCallback);
@@ -49,13 +58,77 @@ void CNetServer::Init(CNetServerCallback *serverCallback, CNetPacketCallback *pa
 
 CNetServer::~CNetServer()
 {
+	// Stop the network thread (no-op if it was never started or already
+	// stopped) and wait for it to actually exit before freeing anything it
+	// might still touch.
+	StopServer();
+	SYS_JoinThread(this);
+
+	delete packetMutex;
+	delete clientsMutex;
+
+	for (u32 i = 0; i < NET_MAX_CLIENTS; i++)
+	{
+		delete clients[i];
+	}
+
+	delete byteBufferIn;
+	delete byteBufferReliableOut;
+	delete byteBufferNotReliableOut;
+
+	// serverCallbacks / packetCallbacks hold pointers the caller owns -- not freed here.
 }
 
 void CNetServer::StartServer()
 {
 	LOGCS("CNetServer::StartServer");
+	// Reset the shutdown flag from any prior StopServer() -- otherwise a
+	// restarted server would immediately trip the race guard in ThreadRun
+	// (shutdownRequested still true from the earlier stop) and shut itself
+	// back down before ever going ONLINE.
+	this->shutdownRequested = false;
+	// Release the PREVIOUS thread handle before SYS_StartThread overwrites it.
+	// SYS_StartThread creates a JOINABLE SDL thread; a restart-after-stop (a
+	// supported flow since the shutdownRequested reset above was added) would
+	// otherwise drop `run->thread` on the floor, leaking the handle and its
+	// resources (final-review Minor 11). SYS_JoinThread is a no-op when the
+	// thread was never started, and StopServer() has already waited for the old
+	// thread to exit, so this does not block.
+	SYS_JoinThread(this);
 	this->status = NET_SERVER_STATUS_SETUP;
 	SYS_StartThread(this);
+}
+
+void CNetServer::StopServer()
+{
+	// No-op if the server was never started (or has already fully stopped):
+	// nothing to signal, nothing to wait for.
+	if (this->status == NET_SERVER_STATUS_OFFLINE && !this->isRunning)
+		return;
+
+	LOGCS("CNetServer::StopServer: requesting shutdown (port %d)", serverPort);
+
+	this->shutdownRequested = true;
+	this->status = NET_SERVER_STATUS_SHUTDOWN;
+
+	// Wait for BOTH status==OFFLINE and isRunning==false. status alone is not
+	// enough: ThreadRun publishes OFFLINE, then returns, and only after that
+	// does the CSlrThread wrapper (SYS_Threading.cpp) write isRunning=false --
+	// a caller that stopped waiting at status==OFFLINE could still race the
+	// thread's own return path (and, before this fix, the still-open socket;
+	// enet_host_destroy() now runs before status is published, so this is
+	// purely about the thread having fully exited before we hand `this` back
+	// to a caller who may delete it).
+	u64 startMs = SYS_GetCurrentTimeInMillis();
+	while (this->status != NET_SERVER_STATUS_OFFLINE || this->isRunning)
+	{
+		if (SYS_GetCurrentTimeInMillis() - startMs > 5000)
+		{
+			LOGError("CNetServer::StopServer: timed out waiting for server (port %d) to reach OFFLINE", serverPort);
+			break;
+		}
+		SYS_Sleep(10);
+	}
 }
 
 void CNetServer::ThreadRun(void *data)
@@ -67,10 +140,22 @@ void CNetServer::ThreadRun(void *data)
 	ENetAddress address;
 	ENetHost * server;
 
-	// Bind the server to the default localhost.
-	// A specific host address can be specified by
-	// enet_address_set_host (& address, "x.x.x.x");
-	address.host = ENET_HOST_ANY;
+	// Bind address: empty (the default) binds ENET_HOST_ANY -- all interfaces.
+	// A specific host is set by the caller via bindAddress before StartServer()
+	// (e.g. "127.0.0.1" to keep the socket off the public interface).
+	if (!bindAddress.empty())
+	{
+		if (enet_address_set_host(&address, bindAddress.c_str()) != 0)
+		{
+			LOGError("CNetServer::ThreadRun: Failed to resolve bind address '%s'", bindAddress.c_str());
+			this->status = NET_SERVER_STATUS_OFFLINE;
+			return;
+		}
+	}
+	else
+	{
+		address.host = ENET_HOST_ANY;
+	}
 
 	// Bind the server to port 5454
 	int actualPort = SYS_ApplyPortOffset(serverPort);
@@ -91,13 +176,25 @@ void CNetServer::ThreadRun(void *data)
 		return;
 	}
 
+	// Race guard: a StopServer() call that lands between StartServer() and
+	// this point already flipped shutdownRequested (and status to SHUTDOWN).
+	// Without this check the unconditional assignment below would stomp
+	// status back to ONLINE and the loop condition would never see SHUTDOWN,
+	// so the thread -- and the socket -- would never exit.
+	if (shutdownRequested)
+	{
+		enet_host_destroy(server);
+		status = NET_SERVER_STATUS_OFFLINE;
+		return;
+	}
+
 	status = NET_SERVER_STATUS_ONLINE;
 
 	LOGM("Server ready on port %d (base %d)", actualPort, serverPort);
-	
+
 	ENetEvent event;
 
-	while(status != NET_SERVER_STATUS_SHUTDOWN)
+	while(status != NET_SERVER_STATUS_SHUTDOWN && !shutdownRequested)
 	{
 		//LOGD("... wait up to NET_SERVICE_EVENT_SLEEP_TIME milliseconds for an event ...");
 		while (enet_host_service (server, &event, NET_SERVICE_EVENT_SLEEP_TIME) > 0)
@@ -205,7 +302,9 @@ void CNetServer::ThreadRun(void *data)
 				}
 				else
 				{
+					this->clientsMutex->Lock();
 					clients[i]->state = NET_CLIENT_STATE_EMPTY;
+					this->clientsMutex->Unlock();
 				}
 			}
 
@@ -227,15 +326,23 @@ void CNetServer::ThreadRun(void *data)
 		this->NetLogic();
 	}
 
-	this->status = NET_SERVER_STATUS_OFFLINE;
-
+	// Close the socket BEFORE publishing OFFLINE: StopServer() polls status,
+	// and if it saw OFFLINE while the port was still bound, a caller relying
+	// on that as "safe to delete / safe to rebind the port" would race the
+	// still-open ENet host and the thread's own remaining writes to `this`.
 	enet_host_destroy(server);
+
+	this->status = NET_SERVER_STATUS_OFFLINE;
 
 	LOGCS("CNetServer::ThreadRun: thread finished");
 }
 
 CNetClientData *CNetServer::ConnectPeer(ENetPeer *peer)
 {
+	// Guards clients[]->state/clientName against a concurrent reader taking a
+	// render-thread snapshot (see CViewGameServer::RenderImGui).
+	this->clientsMutex->Lock();
+
 	for (u32 i = 0; i < NET_MAX_CLIENTS; i++)
 	{
 		if (clients[i]->state == NET_CLIENT_STATE_EMPTY)
@@ -255,9 +362,12 @@ CNetClientData *CNetServer::ConnectPeer(ENetPeer *peer)
 			//	enet_peer_throttle_configure(
 
 			//LOGD("peer connected id=%d", i);
+			this->clientsMutex->Unlock();
 			return clients[i];
 		}
 	}
+
+	this->clientsMutex->Unlock();
 
 	LOGError("CNetServer::ConnectPeer: too many peers (max=%d)", NET_MAX_CLIENTS);
 	enet_peer_disconnect(peer, 0);
@@ -267,7 +377,9 @@ CNetClientData *CNetServer::ConnectPeer(ENetPeer *peer)
 
 void CNetServer::Disconnect(CNetClientData *netClientData)
 {
+	this->clientsMutex->Lock();
 	netClientData->state = NET_CLIENT_STATE_DISCONNECT;
+	this->clientsMutex->Unlock();
 }
 
 void CNetServer::Disconnected(CNetClientData *netClientData)
@@ -283,9 +395,11 @@ void CNetServer::Disconnected(CNetClientData *netClientData)
 		callback->NetServerCallbackClientDisconnected(netClientData);
 	}
 
+	this->clientsMutex->Lock();
 	netClientData->peer->data = NULL;
 	netClientData->peer = NULL;
 	netClientData->state = NET_CLIENT_STATE_EMPTY;
+	this->clientsMutex->Unlock();
 }
 
 
@@ -528,10 +642,14 @@ bool CNetServer::ParseAuthorize(CNetClientData *netClientData, CByteBuffer *byte
 	netClientData->authorizePendingIssuedAtMillis = 0;
 
 	u8 authStatus = NET_SERVER_CALLBACK_AUTHORIZE_NOT_AVAILABLE;
-	for (std::list<CNetServerCallback *>::iterator it = this->serverCallbacks.begin();
-		it != this->serverCallbacks.end(); it++)
+
+	// Copy callback list under mutex for safe iteration (same pattern as NetLogic()).
+	this->LockMutex();
+	std::list<CNetServerCallback *> authorizeCallbacksCopy = this->serverCallbacks;
+	this->UnlockMutex();
+
+	for (auto *callback : authorizeCallbacksCopy)
 	{
-		CNetServerCallback *callback = (*it);
 		authStatus = callback->NetServerAuthorize(netClientData, userName, passwordHashVector);
 		if (authStatus != NET_SERVER_CALLBACK_AUTHORIZE_NOT_AVAILABLE)
 			break;
@@ -578,6 +696,7 @@ bool CNetServer::ParseAuthorize(CNetClientData *netClientData, CByteBuffer *byte
 	}
 	
 	// authorized OK, check if we have already other user session and drop it
+	this->clientsMutex->Lock();
 	for (int i = 0; i < NET_MAX_CLIENTS; i++)
 	{
 		CNetClientData *client = clients[i];
@@ -587,8 +706,8 @@ bool CNetServer::ParseAuthorize(CNetClientData *netClientData, CByteBuffer *byte
 			Disconnect(client);
 		}
 	}
-	
 	netClientData->SetClientName(userName);
+	this->clientsMutex->Unlock();
 
 	// send authorization confirmed
 	byteBufferReliableOut->Reset();
@@ -598,13 +717,17 @@ bool CNetServer::ParseAuthorize(CNetClientData *netClientData, CByteBuffer *byte
 	this->SendReliableBufferAsync(netClientData, byteBufferReliableOut);
 
 	LOGST("AUTHORIZED successfully");
-	
-	netClientData->state = NET_CLIENT_STATE_ONLINE;
 
-	for (std::list<CNetServerCallback *>::iterator it = this->serverCallbacks.begin();
-		it != this->serverCallbacks.end(); it++)
+	this->clientsMutex->Lock();
+	netClientData->state = NET_CLIENT_STATE_ONLINE;
+	this->clientsMutex->Unlock();
+
+	this->LockMutex();
+	std::list<CNetServerCallback *> connectedCallbacksCopy = this->serverCallbacks;
+	this->UnlockMutex();
+
+	for (auto *callback : connectedCallbacksCopy)
 	{
-		CNetServerCallback *callback = (*it);
 		callback->NetServerCallbackClientConnected(netClientData);
 	}
 
@@ -654,10 +777,14 @@ bool CNetServer::ParseAuthorizeResponse(CNetClientData *netClientData, CByteBuff
 	}
 
 	u8 authStatus = NET_SERVER_CALLBACK_AUTHORIZE_NOT_AVAILABLE;
-	for (std::list<CNetServerCallback *>::iterator it = this->serverCallbacks.begin();
-		it != this->serverCallbacks.end(); it++)
+
+	// Copy callback list under mutex for safe iteration (same pattern as NetLogic()).
+	this->LockMutex();
+	std::list<CNetServerCallback *> authorizeResponseCallbacksCopy = this->serverCallbacks;
+	this->UnlockMutex();
+
+	for (auto *callback : authorizeResponseCallbacksCopy)
 	{
-		CNetServerCallback *callback = (*it);
 		authStatus = callback->NetServerAuthorize(netClientData, userName, responseVector);
 		if (authStatus != NET_SERVER_CALLBACK_AUTHORIZE_NOT_AVAILABLE)
 			break;
@@ -682,6 +809,7 @@ bool CNetServer::ParseAuthorizeResponse(CNetClientData *netClientData, CByteBuff
 	}
 
 	// authorized OK, check if we have already other user session and drop it
+	this->clientsMutex->Lock();
 	for (int i = 0; i < NET_MAX_CLIENTS; i++)
 	{
 		CNetClientData *client = clients[i];
@@ -691,8 +819,8 @@ bool CNetServer::ParseAuthorizeResponse(CNetClientData *netClientData, CByteBuff
 			Disconnect(client);
 		}
 	}
-
 	netClientData->SetClientName(userName);
+	this->clientsMutex->Unlock();
 
 	// send authorization confirmed
 	byteBufferReliableOut->Reset();
@@ -701,12 +829,16 @@ bool CNetServer::ParseAuthorizeResponse(CNetClientData *netClientData, CByteBuff
 	this->SendReliableBufferAsync(netClientData, byteBufferReliableOut);
 
 	LOGST("AUTHORIZED successfully");
+	this->clientsMutex->Lock();
 	netClientData->state = NET_CLIENT_STATE_ONLINE;
+	this->clientsMutex->Unlock();
 
-	for (std::list<CNetServerCallback *>::iterator it = this->serverCallbacks.begin();
-		it != this->serverCallbacks.end(); it++)
+	this->LockMutex();
+	std::list<CNetServerCallback *> connectedResponseCallbacksCopy = this->serverCallbacks;
+	this->UnlockMutex();
+
+	for (auto *callback : connectedResponseCallbacksCopy)
 	{
-		CNetServerCallback *callback = (*it);
 		callback->NetServerCallbackClientConnected(netClientData);
 	}
 
@@ -835,3 +967,5 @@ u8 CNetServerCallback::NetServerAuthorize(CNetClientData *clientData, string use
 CNetServerCallback::~CNetServerCallback()
 {
 }
+
+#endif // MT_ENABLE_ENET

@@ -25,6 +25,14 @@ class CMusicWaveformCache
 public:
 	bool BuildFromInterleavedPcm16(const int16_t *samples, size_t frameCount, int channels, size_t envelopePoints);
 	bool LoadFromOggFile(const std::string &filePath, size_t envelopePoints = 8192);
+
+	// ANY format the engine can play, streamed. LoadFromOggFile stays because
+	// it reads through libvorbis directly and is what .ogg has always used;
+	// this is the general path, and it is STREAMING for the same reason that
+	// one is -- a lossless FLAC or ALAC album track is tens of megabytes of
+	// PCM, and BuildFromInterleavedPcm16 wants the whole thing in memory at
+	// once. Without this, every format added since .ogg had no waveform at all.
+	bool LoadFromMusicFile(const std::string &filePath, size_t envelopePoints = 8192);
 	bool SaveToBinaryFile(const std::string &cachePath, const CMusicWaveformSourceInfo &sourceInfo) const;
 	bool LoadFromBinaryFile(const std::string &cachePath, const CMusicWaveformSourceInfo &expectedSourceInfo);
 	bool BuildRenderWindow(size_t pixelWidth, float centerNorm, float zoom, std::vector<CMusicWaveformRenderPoint> &outPoints) const;

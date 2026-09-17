@@ -2,6 +2,14 @@
 
 #include "CSlrFileFromDocuments.h"
 #include "CSlrMusicFileOgg.h"
+#if !defined(MT_CAP_MUSIC_PLAYER) || MT_CAP_MUSIC_PLAYER
+#include "CSlrMusicFileMiniaudio.h"
+#define MT_HAVE_MINIAUDIO_MUSIC 1
+#else
+#define MT_HAVE_MINIAUDIO_MUSIC 0
+#endif
+#include "CSlrMusicFileNative.h"
+#include "MT_MusicFileFactory.h"
 #include "SND_Main.h"
 
 #include <algorithm>
@@ -134,25 +142,26 @@ bool CPlaylistPlaybackManager::EnsureTrackPlaybackLoaded(const CSlrMusicPlaylist
 	entry.attemptedLoad = true;
 	entry.loadSucceeded = false;
 
-	if (!IsOggPath(track.path))
+	// FORMAT GATE. Ogg keeps its own decoder -- it works, and it carries the
+	// cue-point behaviour apps depend on -- while MP3/FLAC/WAV go to
+	// miniaudio. Anything else is still refused here rather than opened and
+	// failed later, so the playlist never shows a row it cannot play.
+	// One routing decision for the whole engine, in MT_MusicFileFactory --
+	// the waveform cache needs the same answer, and two copies of an extension
+	// list is how a format ends up playable with no waveform.
+	if (!MusicFile_CanPlay(track.path.c_str()))
 		return false;
 
 	entry.fileHandle = new CSlrFileFromDocuments(track.path.c_str(), SLR_FILE_MODE_READ, true);
 	if (entry.fileHandle == NULL || !entry.fileHandle->Exists())
 	{
-		if (entry.fileHandle)
-		{
-			delete entry.fileHandle;
-			entry.fileHandle = NULL;
-		}
+		if (entry.fileHandle) { delete entry.fileHandle; entry.fileHandle = NULL; }
 		return false;
 	}
 
-	entry.music = new CSlrMusicFileOgg(track.path.c_str());
-	if (!entry.music->Init(entry.fileHandle, true))
+	entry.music = MusicFile_Open(track.path.c_str(), entry.fileHandle);
+	if (entry.music == NULL)
 	{
-		delete entry.music;
-		entry.music = NULL;
 		delete entry.fileHandle;
 		entry.fileHandle = NULL;
 		return false;

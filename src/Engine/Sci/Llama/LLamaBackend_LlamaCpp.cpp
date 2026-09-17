@@ -1,3 +1,12 @@
+// CAPABILITY GUARD (MT_ENABLE_LLAMA_CPP). Stays in all three build lists,
+// compiles to nothing when off -- the same contract CLlamaModelDownloader.cpp
+// carries. llama.h arrives with the llama.cpp gated submodule, which the
+// capability-selective deps scripts do not fetch when MT_CAP_LLM resolves 0,
+// so an unconditional include would break every build that honestly disables
+// the capability. Every caller reaches this class through CLlamaService,
+// whose uses are guarded already.
+#if !defined(MT_ENABLE_LLAMA_CPP) || (MT_ENABLE_LLAMA_CPP)
+
 #include "LLamaBackend_LlamaCpp.h"
 
 #include <algorithm>
@@ -634,3 +643,5 @@ void LLamaBackend_LlamaCpp::InferenceThread(std::string prompt,
 	generating = false;
 	if (doneCb) doneCb(reason);
 }
+
+#endif // MT_ENABLE_LLAMA_CPP

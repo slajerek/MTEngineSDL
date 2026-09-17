@@ -1,7 +1,10 @@
 // Native AAC decode via Windows Media Foundation's in-box AAC decoder MFT.
 #include "CAudioDecoderAACMF.h"
 
-#if defined(_WIN32) && (!defined(MT_ENABLE_FFMPEG) || (MT_ENABLE_FFMPEG))
+// Platform only -- the gate no longer includes MT_ENABLE_FFMPEG. See the
+// header and MT_MediaPacket.h: this decoder is the destination of the FFmpeg
+// removal and must not be switched off by it.
+#if defined(_WIN32)
 
 #include "AacAscParser.h"
 #include "DBG_Log.h"
@@ -389,4 +392,4 @@ bool CAudioDecoderAACMF::DecodePacket(const u8 *data, int size, std::vector<s16>
 	return true; // true regardless of whether outPCM ended up empty (priming), per class contract
 }
 
-#endif // _WIN32 && MT_ENABLE_FFMPEG
+#endif // _WIN32

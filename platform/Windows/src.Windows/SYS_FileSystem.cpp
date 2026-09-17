@@ -232,6 +232,23 @@ static bool SYS_WinCreateDirectoryUtf8(const std::string &path)
 // shall we use new folder for settings (CSIDL_LOCAL_APPDATA instead of CSIDL_COMMON_APPDATA)
 //#define SKIP_SETTINGS_MIGRATION
 
+// MT_SETTINGS_DIR redirects the settings folder wholesale. An automated run
+// MUST use it -- the app rewrites layouts/imgui.ini/settings on every
+// shutdown, so a test run pointed at the real folder overwrites the user's
+// workspace. tests/run_test.sh sets it. Returns "" when unset.
+static std::string SYS_WinGetSettingsDirOverride()
+{
+	const char *v = getenv("MT_SETTINGS_DIR");
+	if (v == NULL || v[0] == 0)
+		return std::string();
+	std::string path(v);
+	if (path.back() != '\\' && path.back() != '/')
+		path += "\\";
+	if (!SYS_WinPathExistsUtf8(path))
+		SYS_WinCreateDirectoryUtf8(path);
+	return path;
+}
+
 void SYS_InitFileSystem()
 {
 	if (sysInitFileSystemDone == true)
@@ -279,7 +296,10 @@ void SYS_InitFileSystem()
 	else
 	{
 		const char *settingsFolderName = MT_GetSettingsFolderName();
-		std::string settingsPath = commonAppData + "\\" + settingsFolderName + "\\";
+		std::string settingsOverride = SYS_WinGetSettingsDirOverride();
+		std::string settingsPath = settingsOverride.empty()
+			? (commonAppData + "\\" + settingsFolderName + "\\")
+			: settingsOverride;
 
 		// check if folder exists & create new if needed
 		if (!SYS_WinPathExistsUtf8(settingsPath))
@@ -307,7 +327,10 @@ void SYS_InitFileSystem()
 	else
 	{
 		const char *settingsFolderName = MT_GetSettingsFolderName();
-		std::string settingsPath = localAppData + "\\" + settingsFolderName + "\\";
+		std::string settingsOverride = SYS_WinGetSettingsDirOverride();
+		std::string settingsPath = settingsOverride.empty()
+			? (localAppData + "\\" + settingsFolderName + "\\")
+			: settingsOverride;
 		
 		// check if folder exists & create new if needed
 		if (!SYS_WinPathExistsUtf8(settingsPath))
@@ -585,7 +608,9 @@ std::vector<CFileItem *> *SYS_GetFilesInFolder(char *directoryPath, std::list<ch
 						char *extension = *itExtensions;
 
 						//LOGD("fileExtension='%s' extension='%s'", fileExtension, extension);
-						if (!strcmp(extension, fileExtension))
+						// Case-insensitive: a caller asking for "ins" means
+						// Snare.ins, Snare.INS and Snare.Ins alike.
+						if (!_stricmp(extension, fileExtension))
 						{
 							filesize.LowPart = ffd.nFileSizeLow;
 							filesize.HighPart = ffd.nFileSizeHigh;
@@ -1293,7 +1318,7 @@ char* SYS_GetFileExtension(const char* fileName)
 		if (fileName[i] == SYS_FILE_SYSTEM_PATH_SEPARATOR)
 		{
 			// no extension separator
-			char *buf = new char[1];
+			char *buf = (char*)malloc(1);
 			buf[0] = 0x00;
 			return buf;
 		}
@@ -1306,7 +1331,7 @@ char* SYS_GetFileExtension(const char* fileName)
 
 	if (index == -1)
 	{
-		char *empty = new char[1];
+		char *empty = (char*)malloc(1);
 		empty[0] = 0x00;
 		return empty;
 	}
@@ -1568,5 +1593,42 @@ void SYS_OpenURLInBrowser(const char *url)
 	if ((int)result <= 32) 
 	{
 		LOGError("SYS_OpenURLInBrowser: Failed to open URL: %s", url);
+	}
+}
+
+void SYS_ShowFileInFileManager(const char *filePath)
+{
+	if (filePath == NULL || filePath[0] == 0)
+		return;
+
+	std::wstring wide = SYS_WinUtf8ToWide(filePath);
+	if (wide.empty())
+	{
+		LOGError("SYS_ShowFileInFileManager: could not convert %s", filePath);
+		return;
+	}
+
+	DWORD attributes = GetFileAttributesW(wide.c_str());
+	bool isDirectory = (attributes != INVALID_FILE_ATTRIBUTES)
+		&& (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+
+	HINSTANCE result;
+	if (isDirectory)
+	{
+		// A folder is its own destination -- opening it is what "show" means.
+		result = ShellExecuteW(NULL, L"explore", wide.c_str(), NULL, NULL, SW_SHOWNORMAL);
+	}
+	else
+	{
+		// /select, opens the parent with the file highlighted. The path is
+		// quoted because it may contain spaces; explorer parses this itself,
+		// there is no shell involved.
+		std::wstring params = L"/select,\"" + wide + L"\"";
+		result = ShellExecuteW(NULL, L"open", L"explorer.exe", params.c_str(), NULL, SW_SHOWNORMAL);
+	}
+
+	if ((INT_PTR)result <= 32)
+	{
+		LOGError("SYS_ShowFileInFileManager: failed to reveal %s", filePath);
 	}
 }

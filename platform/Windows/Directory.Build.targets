@@ -247,7 +247,7 @@
              that property is still empty there, so both entries evaluated to
              bogus relative paths and an IDE build failed on tiffio.h and
              webp/decode.h. Re-add them here, where the property has a value. -->
-        <AdditionalIncludeDirectories>$(MTCapsIncludeDir);$(MTCapsLibsDir)\image-codecs\include;$(MTCapsLibsDir)\ffmpeg\include;%(ClCompile.AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+        <AdditionalIncludeDirectories>$(MTCapsIncludeDir);$(MTCapsLibsDir)\image-codecs\include;$(MTCapsLibsDir)\ffmpeg\include;$(MTCapsLibsDir)\opencv\include;%(ClCompile.AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       </ClCompile>
       <!-- The keyed directory goes FIRST. It used to matter because
            platform\Windows\libs still held tracked prebuilts that could shadow

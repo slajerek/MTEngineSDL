@@ -458,6 +458,12 @@ void CTestCmsTransformCache::Run(ITestCallback *callback)
 		          "the last release destroys the entry and retires its engine");
 	}
 
+	// SetEngineVariant above left the process-wide singleton on
+	// CMS_VARIANT_DEFAULT (ICM 2.0 on Windows) -- restore the app's actual
+	// default so later tests/callers do not inherit ICM 2.0's documented
+	// near-identity-for-wide-gamut-source defect (CColorManager.cpp).
+	cm->SetEngineVariant(CMS_VARIANT_LCMS2);
+
 	TestCompleted(true, "Transform sharing, eviction, lease survival and backend retirement verified");
 }
 

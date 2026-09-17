@@ -1,3 +1,9 @@
+// CAPABILITY GUARD (MT_ENABLE_NET_GAME). The file stays in all three build lists and
+// compiles to nothing when the capability is off -- an Xcode PBXBuildFile
+// cannot be conditioned on a build setting, so the condition lives here.
+// MT_CAP_NET_GAME implies NET_TRANSPORT and HTTP, so this whole stack rides on one flag -- which did not exist until 2026-09-06 (enables was an empty list).
+#if MT_ENABLE_NET_GAME
+
 #include "CNetGameClient.h"
 #include "CGuiViewMessages.h"
 #include "CSlrDate.h"
@@ -244,3 +250,5 @@ void CNetGameClient::AddLog(const char* fmt, ...)
 
 	mutexLog->Unlock();
 }
+
+#endif // MT_ENABLE_NET_GAME

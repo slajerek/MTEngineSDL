@@ -5,6 +5,10 @@ CGuiEvent::CGuiEvent()
     this->type = GUI_EVENT_TYPE_UNKNOWN;
 }
 
+CGuiEvent::~CGuiEvent()
+{
+}
+
 CGuiEventKeyboard::CGuiEventKeyboard(GuiEventKeyboardState keyboardState, u32 mtKey, u32 systemKeyCode)
 {
 	this->type = GUI_EVENT_TYPE_KEYBOARD;

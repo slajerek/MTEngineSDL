@@ -12,8 +12,19 @@
 // CAudioDecoderAACMF.cpp, where it first appeared) so Task 6 shares the
 // mechanism instead of duplicating it -- header-only (inline functions), so
 // this stays a zero-link-cost dependency. Compiles to nothing anywhere
-// except a Windows FFmpeg-enabled build.
-#if defined(_WIN32) && (!defined(MT_ENABLE_FFMPEG) || (MT_ENABLE_FFMPEG))
+// except a Windows build.
+//
+// The guard is defined(_WIN32) and NOTHING ELSE. It used to also require
+// MT_ENABLE_FFMPEG, which was correct only while the four MF decoders it
+// serves carried the same condition. Engine fd75d490 narrowed those four to
+// defined(_WIN32) -- so that they survive precisely when FFmpeg does not --
+// and missed this header. emit.py emits MT_ENABLE_FFMPEG=0 as a define rather
+// than an absence, so at =0 this file compiled to nothing while all four
+// callers still called EnsureComInitializedForThisThread()/EnsureMFStarted():
+// a hard compile break on Windows, in the one configuration the media-codecs
+// programme exists to produce. A helper must never be gated more narrowly
+// than the code that depends on it.
+#if defined(_WIN32)
 
 #include <mfapi.h>
 #include <mfidl.h>
@@ -64,7 +75,7 @@ namespace MFComThreadGuard
 	}
 }
 
-#endif // _WIN32 && MT_ENABLE_FFMPEG
+#endif // _WIN32
 
 #endif
 //_MFCOMTHREADGUARD_H_

@@ -66,6 +66,55 @@ static void ReleaseProcessHandle(pid_t pid)
 }
 #endif
 
+// Pure string function -- compiled on all platforms (not guarded by
+// #ifdef _WIN32) so it is unit-testable outside of Windows. See the header
+// for the quoting rules.
+string CProcessSpawner::BuildWindowsCommandLine(const vector<string> &args)
+{
+	string cmdLine;
+	for (size_t i = 0; i < args.size(); i++)
+	{
+		if (i > 0)
+			cmdLine += " ";
+
+		const string &arg = args[i];
+		bool needsQuotes = arg.empty() || arg.find_first_of(" \t\"") != string::npos;
+
+		if (!needsQuotes)
+		{
+			cmdLine += arg;
+			continue;
+		}
+
+		cmdLine += "\"";
+		size_t numBackslashes = 0;
+		for (char c : arg)
+		{
+			if (c == '\\')
+			{
+				numBackslashes++;
+			}
+			else if (c == '"')
+			{
+				cmdLine.append(numBackslashes * 2 + 1, '\\');
+				cmdLine += "\"";
+				numBackslashes = 0;
+			}
+			else
+			{
+				cmdLine.append(numBackslashes, '\\');
+				cmdLine += c;
+				numBackslashes = 0;
+			}
+		}
+		// Trailing backslashes (right before the closing quote) double, with
+		// no escaped-quote suffix since there's no literal quote to protect.
+		cmdLine.append(numBackslashes * 2, '\\');
+		cmdLine += "\"";
+	}
+	return cmdLine;
+}
+
 pid_t CProcessSpawner::Spawn(const vector<string> &args)
 {
 	if (args.empty())
@@ -76,16 +125,7 @@ pid_t CProcessSpawner::Spawn(const vector<string> &args)
 
 #ifdef _WIN32
 	// Windows: CreateProcess
-	string cmdLine;
-	for (size_t i = 0; i < args.size(); i++)
-	{
-		if (i > 0) cmdLine += " ";
-		// Quote arguments that contain spaces
-		if (args[i].find(' ') != string::npos)
-			cmdLine += "\"" + args[i] + "\"";
-		else
-			cmdLine += args[i];
-	}
+	string cmdLine = BuildWindowsCommandLine(args);
 
 	STARTUPINFOA si = {};
 	si.cb = sizeof(si);
@@ -171,15 +211,7 @@ pid_t CProcessSpawner::SpawnWithEnv(const vector<string> &args, const vector<str
 	}
 	envBlock.push_back('\0');
 
-	string cmdLine;
-	for (size_t i = 0; i < args.size(); i++)
-	{
-		if (i > 0) cmdLine += " ";
-		if (args[i].find(' ') != string::npos)
-			cmdLine += "\"" + args[i] + "\"";
-		else
-			cmdLine += args[i];
-	}
+	string cmdLine = BuildWindowsCommandLine(args);
 
 	STARTUPINFOA si = {};
 	si.cb = sizeof(si);

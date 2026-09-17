@@ -65,9 +65,6 @@ other/lib/SDL2-2.0.10-static/VisualC/SDL/x64/
 other/lib/SDL2-2.0.10-static/VisualC/SDLmain/Win32/
 other/lib/SDL2-2.0.10-static/VisualC/SDLmain/x64/
 other/lib/uSockets/*.o
-other/lib/mbedtls.macos/
-other/lib/mbedtls.linux/
-other/lib/mbedtls.windows-*/
 # image-codecs/ holds downloaded upstream trees and build output -- ignored --
 # EXCEPT patches/, which is code WE wrote: the build script calls it, and
 # LibRaw's CDDL 1.0 requires our modification to be published. Note the trailing

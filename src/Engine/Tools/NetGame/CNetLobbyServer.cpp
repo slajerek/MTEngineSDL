@@ -1,3 +1,9 @@
+// CAPABILITY GUARD (MT_ENABLE_NET_GAME). The file stays in all three build lists and
+// compiles to nothing when the capability is off -- an Xcode PBXBuildFile
+// cannot be conditioned on a build setting, so the condition lives here.
+// MT_CAP_NET_GAME implies NET_TRANSPORT and HTTP, so this whole stack rides on one flag -- which did not exist until 2026-09-06 (enables was an empty list).
+#if MT_ENABLE_NET_GAME
+
 #include "CNetLobbyServer.h"
 #include "CChatHistory.h"
 #include "NET_Main.h"
@@ -18,9 +24,10 @@ using namespace std;
 // Out-of-class definition required for ODR (used as function argument)
 const int CNetLobbyServer::CHAT_HISTORY_PAGE_SIZE;
 
-CNetLobbyServer::CNetLobbyServer(int serverPort)
+CNetLobbyServer::CNetLobbyServer(int serverPort, const std::string &bindAddress)
 {
 	this->serverPort = serverPort;
+	this->bindAddress = bindAddress;
 	this->config = NULL;
 	this->netServer = NULL;
 	this->netPackets = NULL;
@@ -51,6 +58,9 @@ void CNetLobbyServer::Init(CNetServer *netServer)
 
 	this->netPackets = new CNetGamePackets();
 	this->netServer->AddPacketCallback(this->netPackets);
+
+	if (!this->bindAddress.empty())
+		this->netServer->bindAddress = this->bindAddress;
 
 	this->netServer->StartServer();
 }
@@ -353,3 +363,5 @@ void CNetLobbyServer::SendChatHistoryToClient(CNetClientData *clientData)
 	jHistory["hasMore"] = (startIndex > 0);
 	SendJson(clientData, jHistory);
 }
+
+#endif // MT_ENABLE_NET_GAME

@@ -14,7 +14,10 @@
 // (CVideoSourceFFmpeg references std::unique_ptr<CAudioDecoderAACNative>
 // with no #ifdef at any call site). Compiles to nothing anywhere except a
 // Windows FFmpeg-enabled build.
-#if defined(_WIN32) && (!defined(MT_ENABLE_FFMPEG) || (MT_ENABLE_FFMPEG))
+// Platform only. This class never used a single FFmpeg symbol, yet the gate
+// removed it whenever FFmpeg was off -- so AAC vanished on Windows in exactly
+// the build that needs the OS decoder most. Tracker item 4.8.
+#if defined(_WIN32)
 
 #include "SYS_Defs.h"
 #include <string>
@@ -72,7 +75,7 @@ private:
 	int inputChannels = 0; // compressed-side channel count, from hand-parsing the ASC (AacAscParser.h)
 };
 
-#endif // _WIN32 && MT_ENABLE_FFMPEG
+#endif // _WIN32
 
 #endif
 //_CAUDIODECODERAACMF_H_

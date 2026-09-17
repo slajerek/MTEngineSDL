@@ -1,3 +1,9 @@
+// CAPABILITY GUARD (MT_ENABLE_HTTPLIB). The file stays in all three build lists and
+// compiles to nothing when the capability is off -- an Xcode PBXBuildFile
+// cannot be conditioned on a build setting, so the condition lives here.
+// MT_CAP_HTTP declared this removable and nothing enforced it: MT_ENABLE_HTTPLIB appeared in no source at all.
+#if MT_ENABLE_HTTPLIB
+
 #include "CAssetServerProcess.h"
 #include "CAssetServer.h"
 
@@ -52,6 +58,14 @@ bool CAssetServerProcess::ParseArgs(int argc, const char **argv, Config &config)
 		{
 			config.authServicePort = atoi(argv[++i]);
 		}
+		else if (strcmp(argv[i], "--auth-tls") == 0)
+		{
+			config.authServiceUseTls = true;
+		}
+		else if (strcmp(argv[i], "--auth-ca") == 0 && i + 1 < argc)
+		{
+			config.authServiceCaCertPath = argv[++i];
+		}
 		else if (strcmp(argv[i], "--ssl") == 0)
 		{
 			config.useSSL = true;
@@ -63,6 +77,14 @@ bool CAssetServerProcess::ParseArgs(int argc, const char **argv, Config &config)
 		else if (strcmp(argv[i], "--ssl-key") == 0 && i + 1 < argc)
 		{
 			config.sslKeyPath = argv[++i];
+		}
+		else if (strcmp(argv[i], "--listen") == 0 && i + 1 < argc)
+		{
+			config.listenInterface = argv[++i];
+		}
+		else if (strcmp(argv[i], "--allow-plaintext") == 0)
+		{
+			config.allowPlaintext = true;
 		}
 	}
 	return found;
@@ -84,12 +106,24 @@ void CAssetServerProcess::Run(const Config &config)
 	server->projectsFolder = config.projectsFolder;
 	server->authServiceAddress = config.authServiceAddress;
 	server->authServicePort = config.authServicePort;
+	server->authServiceUseTls = config.authServiceUseTls;
+	server->authServiceCaCertPath = config.authServiceCaCertPath;
+	server->listenInterface = config.listenInterface;
 	server->useSSL = config.useSSL;
 	server->sslCertPath = config.sslCertPath;
 	server->sslKeyPath = config.sslKeyPath;
+	server->allowPlaintext = config.allowPlaintext;
 
-	LOGM("CAssetServerProcess: starting on port %d", config.port);
-	server->Start();
+	LOGM("CAssetServerProcess: starting on %s:%d", config.listenInterface.c_str(), config.port);
+	if (!server->Start())
+	{
+		LOGError("CAssetServerProcess: asset server failed to start on %s:%d", config.listenInterface.c_str(), config.port);
+		delete server;
+		return;
+	}
+
+	LOGM("asset server: %s://%s:%d", server->useSSL ? "https" : "http",
+		 config.listenInterface.c_str(), SYS_ApplyPortOffset(config.port));
 
 	while (!sAssetShutdownRequested)
 	{
@@ -100,3 +134,5 @@ void CAssetServerProcess::Run(const Config &config)
 	server->Shutdown();
 	delete server;
 }
+
+#endif // MT_ENABLE_HTTPLIB

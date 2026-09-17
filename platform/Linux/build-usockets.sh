@@ -86,7 +86,8 @@ USOCKETS_WORK="$(mt_caps_work_dir uSockets)/src-linux"
 rm -rf "$USOCKETS_WORK"
 mkdir -p "$USOCKETS_WORK"
 cp -R "$USOCKETS_DIR/." "$USOCKETS_WORK/"
-make -C "$USOCKETS_WORK" -j"$(nproc)"
+# MT_BUILD_JOBS, as everywhere else; see the note in build-opencv.sh.
+make -C "$USOCKETS_WORK" -j"${MT_BUILD_JOBS:-$(nproc)}"
 
 cp -f "$USOCKETS_WORK/uSockets.a" "$OUT_LIB"
 echo -n "$STAMP_VALUE" > "$STAMP_FILE"

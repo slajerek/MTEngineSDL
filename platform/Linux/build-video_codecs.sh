@@ -39,7 +39,22 @@ if ! declare -f mt_caps_lib_dir >/dev/null 2>&1; then
   # shellcheck source=../caps-lib.sh
   . "$ROOT_DIR/platform/caps-lib.sh"
 fi
-CACHE_DIR="$(mt_caps_work_dir video-codecs)"
+# The FFmpeg lane is separate from the WebM lane since ef700aab -- see the
+# macOS script for the full note. An app can keep video and drop FFmpeg.
+FFMPEG_ON="${MT_ENABLE_FFMPEG:-1}"
+
+# A SEPARATE WORK TREE WHEN FFmpeg IS OFF. mt_caps_work_dir returns one global
+# directory per unit, shared across every app and caps set, and the build below
+# does `rm -rf "$BUILD_DIR" "$PREFIX_DIR"` unconditionally -- so sharing it
+# between the two configurations means one FFmpeg-off run deletes libavcodec
+# for every app on the machine and every FFmpeg-ON build after it rebuilds cold.
+# The suffix appears only when the flag is explicitly off, so the default work
+# tree keeps the path and the warm state it has today.
+if [[ "$FFMPEG_ON" == "0" ]]; then
+  CACHE_DIR="$(mt_caps_work_dir video-codecs-noffmpeg)"
+else
+  CACHE_DIR="$(mt_caps_work_dir video-codecs)"
+fi
 DOWNLOAD_DIR="$CACHE_DIR/downloads"
 SRC_DIR="$CACHE_DIR/src"
 
@@ -212,8 +227,34 @@ if [[ "${MT_ENABLE_WEBM_VPX:-${MT_ENABLE_FFMPEG:-1}}" == "0" ]]; then
   exit 0
 fi
 
-stamp_value="${script_sha}:libvpx-${VPX_VERSION}:opus-${OPUS_VERSION}:ffmpeg-${FFMPEG_VERSION}:linux-${ARCH}:mode-${FFMPEG_BUILD_MODE}"
-if [[ -f "$OUT_LIB" && -f "$STAMP_FILE" && -f "$PREFIX_DIR/lib/libavcodec.so" ]]; then
+# Same fallback order the script already uses for script_sha above.
+_mt_sha256_stdin() {
+  if command -v sha256sum >/dev/null 2>&1; then sha256sum | cut -d ' ' -f 1
+  else shasum -a 256 | cut -d ' ' -f 1; fi
+}
+
+# THE CODEC POLICY IS PART OF THE IDENTITY OF THIS BUILD.
+# See the macOS twin for the measurement: vocabulary.json reaches this script
+# only through these four variables, none of them was in any cache key, and a
+# decoder added to decoders_base was therefore a silent no-op on any warm
+# bucket -- with require_ffmpeg_exact_set reporting success without executing.
+# The :- defaults are load-bearing under `set -euo pipefail`.
+ffmpeg_policy_sha="$(printf '%s|%s|%s|%s' \
+  "${MT_FFMPEG_DECODERS:-}" "${MT_FFMPEG_DEMUXERS:-}" \
+  "${MT_FFMPEG_PARSERS:-}"  "${MT_FFMPEG_DECODERS_WITHHELD:-}" \
+  | _mt_sha256_stdin)"
+
+stamp_value="${script_sha}:libvpx-${VPX_VERSION}:opus-${OPUS_VERSION}:ffmpeg-${FFMPEG_VERSION}:linux-${ARCH}:mode-${FFMPEG_BUILD_MODE}:policy-${ffmpeg_policy_sha}:ffmpeg-${FFMPEG_ON}"
+# With FFmpeg off there is no libavcodec.so to find; demanding one would mean
+# the stamp never hits and libvpx+opus rebuild on every single invocation.
+if [[ "$FFMPEG_ON" == "0" ]]; then
+  ffmpeg_outputs_present=1
+elif [[ -f "$PREFIX_DIR/lib/libavcodec.so" ]]; then
+  ffmpeg_outputs_present=1
+else
+  ffmpeg_outputs_present=0
+fi
+if [[ -f "$OUT_LIB" && -f "$STAMP_FILE" && "$ffmpeg_outputs_present" == "1" ]]; then
   if [[ "$(cat "$STAMP_FILE")" == "$stamp_value" ]]; then
     echo "Video codec bundle is up to date: $OUT_LIB"
     exit 0
@@ -329,6 +370,18 @@ build_libvpx() {
   target="$(vpx_target_for_arch "$ARCH")"
   local build="$BUILD_DIR/libvpx"
 
+  # VP8 DECODE IS BUILT, and it was not before 2026-09-10. The configure line
+  # below used to pass `--disable-vp8-decoder` explicitly, so the archive
+  # carried zero VP8 symbols and a VP8 WebM could only play through FFmpeg --
+  # i.e. not at all in a store build. That was a licensing decision applied to
+  # the wrong library: libvpx is BSD-3 and VP8 carries Google's irrevocable
+  # royalty-free patent grant, so it is store-safe by the same standard as the
+  # VP9 beside it. The ENCODERS stay off; nothing in this engine encodes.
+  #
+  # NOTE FOR ANYONE EDITING THE LINE BELOW: it is one backslash-continued
+  # command. A `#` comment cannot go INSIDE it -- the continuation swallows the
+  # rest of the command into the comment, which is how `--disable-vp9-encoder`
+  # briefly stopped being passed while this very change was being written.
   mkdir -p "$build"
   pushd "$build" >/dev/null
   CC="$HOST_CC" \
@@ -346,7 +399,6 @@ build_libvpx() {
       --enable-vp9 \
       --enable-vp9-highbitdepth \
       --disable-vp8-encoder \
-      --disable-vp8-decoder \
       --disable-vp9-encoder
   make -j "$JOBS"
   make install
@@ -451,6 +503,9 @@ build_ffmpeg() {
 FFMPEG_IMPLICIT_DECODERS="h263"
 FFMPEG_IMPLICIT_PARSERS="h263"
 
+# FFmpeg-only, and under `set -u` an unset MT_FFMPEG_DECODERS is a hard exit --
+# which is what an FFmpeg-off build legitimately has. Empty is the truthful value.
+if [[ "$FFMPEG_ON" == "1" ]]; then
 FFMPEG_EXPECTED_DECODERS="$(policy_sorted "$MT_FFMPEG_DECODERS $FFMPEG_IMPLICIT_DECODERS")"
 FFMPEG_EXPECTED_DEMUXERS="$(policy_sorted "$MT_FFMPEG_DEMUXERS")"
 FFMPEG_EXPECTED_PARSERS="$(policy_sorted "$MT_FFMPEG_PARSERS $FFMPEG_IMPLICIT_PARSERS")"
@@ -460,6 +515,12 @@ FFMPEG_EXPECTED_PARSERS="$(policy_sorted "$MT_FFMPEG_PARSERS $FFMPEG_IMPLICIT_PA
 # Derived from the same withheld list the licence scanner reads, so the two
 # cannot drift; 13 names now, where the hand-written copy had 10.
 FFMPEG_FORBIDDEN_DECODERS_COMMERCIAL="$(printf '%s' "$MT_FFMPEG_DECODERS_WITHHELD" | tr '[:lower:] ' '[:upper:]\n' | tr '\n' ' ')"
+else
+  FFMPEG_EXPECTED_DECODERS=""
+  FFMPEG_EXPECTED_DEMUXERS=""
+  FFMPEG_EXPECTED_PARSERS=""
+  FFMPEG_FORBIDDEN_DECODERS_COMMERCIAL=""
+fi
 
 # require_ffmpeg_exact_set <build-dir> <KIND> <expected-space-separated>
 # KIND is the config_components.h suffix: DECODER, DEMUXER, or PARSER.
@@ -544,36 +605,42 @@ require_symbol() {
 
 download_archive "libvpx-${VPX_VERSION}" "$VPX_URL" "$VPX_SHA256"
 download_archive "opus-${OPUS_VERSION}" "$OPUS_URL" "$OPUS_SHA256"
-download_archive_xz "ffmpeg-${FFMPEG_VERSION}" "$FFMPEG_URL" "$FFMPEG_SHA256"
+if [[ "$FFMPEG_ON" == "1" ]]; then
+  download_archive_xz "ffmpeg-${FFMPEG_VERSION}" "$FFMPEG_URL" "$FFMPEG_SHA256"
+fi
 
 extract_archive "libvpx-${VPX_VERSION}" "libvpx-${VPX_VERSION}"
 extract_archive "opus-${OPUS_VERSION}" "opus-${OPUS_VERSION}"
-extract_archive_xz "ffmpeg-${FFMPEG_VERSION}" "ffmpeg-${FFMPEG_VERSION}"
+if [[ "$FFMPEG_ON" == "1" ]]; then
+  extract_archive_xz "ffmpeg-${FFMPEG_VERSION}" "ffmpeg-${FFMPEG_VERSION}"
+fi
 
 rm -rf "$BUILD_DIR" "$PREFIX_DIR"
 mkdir -p "$BUILD_DIR" "$PREFIX_DIR"
 
 build_libvpx "$PREFIX_DIR"
 build_opus "$PREFIX_DIR"
-build_ffmpeg "$PREFIX_DIR"
+if [[ "$FFMPEG_ON" == "1" ]]; then
+  build_ffmpeg "$PREFIX_DIR"
 
-# The guard picks its expected set on the same value the configure line used,
-# or it asserts one mode's library against the other's set.
-# ONE expected set per kind, whatever the mode. (Identical note to the macOS
-# script.) Only the absence check is mode-specific.
-require_ffmpeg_exact_set "$BUILD_DIR/ffmpeg" "DECODER" "$FFMPEG_EXPECTED_DECODERS"
-require_ffmpeg_exact_set "$BUILD_DIR/ffmpeg" "PARSER" "$FFMPEG_EXPECTED_PARSERS"
-if [[ "$FFMPEG_BUILD_MODE" == "commercial" ]]; then
-  for dec in $FFMPEG_FORBIDDEN_DECODERS_COMMERCIAL; do
-    require_ffmpeg_decoder_disabled "$BUILD_DIR/ffmpeg" "$dec"
+  # Every guard below reads $BUILD_DIR/ffmpeg and hard-exits when it is
+  # missing, so they belong inside the gate with the build that creates it.
+  # ONE expected set per kind, whatever the mode. (Identical note to the macOS
+  # script.) Only the absence check is mode-specific.
+  require_ffmpeg_exact_set "$BUILD_DIR/ffmpeg" "DECODER" "$FFMPEG_EXPECTED_DECODERS"
+  require_ffmpeg_exact_set "$BUILD_DIR/ffmpeg" "PARSER" "$FFMPEG_EXPECTED_PARSERS"
+  if [[ "$FFMPEG_BUILD_MODE" == "commercial" ]]; then
+    for dec in $FFMPEG_FORBIDDEN_DECODERS_COMMERCIAL; do
+      require_ffmpeg_decoder_disabled "$BUILD_DIR/ffmpeg" "$dec"
+    done
+  fi
+  require_ffmpeg_exact_set "$BUILD_DIR/ffmpeg" "DEMUXER" "$FFMPEG_EXPECTED_DEMUXERS"
+
+  for ff_lib in libavutil libavcodec libavformat libswscale libswresample; do
+    ff_soname="$(ffmpeg_soname_link "$PREFIX_DIR/lib" "$ff_lib")"
+    require_ffmpeg_clean_deps "$PREFIX_DIR/lib/$ff_soname"
   done
 fi
-require_ffmpeg_exact_set "$BUILD_DIR/ffmpeg" "DEMUXER" "$FFMPEG_EXPECTED_DEMUXERS"
-
-for ff_lib in libavutil libavcodec libavformat libswscale libswresample; do
-  ff_soname="$(ffmpeg_soname_link "$PREFIX_DIR/lib" "$ff_lib")"
-  require_ffmpeg_clean_deps "$PREFIX_DIR/lib/$ff_soname"
-done
 
 # Commercial-only binary trace scan (secondary guard; require_ffmpeg_exact_set
 # on config_components.h is the authoritative one). Scans the .so symbol
@@ -605,14 +672,30 @@ require_ffmpeg_no_forbidden_symbols() {
   echo "Commercial trace scan clean: no forbidden decoder symbols in $libdir"
 }
 
-if [[ "$FFMPEG_BUILD_MODE" == "commercial" ]]; then
+if [[ "$FFMPEG_ON" == "1" && "$FFMPEG_BUILD_MODE" == "commercial" ]]; then
   require_ffmpeg_no_forbidden_symbols "$PREFIX_DIR/lib"
 fi
 
 # Mode marker: consumed by app build scripts (guard #3 in the 2026-07-18 WMV
 # spec). A commercial app build against a "full" install is a fatal error
-# there; this file is how it knows what it is linking.
-echo -n "$FFMPEG_BUILD_MODE" > "$PREFIX_DIR/.ffmpeg-build-mode"
+# there; this file is how it knows what it is linking. NOT written when FFmpeg
+# is off -- the honest answer to "what kind of FFmpeg is installed here" in a
+# build with none is the file's absence.
+if [[ "$FFMPEG_ON" == "1" ]]; then
+  echo -n "$FFMPEG_BUILD_MODE" > "$PREFIX_DIR/.ffmpeg-build-mode"
+else
+  # Retire this unit's own outputs from BOTH the store and the view.
+  # mt_caps_sync_store_to_view is additive by design -- the view is shared by
+  # every unit, so a mirroring sync would delete the others' archives -- which
+  # means only the producing script can remove what it no longer produces.
+  for dir in "$OUT_LIB_DIR" "${MT_VIEW_LIB_DIR:-}"; do
+    [[ -n "$dir" && -d "$dir" ]] || continue
+    for ff_lib in libavutil libavcodec libavformat libswscale libswresample; do
+      rm -f "$dir/$ff_lib".so.* "$dir/$ff_lib.so"
+    done
+    rm -f "$dir/.ffmpeg-build-mode"
+  done
+fi
 
 INPUT_LIBS=(
   "$PREFIX_DIR/lib/libvpx.a"
@@ -659,4 +742,8 @@ require_symbol "opus_strerror"
 
 echo -n "$stamp_value" > "$STAMP_FILE"
 echo "Video codec bundle built: $OUT_LIB"
-echo "FFmpeg LGPL decode shared libs built: $PREFIX_DIR/lib (avutil/avcodec/avformat/swscale/swresample)"
+if [[ "$FFMPEG_ON" == "1" ]]; then
+  echo "FFmpeg LGPL decode shared libs built: $PREFIX_DIR/lib (avutil/avcodec/avformat/swscale/swresample)"
+else
+  echo "MT_ENABLE_FFMPEG=0: no FFmpeg downloaded, built or staged. libvpx + opus only."
+fi

@@ -60,7 +60,7 @@ static ov_callbacks OV_CALLBACKS_MTENGINE_NOT_SEEKABLE =
 
 
 CSlrMusicFileOgg::CSlrMusicFileOgg(const char *channelName)
-: CSlrMusicFile(channelName)
+: CSlrMusicFileResampled(channelName)
 {
 	this->type = MUSIC_TYPE_OGG;
 	oggFileMutex = new CSlrMutex("CSlrMusicFileOgg");
@@ -70,6 +70,8 @@ CSlrMusicFileOgg::CSlrMusicFileOgg(const char *channelName)
 
 	oggMixBuffer = new int[SOUND_BUFFER_SIZE];
 	oggAudioBuffer = new int[SOUND_BUFFER_SIZE];
+	sourceSampleRate = SND_GetEngineSampleRate();
+	sourceChannels = 2;
 
 	oggVorbisData = NULL;
 
@@ -77,7 +79,7 @@ CSlrMusicFileOgg::CSlrMusicFileOgg(const char *channelName)
 }
 
 CSlrMusicFileOgg::CSlrMusicFileOgg(const char *channelName, const char *fileName, bool seekable, bool fromResources)
-: CSlrMusicFile(channelName)
+: CSlrMusicFileResampled(channelName)
 {
 	this->type = MUSIC_TYPE_OGG;
 	oggFileMutex = new CSlrMutex("CSlrMusicFileOgg");
@@ -87,6 +89,8 @@ CSlrMusicFileOgg::CSlrMusicFileOgg(const char *channelName, const char *fileName
 
 	oggMixBuffer = new int[SOUND_BUFFER_SIZE];
 	oggAudioBuffer = new int[SOUND_BUFFER_SIZE];
+	sourceSampleRate = SND_GetEngineSampleRate();
+	sourceChannels = 2;
 
 	oggVorbisData = NULL;
 
@@ -97,7 +101,7 @@ CSlrMusicFileOgg::CSlrMusicFileOgg(const char *channelName, const char *fileName
 }
 
 CSlrMusicFileOgg::CSlrMusicFileOgg(const char *channelName, CSlrFile *file, bool seekable)
-: CSlrMusicFile(channelName)
+: CSlrMusicFileResampled(channelName)
 {
 	this->type = MUSIC_TYPE_OGG;
 	oggFileMutex = new CSlrMutex("CSlrMusicFileOgg");
@@ -107,6 +111,8 @@ CSlrMusicFileOgg::CSlrMusicFileOgg(const char *channelName, CSlrFile *file, bool
 	
 	oggMixBuffer = new int[SOUND_BUFFER_SIZE];
 	oggAudioBuffer = new int[SOUND_BUFFER_SIZE];
+	sourceSampleRate = SND_GetEngineSampleRate();
+	sourceChannels = 2;
 	
 	oggVorbisData = NULL;
 	
@@ -187,10 +193,41 @@ bool CSlrMusicFileOgg::Init(CSlrFile *file, bool seekable, bool takeOwnership)
 
 	oggVorbisDataInitialized = true;
 
+	// ASK THE FILE WHAT IT IS. This class never did, and simply mixed whatever
+	// ov_read returned as if it were already at the engine rate -- so a 48 kHz
+	// track played 8.8% long and 1.45 semitones flat. All of one app's music
+	// is 48 kHz.
+	vorbis_info *vi = ov_info(oggVorbisData, -1);
+	if (vi != NULL && vi->rate > 0 && vi->channels > 0)
+	{
+		sourceSampleRate = (u32)vi->rate;
+		sourceChannels = vi->channels;
+	}
+	else
+	{
+		// Keep the historic assumption rather than dividing by zero later, and
+		// say so -- a file we cannot interrogate is worth a line in the log.
+		LOGWarning("CSlrMusicFileOgg::Init: ov_info gave no format; assuming %u Hz stereo",
+				   (unsigned)SND_GetEngineSampleRate());
+		sourceSampleRate = SND_GetEngineSampleRate();
+		sourceChannels = 2;
+	}
+
+	this->ResetResampler();
+
+	if (sourceSampleRate != SND_GetEngineSampleRate() || sourceChannels != 2)
+	{
+		LOGM("CSlrMusicFileOgg: '%s' is %u Hz %d ch -> converting to %u Hz stereo",
+			 this->name != NULL ? this->name : "(unnamed)",
+			 (unsigned)sourceSampleRate, sourceChannels,
+			 (unsigned)SND_GetEngineSampleRate());
+	}
+
 	this->UnlockMutex();
 
 	return true;
 }
+
 
 void CSlrMusicFileOgg::DeleteVorbisData()
 {
@@ -262,12 +299,21 @@ void CSlrMusicFileOgg::Seek(double second)
 	this->LockMutex();
 	//LOGA("CSlrMusicFileOgg::Seek: %f", second);
 
-	double sampleRate = (double)SOUND_SAMPLE_RATE;
+	// NATIVE frames. ov_pcm_seek's argument is in the file's own PCM frames, and
+	// this used to multiply by the ENGINE rate -- so on a 48 kHz file Seek(10.0)
+	// landed at 9.19 s. Latent until now only because the playlist manager seeks
+	// with SeekToSample and never with seconds.
+	double sampleRate = (double)this->GetSourceSampleRate();
 	double val = sampleRate * second;
 
 	u64 val64 = (u64)val;
 
 	int ret = ov_pcm_seek(oggVorbisData, val64);
+
+	// The resampler carries interpolation history and a fractional phase from
+	// wherever we just were. Left alone across a seek they are stitched onto the
+	// new position and the listener hears the join.
+	this->ResetResampler();
 	if (ret == 0)
 	{
 		//LOGA("Seek OK");
@@ -326,6 +372,11 @@ void CSlrMusicFileOgg::SeekToSample(u64 sampleNum)
 	//LOGA("CSlrMusicFileOgg::Seek: %f", second);
 	
 	int ret = ov_pcm_seek(oggVorbisData, sampleNum);
+
+	// The resampler carries interpolation history and a fractional phase from
+	// wherever we just were. Left alone across a seek they are stitched onto the
+	// new position and the listener hears the join.
+	this->ResetResampler();
 	if (ret == 0)
 	{
 		//LOGA("Seek OK");
@@ -534,6 +585,44 @@ void CSlrMusicFileOgg::OggMix(u32 numSamples)
 				break;
 			}
 
+			// MONO IS WIDENED HERE, before any of the bookkeeping below.
+			// Everything downstream indexes oggAudioBuffer as "one int == one
+			// stereo frame"; expanding at this single point keeps that true
+			// instead of making every later expression channel-aware.
+			if (sourceChannels == 1 && oggAudioBufferLen > 0)
+			{
+				int monoFrames = oggAudioBufferLen / 2;   // bytes -> s16 samples
+				signed short *sp = (signed short *)oggAudioBuffer;
+				for (int i = monoFrames - 1; i >= 0; i--)
+				{
+					signed short v = sp[i];
+					sp[i * 2 + 0] = v;
+					sp[i * 2 + 1] = v;
+				}
+				oggAudioBufferLen = monoFrames * 4;       // now stereo bytes
+			}
+			else if (sourceChannels > 2 && oggAudioBufferLen > 0)
+			{
+				// Take the first two channels. A real downmix needs a per-codec
+				// channel map and belongs with the formats work; dropping the
+				// rest silently would be worse than saying so once.
+				static bool warned = false;
+				if (!warned)
+				{
+					warned = true;
+					LOGWarning("CSlrMusicFileOgg: %d channels -- using the first two only",
+							   sourceChannels);
+				}
+				int frames = oggAudioBufferLen / (2 * sourceChannels);
+				signed short *sp = (signed short *)oggAudioBuffer;
+				for (int i = 0; i < frames; i++)
+				{
+					sp[i * 2 + 0] = sp[i * sourceChannels + 0];
+					sp[i * 2 + 1] = sp[i * sourceChannels + 1];
+				}
+				oggAudioBufferLen = frames * 4;
+			}
+
 			oggAudioBufferLen /= 4;
 
 			//LOGD("oggAudioBufferLen=%d", oggAudioBufferLen);
@@ -582,19 +671,33 @@ void CSlrMusicFileOgg::OggMix(u32 numSamples)
 	}
 }
 
+// The base's one decode hook.
+//
+// OggMix() already yields interleaved stereo s16 at the FILE's own rate, pads a
+// short read with silence and handles repeat itself, so it never returns fewer
+// frames than asked -- which is why this returns `frames` unconditionally and
+// the base's exhausted-stream path is simply never reached on this decoder.
+// The cap is the one the old inline loop carried: oggMixBuffer is
+// SOUND_BUFFER_SIZE bytes, so a larger request would overrun it.
+u32 CSlrMusicFileOgg::DecodeNativeStereo(s16 *out, u32 frames)
+{
+	if (out == NULL || frames == 0)
+		return 0;
+	const u32 cap = (u32)(SOUND_BUFFER_SIZE / 8);
+	if (frames > cap)
+		frames = cap;
+
+	this->OggMix(frames);
+	memcpy(out, oggMixBuffer, (size_t)frames * 2 * sizeof(s16));
+	return frames;
+}
+
 void CSlrMusicFileOgg::FillBuffer(int *mixBuffer, u32 numSamples)
 {
-	this->OggMix(numSamples);
-
-	signed short *outBuf = (signed short *)mixBuffer;
-	signed short *inBuf = (signed short *)oggMixBuffer;
-
-	u32 j = 0;
-	for (u32 i = 0; i < numSamples; i++)
-	{
-		outBuf[j] = inBuf[j]; j++;
-		outBuf[j] = inBuf[j]; j++;
-	}
+	// Everything -- passthrough detection, the refill loop, float conversion,
+	// clamping -- is CSlrMusicFileResampled's, shared with the miniaudio path.
+	// This class is a decoder and a libvorbis-backed clock, nothing more.
+	FillResampled(mixBuffer, numSamples);
 }
 
 void CSlrMusicFileOgg::Mix(int *mixBuffer, u32 numSamples)

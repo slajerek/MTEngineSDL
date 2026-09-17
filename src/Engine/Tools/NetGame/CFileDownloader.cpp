@@ -1,3 +1,9 @@
+// CAPABILITY GUARD (MT_ENABLE_HTTPLIB). The file stays in all three build lists and
+// compiles to nothing when the capability is off -- an Xcode PBXBuildFile
+// cannot be conditioned on a build setting, so the condition lives here.
+// MT_CAP_HTTP declared this removable and nothing enforced it: MT_ENABLE_HTTPLIB appeared in no source at all.
+#if MT_ENABLE_HTTPLIB
+
 #include "CFileDownloader.h"
 #include "MT_API.h"
 
@@ -455,3 +461,5 @@ void CFileDownloader::Shutdown()
 	downloading = false;
 	dlMutex->Unlock();
 }
+
+#endif // MT_ENABLE_HTTPLIB

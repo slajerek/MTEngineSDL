@@ -297,6 +297,24 @@ public:
 
 	float fullScreenSizeX, fullScreenSizeY;
 	void SetFullScreenViewSize(float sx, float sy);
+
+	// Edges a FULLSCREEN view leaves to the app, in pixels. PreRenderImGui
+	// subtracts them from the viewport work area before solving the view's
+	// aspect ratio, so a host can reserve a strip alongside a fullscreen view
+	// -- a filmstrip, a tool rail -- instead of being forced to draw it ON the
+	// content.
+	//
+	// All four default to 0 and MUST stay that way: at zero the fullscreen
+	// path is byte-identical to what it was before these existed, which is
+	// what keeps every other host of this engine unaffected. Only a view that
+	// asks for space gets any.
+	//
+	// Ignored when the view is not fullscreen (windowed layout has its own
+	// position/size machinery, and a host that wants space there simply asks
+	// for a smaller window).
+	float fullScreenInsetLeft, fullScreenInsetRight;
+	float fullScreenInsetTop,  fullScreenInsetBottom;
+	void SetFullScreenInsets(float left, float right, float top, float bottom);
 	
 	bool isShowingContextMenu;
 	

@@ -76,6 +76,41 @@ namespace
 // ============================================================================
 // Constructor / Destructor
 // ============================================================================
+// THE DEMUXER BOUNDARY. FFmpeg's types stop here: the native decoders take the
+// engine's own SVideoPacket and EMediaCodecId (MT_MediaPacket.h), so they no
+// longer depend on the library they exist to replace. When AVFoundation or
+// Media Foundation becomes the demuxer, these two functions are what it
+// reimplements -- and nothing downstream of them changes.
+static SVideoPacket MakeEnginePacket(const AVPacket *pkt)
+{
+	SVideoPacket p;
+	if (pkt == NULL)
+		return p;
+	p.data     = pkt->data;
+	p.size     = pkt->size;
+	p.ptsUs    = (pkt->pts != AV_NOPTS_VALUE) ? (i64)pkt->pts : SVideoPacket::kNoPts;
+	p.keyframe = (pkt->flags & AV_PKT_FLAG_KEY) != 0;
+	return p;
+}
+
+static EMediaCodecId EngineCodecId(int avCodecId)
+{
+	switch (avCodecId)
+	{
+		case AV_CODEC_ID_H264:   return EMediaCodecId::H264;
+		case AV_CODEC_ID_HEVC:   return EMediaCodecId::HEVC;
+		case AV_CODEC_ID_WMV1:   return EMediaCodecId::WMV1;
+		case AV_CODEC_ID_WMV2:   return EMediaCodecId::WMV2;
+		case AV_CODEC_ID_WMV3:   return EMediaCodecId::WMV3;
+		case AV_CODEC_ID_VC1:    return EMediaCodecId::VC1;
+		case AV_CODEC_ID_WMAV1:  return EMediaCodecId::WMAV1;
+		case AV_CODEC_ID_WMAV2:  return EMediaCodecId::WMAV2;
+		case AV_CODEC_ID_WMAPRO: return EMediaCodecId::WMAPRO;
+		case AV_CODEC_ID_AAC:    return EMediaCodecId::AAC;
+		default:                 return EMediaCodecId::Unknown;
+	}
+}
+
 CVideoSourceFFmpeg::CVideoSourceFFmpeg()
 {
 }
@@ -269,7 +304,7 @@ bool CVideoSourceFFmpeg::Open(const char *filePath)
 	if (isWMVFamily && !nativeDecoder && !disableAutoNativeDecoders &&
 		IVideoPacketDecoder::IsWMVDecodeAvailable())
 	{
-		ownedNativeDecoder = std::make_unique<CVideoDecoderWMVMF>((int)vp->codec_id);
+		ownedNativeDecoder = std::make_unique<CVideoDecoderWMVMF>(EngineCodecId((int)vp->codec_id));
 		nativeDecoder = ownedNativeDecoder.get();
 	}
 #endif
@@ -670,7 +705,7 @@ bool CVideoSourceFFmpeg::OpenAudioDecoder()
 	// audio -- 2026-07-19 codec-superset spec).
 	if (isWMAFamily && !disableAutoNativeDecoders)
 	{
-		wmaInit.codecId = (int)ap->codec_id;
+		wmaInit.codecId = EngineCodecId((int)ap->codec_id);
 		wmaInit.extradata.assign(ap->extradata, ap->extradata + (ap->extradata && ap->extradata_size > 0 ? ap->extradata_size : 0));
 		wmaInit.channels = ap->ch_layout.nb_channels;
 		wmaInit.sampleRate = ap->sample_rate;
@@ -876,7 +911,8 @@ bool CVideoSourceFFmpeg::ReadVideoFrame(SDecodedVideoFrame &out)
 						}
 
 						av_packet_rescale_ts(bsfPacket, fmtCtx->streams[videoStream]->time_base, AV_TIME_BASE_Q);
-						bool got = nativeDecoder->DecodePacket(bsfPacket, out);
+						SVideoPacket ep = MakeEnginePacket(bsfPacket);
+						bool got = nativeDecoder->DecodePacket(&ep, out);
 						av_packet_unref(bsfPacket);
 						if (got)
 						{
@@ -911,7 +947,7 @@ bool CVideoSourceFFmpeg::ReadVideoFrame(SDecodedVideoFrame &out)
 				// EOS: drain the decoder's internal pts-reorder queue (VT) or
 				// internal DRAIN command (MF) one frame per ReadVideoFrame()
 				// call, same shape as the vctx flush path above.
-				if (nativeDecoder->DecodePacket(nullptr, out))
+				if (nativeDecoder->DecodePacket((const SVideoPacket *)NULL, out))
 				{
 					out.pts = NormalizePtsSeconds(out.pts);
 					debugFramesDecodedAfterSeek++;
@@ -994,7 +1030,8 @@ bool CVideoSourceFFmpeg::ReadVideoFrame(SDecodedVideoFrame &out)
 						}
 
 						av_packet_rescale_ts(bsfPacket, fmtCtx->streams[videoStream]->time_base, AV_TIME_BASE_Q);
-						got = nativeDecoder->DecodePacket(bsfPacket, out);
+						{ SVideoPacket ep = MakeEnginePacket(bsfPacket);
+					  got = nativeDecoder->DecodePacket(&ep, out); }
 						av_packet_unref(bsfPacket);
 						if (got)
 							break;
@@ -1017,7 +1054,8 @@ bool CVideoSourceFFmpeg::ReadVideoFrame(SDecodedVideoFrame &out)
 					// VT path (hevcBsf never allocated here): byte-identical
 					// to the code before this seam existed.
 					av_packet_rescale_ts(packet, fmtCtx->streams[videoStream]->time_base, AV_TIME_BASE_Q);
-					got = nativeDecoder->DecodePacket(packet, out);
+					{ SVideoPacket ep = MakeEnginePacket(packet);
+					  got = nativeDecoder->DecodePacket(&ep, out); }
 					av_packet_unref(packet);
 				}
 
@@ -1582,7 +1620,7 @@ void CVideoSourceFFmpeg::FlushDecodersAfterSeek()
 	// comment): a full re-Init() with the cached WAVEFORMATEX-style params
 	// discards the MFT's stale pre-seek state; on failure, drop to
 	// video-only cleanly rather than warn-per-packet forever.
-	if (wmaDecoder && wmaInit.codecId != 0)
+	if (wmaDecoder && wmaInit.codecId != EMediaCodecId::Unknown)
 	{
 		if (!wmaDecoder->Init(wmaInit.codecId,
 							  wmaInit.extradata.empty() ? nullptr : wmaInit.extradata.data(),
@@ -1870,30 +1908,5 @@ void CVideoSourceFFmpeg::FreeResources()
 
 	info = SVideoInfo();
 }
-
-#if !defined(__APPLE__) && !defined(_WIN32)
-// Builds with no native HEVC decoder story at all (Linux today) have no
-// IVideoPacketDecoder implementation registered anywhere -- this is the
-// "false stub elsewhere" IVideoPacketDecoder.h's comment refers to, kept
-// alongside the interface's only other FFmpeg-enabled TU so the symbol
-// always exists once FFmpeg is linked in. Apple defines this in
-// CVideoDecoderHEVCVT.cpp (always true -- VideoToolbox); Windows defines it
-// in CVideoDecoderHEVCMF.cpp (true iff an HEVC decoder MFT resolves).
-bool IVideoPacketDecoder::IsHEVCDecodeAvailable()
-{
-	return false;
-}
-#endif
-
-#if !defined(_WIN32)
-// Native WMV decode exists only on Windows (the in-box WMVideo Decoder MFT
-// -- see CVideoDecoderWMVMF.cpp for the true implementation). Apple AND
-// Linux take this false stub: VideoToolbox has no WMV/VC-1 support at all,
-// so unlike HEVC there is no Apple-side implementation file to host it.
-bool IVideoPacketDecoder::IsWMVDecodeAvailable()
-{
-	return false;
-}
-#endif
 
 #endif // MT_ENABLE_FFMPEG

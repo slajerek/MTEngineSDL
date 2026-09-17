@@ -16,7 +16,33 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 # shellcheck source=../caps-lib.sh
 . "$ROOT_DIR/platform/caps-lib.sh"
 mt_caps_strip_host_build_env
-CACHE_DIR="$(mt_caps_work_dir video-codecs)"
+# THE FFmpeg LANE IS SEPARATE FROM THE WEBM LANE, since ef700aab.
+#
+# MT_ENABLE_WEBM_VPX (vpx/opus/nestegg) and MT_ENABLE_FFMPEG used to derive
+# from MT_CAP_VIDEO_PLAYBACK together, so one switch served the whole script --
+# the note at the capability gate below still said "both derive from
+# MT_CAP_VIDEO_PLAYBACK today, so the values agree". An app can now keep video
+# and drop FFmpeg, and a store build does exactly that: it must not pay for a
+# multi-minute FFmpeg build and a 40 MB download it never links.
+FFMPEG_ON="${MT_ENABLE_FFMPEG:-1}"
+
+# A SEPARATE WORK TREE WHEN FFmpeg IS OFF, and this is not tidiness.
+#
+# mt_caps_work_dir returns ONE global directory per unit, shared across every
+# app and every caps set, and the build below does `rm -rf "$BUILD_DIR"
+# "$PREFIX_DIR"` unconditionally. Sharing it between the two configurations
+# means one FFmpeg-off run deletes install/lib/libavcodec.dylib for every app
+# on the machine, and every FFmpeg-ON build after it fails its stamp
+# precondition and does a full cold rebuild of libvpx, opus AND FFmpeg --
+# in both directions, forever, on every alternation.
+#
+# The suffix appears ONLY when the flag is explicitly off, so the default work
+# tree keeps the path (and the warm state) it has today.
+if [[ "$FFMPEG_ON" == "0" ]]; then
+  CACHE_DIR="$(mt_caps_work_dir video-codecs-noffmpeg)"
+else
+  CACHE_DIR="$(mt_caps_work_dir video-codecs)"
+fi
 DOWNLOAD_DIR="$CACHE_DIR/downloads"
 SRC_DIR="$CACHE_DIR/src"
 BUILD_DIR="$CACHE_DIR/build"
@@ -147,14 +173,42 @@ if [[ "${MT_ENABLE_WEBM_VPX:-${MT_ENABLE_FFMPEG:-1}}" == "0" ]]; then
   exit 0
 fi
 
-stamp_value="${script_sha}:libvpx-${VPX_VERSION}:opus-${OPUS_VERSION}:ffmpeg-${FFMPEG_VERSION}:${DEPLOYMENT_TARGET}:mode-${FFMPEG_BUILD_MODE}"
+# THE CODEC POLICY IS PART OF THE IDENTITY OF THIS BUILD.
+#
+# vocabulary.json reaches this script only through these four variables, and
+# not one of them was in any cache key. Adding a decoder to decoders_base
+# therefore changed nothing any layer could see: the stamp below still matched,
+# the build was skipped, and require_ffmpeg_exact_set never ran -- reporting
+# success because it did not execute. Measured 2026-09-09: with `tta` added to
+# decoders_base and MT_FFMPEG_DECODERS carrying it into the environment,
+# config_components.h still said CONFIG_TTA_DECODER 0 and the dylib's mtime was
+# an hour old.
+#
+# The :- defaults are load-bearing. This script runs under `set -euo pipefail`
+# and none of the four is defaulted before the early exit below, so a bare
+# expansion would abort the script on any run that does not set them.
+ffmpeg_policy_sha="$(printf '%s|%s|%s|%s' \
+  "${MT_FFMPEG_DECODERS:-}" "${MT_FFMPEG_DEMUXERS:-}" \
+  "${MT_FFMPEG_PARSERS:-}"  "${MT_FFMPEG_DECODERS_WITHHELD:-}" \
+  | shasum -a 256 | cut -d ' ' -f 1)"
+
+stamp_value="${script_sha}:libvpx-${VPX_VERSION}:opus-${OPUS_VERSION}:ffmpeg-${FFMPEG_VERSION}:${DEPLOYMENT_TARGET}:mode-${FFMPEG_BUILD_MODE}:policy-${ffmpeg_policy_sha}:ffmpeg-${FFMPEG_ON}"
 # The staged dylib is part of the check, not just the archive. $OUT_LIB_DIR is
 # keyed by capability set, so a fresh key has a valid stamp only if it also has
 # the dylibs -- and an app that links FFmpeg needs both halves of this script's
 # output, not one.
-if [[ -f "$OUT_LIB" && -f "$STAMP_FILE" \
-      && -f "$PREFIX_DIR/lib/libavcodec.dylib" \
-      && -f "$OUT_LIB_DIR/libavcodec.dylib" ]]; then
+# With FFmpeg off there is no libavcodec.dylib to find, and demanding one
+# would mean the stamp NEVER hits: libvpx and opus would rebuild from source on
+# every single invocation, forever. The archive and the stamp are the whole
+# check in that configuration.
+if [[ "$FFMPEG_ON" == "0" ]]; then
+  ffmpeg_outputs_present=1
+elif [[ -f "$PREFIX_DIR/lib/libavcodec.dylib" && -f "$OUT_LIB_DIR/libavcodec.dylib" ]]; then
+  ffmpeg_outputs_present=1
+else
+  ffmpeg_outputs_present=0
+fi
+if [[ -f "$OUT_LIB" && -f "$STAMP_FILE" && "$ffmpeg_outputs_present" == "1" ]]; then
   if [[ "$(cat "$STAMP_FILE")" == "$stamp_value" ]]; then
     # Stamp hit: make sure the header/marker staging (Phase 2) is present in
     # this keyed bucket too -- a bucket stamped before the relocation has the
@@ -276,6 +330,18 @@ build_libvpx() {
   target="$(vpx_target_for_arch "$arch")"
   local build="$BUILD_DIR/libvpx-$arch"
 
+  # VP8 DECODE IS BUILT, and it was not before 2026-09-10. The configure line
+  # below used to pass `--disable-vp8-decoder` explicitly, so the archive
+  # carried zero VP8 symbols and a VP8 WebM could only play through FFmpeg --
+  # i.e. not at all in a store build. That was a licensing decision applied to
+  # the wrong library: libvpx is BSD-3 and VP8 carries Google's irrevocable
+  # royalty-free patent grant, so it is store-safe by the same standard as the
+  # VP9 beside it. The ENCODERS stay off; nothing in this engine encodes.
+  #
+  # NOTE FOR ANYONE EDITING THE LINE BELOW: it is one backslash-continued
+  # command. A `#` comment cannot go INSIDE it -- the continuation swallows the
+  # rest of the command into the comment, which is how `--disable-vp9-encoder`
+  # briefly stopped being passed while this very change was being written.
   mkdir -p "$build"
   pushd "$build" >/dev/null
   CC="clang -arch $arch -mmacosx-version-min=$DEPLOYMENT_TARGET" \
@@ -293,7 +359,6 @@ build_libvpx() {
       --enable-vp9 \
       --enable-vp9-highbitdepth \
       --disable-vp8-encoder \
-      --disable-vp8-decoder \
       --disable-vp9-encoder
   make -j "$JOBS"
   make install
@@ -421,6 +486,13 @@ build_ffmpeg() {
 FFMPEG_IMPLICIT_DECODERS="h263"
 FFMPEG_IMPLICIT_PARSERS="h263"
 
+# These four derive the expected codec sets from the vocabulary's policy lists.
+# They are FFmpeg-only -- every consumer is inside an FFMPEG_ON block -- and
+# under `set -u` an unset MT_FFMPEG_DECODERS is a hard exit, which is what an
+# FFmpeg-off build legitimately has: no FFmpeg means no decoder policy to
+# state. Defaulted rather than gated so the variables always exist for any
+# later reader, and empty is the truthful value.
+if [[ "$FFMPEG_ON" == "1" ]]; then
 FFMPEG_EXPECTED_DECODERS="$(policy_sorted "$MT_FFMPEG_DECODERS $FFMPEG_IMPLICIT_DECODERS")"
 
 # Demuxers: identical in both modes (asf demuxing is licensing-safe under
@@ -442,6 +514,12 @@ FFMPEG_EXPECTED_PARSERS="$(policy_sorted "$MT_FFMPEG_PARSERS $FFMPEG_IMPLICIT_PA
 # and it grows from 10 names to 13, because the scripts' hand-written copy had
 # been missing msmpeg4v1/v2/v3 while the vocabulary listed them.
 FFMPEG_FORBIDDEN_DECODERS_COMMERCIAL="$(printf '%s' "$MT_FFMPEG_DECODERS_WITHHELD" | tr '[:lower:] ' '[:upper:]\n' | tr '\n' ' ')"
+else
+  FFMPEG_EXPECTED_DECODERS=""
+  FFMPEG_EXPECTED_DEMUXERS=""
+  FFMPEG_EXPECTED_PARSERS=""
+  FFMPEG_FORBIDDEN_DECODERS_COMMERCIAL=""
+fi
 
 # require_ffmpeg_exact_set <build-dir> <KIND> <expected-space-separated>
 # KIND is the config_components.h suffix: DECODER, DEMUXER, or PARSER.
@@ -630,7 +708,11 @@ merge_ffmpeg_headers() {
   # Linux never had this: it stages the whole install prefix, so vpx's and
   # opus's headers travel with FFmpeg's. This makes macOS match.
   local dir
-  for dir in libavutil libavcodec libavformat libswscale libswresample vpx opus; do
+  local dirs=(vpx opus)
+  if [[ "$FFMPEG_ON" == "1" ]]; then
+    dirs=(libavutil libavcodec libavformat libswscale libswresample vpx opus)
+  fi
+  for dir in "${dirs[@]}"; do
     cp -R "$CACHE_DIR/install-${ARCH_LIST[0]}/include/$dir" "$PREFIX_DIR/include/"
   done
 
@@ -638,6 +720,10 @@ merge_ffmpeg_headers() {
   # little-endian macOS with the same compiler so it should be identical.
   # Fail loudly instead of silently shipping a wrong header if that ever
   # stops being true.
+  # Only when FFmpeg was built -- there is no libavutil/avconfig.h otherwise,
+  # and diff'ing a file that does not exist would fail this whole function,
+  # which now also stages vpx and opus.
+  [[ "$FFMPEG_ON" == "1" ]] || return 0
   local avconfig_ref="$CACHE_DIR/install-${ARCH_LIST[0]}/include/libavutil/avconfig.h"
   local arch
   for arch in "${ARCH_LIST[@]}"; do
@@ -681,11 +767,15 @@ require_symbol() {
 
 download_archive "libvpx-${VPX_VERSION}" "$VPX_URL" "$VPX_SHA256"
 download_archive "opus-${OPUS_VERSION}" "$OPUS_URL" "$OPUS_SHA256"
-download_archive_xz "ffmpeg-${FFMPEG_VERSION}" "$FFMPEG_URL" "$FFMPEG_SHA256"
+if [[ "$FFMPEG_ON" == "1" ]]; then
+  download_archive_xz "ffmpeg-${FFMPEG_VERSION}" "$FFMPEG_URL" "$FFMPEG_SHA256"
+fi
 
 extract_archive "libvpx-${VPX_VERSION}" "libvpx-${VPX_VERSION}"
 extract_archive "opus-${OPUS_VERSION}" "opus-${OPUS_VERSION}"
-extract_archive_xz "ffmpeg-${FFMPEG_VERSION}" "ffmpeg-${FFMPEG_VERSION}"
+if [[ "$FFMPEG_ON" == "1" ]]; then
+  extract_archive_xz "ffmpeg-${FFMPEG_VERSION}" "ffmpeg-${FFMPEG_VERSION}"
+fi
 
 rm -rf "$BUILD_DIR" "$PREFIX_DIR" "$CACHE_DIR"/install-*
 mkdir -p "$BUILD_DIR" "$PREFIX_DIR"
@@ -695,21 +785,28 @@ for arch in "${ARCH_LIST[@]}"; do
   mkdir -p "$arch_prefix"
   build_libvpx "$arch" "$arch_prefix"
   build_opus "$arch" "$arch_prefix"
-  build_ffmpeg "$arch" "$arch_prefix"
-  # ONE expected set per kind, whatever the mode: the policy lists already
-  # carry the withheld names when the mode is `full`, so the guard no longer
-  # picks between two hand-written sets -- which is what it got wrong by
-  # picking on the licence tier. Only the absence check is mode-specific,
-  # because "these must NOT be here" has no meaning in full mode.
-  require_ffmpeg_exact_set "$BUILD_DIR/ffmpeg-$arch" "DECODER" "$FFMPEG_EXPECTED_DECODERS"
-  require_ffmpeg_exact_set "$BUILD_DIR/ffmpeg-$arch" "PARSER" "$FFMPEG_EXPECTED_PARSERS"
-  if [[ "$FFMPEG_BUILD_MODE" == "commercial" ]]; then
-    for dec in $FFMPEG_FORBIDDEN_DECODERS_COMMERCIAL; do
-      require_ffmpeg_decoder_disabled "$BUILD_DIR/ffmpeg-$arch" "$dec"
-    done
+  if [[ "$FFMPEG_ON" == "1" ]]; then
+    build_ffmpeg "$arch" "$arch_prefix"
+    # ONE expected set per kind, whatever the mode: the policy lists already
+    # carry the withheld names when the mode is `full`, so the guard no longer
+    # picks between two hand-written sets -- which is what it got wrong by
+    # picking on the licence tier. Only the absence check is mode-specific,
+    # because "these must NOT be here" has no meaning in full mode.
+    #
+    # Every one of these reads $BUILD_DIR/ffmpeg-$arch and hard-exits when it is
+    # missing, so they belong INSIDE the gate with the build that creates it.
+    # Gating only the build_ffmpeg call leaves six guards to fail on a directory
+    # that was never made.
+    require_ffmpeg_exact_set "$BUILD_DIR/ffmpeg-$arch" "DECODER" "$FFMPEG_EXPECTED_DECODERS"
+    require_ffmpeg_exact_set "$BUILD_DIR/ffmpeg-$arch" "PARSER" "$FFMPEG_EXPECTED_PARSERS"
+    if [[ "$FFMPEG_BUILD_MODE" == "commercial" ]]; then
+      for dec in $FFMPEG_FORBIDDEN_DECODERS_COMMERCIAL; do
+        require_ffmpeg_decoder_disabled "$BUILD_DIR/ffmpeg-$arch" "$dec"
+      done
+    fi
+    require_ffmpeg_exact_set "$BUILD_DIR/ffmpeg-$arch" "DEMUXER" "$FFMPEG_EXPECTED_DEMUXERS"
+    normalize_ffmpeg_install_names "$arch"
   fi
-  require_ffmpeg_exact_set "$BUILD_DIR/ffmpeg-$arch" "DEMUXER" "$FFMPEG_EXPECTED_DEMUXERS"
-  normalize_ffmpeg_install_names "$arch"
 done
 
 rm -rf "$PREFIX_DIR/lib"
@@ -721,24 +818,41 @@ combine_universal_lib "lib/libopus.a"
 # FFmpeg dylibs are a separate output (install/lib/*.dylib) -- they are NOT
 # merged into libmt_video_codecs.a below. Each arch's dylibs were already
 # normalized to @rpath install names above, before this lipo merge.
-for ff_lib in libavutil libavcodec libavformat libswscale libswresample; do
-  combine_universal_ffmpeg_dylib "$ff_lib"
-done
+if [[ "$FFMPEG_ON" == "1" ]]; then
+  for ff_lib in libavutil libavcodec libavformat libswscale libswresample; do
+    combine_universal_ffmpeg_dylib "$ff_lib"
+  done
+fi
+# ALWAYS, in both configurations. merge_ffmpeg_headers stages vpx and opus as
+# well as the libav* trees -- the engine includes <vpx/vpx_codec.h> and
+# <opus/opus.h> directly, and this function is the only thing that puts them
+# where the compiler looks. Skipping it wholesale with FFmpeg reproduces the
+# 2026-09-03 failure its own comment records: "fatal error: 'vpx/vpx_codec.h'
+# file not found", after every dependency had built successfully.
 merge_ffmpeg_headers
 
-for ff_lib in libavutil libavcodec libavformat libswscale libswresample; do
-  ff_soname="$(ffmpeg_soname_link "$PREFIX_DIR/lib" "$ff_lib")"
-  require_ffmpeg_clean_deps "$PREFIX_DIR/lib/$ff_soname"
-done
+if [[ "$FFMPEG_ON" == "1" ]]; then
+  for ff_lib in libavutil libavcodec libavformat libswscale libswresample; do
+    ff_soname="$(ffmpeg_soname_link "$PREFIX_DIR/lib" "$ff_lib")"
+    require_ffmpeg_clean_deps "$PREFIX_DIR/lib/$ff_soname"
+  done
 
-if [[ "$FFMPEG_BUILD_MODE" == "commercial" ]]; then
-  require_ffmpeg_no_forbidden_symbols "$PREFIX_DIR/lib"
+  if [[ "$FFMPEG_BUILD_MODE" == "commercial" ]]; then
+    require_ffmpeg_no_forbidden_symbols "$PREFIX_DIR/lib"
+  fi
 fi
 
 # Mode marker: consumed by app build scripts (guard #3 in the 2026-07-18 WMV
 # spec). A commercial app build against a "full" install is a fatal error
 # there; this file is how it knows what it is linking.
-echo -n "$FFMPEG_BUILD_MODE" > "$PREFIX_DIR/.ffmpeg-build-mode"
+# NOT written when FFmpeg is off. The marker answers "what kind of FFmpeg is
+# installed here", and the honest answer to that in a build with none is the
+# file's absence -- app-build-*.sh treats a missing marker as a hard error for
+# a commercial build, which is exactly right for a bucket that claims FFmpeg
+# and has not got it.
+if [[ "$FFMPEG_ON" == "1" ]]; then
+  echo -n "$FFMPEG_BUILD_MODE" > "$PREFIX_DIR/.ffmpeg-build-mode"
+fi
 
 INPUT_LIBS=(
   "$PREFIX_DIR/lib/libvpx.a"
@@ -783,23 +897,65 @@ require_symbol "_opus_strerror"
 # regular file would work but would double what an app embeds.
 #
 # install/lib keeps its copies -- the photo app still reads them from there.
-echo "Staging FFmpeg dylibs to $OUT_LIB_DIR"
-for ff_lib in libavutil libavcodec libavformat libswscale libswresample; do
-  for f in "$PREFIX_DIR/lib/$ff_lib".*.dylib "$PREFIX_DIR/lib/$ff_lib.dylib"; do
-    [[ -e "$f" ]] || continue
-    cp -R -f "$f" "$OUT_LIB_DIR/"
+if [[ "$FFMPEG_ON" == "1" ]]; then
+  echo "Staging FFmpeg dylibs to $OUT_LIB_DIR"
+  for ff_lib in libavutil libavcodec libavformat libswscale libswresample; do
+    for f in "$PREFIX_DIR/lib/$ff_lib".*.dylib "$PREFIX_DIR/lib/$ff_lib.dylib"; do
+      [[ -e "$f" ]] || continue
+      cp -R -f "$f" "$OUT_LIB_DIR/"
+    done
   done
-done
+fi
 
 echo -n "$stamp_value" > "$STAMP_FILE"
 echo "Video codec bundle built: $OUT_LIB"
-# The mode marker travels WITH the staged dylibs (Phase 2, 2026-08-31): a
-# guard reading the in-checkout prefix reads a path the relocation will
-# delete, and a stale tree there could answer for the wrong mode.
-echo -n "$FFMPEG_BUILD_MODE" > "$OUT_LIB_DIR/.ffmpeg-build-mode"
+# THE VIEW IS SHARED BETWEEN THE TWO CONFIGURATIONS AND IS NEVER CLEANED.
+#
+# $OUT_LIB_DIR is keyed by the capability set, and MT_ENABLE_FFMPEG is not part
+# of that key -- flipping the flag does not change this path. The staging below
+# only ever COPIES, so without the removal an FFmpeg-off build inherits the
+# previous FFmpeg-on build's dylibs, its libav* headers and its mode marker.
+#
+# Measured 2026-09-10, from a wiped _deps: an FFmpeg-off build reported the
+# skip correctly and the view still held 9 libav dylibs, a resolvable
+# <libavcodec/avcodec.h> and a marker reading "full". The test app then compiled
+# green at MT_ENABLE_FFMPEG=0 purely because its test header's unconditional
+# libavcodec include resolved against those stale headers -- a FALSE GREEN for
+# the exact configuration this programme exists to produce.
+if [[ "$FFMPEG_ON" == "0" ]]; then
+  # BOTH the store and the view. mt_caps_sync_store_to_view is `tar c | tar x`
+  # -- purely additive, and deliberately so: the view is SHARED by every unit
+  # (sdl3, opencv, image_codecs, ...), so a sync that mirrored its store would
+  # delete the other units' archives. The consequence is that only the
+  # producing script can retire its own outputs, because only it knows which
+  # files are its own. Removing from the store alone leaves the view holding
+  # the previous FFmpeg-on build's dylibs and headers forever.
+  for dir in "$OUT_LIB_DIR" "${MT_VIEW_LIB_DIR:-}"; do
+    [[ -n "$dir" && -d "$dir" ]] || continue
+    for ff_lib in libavutil libavcodec libavformat libswscale libswresample; do
+      rm -f "$dir/$ff_lib".*.dylib "$dir/$ff_lib.dylib"
+    done
+    rm -f "$dir/.ffmpeg-build-mode"
+    rm -rf "$dir/ffmpeg/include/libavutil" "$dir/ffmpeg/include/libavcodec" \
+           "$dir/ffmpeg/include/libavformat" "$dir/ffmpeg/include/libswscale" \
+           "$dir/ffmpeg/include/libswresample"
+  done
+else
+  # The mode marker travels WITH the staged dylibs (Phase 2, 2026-08-31): a
+  # guard reading the in-checkout prefix reads a path the relocation will
+  # delete, and a stale tree there could answer for the wrong mode.
+  echo -n "$FFMPEG_BUILD_MODE" > "$OUT_LIB_DIR/.ffmpeg-build-mode"
+fi
 # FFmpeg headers travel with the dylibs too (Phase 2) -- the projects used to
-# read other/lib/video-codecs/install/include from inside the checkout.
+# read other/lib/video-codecs/install/include from inside the checkout. The
+# rm -rf is what makes this correct in both directions: the include tree is
+# REPLACED by whatever this configuration built, so an FFmpeg-off build leaves
+# vpx and opus and no libav* at all.
 rm -rf "$OUT_LIB_DIR/ffmpeg/include"
 mkdir -p "$OUT_LIB_DIR/ffmpeg"
 cp -R "$PREFIX_DIR/include" "$OUT_LIB_DIR/ffmpeg/include"
-echo "FFmpeg LGPL decode dylibs built: $PREFIX_DIR/lib, staged to $OUT_LIB_DIR (avutil/avcodec/avformat/swscale/swresample)"
+if [[ "$FFMPEG_ON" == "1" ]]; then
+  echo "FFmpeg LGPL decode dylibs built: $PREFIX_DIR/lib, staged to $OUT_LIB_DIR (avutil/avcodec/avformat/swscale/swresample)"
+else
+  echo "MT_ENABLE_FFMPEG=0: no FFmpeg downloaded, built or staged. libvpx + opus only."
+fi

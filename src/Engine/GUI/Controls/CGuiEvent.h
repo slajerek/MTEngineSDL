@@ -32,10 +32,20 @@ enum GuiEventMouseState : u8
 
 
 // generic classes for events, not used widely
+//
+// The destructor is virtual because these are stored and deleted
+// polymorphically: queues hold CGuiEvent* that actually point at
+// CGuiEventKeyboard / CGuiEventMouse, and `delete event` on the base pointer
+// is undefined behaviour without it -- C++14 sized deallocation hands
+// operator delete the BASE size, so the allocator is told the wrong extent of
+// the block. CViewC64GoatTracker::ForwardEvents() does exactly that on the
+// GoatTracker thread, which is where an unexplained SIGSEGV was reported on
+// 2026-09-08.
 class CGuiEvent
 {
     public:
         CGuiEvent();
+        virtual ~CGuiEvent();
         u8 type;
 };
 

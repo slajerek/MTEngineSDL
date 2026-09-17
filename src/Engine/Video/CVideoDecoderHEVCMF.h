@@ -13,7 +13,10 @@
 // anywhere except a Windows FFmpeg-enabled build. See the .cpp's header
 // comment for why this drives the decoder through a Topology/IMFMediaSession
 // pipeline rather than a raw IMFTransform push/pull loop.
-#if defined(_WIN32) && (!defined(MT_ENABLE_FFMPEG) || (MT_ENABLE_FFMPEG))
+// Platform only. This used to also require MT_ENABLE_FFMPEG, which switched
+// the OS-native decoder off together with the software one it exists to
+// replace -- see MT_MediaPacket.h.
+#if defined(_WIN32)
 
 #include "IVideoPacketDecoder.h"
 #include <functional>
@@ -37,14 +40,37 @@ public:
 	enum class ECodec
 	{
 		HEVC,
+		H264, // Matroska lane only -- MP4/MOV reach Media Foundation through
+			  // CVideoSourceMediaFoundation, which decodes H.264 itself.
+			  // UNVERIFIED on Windows; see the Windows handover notes.
+		MPEG4V, // MPEG-4 Part 2 (DivX/XviD), for the AVI lane. Windows ships
+				// an in-box MPEG-4 Part 2 decoder MFT. It takes the raw
+				// VOS/VOL header through MF_MT_USER_DATA -- no esds wrapper,
+				// which is the Apple side's requirement, not this one's.
+				// UNVERIFIED.
+		MJPEG,  // Also for the AVI lane; every frame carries its own tables,
+				// so there is no configuration record to pass. UNVERIFIED.
 		WMV1, // Windows Media Video 7
 		WMV2, // Windows Media Video 8
 		WMV3, // Windows Media Video 9 (VC-1 Simple/Main)
-		WVC1, // VC-1 Advanced (AV_CODEC_ID_VC1)
+		WVC1, // VC-1 Advanced
 	};
 
 	CVideoDecoderHEVCMF();
 	~CVideoDecoderHEVCMF() override;
+
+	// PUBLIC, not the subclass seam it started as. The codec-selecting
+	// constructor was protected for CVideoDecoderWMVMF alone, which was true
+	// until the Matroska lane arrived: CVideoSourceWebMVpx::InitPacketVideoDecoder
+	// constructs this directly to pick H264, and Windows would not compile.
+	//
+	//     error : calling a protected constructor of class 'CVideoDecoderHEVCMF'
+	//
+	// Construction-time selection rather than a SetCodec() setter like the
+	// VideoToolbox twin's, because inputCodec steers Init() (the P010 sink
+	// fallback and the Annex-B extradata convention) and there is no window
+	// between construction and Init() in which it would be legal to change.
+	explicit CVideoDecoderHEVCMF(ECodec codec);
 
 	// extradata/extradataSize are the ANNEX-B-converted parameter sets from
 	// CVideoSourceFFmpeg's hevc_mp4toannexb bitstream filter (bsf->par_out),
@@ -53,7 +79,7 @@ public:
 	// DecodePacket() is Annex-B (start-code-prefixed) for the same reason.
 	bool Init(const u8 *extradata, int extradataSize, int width, int height,
 			  int colorTrc = 2 /* AVCOL_TRC_UNSPECIFIED */) override;
-	bool DecodePacket(const AVPacket *pkt, SDecodedVideoFrame &out) override;
+	bool DecodePacket(const SVideoPacket *pkt, SDecodedVideoFrame &out) override;
 
 	// Abort plumbing (Task 5; contract in IVideoPacketDecoder.h). THIS decoder is
 	// the reason the whole chain exists: DecodePacket() blocks on TWO condvar
@@ -92,7 +118,16 @@ public:
 	// convention -- rather than the length-prefixed hvcC layout
 	// CVideoSourceFFmpeg's demuxer hands out by default. See
 	// IVideoPacketDecoder::WantsAnnexB()'s doc comment for the full seam.
-	bool WantsAnnexB() const override { return true; }
+	// TRUE ONLY FOR THE NAL-BASED CODECS. It was an unconditional `true`,
+	// which was correct while this class decoded HEVC and the WMV family (the
+	// WMV path ignores it -- ASF sequence headers are not NALs and no bitstream
+	// filter is installed for them). MPEG-4 Part 2 and MJPEG are not
+	// NAL-carried at all, and telling the Matroska/AVI lanes to run an
+	// Annex-B conversion over them would corrupt every packet.
+	bool WantsAnnexB() const override
+	{
+		return inputCodec == ECodec::HEVC || inputCodec == ECodec::H264;
+	}
 
 	// Forward-declared here (public) rather than in the private section below
 	// purely so the .cpp's anonymous-namespace helper classes (which live
@@ -103,11 +138,12 @@ public:
 	struct SPipeline;
 
 protected:
-	// Subclass seam (CVideoDecoderWMVMF): same pipeline, different compressed
-	// input subtype. HEVC-only behavior keyed off inputCodec below: the P010
-	// 10-bit sink fallback (WMV is 8-bit NV12 only) and the Annex-B extradata
-	// convention (see Init()'s doc comment).
-	explicit CVideoDecoderHEVCMF(ECodec codec);
+	// The codec-selecting constructor USED to live here, as a seam for
+	// CVideoDecoderWMVMF: same pipeline, different compressed input subtype,
+	// with the HEVC-only behaviour keyed off inputCodec below (the P010 10-bit
+	// sink fallback, WMV being 8-bit NV12 only, and the Annex-B extradata
+	// convention -- see Init()'s doc comment). It is public now; the subclass
+	// reaches it exactly as before.
 
 private:
 	ECodec inputCodec = ECodec::HEVC;
@@ -237,7 +273,7 @@ private:
 	SPendingFrame outFrame;
 };
 
-#endif // _WIN32 && MT_ENABLE_FFMPEG
+#endif // _WIN32
 
 #endif
 //_CVIDEODECODERHEVCMF_H_

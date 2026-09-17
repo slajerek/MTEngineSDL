@@ -1,5 +1,11 @@
 #pragma once
 
+
+// CAPABILITY GUARD (MT_ENABLE_NET_GAME). The header stays INCLUDABLE and declares nothing
+// when the capability is off, so a conditional consumer still compiles.
+// MT_CAP_NET_GAME implies NET_TRANSPORT and HTTP, so this whole stack rides on one flag -- which did not exist until 2026-09-06 (enables was an empty list).
+#if MT_ENABLE_NET_GAME
+
 #include "NET_Main.h"
 #include "SYS_Threading.h"
 
@@ -95,7 +101,12 @@ public:
 
 	// Lifecycle
 	void SaveState();
-	void Shutdown();
+	// Stops the network thread via CNetServer::StopServer() (waits for OFFLINE
+	// and !isRunning, 5s cap) and returns whether it actually stopped. Idempotent:
+	// safe to call again (e.g. a caller that got false may retry later). A caller
+	// that gets false MUST NOT delete this object -- the network thread may still
+	// be executing inside it.
+	bool Shutdown();
 
 	// Periodic save — checkpoint every periodicSaveIntervalSeconds (0 = disabled)
 	int periodicSaveIntervalSeconds;
@@ -138,3 +149,5 @@ protected:
 	vector<PendingAuth> pendingAuthQueue;
 	void ProcessPendingAuth();
 };
+
+#endif // MT_ENABLE_NET_GAME

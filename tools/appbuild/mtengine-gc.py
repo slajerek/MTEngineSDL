@@ -14,6 +14,8 @@ requirement of the capability system). The cache root layout it knows:
     <root>/_depstore/<plat>/<arch>/<cfg>/<unit>[/<backend>]/<hash>
                                            per-unit dependency build stores (L16)
     <root>/_standalone/, <root>/_deps/standalone/            caps-less builds
+    <root>/toolchains/<name>-<version>/    acquired SDKs -- REPORTED, NEVER
+                                           PRUNED: input, not build output
 
 Default action is a REPORT. --prune deletes, with liveness computed from the
 REAL tooling: the current engine HEAD (and, for deps/_build, an actual
@@ -254,6 +256,17 @@ def main():
         app_dir = os.path.join(root, app)
         if not os.path.isdir(app_dir) or app.startswith("_"):
             continue
+        # NOT AN APP. This loop reads <root>/<app>/<engine-rev>, and the only
+        # thing keeping non-app directories out of it was the "_" prefix every
+        # other special directory happens to carry. `toolchains` does not, so
+        # it was walked as an app and each toolkit version as a REV DIR --
+        # eligible for the generational retention, which keeps the --keep
+        # newest and deletes the rest. With one version installed that is
+        # invisible (it is the newest); with three, `--prune` would silently
+        # delete a 3 GB SDK that no rebuild can recreate, only a re-download.
+        # Caught 2026-09-07 by the toolkit appearing twice in the report.
+        if app == "toolchains":
+            continue
         for rev in sorted(os.listdir(app_dir)):
             p = os.path.join(app_dir, rev)
             if not os.path.isdir(p):
@@ -347,6 +360,30 @@ def main():
             continue
         victims.append((path, size, "deps bucket, not live, #%d newest" % (i + 1)))
 
+    # TOOLCHAINS ARE REPORTED AND NEVER PRUNED, and the distinction is the
+    # point. Everything else under this root is BUILD OUTPUT: reproducible by
+    # rebuilding, so retention can be generational. <root>/toolchains holds
+    # acquired SDKs -- today the CUDA toolkit that acquire-cuda-toolkit.ps1
+    # assembles from NVIDIA's redistributables, because their installer refuses
+    # an ARM64 host -- and that is INPUT. Deleting it does not cost a rebuild,
+    # it costs a 2 GB download, and no liveness check here could tell which of
+    # several toolkit versions a developer still wants.
+    #
+    # It is reported because the alternative is worse: silently omitting it
+    # made "mtengine cache -- N GB total" understate the directory by the size
+    # of the largest single thing in it, which is exactly the number someone
+    # reads before deciding whether to prune.
+    toolchains_root = os.path.join(root, "toolchains")
+    toolchain_total = 0
+    if os.path.isdir(toolchains_root):
+        for name in sorted(os.listdir(toolchains_root)):
+            p = os.path.join(toolchains_root, name)
+            if not os.path.isdir(p):
+                continue
+            size = du(p)
+            toolchain_total += size
+            report.append(("toolchains/%s  [never pruned]" % name, size))
+
     report.sort(key=lambda x: -x[1])
     total = sum(s for _, s in report)
     print("\nmtengine cache at %s -- %s total\n" % (root, human(total)))
@@ -354,6 +391,11 @@ def main():
         print("  %10s  %s" % (human(size), label))
     if len(report) > 40:
         print("  ... and %d more entries" % (len(report) - 40))
+    if toolchain_total:
+        print("\n  of which %s is toolchains/ -- acquired SDKs, never pruned."
+              % human(toolchain_total))
+        print("  Remove one with its own acquirer, e.g."
+              " platform\\Windows\\acquire-cuda-toolkit.ps1 -Clean")
 
     if not args.prune:
         print("\n(report only; --prune deletes with the retention in --help)")

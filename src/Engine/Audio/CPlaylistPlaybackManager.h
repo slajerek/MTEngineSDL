@@ -9,7 +9,7 @@
 #include <string>
 #include <unordered_set>
 
-class CSlrMusicFileOgg;
+class CSlrMusicFile;
 class CSlrFileFromDocuments;
 
 struct SPlaybackResumeState
@@ -71,8 +71,8 @@ public:
 
 	// Query current state
 	int GetCurrentPlaybackTrackId() const { return currentPlaybackTrackId; }
-	CSlrMusicFileOgg *GetCurrentPlaybackMusic() const { return currentPlaybackMusic; }
-	CSlrMusicFileOgg *GetCrossfadeOutgoingMusic() const { return crossfadeOutgoingMusic; }
+	CSlrMusicFile *GetCurrentPlaybackMusic() const { return currentPlaybackMusic; }
+	CSlrMusicFile *GetCrossfadeOutgoingMusic() const { return crossfadeOutgoingMusic; }
 	bool IsTransitionPending() const { return transitionPending; }
 	bool IsPaused() const { return isPaused; }
 	int64_t GetCurrentSampleNum() const;
@@ -110,7 +110,9 @@ public:
 private:
 	struct SPlaybackEntry
 	{
-		CSlrMusicFileOgg *music = NULL;
+		// Base type since 2026-09-10: Ogg goes to Tremor, MP3/FLAC/WAV to
+		// miniaudio, and the playlist does not care which.
+		CSlrMusicFile *music = NULL;
 		CSlrFileFromDocuments *fileHandle = NULL;
 		bool attemptedLoad = false;
 		bool loadSucceeded = false;
@@ -125,7 +127,7 @@ private:
 
 	std::map<u32, SPlaybackEntry> playbackByTrackId;
 	int currentPlaybackTrackId = -1;
-	CSlrMusicFileOgg *currentPlaybackMusic = NULL;
+	CSlrMusicFile *currentPlaybackMusic = NULL;
 	float masterVolume = 1.0f;
 	float currentPlaybackBaseVolume = 1.0f;
 	float outgoingPlaybackBaseVolume = 1.0f;
@@ -146,7 +148,7 @@ private:
 	// Crossfade state
 	bool crossfadeEnabled = false;
 	int crossfadeDurationMs = 2000;
-	CSlrMusicFileOgg *crossfadeOutgoingMusic = NULL;
+	CSlrMusicFile *crossfadeOutgoingMusic = NULL;
 	int crossfadeOutgoingTrackId = -1;
 	float crossfadeProgress = 0.0f;
 

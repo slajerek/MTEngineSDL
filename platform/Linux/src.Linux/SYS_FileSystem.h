@@ -94,6 +94,8 @@ uint8 *SYS_MapMemoryToFile(int memorySize, const char *filePath, void **fileDesc
 void SYS_UnMapMemoryFromFile(uint8 *memoryMap, int memorySize, void **fileDescriptor);
 
 void SYS_SetCurrentFolder(CSlrString *path);
+// Returns the extension without the dot, or an empty string when there is
+// none. The buffer is malloc()ed -- release it with free(), never delete[].
 char* SYS_GetFileExtension(const char* fileName);
 char* SYS_GetFileName(const char* filePath);
 
@@ -106,5 +108,11 @@ std::string SYS_GetRelativePath(const char* pathToFolder, const char* pathToFile
 std::string SYS_GetAbsolutePath(const char* pathToFolder, const char* relativePath);
 
 void SYS_OpenURLInBrowser(const char *url);
+
+// Reveals a file or a folder in the desktop file manager (Finder / Explorer /
+// whatever xdg-open resolves to), selecting it in its parent where the platform
+// supports that. Unlike SYS_OpenURLInBrowser this never *runs* the file, and it
+// does not go through a shell, so a path with spaces or quotes is safe.
+void SYS_ShowFileInFileManager(const char *filePath);
 
 #endif //__SYS_FILESYSTEM_H__

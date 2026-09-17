@@ -1,5 +1,11 @@
 #pragma once
 
+
+// CAPABILITY GUARD (MT_ENABLE_HTTPLIB). The header stays INCLUDABLE and declares nothing
+// when the capability is off, so a conditional consumer still compiles.
+// MT_CAP_HTTP declared this removable and nothing enforced it: MT_ENABLE_HTTPLIB appeared in no source at all.
+#if MT_ENABLE_HTTPLIB
+
 #include <string>
 #include <stdint.h>
 #include <thread>
@@ -83,3 +89,5 @@ private:
 
 	CSlrMutex *dlMutex;
 };
+
+#endif // MT_ENABLE_HTTPLIB

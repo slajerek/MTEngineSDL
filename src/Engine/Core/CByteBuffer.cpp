@@ -1399,6 +1399,20 @@ bool CByteBuffer::storeToSettings(CSlrString *fileName)
 	
 //	str->DebugPrint("CByteBuffer::storeToSettings: storeToFile, path str=");
 	
+	// The name may carry sub-folders ("gt2/gt2-settings.hjson"), and
+	// storeToFile() does not create them -- it just fails. That went unnoticed
+	// for as long as the settings folder was long-lived and the sub-folder
+	// happened to exist from some earlier run; a fresh settings folder (a test
+	// run redirected by MT_SETTINGS_DIR) turned every such save into
+	// "failed to save config". Create the parent chain first.
+	CSlrString *folder = str->GetFilePathWithoutFileNameComponentFromPath();
+	if (folder != NULL)
+	{
+		if (folder->GetLength() > 0 && SYS_FileDirExists(folder) == false)
+			SYS_CreateFolder(folder);
+		delete folder;
+	}
+	
 	bool ret = storeToFile(str);
 	delete str;
 	

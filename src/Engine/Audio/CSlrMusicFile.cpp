@@ -1,4 +1,5 @@
 #include "CSlrMusicFile.h"
+#include "SND_SoundEngine.h"
 #include "SYS_Main.h"
 
 CSlrMusicFile::CSlrMusicFile(const char *channelName)
@@ -145,3 +146,9 @@ const char *CSlrMusicFile::ResourceGetTypeName()
 	return "music";
 }
 
+// A source that does not know better is assumed to already be at the engine
+// rate, which is what every subclass did implicitly before this existed.
+u32 CSlrMusicFile::GetSourceSampleRate()
+{
+	return SND_GetEngineSampleRate();
+}

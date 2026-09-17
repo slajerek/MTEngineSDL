@@ -48,7 +48,10 @@
 // cheap enough for a Seek()-frequency operation.
 #include "CVideoDecoderHEVCMF.h"
 
-#if defined(_WIN32) && (!defined(MT_ENABLE_FFMPEG) || (MT_ENABLE_FFMPEG))
+// Platform only -- the gate no longer includes MT_ENABLE_FFMPEG. See the
+// header and MT_MediaPacket.h: this decoder is the destination of the FFmpeg
+// removal and must not be switched off by it.
+#if defined(_WIN32)
 
 #include "MFComThreadGuard.h"
 #include "CVideoTransferFunctions.h"
@@ -63,8 +66,6 @@
 #include <chrono>
 
 extern "C" {
-#include <libavcodec/avcodec.h>
-#include <libavutil/avutil.h>
 }
 
 #include <mfapi.h>
@@ -930,6 +931,9 @@ bool CVideoDecoderHEVCMF::BuildPipeline()
 	switch (inputCodec)
 	{
 		case ECodec::HEVC: inputSubtype = MFVideoFormat_HEVC; break;
+		case ECodec::H264: inputSubtype = MFVideoFormat_H264; break;
+		case ECodec::MPEG4V: inputSubtype = MFVideoFormat_MP4V; break;
+		case ECodec::MJPEG: inputSubtype = MFVideoFormat_MJPG; break;
 		case ECodec::WMV1: inputSubtype = MFVideoFormat_WMV1; break;
 		case ECodec::WMV2: inputSubtype = MFVideoFormat_WMV2; break;
 		case ECodec::WMV3: inputSubtype = MFVideoFormat_WMV3; break;
@@ -1138,7 +1142,7 @@ bool CVideoDecoderHEVCMF::Init(const u8 *extradata, int extradataSize, int w, in
 // DecodePacket -- one packet in, at most one frame out per call (see the
 // SPipeline doc comment above for the full handoff protocol).
 // ============================================================================
-bool CVideoDecoderHEVCMF::DecodePacket(const AVPacket *pkt, SDecodedVideoFrame &out)
+bool CVideoDecoderHEVCMF::DecodePacket(const SVideoPacket *pkt, SDecodedVideoFrame &out)
 {
 	// LEVEL-TRIGGERED ABORT (Task 5), checked at entry and joined into both waits
 	// below. Generation scoping is the PREDICATE's, not ours: it reads true exactly
@@ -1175,7 +1179,7 @@ bool CVideoDecoderHEVCMF::DecodePacket(const AVPacket *pkt, SDecodedVideoFrame &
 	pipeline->pktIsEOS = (pkt == nullptr);
 	if (pkt)
 	{
-		double ptsSeconds = (pkt->pts != AV_NOPTS_VALUE) ? (double)pkt->pts / (double)AV_TIME_BASE : 0.0;
+		double ptsSeconds = pkt->PtsSeconds();
 		pipeline->pktPts100ns = (LONGLONG)std::llround(ptsSeconds * 10000000.0);
 		pipeline->pktDataBuf.assign(pkt->data, pkt->data + pkt->size);
 	}
@@ -1412,4 +1416,4 @@ bool CVideoDecoderHEVCMF::EmitOutFrame(SDecodedVideoFrame &out)
 	return true;
 }
 
-#endif // _WIN32 && MT_ENABLE_FFMPEG
+#endif // _WIN32

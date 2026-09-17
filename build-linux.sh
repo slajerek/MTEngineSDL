@@ -273,6 +273,11 @@ bash "$SCRIPT_DIR/platform/Linux/build-video_codecs.sh"
 echo -e "\n\e[94mBuilding \e[31mFTXUI\e[0m"
 bash "$SCRIPT_DIR/platform/Linux/build-ftxui.sh"
 
+# OpenCV. Gated inside the script and DEFAULT OFF, unlike every other
+# dependency here: with MT_ENABLE_OPENCV unset this writes a stub and returns
+# in milliseconds, downloading nothing.
+bash "$SCRIPT_DIR/platform/Linux/build-opencv.sh"
+
 # 6. llama.cpp is built by CMake add_subdirectory, no separate script needed
 
 if [[ "$DEPS_ONLY" == "true" ]]; then

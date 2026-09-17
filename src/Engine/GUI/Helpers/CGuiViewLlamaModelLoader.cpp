@@ -1,3 +1,8 @@
+// CAPABILITY GUARD (MT_ENABLE_LLAMA_CPP). Stays in all three build lists, compiles to
+// nothing when off.
+// Its dependency is CFileDownloader, hence httplib. Guarded on the LLM flag rather than the HTTP one because MT_CAP_LLM implies MT_CAP_HTTP: with LLM on the downloader is guaranteed to exist, and with LLM off this is dead weight regardless.
+#if MT_ENABLE_LLAMA_CPP
+
 #include "CGuiViewLlamaModelLoader.h"
 
 #include "SYS_FileSystem.h"
@@ -857,3 +862,5 @@ void CGuiViewLlamaModelLoader::RenderImGui()
 
 	PostRenderImGui();
 }
+
+#endif // MT_ENABLE_LLAMA_CPP

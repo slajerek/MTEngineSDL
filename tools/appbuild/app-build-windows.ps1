@@ -310,6 +310,41 @@ if ($Clean) {
     exit 0
 }
 
+# --- parallelism --------------------------------------------------------------
+# Bare /m (every core) unless MT_BUILD_JOBS says otherwise.
+#
+# The default is unchanged: /m is what this script has always passed, and what
+# it still passes when the variable is unset. The knob exists because /m scales
+# with core count and not with available RAM -- on a many-core box a clang-cl
+# build of the engine, or of OpenCV's dnn translation units, can exhaust memory
+# and get the compiler killed. That surfaces as a build "failure" carrying no
+# diagnostic at all, so capping jobs needs to be reachable without editing this
+# file:
+#
+#   $env:MT_BUILD_JOBS = 4      # cap at 4 parallel jobs
+#
+# Set BEFORE the dependency stage so it covers that too: the two MSBuild calls
+# below take $jobsArg, and the dep scripts' `cmake --build` reads the standard
+# CMAKE_BUILD_PARALLEL_LEVEL, which is exported here for the same reason.
+#
+# BOTH LEVERS, because they multiply. /m caps how many PROJECTS build at once,
+# but MTEngineSDL.vcxproj sets MultiProcessorCompilation, i.e. /MP, which spawns
+# one cl per core INSIDE a single project -- and the engine is one project, so
+# /m alone leaves it untouched. CL_MPCount is the property that caps /MP. Left
+# unset, /MP keeps its default (one per core), which is today's behaviour.
+$jobsArg = '/m'
+$mpArgs  = @()
+if ($env:MT_BUILD_JOBS) {
+    $n = 0
+    if (-not [int]::TryParse($env:MT_BUILD_JOBS, [ref]$n) -or $n -lt 1) {
+        Write-Error "MT_BUILD_JOBS must be a positive integer, got '$env:MT_BUILD_JOBS'"; exit 1
+    }
+    $jobsArg = "/m:$n"
+    $mpArgs  = @("/p:CL_MPCount=$n")
+    $env:CMAKE_BUILD_PARALLEL_LEVEL = "$n"
+    Write-Host "Build parallelism: $jobsArg /p:CL_MPCount=$n (MT_BUILD_JOBS)" -ForegroundColor Yellow
+}
+
 # --- dependencies: fail-closed, all five families -----------------------------
 if ($SkipDeps) {
     Write-Host "`n=== Skipping dependency acquisition (-SkipDeps) ===" -ForegroundColor Yellow
@@ -326,13 +361,13 @@ Write-Host "`n=== Building MTEngineSDL ($Platform $Configuration $Compiler) ==="
 & $msbuild "$mtDir\platform\Windows\MTEngineSDL.sln" `
     /t:MTEngineSDL `
     /p:Configuration=$Configuration /p:Platform=$Platform `
-    @toolsetArgs @mtCapsArgs @modeArgs /m /v:minimal /nologo
+    @toolsetArgs @mtCapsArgs @modeArgs $jobsArg @mpArgs /v:minimal /nologo
 if ($LASTEXITCODE -ne 0) { Write-Error "MTEngineSDL build failed"; exit 1 }
 
 Write-Host "`n=== Building $appName ($Platform $Configuration $Compiler) ===" -ForegroundColor Cyan
 & $msbuild $appSln `
     /p:Configuration=$Configuration /p:Platform=$Platform `
-    @toolsetArgs @mtCapsArgs @modeArgs /m /v:minimal /nologo
+    @toolsetArgs @mtCapsArgs @modeArgs $jobsArg @mpArgs /v:minimal /nologo
 if ($LASTEXITCODE -ne 0) { Write-Error "$appName build failed"; exit 1 }
 
 $outDir = "$appDir\platform\Windows\bin\$Platform\$Configuration"
@@ -342,7 +377,12 @@ Write-Host "`n=== Build successful ===" -ForegroundColor Green
 Write-Host "Output: $outDir"
 
 # --- licence gate -------------------------------------------------------------
-if ($mtResolved -match 'MT_CAP_VIDEO_PLAYBACK=1') {
+# Keyed on the FLAG, not the capability -- see app-build-macos.sh. mtResolved
+# is canonical_form and structurally cannot carry an MT_ENABLE_*, so the old
+# test could not see an FFmpeg-less build and would demand a build-mode marker
+# from a build that deliberately has none. UNVERIFIED: written on macOS.
+$ffmpegOn = if ($null -ne $env:MT_ENABLE_FFMPEG) { $env:MT_ENABLE_FFMPEG } else { '1' }
+if ($ffmpegOn -eq '1') {
     $marker = "$mtLibsDir\ffmpeg\.ffmpeg-build-mode"
     $markerMode = if (Test-Path $marker) { (Get-Content $marker -Raw).Trim() } else { 'missing' }
     if ($commercial -eq '1' -and $markerMode -ne 'commercial') {
@@ -355,6 +395,12 @@ if ($mtResolved -match 'MT_CAP_VIDEO_PLAYBACK=1') {
         if ($LASTEXITCODE -ne 0) { Write-Error "forbidden-decoder scan failed"; exit 1 }
     }
 }
+
+# The POSITIVE half -- proves a build that said it carries no FFmpeg carries
+# none. Runs in BOTH directions on every build so it is exercised constantly
+# rather than only in the rare configuration. UNVERIFIED on Windows.
+& "$mtDir\tools\appbuild\scan-no-ffmpeg.ps1" -Binary $exe -Dir $outDir -Expect $(if ($ffmpegOn -eq '1') { 'present' } else { 'absent' })
+if ($LASTEXITCODE -ne 0) { Write-Error "no-FFmpeg scan failed"; exit 1 }
 
 # --- app post-build hook (optional) -------------------------------------------
 if ($conf['MT_HOOK_POST_BUILD']) {
@@ -430,11 +476,155 @@ if ($Prod) {
             }
         }
     }
-    $cudaPluginSrc = Join-Path $outDir 'Data\lib\mt_llama_cuda_backend.dll'
-    if (Test-Path $cudaPluginSrc) {
-        $cudaPluginDestDir = Join-Path $prodDir 'Data\lib'
-        New-Item -ItemType Directory -Force -Path $cudaPluginDestDir | Out-Null
-        Copy-Item $cudaPluginSrc $cudaPluginDestDir
+    # ---------------------------------------------------------------------
+    # THE CUDA PLUGIN AND ITS RUNTIME -- BESIDE THE PACKAGE, NOT INSIDE IT.
+    #
+    # build-llama-cpp.ps1 stages mt_llama_cuda_backend.dll together with every
+    # toolkit DLL its import table reaches into <libs>\cuda-runtime\. That set
+    # is ~950 MB, of which cublasLt64_12.dll alone is 668 MB, because those
+    # libraries carry kernels for every architecture NVIDIA supports. Bundling
+    # it turns a 46 MB app into a ~1 GB download for EVERYONE, including the
+    # majority with no NVIDIA GPU at all.
+    #
+    # So by default it ships as a separate add-on that a user unzips over the
+    # app folder. This needs no engine change whatsoever: the plugin is already
+    # runtime-loaded, LLamaBackend_WinCudaPlugin searches Data\lib among other
+    # places, and a plugin that is not found is an ordinary supported state --
+    # IsAvailable() returns false and the engine uses the CPU backend, which is
+    # exactly what a machine without an NVIDIA GPU should do anyway.
+    #
+    # The add-on's layout mirrors the package (Data\lib\...) so unzipping it
+    # over the app folder puts every DLL where the search already looks, and
+    # Windows resolves the plugin's own imports from the directory it was
+    # loaded from -- so co-locating the four files is sufficient and no PATH
+    # change is needed.
+    #
+    # MT_CUDA_ADDON=bundled restores the old behaviour for a build that is
+    # never distributed and where one folder is simply more convenient. It is
+    # an environment variable rather than a parameter so that no app's stub has
+    # to change to reach it -- the same reasoning as MT_BUILD_JOBS.
+    #
+    # A STALE ADD-ON CANNOT SILENTLY MISBEHAVE: the plugin API is versioned and
+    # the loader refuses a plugin whose api_version does not match the engine's
+    # (LLamaBackend_WinCudaPlugin.cpp), falling back to CPU. The manifest below
+    # is therefore for a human reading a folder, not a safety mechanism.
+    # ---------------------------------------------------------------------
+    $cudaRuntimeSrc = Join-Path $mtLibsDir 'cuda-runtime'
+    if (Test-Path $cudaRuntimeSrc) {
+        $cudaMode = if ($env:MT_CUDA_ADDON) { $env:MT_CUDA_ADDON.ToLowerInvariant() } else { 'separate' }
+        if ($cudaMode -notin @('separate', 'bundled')) {
+            throw "MT_CUDA_ADDON must be 'separate' or 'bundled', got '$env:MT_CUDA_ADDON'"
+        }
+
+        $cudaRoot = if ($cudaMode -eq 'bundled') { $prodDir } else { "$appDir\platform\Windows\prod\$Platform-cuda" }
+        if ($cudaMode -eq 'separate' -and (Test-Path $cudaRoot)) {
+            Get-ChildItem $cudaRoot -Force | Remove-Item -Recurse -Force
+        }
+        $cudaLibDir = Join-Path $cudaRoot 'Data\lib'
+        New-Item -ItemType Directory -Force -Path $cudaLibDir | Out-Null
+        Get-ChildItem $cudaRuntimeSrc -Filter '*.dll' | Copy-Item -Destination $cudaLibDir -Force
+        $cudaDlls = @(Get-ChildItem $cudaLibDir -Filter '*.dll')
+        $cudaBytes = ($cudaDlls | Measure-Object -Property Length -Sum).Sum
+
+        # THE NVIDIA LICENCE TEXT TRAVELS WITH THE DLLs, wherever they went.
+        # It is assembled here, at DEPLOY time, and not from the capability
+        # vocabulary -- the vocabulary is consumed by the caps RESOLVE, which
+        # cannot know whether this deploy bundled or split, so an entry there
+        # would name NVIDIA in the LICENSES.txt of every CUDA-capable build
+        # including the ones that ship none of it. This stage knows.
+        #
+        # EVERY component's licence is included rather than a mapping from DLL
+        # back to component: over-inclusive is harmless, and a mapping would
+        # silently under-report the day the staged set changes. The text is
+        # NVIDIA's own, copied by acquire-cuda-toolkit.ps1 out of each archive.
+        $licDir = Join-Path (Get-MTCudaToolkitDir) 'licenses'
+        if (-not (Test-Path $licDir)) {
+            throw "No licence texts at $licDir -- CUDA binaries may not ship without them."
+        }
+        # WHOSE FILE IS WHOSE, stated exactly. mt_llama_cuda_backend.dll is
+        # OURS -- it is the engine's plugin, built from this repository -- and
+        # listing it under "these are NVIDIA's" would be a false statement in a
+        # licence document. The NVIDIA files are the rest, identified by being
+        # the ones the toolkit's own bin\ provided.
+        $cudaOwnDll = 'mt_llama_cuda_backend.dll'
+        $nvidiaDlls = @($cudaDlls | Where-Object { $_.Name -ne $cudaOwnDll })
+        $licLines = @(
+            "NVIDIA CUDA runtime components",
+            "==============================",
+            "",
+            "The files listed under 'NVIDIA components' below are NVIDIA's,",
+            "redistributed under the CUDA EULA's redistributable-components terms.",
+            "They are not part of the application and are covered by no licence",
+            "stated elsewhere in this package.",
+            "",
+            "NVIDIA components:"
+        ) + @($nvidiaDlls | ForEach-Object { "  $($_.Name)" }) + @(
+            "",
+            "Also present, and NOT NVIDIA's -- it is part of this application and",
+            "carries the application's own licence:",
+            "  $cudaOwnDll",
+            "",
+            "nvcuda.dll is NOT redistributed: it is the display driver, installed on",
+            "the user's own machine.",
+            "",
+            "The full text of every component licence from the CUDA toolkit follows.",
+            "Some cover tools used only to BUILD these binaries and shipped nowhere;",
+            "they are included in full rather than filtered, so that nothing which",
+            "should appear is omitted by a mistaken mapping."
+        )
+        # ("-" * 70) PARENTHESISED, and it must be. Inside an array literal the
+        # comma binds tighter than *, so `@("", "-" * 70, "x")` parses as
+        # ("", "-") * (70, "x") -- array repetition with an ARRAY as the count,
+        # which fails with "Cannot convert System.Object[] to System.UInt32"
+        # and reads like it came from somewhere else entirely.
+        $rule = '-' * 70
+        foreach ($f in (Get-ChildItem $licDir -Filter '*.txt' | Sort-Object Name)) {
+            $licLines += @("", $rule, "  $($f.BaseName)", $rule, "", (Get-Content -Raw $f.FullName))
+        }
+
+        if ($cudaMode -eq 'bundled') {
+            # APPENDED to the package's own document. Bundling puts NVIDIA
+            # binaries inside the package, so the package's LICENSES.txt has to
+            # account for them; stage 7 already guarantees that file exists.
+            $pkgLic = Join-Path $prodDir 'LICENSES.txt'
+            if (-not (Test-Path $pkgLic)) { throw "bundled CUDA deploy but no LICENSES.txt in $prodDir" }
+            Add-Content -Path $pkgLic -Encoding UTF8 -Value (@("", "") + $licLines)
+            Write-Host "  NVIDIA CUDA licences appended to the package's LICENSES.txt"
+        } else {
+            # Its own file: the add-on is precisely the redistributed NVIDIA
+            # material, and the package proper contains none of it -- the app
+            # links llama_cpp.lib, the CPU bundle; only this plugin links the
+            # CUDA archives.
+            $licLines | Set-Content -Path (Join-Path $cudaRoot 'LICENSES-CUDA.txt') -Encoding UTF8
+
+            @"
+MTEngineSDL CUDA add-on
+=======================
+
+app         : $appName
+platform    : windows $Platform
+engine rev  : $(git -C $mtDir rev-parse --short HEAD 2>`$null)
+cuda toolkit: $(Split-Path -Leaf (Get-MTCudaToolkitDir))
+built       : $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
+
+TO INSTALL: unzip this folder's contents over the application folder, so that
+the DLLs land in <app>\Data\lib\. Start the app and check Help/AI settings --
+the backend line reports whether the CUDA plugin was loaded.
+
+An NVIDIA GPU and a current NVIDIA display driver are required. Without them
+the application runs its CPU backend, which is the normal, supported state --
+installing this add-on on a machine with no NVIDIA GPU changes nothing.
+
+GPU architectures this build carries: see llama_cpp_cuda.archs in the engine's
+dependency bucket; native code for Ampere/Ada/Blackwell, PTX (JIT-compiled by
+the driver on first run) for Maxwell through Ampere.
+"@ | Set-Content -Path (Join-Path $cudaRoot 'README-CUDA.txt') -Encoding UTF8
+        }
+
+        Write-Host ("CUDA {0}: {1} DLLs, {2:N0} MB -> {3}" -f $cudaMode, $cudaDlls.Count, ($cudaBytes / 1MB), $cudaRoot) -ForegroundColor Green
+        if ($cudaMode -eq 'separate') {
+            Write-Host "  the package itself stays CUDA-free; unzip the add-on over it to enable the GPU backend" -ForegroundColor Cyan
+        }
     }
     # Belt for the symbols contract: a PDB must never ride a prod deploy.
     Get-ChildItem $prodDir -Recurse -Filter '*.pdb' -ErrorAction SilentlyContinue | Remove-Item -Force

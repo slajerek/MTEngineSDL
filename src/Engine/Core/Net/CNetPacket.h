@@ -8,6 +8,14 @@
 #ifndef _CNETPACKET_H_
 #define _CNETPACKET_H_
 
+
+// CAPABILITY GUARD (MT_ENABLE_ENET). The header stays INCLUDABLE either way and simply
+// declares nothing when the capability is off, so a translation unit that
+// includes it conditionally still compiles. Same shape as
+// Video/CVideoSourceFFmpeg.h.
+// MT_CAP_NET_TRANSPORT declared this removable and nothing enforced it: MT_ENABLE_ENET appeared in no source, so the code shipped whatever the manifest said.
+#if MT_ENABLE_ENET
+
 #include "SYS_Defs.h"
 #include "DBG_Log.h"
 #include "NET_Main.h"
@@ -84,6 +92,8 @@ void LOGCCTO(std::string clientName, u8 protocolType, u16 packetType, const char
 
 // log connection server FROM
 void LOGCCFROM(std::string clientName, u8 protocolType, u16 packetType, const char *fmt, ... );
+
+#endif // MT_ENABLE_ENET
 
 #endif
 

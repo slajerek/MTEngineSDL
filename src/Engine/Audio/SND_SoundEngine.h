@@ -4,6 +4,19 @@
 #include <list>
 #include <SDL3/SDL.h>
 
+#include "SYS_Defs.h"
+
+// The rate the engine PRODUCES at. It is not a constant of nature: a future
+// mixer application is expected to make it dynamic and may run at 96 kHz, and
+// the engine's own low-latency audio plan already targets 48000.
+//
+// This macro is the INITIAL value only. Read the rate with
+// SND_GetEngineSampleRate() -- never this macro, and never a literal.
+//
+// It used to be declared twice, here and as a bare `wanted.freq = 44100` where
+// the device stream is opened, with nothing tying them together: changing one
+// would have detuned every decoded stream while the device stayed put.
+// CTestEngineSampleRate asserts the two now agree by asking SDL.
 #define SOUND_SAMPLE_RATE 44100
 #define SOUND_BUFFER_SIZE 48000
 
@@ -47,12 +60,22 @@ public:
 	// instead of the engine fatal-exiting at startup.
 	bool hasAudioDevice;
 
+	// The rate this engine produces at, established ONCE when the device stream
+	// is opened. Everything that converts between seconds and samples, or
+	// resamples into the mix, must read it from here.
+	u32 engineSampleRate;
+
 	void DebugPrintAudioDevices();
 	
 private:
 	char *whoLocked;
 	CSlrMutex *mutex;
 };
+
+// The one runtime source of truth for the engine's production sample rate.
+// Safe before SND_Init(): falls back to SOUND_SAMPLE_RATE while there is no
+// engine yet, so early callers get the value the engine is about to use.
+u32 SND_GetEngineSampleRate();
 
 void SND_Init();
 void SND_Start();

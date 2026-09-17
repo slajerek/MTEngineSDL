@@ -3,6 +3,31 @@
 
 #include "SYS_Defs.h"
 #include "SYS_Threading.h"
+#include "DBG_Log.h"
+
+// DOUBLE-FREE / STRAY-FREE GUARD, development builds only.
+//
+// CPool::Delete() recycles memory itself instead of returning it to the system
+// allocator, so AddressSanitizer cannot see anything that happens to a pooled
+// object: a double delete, or a use after delete, is simply invisible. That is
+// not hypothetical. On 2026-09-09 a CSlrString was deleted twice (a global path
+// string returned by CRecentlyOpenedFiles::GetCurrentOpenedFolder() and then
+// deleted by its caller), the pool handed the same object out to two live
+// strings, and they corrupted each other's pooled character vector. The visible
+// result was a heap-buffer-overflow spraying UTF-16 text through unrelated
+// objects and crashing the app in three different threads, tens of tests away
+// from the actual bug. It cost three debugging passes and was only found by
+// switching the pool OFF so ASan could see the object again.
+//
+// This guard turns that whole class of bug into one log line at the moment it
+// happens. It is a per-item byte, checked in O(1), so the cost is a bounds
+// compare and a byte store on each New/Delete.
+//
+// Gated on MT_DEBUG_LOGS, which the BUILD decides (1 = development,
+// 0 = ./build-<os>.sh --prod). Final builds compile it out entirely.
+#if MT_DEBUG_LOGS
+#define MT_POOL_GUARD 1
+#endif
 
 #define WORD u16
 #define BYTE u8
@@ -62,6 +87,17 @@ private:
 
 	BYTE*			m_pPool;		// The allocation pool of items.
 	BYTE**			m_pFreeStack;	// The stack of deleted items.
+
+#if defined(MT_POOL_GUARD)
+	// One byte per slot: 1 while the slot is handed out, 0 while it is free.
+	// Indexed by (pItem - m_pPool) / m_nItemSize, so the check is O(1) rather
+	// than a scan of the free stack -- which for the 65535-slot strings pool
+	// would have made every delete quadratic.
+	BYTE*			m_pSlotInUse;
+	void			GuardOnNew(BYTE *pItem);
+	// Returns false when the item must NOT be pushed onto the free stack.
+	bool			GuardOnDelete(BYTE *pItem);
+#endif
 	
 	CSlrMutex *mutex;
 };

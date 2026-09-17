@@ -50,7 +50,18 @@ public:
 	string stateFilePath;   // "data/games/{gameId}_state.json"
 
 	// Lifecycle
-	enum Status { STARTING, RUNNING, SUSPENDED, FINISHED };
+	// STOPPING: an in-flight stop (StopGameServer()/UpdateIdleServers())
+	// detached the server and released the manager mutex for the blocking
+	// network stop. It is set under the mutex before unlocking and cleared
+	// under the mutex once the stop completes, ONLY if the record is still
+	// STOPPING at that point -- if something else (a restart) changed it
+	// away from STOPPING in the meantime, the stopper leaves the record
+	// alone and only does its own port bookkeeping. Relies on the existing
+	// invariant that StopGameServer()/UpdateIdleServers() are only ever
+	// called from the main thread, never concurrently for the same record.
+	// Any path that might (re)start or archive a record must treat STOPPING
+	// as busy: refuse/wait, never start, never archive.
+	enum Status { STARTING, RUNNING, STOPPING, SUSPENDED, FINISHED };
 	Status status;
 	bool isFinishing;	// Guard against concurrent FinishGame double-call
 	time_t lastActivityTime;

@@ -1,5 +1,11 @@
 #pragma once
 
+
+// CAPABILITY GUARD (MT_ENABLE_NET_GAME). The header stays INCLUDABLE and declares nothing
+// when the capability is off, so a conditional consumer still compiles.
+// MT_CAP_NET_GAME implies NET_TRANSPORT and HTTP, so this whole stack rides on one flag -- which did not exist until 2026-09-06 (enables was an empty list).
+#if MT_ENABLE_NET_GAME
+
 #include "SYS_Defs.h"
 #include "SYS_Threading.h"
 #include "json.hpp"
@@ -138,4 +144,15 @@ private:
 	int AllocatePort();
 	void ReleasePort(int port);
 	set<int> usedPorts;
+
+	// Ports whose game server leaked (its network thread refused to stop in
+	// time -- see StopGameServer()/UpdateIdleServers()). The port stays in
+	// usedPorts (never released) so AllocatePort() can never hand it out
+	// while the zombie thread may still hold the ENet socket; zombiePorts is
+	// bookkeeping for diagnostics/a future reaper. Nothing currently reclaims
+	// these -- a process restart is what frees them today.
+	void RetainZombiePort(int port);
+	set<int> zombiePorts;
 };
+
+#endif // MT_ENABLE_NET_GAME

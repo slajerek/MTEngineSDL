@@ -32,6 +32,14 @@
 //
 
 class IMGUI_API TextEditor {
+	// The engine's white-box test for the typesetter/document mutation
+	// invariants reaches the members below. It is a friend rather than a
+	// `#define protected public` at the include site because the MSVC ABI
+	// encodes member access in the mangled name: that trick relinks every
+	// out-of-line member as `public:` and nothing defines those symbols,
+	// so it links on the Itanium ABI (macOS, Linux) and cannot on Windows.
+	friend class CTestTextEditorMutation;
+
 public:
 	// constructor
 	TextEditor();

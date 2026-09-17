@@ -70,6 +70,19 @@ void SYS_StartThread(CSlrThread *run, void *passData);
 void SYS_StartThread(CSlrThread *run);
 void SYS_KillThread(CSlrThread *run);
 
+// Wait for a thread to return, then forget its handle.
+//
+// SYS_StartThread creates a JOINABLE SDL thread and, until now, nothing ever
+// waited on one: SYS_KillThread is an empty function (SDL_KillThread has not
+// existed since SDL 1.2), so a worker's teardown was "set a flag and trust the
+// process to outlive it". A view that owns a thread and is destroyed while that
+// thread still touches its members needs a real join.
+//
+// This WAITS; it does not interrupt. Ask the thread to stop first -- set the
+// flag its loop reads -- or this blocks until it finishes on its own. Safe to
+// call on a thread that was never started.
+void SYS_JoinThread(CSlrThread *run);
+
 void SYS_SetThreadPriority(float priority);
 void SYS_SetThreadName(const char *name);
 

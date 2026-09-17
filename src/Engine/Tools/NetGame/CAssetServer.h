@@ -1,5 +1,11 @@
 #pragma once
 
+
+// CAPABILITY GUARD (MT_ENABLE_HTTPLIB). The header stays INCLUDABLE and declares nothing
+// when the capability is off, so a conditional consumer still compiles.
+// MT_CAP_HTTP declared this removable and nothing enforced it: MT_ENABLE_HTTPLIB appeared in no source at all.
+#if MT_ENABLE_HTTPLIB
+
 #include "SYS_Defs.h"
 #include "SYS_Threading.h"
 
@@ -8,6 +14,7 @@
 #include <map>
 #include <cstdint>
 #include <ctime>
+#include <thread>
 
 #include "json.hpp"
 
@@ -46,10 +53,24 @@ public:
 	bool useSSL;
 	std::string sslCertPath;
 	std::string sslKeyPath;
+	// Allow plaintext HTTP on a non-loopback interface (trusted network only).
+	// Loopback plaintext is always allowed regardless of this flag.
+	bool allowPlaintext = false;
 
 	// Auth service connection (for token validation)
 	std::string authServiceAddress;
 	int authServicePort;
+	// The OUTBOUND leg: how this server reaches the auth service to validate a
+	// client's bearer token. Independent of useSSL above (that is the INBOUND
+	// listener) -- the two hops are configured separately because they can be
+	// two different machines with two different certificates. Must be true
+	// whenever the auth service itself is started with --ssl: a plaintext POST
+	// to a TLS listener never returns 200, so every asset request would 401.
+	bool authServiceUseTls = false;
+	// Optional CA bundle for the auth service's certificate (private CA or a
+	// self-signed fixture). Empty means "use the system trust store".
+	// Verification is ALWAYS on -- there is no disable switch here by design.
+	std::string authServiceCaCertPath;
 
 	bool isRunning;
 
@@ -60,11 +81,17 @@ public:
 	// Build/rebuild manifests (called on Start, can be called to refresh)
 	void RebuildManifests();
 
-	void Start();
+	// Returns false when the server refused to start (bad TLS cert/key, or
+	// plaintext requested on a non-loopback interface without allowPlaintext).
+	bool Start();
 	void Shutdown();
 
 private:
 	void *httpServer;
+	// The listen thread, kept (not detached) so Shutdown() can join it before
+	// deleting the httplib::Server the thread is still inside -- every route
+	// lambda captures `this`, so deleting under a live thread is a UAF.
+	std::thread serverThread;
 	// Token validation cache
 	struct CachedTokenInfo {
 		int profileId;
@@ -104,3 +131,5 @@ private:
 	// Find all project IDs by scanning projectsFolder
 	std::vector<std::string> ScanProjectIds();
 };
+
+#endif // MT_ENABLE_HTTPLIB

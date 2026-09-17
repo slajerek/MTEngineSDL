@@ -9,5 +9,6 @@
 
 #include "httplib.h"
 
-// NOTE: This file is vendored inside the llama.cpp submodule.
-#include "../../../../other/lib/llama.cpp/vendor/cpp-httplib/httplib.cpp"
+// NOTE: This file is vendored under other/lib/cpp-httplib, owned by the
+// engine and independent of the llama.cpp submodule.
+#include "../../../../other/lib/cpp-httplib/httplib.cpp"

@@ -1,5 +1,11 @@
 #pragma once
 
+
+// CAPABILITY GUARD (MT_ENABLE_NET_GAME). The header stays INCLUDABLE and declares nothing
+// when the capability is off, so a conditional consumer still compiles.
+// MT_CAP_NET_GAME implies NET_TRANSPORT and HTTP, so this whole stack rides on one flag -- which did not exist until 2026-09-06 (enables was an empty list).
+#if MT_ENABLE_NET_GAME
+
 #include "NET_Main.h"
 #include "SYS_Threading.h"
 #include "CFeatureConfig.h"
@@ -24,7 +30,10 @@ class CGameServerRegistry;
 class CNetLobbyServer : public CNetServerCallback, public CFeatureConfig
 {
 public:
-	CNetLobbyServer(int serverPort);
+	// bindAddress: forwarded to netServer->bindAddress by Init(), before
+	// StartServer() -- empty (the default) binds ENET_HOST_ANY, matching the
+	// historical behaviour.
+	CNetLobbyServer(int serverPort, const std::string &bindAddress = "");
 	virtual ~CNetLobbyServer();
 
 	void Init(CNetServer *netServer);
@@ -32,6 +41,7 @@ public:
 	CFeatureConfig *config;
 	CNetServer *netServer;
 	CNetGamePackets *netPackets;
+	std::string bindAddress;
 
 	// Pure virtual hooks — subclass must implement
 	virtual void NetServerCallbackClientConnected(CNetClientData *clientData) = 0;
@@ -98,3 +108,5 @@ public:
 
 	static const int CHAT_HISTORY_PAGE_SIZE = 50;
 };
+
+#endif // MT_ENABLE_NET_GAME

@@ -794,6 +794,122 @@ CLI arguments: `--game-server --game-id <id> --port <port> --lobby-address <addr
 
 ---
 
+## Standalone Auth/Asset Services
+
+Two more standalone HTTP processes complete the deployable server set,
+alongside the registry/lobby/game-server/node-agent processes above:
+`CAuthServiceServer`/`CAuthServiceProcess` (player register/login/session
+management) and `CAssetServer`/`CAssetServerProcess` (asset/project sync,
+bearer-token validated against the auth service). Both are `httplib`-based
+(`MT_ENABLE_HTTPLIB`-gated) and share the same TLS/bind-address guard shape,
+added in Security Phase B (2026-09-09):
+
+```cpp
+// In main():
+CAuthServiceProcess::Config authConfig;
+if (CAuthServiceProcess::ParseArgs(argc, argv, authConfig))
+{
+    CAuthServiceProcess::Run(authConfig);
+    return;
+}
+
+CAssetServerProcess::Config assetConfig;
+if (CAssetServerProcess::ParseArgs(argc, argv, assetConfig))
+{
+    CAssetServerProcess::Run(assetConfig);
+    return;
+}
+```
+
+CLI arguments:
+- Auth service: `--auth-server --auth-port <port> --app-path <path> --config <path> --listen <iface> --ssl --ssl-cert <path> --ssl-key <path> --allow-plaintext --internal-secret <value> --internal-secret-file <path> --rate-limit-max <n> --rate-limit-window <seconds>`
+- Asset service: `--asset-server --asset-port <port> --app-path <path> --assets-folder <path> --projects-folder <path> --auth-address <host> --auth-port <port> --auth-tls --auth-ca <path> --listen <iface> --ssl --ssl-cert <path> --ssl-key <path> --allow-plaintext`
+
+**TLS and bind-address policy** (`NetGameListenPolicy.h`,
+`NetGameIsLoopbackInterface` — exact-match on `"127.0.0.1"`/`"localhost"`/`"::1"`,
+shared by both servers): `listenInterface` defaults to `"127.0.0.1"` on
+both. `Start()` returns `bool` on both classes. With `--ssl` given, `Start()`
+builds an `httplib::SSLServer(sslCertPath, sslKeyPath)` (gated on
+`MT_ENABLE_MBEDTLS`; `LOGError` + returns `false` on a missing/invalid
+cert-key pair or a build without mbedTLS support — it never silently falls
+back to plaintext). Without `--ssl`, `Start()` refuses to bind any
+interface `NetGameIsLoopbackInterface()` doesn't recognize unless
+`--allow-plaintext` is explicitly passed (intended for local
+development/trusted networks only — logs `LOGWarning` when used this way).
+A caller (`Run()`) that gets `false` back must delete the server and data
+provider and return without serving; both `CAuthServiceProcess::Run()` and
+`CAssetServerProcess::Run()` do this.
+
+Both servers **bind synchronously** inside `Start()` (`bind_to_port()`, then
+`listen_after_bind()` on the background thread, which is kept as a member and
+`join()`ed by `Shutdown()` before the `httplib::Server` is deleted). A failed
+bind — port in use, interface unavailable — is therefore a `Start()` failure
+with a `LOGError`, not a silent no-op behind a `true` return.
+
+**`--auth-tls` / `--auth-ca <path>`** (asset service only) configure the
+**outbound** hop — the `POST /api/v1/validate` call `CAssetServer::ValidateToken()`
+makes to the auth service on every authenticated request. This is independent
+of `--ssl`, which configures the *inbound* listener; the two can be different
+machines with different certificates, and the outbound one defaults to
+plaintext. `--auth-tls` selects `https://`; `--auth-ca` adds a trust anchor for
+a private/self-signed auth-service CA (the system store is used otherwise, and
+certificate verification is always on — there is no switch to disable it).
+Because that hop carries the client's bearer session token, `Start()` **refuses
+to start** when `useSSL` is set, `authServiceUseTls` is not, and
+`authServiceAddress` is not loopback.
+
+**The internal secret** (auth service only) authenticates
+`POST /api/v1/redeem-ticket`, compared constant-time
+(`SYS_ConstantTimeEquals`) against the caller-supplied `secret` field. It has
+three sources, resolved in `CAuthServiceProcess::Run()` in this order:
+`--internal-secret-file <path>` (contents, whitespace-trimmed), the
+`MT_INTERNAL_SECRET` environment variable, then `--internal-secret <value>`.
+The bare flag is last and **dev-only** — a process command line is
+world-readable via `ps`. `Run()` logs which source it used. If no source
+supplies one, the endpoint logs a `LOGWarning` once at `Start()` and accepts any
+(or no) secret for that call — a deployment embedding this process must
+supply the same secret value its lobby process uses for its own internal
+links (see `CNetGameInternalAuth.h`'s PW2-based internal authentication,
+below — a separate mechanism from this HTTP bearer secret, but conventionally
+the same underlying shared value in a game-lobby-style deployment).
+
+**Auth service endpoints** (all under `/api/v1/`): `register`, `login`,
+`validate`, `logout` (revoke a session token, idempotent `200`),
+`lobby-ticket` (exchange a valid session token for a short-lived,
+single-use ticket — `LOBBY_TICKET_TTL_SECONDS = 60` — so a long-lived
+session token need never be handed to a lower-trust channel such as the
+lobby's own transport), `redeem-ticket` (the internal, internal-secret-
+gated call that consumes a ticket exactly once and returns the profile it
+belongs to). Three independent per-IP rate-limit buckets exist, all over the
+same `rateLimitWindowSeconds` window: `register`/`login` share
+`rateLimitMaxAttempts` (default 10), `validate` has `VALIDATE_RATE_LIMIT_MAX`
+(600), and `lobby-ticket` has `TICKET_RATE_LIMIT_MAX` (120) — the ticket
+endpoint is fetched once per *connection attempt* by `CNetClient`'s
+`authDataProvider`, not once per login, so sharing login's ceiling let a
+reconnect loop lock its own IP (and, behind NAT, everyone else's) out of
+`/login`.
+
+**`CNetClient::SetAuthDataProvider(fn)` / `ClearAuthDataProvider()`.** The
+provider is an optional `std::function<std::vector<u8>()>` consulted on the
+network thread immediately before every authorize packet (initial connect and
+each RECONNECT); a non-empty return replaces `passwordHash` for that attempt.
+It exists so a client can fetch a fresh single-use lobby ticket per connection
+attempt. `ThreadRun` copies the function under `packetMutex` and calls the copy
+**outside** the lock, because the call is expected to be a blocking round trip.
+A caller whose lambda captures an object it is about to destroy must therefore
+use `ClearAuthDataProvider()` (which `SetAuthDataProvider(nullptr)` forwards
+to): it clears the provider *and* waits, bounded at ~10s, for any invocation
+already running to return. Called from the network thread itself (i.e. from
+inside a provider) it detects that by thread id, logs a `LOGWarning` and skips
+the wait instead of deadlocking on itself. Login gains per-IP and, since Security Phase B, per-account
+rate limiting (a locked account and an unknown username return the
+byte-identical `401` a wrong password does, and pay for the same password-
+hash derivation, so failed-login timing doesn't distinguish the three
+cases); registration returns one uniform rejection error regardless of
+which validation failed, to avoid a username-enumeration oracle.
+
+---
+
 ## Registry Modes
 
 ### Embedded (default, single machine)
@@ -841,6 +957,26 @@ Game server CLI: `--registry-address registry.example.com --registry-port 14650`
 - **Token auth**: One-time tokens generated per game start, never persisted on game server
 - **Heartbeat timeout**: 30 seconds (service server and registry)
 - **Idle shutdown**: Game servers auto-stop after 60 seconds with no activity
+- **`CNetServer::StopServer()`**: waits up to 5000ms for the network thread
+  to actually stop (socket destroyed and the thread wrapper's own
+  `isRunning` cleared) before returning — idempotent, `LOGError` only on
+  timeout. `bindAddress` (empty = `ENET_HOST_ANY`) lets a lobby/registry
+  server bind a specific interface instead of every interface.
+  `CNetGameServer::Shutdown()`/`CLobbyLink::Shutdown()` are built on top of
+  this and return `bool`; a caller that gets `false` back must not delete
+  the object it just tried to stop — its network thread may still be
+  running and touching it.
+- **Internal-service authentication** (registry↔lobby-service/game-server/
+  node-agent links, `CNetGameInternalAuth.h`): a PW2 challenge/response
+  keyed from the shared internal secret, not a static HMAC comparison — a
+  wire observer who sees one handshake cannot replay it, since the server
+  issues a fresh 32-byte nonce per connection attempt
+  (`NetGameInternalMakeVerifier`/`NetGameInternalAuthorize`/
+  `NetGameInternalClientAuthData`). Fails closed: an empty or
+  underiveable secret leaves the verifier permanently invalid, refusing
+  every internal connection rather than falling back to an unauthenticated
+  mode.
+- **Auth/asset service TLS**: see "Standalone Auth/Asset Services" above.
 
 ---
 
@@ -986,6 +1122,8 @@ while (running)
 | `CViewGameClient` | Game client view | Optional |
 | `CGameServerProcessBase` | Standalone server runner | Uses as-is |
 | `CLobbyServiceServer` | Internal service port | Uses as-is |
+| `CAuthServiceServer` / `CAuthServiceProcess` | Standalone auth HTTP service | Uses as-is |
+| `CAssetServer` / `CAssetServerProcess` | Standalone asset/project HTTP service | Uses as-is |
 | `CLobbyLink` | Game → lobby heartbeat | Uses as-is |
 | `CGameServerRegistry` | Registry abstraction | Uses as-is |
 | `CRegistryServer` | Standalone registry | Uses as-is |

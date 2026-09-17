@@ -325,8 +325,18 @@ if ($webmVpx -eq '0') {
     exit 0
 }
 
-$stampValue = "$scriptHash|libvpx-$vpxVersion|opus-$opusVersion|ffmpeg-$ffmpegVersion|$Platform|$Configuration|mode-$ffmpegBuildMode"
-$ffmpegStampValue = "$scriptHash|ffmpeg-$ffmpegVersion|$Platform|mode-$ffmpegBuildMode"
+# THE CODEC POLICY IS PART OF THE IDENTITY OF THIS BUILD.
+# vocabulary.json reaches this script only through these four variables and was
+# in neither stamp. BOTH stamps need it: $stampValue gates the vpx/opus archive,
+# but it is $ffmpegStampValue that gates the FFmpeg build further down via
+# $ffmpegUpToDate -- so patching only the first would rebuild the archive and
+# silently reuse the old FFmpeg, which is the exact defect this removes.
+$ffmpegPolicyString = "$($env:MT_FFMPEG_DECODERS)|$($env:MT_FFMPEG_DEMUXERS)|$($env:MT_FFMPEG_PARSERS)|$($env:MT_FFMPEG_DECODERS_WITHHELD)"
+$ffmpegPolicyStream = [System.IO.MemoryStream]::new([System.Text.Encoding]::UTF8.GetBytes($ffmpegPolicyString))
+$ffmpegPolicyHash = (Get-FileHash -InputStream $ffmpegPolicyStream -Algorithm SHA256).Hash.ToLower()
+
+$stampValue = "$scriptHash|libvpx-$vpxVersion|opus-$opusVersion|ffmpeg-$ffmpegVersion|$Platform|$Configuration|mode-$ffmpegBuildMode|policy-$ffmpegPolicyHash"
+$ffmpegStampValue = "$scriptHash|ffmpeg-$ffmpegVersion|$Platform|mode-$ffmpegBuildMode|policy-$ffmpegPolicyHash"
 
 $ffmpegUpToDate = $false
 if ((Test-Path (Join-Path $ffmpegPrefix "lib")) -and (Test-Path (Join-Path $ffmpegPrefix "bin")) -and (Test-Path $ffmpegStampFile)) {
@@ -952,7 +962,6 @@ cd '$vpxBuildPosix'
   --enable-vp9 \
   --enable-vp9-highbitdepth \
   --disable-vp8-encoder \
-  --disable-vp8-decoder \
   --disable-vp9-encoder \
   2>&1 | tee configure.log
 

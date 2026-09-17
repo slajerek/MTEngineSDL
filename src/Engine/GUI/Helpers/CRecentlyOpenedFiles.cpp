@@ -154,7 +154,24 @@ CSlrString *CRecentlyOpenedFiles::GetCurrentOpenedFolder()
 	if (listOfFiles.empty())
 	{
 		filesListMutex->Unlock();
-		return gUTFPathToDocuments;
+		// A COPY, never the global itself. The other branch below returns a
+		// freshly allocated string, so every caller deletes what it gets back
+		// -- all nine of them do. Returning gUTFPathToDocuments raw meant the
+		// first caller on an empty list DELETED THAT GLOBAL, and every later
+		// call handed out the dangling pointer.
+		//
+		// The list is empty exactly on a first run (no recent files yet), which
+		// is why this only ever bit with a fresh settings folder. Under
+		// USE_STRINGS_POOL the freed CSlrString is recycled by CPool -- which
+		// has no double-free guard -- and handed to another string, so two live
+		// CSlrStrings ended up sharing one pooled std::vector<u16>. One cleared
+		// it while the other filled it, and CSlrString::GetUTF16's
+		// `new u16[GetLength()]` then allocated zero elements while the loop
+		// after it still wrote the other string's characters: a
+		// heap-buffer-overflow that sprayed UTF-16 path text through unrelated
+		// live objects and crashed the app far from here. Found with ASan
+		// 2026-09-09; see c64d/src/TODO.txt "FIRST RUN".
+		return new CSlrString(gUTFPathToDocuments);
 	}
 	
 	CRecentFile *file = listOfFiles.front();

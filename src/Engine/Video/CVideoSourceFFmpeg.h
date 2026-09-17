@@ -10,6 +10,7 @@
 #if MT_ENABLE_FFMPEG
 
 #include "IVideoSource.h"
+#include "MT_MediaPacket.h"
 #include "IVideoPacketDecoder.h"
 #include <cstdint>
 #include <deque>
@@ -370,12 +371,12 @@ private:
 	std::unique_ptr<CAudioDecoderWMANative> wmaDecoder;
 	// Everything Seek() needs to fully re-Init() the native decoder
 	// (mirrors aacExtradata; WMA additionally needs the WAVEFORMATEX-style
-	// stream parameters that AAC's self-contained ASC doesn't). codecId is
-	// the plain AVCodecID value, kept as int so this header needs no FFmpeg
-	// includes.
+	// stream parameters that AAC's self-contained ASC doesn't). codecId is the
+	// engine's own EMediaCodecId, translated at the demuxer boundary -- so this
+	// header needs no FFmpeg include and neither does the decoder.
 	struct SWMAInitParams
 	{
-		int codecId = 0;
+		EMediaCodecId codecId = EMediaCodecId::Unknown;
 		std::vector<u8> extradata;
 		int channels = 0;
 		int sampleRate = 0;

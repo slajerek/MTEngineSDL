@@ -33,6 +33,251 @@ however it likes.
 
 ---
 
+## 3.21.22 — development
+
+**The app could die at exec with no crash report, after switching licence
+tiers.** Xcode's copy-files phase overwrites the dylib already in
+`Contents/Frameworks`, reusing its **inode**. macOS caches a code signature
+against the vnode, so when the bytes change and the inode does not, dyld
+refuses the library:
+
+    Library not loaded: @rpath/libavutil.59.dylib
+    ... fcntl(fd, F_ADDFILESIGS_RETURN) failed with errno=37   [EALREADY]
+
+The process dies before `main`, so the in-app crash reporter never runs and
+nothing on screen names the cause. It bites whenever two builds embed different
+bytes at the same path -- which is what `--tier commercial` does, since it
+rebuilds FFmpeg in commercial mode and the next ordinary build copies the full
+dylibs back over those inodes.
+
+`app-build-macos.sh` now drops `Contents/Frameworks` whenever the dependency set
+changes, so the copy phase recreates it with fresh inodes, keyed on
+`MT_CAPS_LIBS_DIR` -- the path that carries the caps hash. macOS only: Linux and
+Windows embed no signed dylibs this way.
+
+## 3.21.21 — development
+
+**The Windows x64 build with `MT_CAP_YOLO=1` had never completed, and five
+things were wrong with it.** `build-opencv.ps1` carried the standing note "NEVER
+RUN ON WINDOWS" on its dnn mode; this is that note, run. Four of the five are
+Windows-only.
+
+- **The OpenCV zlib helper did not compile.** It built the engine's vendored
+  zlib with only `/I<zlibSrc>`, but that zlib carries a deliberate unconditional
+  `#include <unistd.h>` which MSVC resolves through
+  `platform/Windows/src.Windows`. `C1083` on `gzlib.c`.
+  `build-image_codecs.ps1` compiles the same sources and already paired the two
+  paths, with a comment naming this exact failure; the two are now in step.
+  The `cl` output was piped to `Out-Null`, so the error was invisible -- it is
+  now captured and printed on failure.
+- **The OpenCV configure died on a backslash.** `ZLIB_LIBRARY` is re-parsed as
+  CMake code by `ocv_target_link_libraries`, so `C:\Users\...` raised
+  `Invalid character escape '\U'`. That path and its three siblings are
+  forward-slashed now.
+- **OpenCV 5.0.0's vendored MLAS cannot be built on Windows/x86 at all**, for
+  two reasons that share a root: `3rdparty/mlas/CMakeLists.txt` assumes a GCC
+  driver. It force-includes `<cstring>` as `-include` + `cstring` behind a guard
+  that matches `Clang` -- which clang-cl reports while driving like MSVC, so the
+  flag is dropped and `cstring` is left as a stray input file. Past that, its
+  x86_64 SGEMM kernels are GNU-syntax `.S` and the tree ships no MASM equivalent
+  for x86 (only arm64 has `.asm`). The second has no fix short of writing those
+  kernels, so the script now applies one idempotent patch routing MSVC/x86 into
+  **the skip branch upstream itself provides** for "no assembler available".
+  `dnn` falls back to its built-in SGEMM: slower GEMM, same results, and on this
+  platform it was never actually accelerated. ARM64 is untouched. The patch is
+  anchored and throws if upstream moves it, so a version bump cannot silently
+  skip it. `docs/opencv.md` has the detail; a report for OpenCV's tracker is
+  written up in the template-app's upstream notes.
+- **`cv::Mat small(...)` does not compile on Windows.** The SDK's `rpcndr.h`
+  does `#define small char`, so `CTestOpenCVBridge.cpp` declared `cv::Mat
+  char(...)`. Renamed; macOS and Linux never saw it.
+
+**`MT_BUILD_JOBS` caps build parallelism, because `/m` scales with cores and not
+with RAM.** `app-build-windows.ps1` passed bare `/m`, and `MTEngineSDL.vcxproj`
+sets `MultiProcessorCompilation` -- so `/MP` spawns one `cl` per core *inside*
+the single engine project and `/m` never constrained it. On a 4-core / 8 GB
+machine that is four clang-cl processes at 1-2 GB each, and the OS kills the
+compiler; MSBuild then reports a failure carrying **no diagnostic at all**.
+`MT_BUILD_JOBS=N` now sets `/m:N`, `/p:CL_MPCount=N` and
+`CMAKE_BUILD_PARALLEL_LEVEL` together. **Unset means bare `/m`, exactly as
+before** -- this adds a knob, it does not change the default.
+
+`app-build-linux.sh` honours the same variable, for the same reason: it ran
+`make -j"$(nproc)"`, which scales with cores and not with memory, and an OOM
+kill there reads as a plain build failure with no hint of the cause. Unset
+still means `nproc`. macOS gets nothing: the app build is xcodebuild's and
+manages its own parallelism, so there is no equivalent lever to offer.
+
+## 3.21.20 — development
+
+No engine change. The number moves with the template, which gained a camera
+source in its OpenCV example and a fix for the pane that was covering its own
+controls.
+
+## 3.21.19 — development
+
+**A stripped macOS app was left unsigned, and unrunnable.** `strip`
+invalidates the ad-hoc signature Xcode applies, so `app-build-macos.sh`
+re-signed afterwards -- and that re-sign has been failing for as long as it has
+existed, with the failure discarded by `2>/dev/null || true`. `codesign`
+refuses to seal a bundle whose nested code is unsigned, and with FFmpeg in
+`Contents/Frameworks` it exits 1 naming `libswresample`. On Apple silicon an
+invalid signature is not a warning: the kernel SIGKILLs at exec, before `main`,
+with no output at all, so a caller sees only `Killed: 9` and an empty log.
+
+The executable is now re-signed **outside the bundle and copied back**, the
+result is verified rather than assumed, and any failure aborts the build -- a
+build that cannot produce a runnable artifact should not report success.
+**Any `--prod` or `--tier commercial` macOS artifact produced before this
+commit is suspect.** Linux and Windows are untouched: neither signs.
+
+The roundabout arrangement is the only one that works, and both obvious
+alternatives were measured failing. `codesign` on any path inside a bundle
+operates on the bundle, so pointing it at the executable fails on the unsigned
+nested dylibs. Signing those dylibs first fixes that build and breaks the next
+one: Xcode's copy-files phase does not re-copy a dylib whose timestamp and size
+are unchanged, so the signatures survive into a later development build and
+dyld refuses them with `F_ADDFILESIGS_RETURN failed with errno=37`. A lone
+Mach-O outside a bundle has no nested code to seal, and its signature travels
+with the bytes.
+
+Found by the capability matrix, not by a person: its commercial pair failed
+while the same pair plus `MT_CAP_VIDEO_PLAYBACK=0` passed, and the difference
+is exactly whether a nested dylib exists for the single-step `codesign` to trip
+over.
+
+**Six defects in the new object-detection code**, from an adversarial review of
+it: `LoadModel` accepted YOLOv5 (`1 x 25200 x 85`) and YOLOv8 (`1 x 84 x 8400`)
+exports it cannot decode, and both are one Browse click away -- it now checks
+the anchor count and the blob type; an OpenCV exception could escape `Detect`
+into a worker thread with no handler, which is `std::terminate` rather than a
+failed detection; NMS was class-agnostic, so a person on a bicycle lost a box;
+custom model ids collided on basename, so two directories each holding a
+`yolox.onnx` gave both rows one key; and browsed models did not survive a
+restart although the selection naming them did.
+
+## 3.21.18 — development
+
+**`MT_CAP_YOLO`, object detection.** The 24th capability and the third whose
+default is 0. It adds no dependency script: it adds a mode to the existing
+`build-opencv.*`, which gains OpenCV's `dnn` module and protobuf. The archive
+goes from 35 MB to 97 MB, which is the whole reason it is a capability of its
+own rather than part of `MT_CAP_OPENCV`. It implies `MT_CAP_OPENCV`,
+`MT_CAP_HTTP` and `MT_CAP_HTTPS` -- the last because every catalogue URL is
+`https://`, and `httplib::Client` on an https host without TLS fails at
+runtime, the same pairing `MT_CAP_LLM` already carries.
+
+`MT_YoloDetector` is one ONNX detector, loaded once and run many times.
+`CYoloModelManager` holds the catalogue, the download URLs, the on-disk paths
+and the selection, shaped after `CLlamaModelManager` down to the HuggingFace
+URL expression. **No model weights ship**; a host downloads what the user
+chooses.
+
+**The shipped catalogue is permissive-only, and a test enforces it rather than
+a comment.** Every Ultralytics YOLO -- v5, v8, 11 and YOLO26 -- is AGPL-3.0,
+which obliges the whole application that links it to be open-sourced. A row for
+one here would put that obligation on every host that copies the template,
+silently, at the moment a user clicked Download. `CTestYoloDetector` fails if a
+row's licence leaves the permissive set or its URL is not an https HuggingFace
+one. Ultralytics models remain reachable through a host's Browse control, where
+the choice and the obligation are the user's.
+
+**The head is decoded, not read.** YOLOX returns a raw head: 80 `Sigmoid` nodes
+and no `Exp` node, and 8400 anchors at a 640 input, which is a three-level
+pyramid at strides 8, 16 and 32. So scores arrive activated and boxes do not --
+`cx = (raw_x + gx) * s`, `w = exp(raw_w) * s`. Skip that and every box lands
+near the origin about a pixel across, which reads as "found nothing" rather
+than as a bug. The test therefore runs the head at a **zero** threshold, so all
+8400 anchors become candidates, and asserts geometry rather than recognition:
+measured 8392 candidates, furthest centre (636, 557), largest side 620 px.
+`LoadModel` probes the output shape once and refuses one it cannot decode.
+
+`cv::dnn::Net` keeps mutable state across `forward()`, so one detector belongs
+to one thread; the template's demo makes its detector a stack local of the
+worker function.
+
+Two acquisition traps came out of building the second architecture: MLAS picks
+its assembly kernels from `CMAKE_SYSTEM_PROCESSOR`, which defaults to the host,
+so a cross pass needs `CMAKE_SYSTEM_NAME` and `CMAKE_SYSTEM_PROCESSOR`; and one
+install directory serves every configuration of the unit, so it is wiped before
+each install rather than staging a header for a module the archive lacks.
+
+## 3.21.17 — development
+
+**Two capabilities that declared code removable and never removed any.**
+`MT_ENABLE_HTTPLIB` and `MT_ENABLE_ENET` appeared in no source file, so
+`MT_CAP_HTTP=0` and `MT_CAP_NET_TRANSPORT=0` changed the manifest, the
+resolved set and the caps-hash while leaving the binary byte-for-byte as
+compiled. One app has been shipping ENet and the whole net-game stack it
+declared it did not want. Both now guard the body and keep the file, so no
+source list changed in any of the three build systems: the 9 vendored ENet
+units and 4 core net classes on `MT_ENABLE_ENET`, the 17 net-game classes
+that reach them on a new `MT_ENABLE_NET_GAME`, the 5 that reach httplib on
+`MT_ENABLE_HTTPLIB`, and the LLM downloader and its view on
+`MT_ENABLE_LLAMA_CPP`. `NET_Initialize()` keeps a definition in both
+branches, because startup calls it unconditionally on two paths.
+
+**Three capabilities could not have been guarded as they were declared.**
+`MT_CAP_HTTP` and `MT_CAP_NET_TRANSPORT` were marked engine-only, which is
+measurably untrue -- three of four apps include `httplib.h` directly, and one
+drives ENet's socket layer from its own files. An app-side guard on an
+engine-only flag evaluates to 0 on macOS and Windows however the capability
+resolved, while Linux gets it right. `MT_CAP_NET_GAME` had no flag at all.
+Neither `MT_ENABLE_HTTPLIB` nor `MT_ENABLE_ENET` had an `option()`, so a
+standalone configure left them undefined.
+
+`MT_CAP_LLM` becomes app-visible for the same reason, found while building:
+the criterion is the one FFmpeg set, that a flag is app-visible when it
+appears in a header app translation units include.
+
+## 3.21.16 — development
+
+**OpenCV, and the first two capabilities that default to OFF.**
+`MT_CAP_OPENCV` builds OpenCV 5.0.0's `core`, `imgproc`, `geometry`, `flann`
+and `features` from a sha256-pinned tarball; `MT_CAP_OPENCV_NONFREE` adds
+`opencv_contrib`'s `xfeatures2d` with SURF and implies the first. Every other
+capability defaults to 1 and its script spells `${MT_ENABLE_X:-1}`, so a bare
+clone builds everything -- these two must not, because turning them on
+downloads 154 MB. SIFT is not in the non-free half: its patent expired in 2020
+and in 5.0 it lives in `features`. SURF is, so the contrib dependency is
+`commercial_safe: false` and a `--tier commercial` build resolves it away.
+
+**One OpenCV seam, `src/Engine/OpenCV/MT_OpenCV.h`.** `CImageData` <-> `cv::Mat`,
+RGBA end to end, copies that honour `mat.step` so a ROI converts instead of
+shearing, and a blit shaped for `CGuiViewMovingPaneImage`'s power-of-two
+raster. No `imgcodecs` is built, so there is no `cv::imread`: images arrive
+through the engine's own decoders. `docs/opencv.md` has the whole contract.
+
+**`SYS_JoinThread`.** `SYS_StartThread` has always created joinable SDL
+threads that nothing waited on, and `SYS_KillThread` is an empty function --
+`SDL_KillThread` stopped existing in SDL 1.2 -- so no engine thread had a
+shutdown contract. A view that owns a worker touching its members needs a
+join, not a flag and optimism.
+
+**A generic capability symbol gate**, `tools/appbuild/scan-capability-symbols.sh`.
+The vocabulary has carried `forbidden_when_off` and `required_when_on` for
+every capability since the programme started and nothing ever checked them.
+The two directions are not symmetric: symbols present for a capability that is
+OFF is a hard failure, because a real archive was linked where a stub was
+promised; symbols absent for one that is ON is only a report, because a static
+archive nothing calls contributes nothing.
+
+**`CGuiViewMovingPaneImage::SetImageData(CImageData *)` set the wrong image.**
+The one-argument overload passed the MEMBER `imageData` to the two-argument
+form instead of its own parameter, so it re-set whatever the pane already held
+and dropped the caller's image. Nothing in the five repositories called it.
+
+**A wrapper build's capability header was outranked by the IDE's.**
+`HEADER_SEARCH_PATHS` put `$(inherited)` first, and on an Xcode build that
+carries `.mtengine-ide/<App>/caps.xcconfig` -- written by some earlier build
+and deliberately not rewritten by a wrapper build. So each translation unit
+found a previous run's `MT_Capabilities.h` before this run's. It made the
+capability matrix unsound on macOS: every variant compiled against the
+previous variant's capability set.
+
+The stale `OPENCV_TRAITS_ENABLE_DEPRECATED` define in `SYS_Defs.h` is gone; it
+named traits OpenCV 5 has removed.
+
 ## 3.21.15 — development
 
 **One `DBG_Log.h`, and debug logging decided by the build.** The three

@@ -502,6 +502,108 @@ function Get-MTBuildRoot {
     return (Join-Path $home_ '.cache\mtengine')
 }
 
+# ---------------------------------------------------------------------------
+# THE CUDA TOOLKIT, ACQUIRED RATHER THAN INSTALLED.
+#
+# NVIDIA's Windows installer is x86_64-only and refuses to run on an ARM64
+# host ("CUDA toolkit must be installed on an amd64 computer"), which is what
+# this repository's Windows build machine is. But the toolkit is also published
+# as per-component redistributable archives -- plain zips, no installer, no OS
+# gate -- and an x64 nvcc.exe runs under ARM64 emulation. Measured 2026-09-07:
+# nvcc 12.9.86 drove HostARM64\x64 cl.exe to PTX and to a multi-arch object on
+# this machine. No GPU is needed to build; nvcc compiles offline.
+#
+# acquire-cuda-toolkit.ps1 fetches the pinned components and assembles them
+# into a CUDA_PATH-shaped tree under the cache root, outside every checkout.
+# The VERSION is pinned HERE, once, so the directory the build looks in and
+# the archives the acquisition fetches cannot disagree.
+#
+# 12.9.2, not 13.x, deliberately: CUDA 13 dropped Maxwell, Pascal and Volta,
+# which is why ggml gates 50/61/70-virtual on CUDA < 13. 12.9 keeps them and
+# has Blackwell (>= 12.8). Widest coverage for a plugin other people's cards
+# will load.
+# ---------------------------------------------------------------------------
+$script:MT_CUDA_TOOLKIT_VERSION = '12.9.2'
+
+function Get-MTCudaToolkitDir {
+    <#
+    .SYNOPSIS
+        Where acquire-cuda-toolkit.ps1 assembles the pinned toolkit.
+    #>
+    return (Join-Path (Get-MTBuildRoot) "toolchains\cuda-$script:MT_CUDA_TOOLKIT_VERSION")
+}
+
+function Resolve-MTCudaPath {
+    <#
+    .SYNOPSIS
+        The CUDA_PATH this build should use, or $null for "no CUDA".
+    .DESCRIPTION
+        A real installation wins: CUDA_PATH set AND pointing at a tree with
+        bin\nvcc.exe is what a developer on an x64 box with the installer has,
+        and their choice is respected. Failing that, the acquired toolkit, but
+        only when its stamp says the acquisition completed -- a half-assembled
+        tree must read as "no CUDA", not as a broken one. Callers set
+        $env:CUDA_PATH from the answer so that MSBuild, which reads environment
+        variables as properties, sees the same thing CMake does.
+    #>
+    if ($env:CUDA_PATH -and (Test-Path (Join-Path $env:CUDA_PATH 'bin\nvcc.exe'))) {
+        return $env:CUDA_PATH
+    }
+    $acquired = Get-MTCudaToolkitDir
+    if ((Test-Path (Join-Path $acquired 'bin\nvcc.exe')) -and
+        (Test-Path (Join-Path $acquired '.mt-cuda-toolkit.stamp'))) {
+        return $acquired
+    }
+    return $null
+}
+
+function Get-MTMSBuild {
+    <#
+    .SYNOPSIS
+        The full path to MSBuild.exe, or $null.
+    .DESCRIPTION
+        vswhere, the same query app-build-windows.ps1 has always used, so a
+        script and the driver cannot disagree about which MSBuild ran. A bare
+        `msbuild` on PATH is only there inside a Developer prompt or after
+        vcvarsall, which is why `Require-Command msbuild` turned a
+        `build-llama-cpp.ps1` run from an ordinary shell into "Missing required
+        tool 'msbuild'" -- true, but avoidable: vswhere finds it either way.
+        PATH is still preferred when it has one, so a developer who has
+        deliberately put a particular MSBuild in front keeps it.
+    #>
+    $onPath = Get-Command msbuild -ErrorAction SilentlyContinue
+    if ($onPath) { return $onPath.Source }
+    $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+    if (-not (Test-Path $vswhere)) { return $null }
+    return (& $vswhere -latest -requires Microsoft.Component.MSBuild `
+                       -find "MSBuild\**\Bin\MSBuild.exe" 2>$null | Select-Object -First 1)
+}
+
+function Get-MTNinja {
+    <#
+    .SYNOPSIS
+        A ninja.exe, or $null. Visual Studio bundles one under its CMake
+        extension; a PATH ninja is accepted too.
+    .DESCRIPTION
+        The CUDA leg needs Ninja because the Visual Studio generator's CUDA
+        support emits projects that use the "CUDA 12.x.targets" build
+        customization -- installed into MSBuild by NVIDIA's installer and by
+        nothing else. The redistributable archives do not carry it. Ninja drives
+        nvcc directly and needs none of that.
+    #>
+    $onPath = Get-Command ninja -ErrorAction SilentlyContinue
+    if ($onPath) { return $onPath.Source }
+    $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+    if (Test-Path $vswhere) {
+        $vsInstall = & $vswhere -latest -property installationPath 2>$null | Select-Object -First 1
+        if ($vsInstall) {
+            $bundled = Join-Path $vsInstall 'Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe'
+            if (Test-Path $bundled) { return $bundled }
+        }
+    }
+    return $null
+}
+
 function Get-MTCapsWorkDir {
     <#
     .SYNOPSIS

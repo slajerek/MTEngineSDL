@@ -30,6 +30,55 @@
 // captured UI steady across several consecutive frames, so reading post-swap
 // yields a valid, identical frame.
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Coroutine bridge: hand the render mutex back while a test runs.
+//
+// A test's TestFunc executes on the coroutine thread, and the main thread
+// dispatches it from inside ImGui::EndFrame() -- i.e. from the middle of
+// VID_Render(), which is holding the render mutex (== guiMain's mutex) for the
+// whole frame. The main thread then blocks until the coroutine yields.
+//
+// So any app call from a test that locks guiMain -- starting an emulator,
+// guiMain->KeyDown(), anything reaching CGuiMain::FindTopWindow() -- parks on a
+// mutex that only the blocked main thread can release. The app hangs with no
+// output and the runner reports "results file not found". The mutex being
+// recursive does not help: recursion is per-thread and this is another thread.
+//
+// The main thread cannot be doing anything with that lock while it waits, so it
+// releases it for the duration and takes it back afterwards. The coroutine then
+// locks and unlocks normally, which keeps real mutual exclusion against the
+// emulation threads rather than papering over it. The depth is unwound and
+// rebuilt because the mutex is recursive and the dispatch also happens from
+// hooks where the main thread does not hold it at all (PostSwap), where the
+// count is simply zero and nothing is released.
+//
+// Test builds only -- this whole file is behind MT_ENABLE_IMGUI_TEST_ENGINE.
+// ---------------------------------------------------------------------------
+static ImGuiTestCoroutineInterface gMTVendoredCoroutine;
+
+static bool MT_CoroutineRun(ImGuiTestCoroutineHandle handle)
+{
+	int depth = VID_GetRenderMutexDepth();
+	for (int i = 0; i < depth; i++)
+		VID_UnlockRenderMutex();
+
+	bool stillRunning = gMTVendoredCoroutine.RunFunc(handle);
+
+	for (int i = 0; i < depth; i++)
+		VID_LockRenderMutex();
+
+	return stillRunning;
+}
+
+static ImGuiTestCoroutineInterface *MT_GetCoroutineInterface()
+{
+	static ImGuiTestCoroutineInterface wrapped;
+	gMTVendoredCoroutine = *Coroutine_ImplStdThread_GetInterface();
+	wrapped = gMTVendoredCoroutine;
+	wrapped.RunFunc = MT_CoroutineRun;
+	return &wrapped;
+}
+
 static bool MT_ScreenCaptureFunc(ImGuiID /*viewport_id*/, int x, int y, int w, int h,
                                  unsigned int *pixels, void * /*user_data*/)
 {
@@ -126,7 +175,7 @@ void CImGuiTestEngine::Init()
 		}
 	}
 	te_io.ConfigLogToTTY = isCliTestRun;
-	te_io.CoroutineFuncs = Coroutine_ImplStdThread_GetInterface();
+	te_io.CoroutineFuncs = MT_GetCoroutineInterface();
 	te_io.ScreenCaptureFunc = MT_ScreenCaptureFunc;
 
 	ImGuiTestEngine_Start(engine, ImGui::GetCurrentContext());

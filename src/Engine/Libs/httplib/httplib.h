@@ -1,6 +1,6 @@
 #pragma once
 
-// Wrapper for vendored cpp-httplib (from llama.cpp).
+// Wrapper for vendored cpp-httplib (engine-owned, independent of llama.cpp).
 //
 // Important:
 // - We enable the mbedTLS backend to support HTTPS downloads without relying on
@@ -32,4 +32,4 @@
 #define CPPHTTPLIB_WINDOWS_AUTOMATIC_ROOT_CERTIFICATES_UPDATE 1
 #endif
 
-#include "../../../../other/lib/llama.cpp/vendor/cpp-httplib/httplib.h"
+#include "../../../../other/lib/cpp-httplib/httplib.h"

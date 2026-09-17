@@ -89,7 +89,8 @@ def resolve(vocab, manifest_path, platform, overrides=None):
     overrides = dict(overrides or {})
     entries = parse_manifest(manifest_path)
 
-    known = set(vocab.keys) | {COMMERCIAL_KEY, PRIVATE_KEY, SYMBOLS_KEY, DEBUG_LOGS_KEY}
+    known = (set(vocab.keys) | {COMMERCIAL_KEY, PRIVATE_KEY, SYMBOLS_KEY, DEBUG_LOGS_KEY}
+             | FLAG_OVERRIDABLE_OFF)
 
     # --- rung 2: explicit manifest keys, suffixed beating unsuffixed -----------
     explicit = {}
@@ -289,6 +290,16 @@ def canonical_form(vocab, values):
         never share one $MT_OUT.
     """
     keys = sorted(list(vocab.keys) + [COMMERCIAL_KEY, PRIVATE_KEY, SYMBOLS_KEY, DEBUG_LOGS_KEY])
+    # Plus any FLAG_OVERRIDABLE_OFF the app actually overrode. Included for the
+    # same reason MT_PRIVATE_BUILD is -- it changes which libraries are linked,
+    # and two builds that compile different code must not share one $MT_OUT.
+    # Included ONLY WHEN PRESENT, so every manifest that does not override one
+    # keeps the caps hash it has today and no warm bucket is invalidated.
+    # Only an override that actually LOWERS the flag counts. A manifest saying
+    # =1 is a no-op (the capability had already raised it, and raising is not
+    # permitted anyway), and a no-op must not fork the bucket -- otherwise two
+    # builds compiling byte-identical code would resolve to different $MT_OUTs.
+    keys += sorted(f for f in FLAG_OVERRIDABLE_OFF if values.get(f, 1) == 0)
     return ";".join("%s=%d" % (k, values[k]) for k in keys)
 
 
@@ -416,6 +427,29 @@ PLATFORM_PROVIDES_FLAGS = {
 #    some at runtime (FFmpeg/HEVC). This is the whole-library shape.
 PRIVATE_ONLY_FLAGS = frozenset({"MT_ENABLE_LIBHEIF"})
 
+# 5. FLAGS AN APP MAY SWITCH OFF WHILE KEEPING THE CAPABILITY ON.
+#
+#    Every other MT_ENABLE_* is derived: `enabled_flags` takes the max over the
+#    capabilities that list it in `enables`, and nothing can lower the result.
+#    That is right for a flag which only ever means "this capability needs this
+#    library" -- and wrong for MT_ENABLE_FFMPEG, where the capability
+#    (MT_CAP_VIDEO_PLAYBACK, "this app plays video") and the flag ("using
+#    FFmpeg to do it") are genuinely separate questions. A store build plays
+#    video through the OS and ships no FFmpeg at all.
+#
+#    Until this existed, video-on/FFmpeg-off could not be EXPRESSED, so every
+#    `=0` arm in the build scripts and the app-build drivers was unreachable by
+#    any resolve -- machinery for a configuration nobody could ask for.
+#
+#    OFF ONLY, and deliberately. A manifest may lower a flag the capability
+#    raised; it may NOT raise one the capability left off, because that would
+#    link a library into a build that declared no need for it. Every forcing
+#    table above takes the same direction, for the same reason.
+#
+#    A flag listed here changes WHICH LIBRARIES ARE LINKED, so an override of
+#    it also joins the caps identity in `canonical_form` -- see the note there.
+FLAG_OVERRIDABLE_OFF = frozenset({"MT_ENABLE_FFMPEG"})
+
 
 def enabled_flags(vocab, values, platform=None):
     """The MT_ENABLE_* set the engine turns on. Every known flag appears, as
@@ -449,6 +483,12 @@ def enabled_flags(vocab, values, platform=None):
         for flag in PRIVATE_ONLY_FLAGS:
             if flag in flags:
                 flags[flag] = 0
+    # An app may lower one of these, never raise it. `values` carries the flag
+    # only when the manifest or a --set named it explicitly (it has no vocab
+    # default), so "present" means "overridden" and absence changes nothing.
+    for flag in FLAG_OVERRIDABLE_OFF:
+        if flag in flags and values.get(flag, 1) == 0:
+            flags[flag] = 0
     return dict(sorted(flags.items()))
 
 
@@ -572,8 +612,37 @@ def default_build_root():
     return os.path.join(cache, "mtengine")
 
 
-def out_dir(root, app, rev, platform, arch, config, mode, backend, chash):
-    return os.path.join(root, app, rev, platform, arch, config, mode, backend, chash)
+def out_dir(root, app, platform, arch, config, mode, backend, chash):
+    """REV-FREE, like build_dir below (2026-09-10).
+
+    It used to carry engine_rev() as a path segment. What that bought had
+    already been taken away from it: the third-party archives moved to deps_dir
+    keyed by the capability set (see caps-lib.sh, "engine revision is worse than
+    irrelevant"), and the compiled objects and generated include/ moved to
+    build_dir. Measured across the four apps afterwards, the rev-keyed tree held
+    ZERO .a archives -- only fragments and stamps, whose content depends on the
+    resolved set and not on the revision, plus dSYMs.
+
+    What it still COST was the whole reason build_dir exists, one level up and
+    on macOS: MT_CAPS_OUT is written into the generated xcconfigs that both
+    capability channels feed to Xcode. A changed xcconfig is a changed
+    configuration for every target that includes it, so a new engine revision
+    -- or merely a dirty edit, since engine_rev() hashes `git diff HEAD` --
+    recompiled the app AND the engine. Measured 2026-09-10 on c64d: two
+    consecutive no-change builds, 802 and then 529 TUs, the only difference
+    between them being this path. Four apps share one engine checkout, so an
+    edit for one app rebuilt the other three.
+
+    Disk was the smaller half: 57 revision directories for c64d, 63 for
+    another private app, 30G of cache against 4.2G of actual shared dependency
+    archives.
+
+    Sharing is safe for what remains. Fragments and stamps are rewritten by
+    every resolve and depend only on the resolved set, which is already in the
+    key. Symbols are overwritten by the latest build of the same capability set,
+    which is the build you have; release symbol retention is a question for the
+    release artifact, not for a build cache."""
+    return os.path.join(root, app, platform, arch, config, mode, backend, chash)
 
 
 def build_dir(root, app, platform, arch, config, mode, backend, chash):
@@ -592,8 +661,10 @@ def build_dir(root, app, platform, arch, config, mode, backend, chash):
     rebuilds on command-line change, so even untouched TUs recompiled.
 
     Everything that stays under out_dir (fragments, stamps, symbols,
-    LICENSES) is either regenerated on every resolve or genuinely
-    per-revision."""
+    LICENSES) is regenerated on every resolve or overwritten by the latest
+    build, so out_dir dropped the rev key too -- see its docstring. This
+    function keeps its own root because compiled objects must not share a
+    directory with them."""
     return os.path.join(root, app, "_build", platform, arch, config, mode,
                         backend, chash)
 
@@ -685,7 +756,16 @@ BUILD_UNITS = {
                                     "MT_CAP_COLOR_MANAGEMENT"], "mode": False, "backend": False,
                           "scripts": ["platform/MacOS/build-image_codecs.sh"]},
         "video_codecs":  {"reads": ["MT_CAP_VIDEO_PLAYBACK"], "mode": True, "backend": False,
+                          "flags": ["MT_ENABLE_FFMPEG"],
                           "scripts": ["platform/MacOS/build-video_codecs.sh"]},
+        # ONE unit for BOTH OpenCV keys. Contrib is not a separate configure:
+        # with NONFREE on, the same CMake run gains a module and the same
+        # archive gains its objects -- so a store keyed by only one of them
+        # would hand a NONFREE build the tree configured without contrib.
+        "opencv":        {"reads": ["MT_CAP_OPENCV", "MT_CAP_OPENCV_NONFREE",
+                                    "MT_CAP_YOLO"],
+                          "mode": False, "backend": False,
+                          "scripts": ["platform/MacOS/build-opencv.sh"]},
     },
     # No llama_cpp: on Linux llama.cpp is an add_subdirectory of the app's own
     # CMake build, not a staged archive, so there is no producer to give a store.
@@ -702,7 +782,16 @@ BUILD_UNITS = {
                                     "MT_CAP_COLOR_MANAGEMENT"], "mode": False, "backend": False,
                           "scripts": ["platform/Linux/build-image_codecs.sh"]},
         "video_codecs":  {"reads": ["MT_CAP_VIDEO_PLAYBACK"], "mode": True, "backend": False,
+                          "flags": ["MT_ENABLE_FFMPEG"],
                           "scripts": ["platform/Linux/build-video_codecs.sh"]},
+        # ONE unit for BOTH OpenCV keys. Contrib is not a separate configure:
+        # with NONFREE on, the same CMake run gains a module and the same
+        # archive gains its objects -- so a store keyed by only one of them
+        # would hand a NONFREE build the tree configured without contrib.
+        "opencv":        {"reads": ["MT_CAP_OPENCV", "MT_CAP_OPENCV_NONFREE",
+                                    "MT_CAP_YOLO"],
+                          "mode": False, "backend": False,
+                          "scripts": ["platform/Linux/build-opencv.sh"]},
     },
     # freetype and libuv are Windows-only units: the other two platforms take
     # them from the system rather than building them.
@@ -728,7 +817,16 @@ BUILD_UNITS = {
                                     "MT_CAP_COLOR_MANAGEMENT"], "mode": False, "backend": False,
                           "scripts": ["platform/Windows/build-image_codecs.ps1"]},
         "video_codecs":  {"reads": ["MT_CAP_VIDEO_PLAYBACK"], "mode": True, "backend": False,
+                          "flags": ["MT_ENABLE_FFMPEG"],
                           "scripts": ["platform/Windows/build-video_codecs.ps1"]},
+        # ONE unit for BOTH OpenCV keys. Contrib is not a separate configure:
+        # with NONFREE on, the same CMake run gains a module and the same
+        # archive gains its objects -- so a store keyed by only one of them
+        # would hand a NONFREE build the tree configured without contrib.
+        "opencv":        {"reads": ["MT_CAP_OPENCV", "MT_CAP_OPENCV_NONFREE",
+                                    "MT_CAP_YOLO"],
+                          "mode": False, "backend": False,
+                          "scripts": ["platform/Windows/build-opencv.ps1"]},
     },
 }
 
@@ -758,7 +856,27 @@ def unit_form(unit, values):
     keys = sorted(unit["reads"])
     if unit.get("mode"):
         keys += [COMMERCIAL_KEY, PRIVATE_KEY]
-    return ";".join("%s=%d" % (k, values[k]) for k in sorted(keys))
+    pairs = [(k, values[k]) for k in keys]
+    # Plus any FLAG_OVERRIDABLE_OFF the unit reads AND the app actually lowered.
+    #
+    # A unit's `reads` names capabilities, and for video_codecs
+    # MT_CAP_VIDEO_PLAYBACK=1 used to be the whole story -- FFmpeg was built iff
+    # video was on. Since ef700aab it is not: an app can keep video and drop
+    # FFmpeg, and that unit then produces a DIFFERENT set of archives from the
+    # same capability value. Without this the two share one _depstore bucket,
+    # which is written additively and never cleaned, so a previous build's
+    # libav* survive into a build that asked for none -- and each app's
+    # CMakeLists auto-defaults MT_ENABLE_FFMPEG from directory existence, so a
+    # stale bucket turns FFmpeg back on.
+    #
+    # Only an EXPLICIT lowering counts (`values` carries the flag only when a
+    # manifest or --set named it). Capability-derived off is already in `reads`,
+    # and a no-op override must not fork a bucket -- so every configuration that
+    # exists today keeps the store hash it has today.
+    for flag in sorted(FLAG_OVERRIDABLE_OFF):
+        if flag in unit.get("flags", ()) and values.get(flag) == 0:
+            pairs.append((flag, 0))
+    return ";".join("%s=%d" % (k, v) for k, v in sorted(pairs))
 
 
 def unit_store_dir(root, platform, arch, dconfig, unit_name, unit, values, backend):

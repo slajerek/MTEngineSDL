@@ -5,35 +5,60 @@
 #   build-lock.sh acquire <app>    # blocks until free, then takes it
 #   build-lock.sh release <app>    # releases it, but only if <app> owns it
 #   build-lock.sh status           # prints the current holder, exit 1 if free
+#   build-lock.sh owns <app>       # exit 0 only when this process owns it
 #   build-lock.sh annotate <app>   # fill in a field the outer acquire could not know
 #   build-lock.sh steal            # manual escape hatch, prints what it broke
 #
-# WHY THIS EXISTS.
+# WHY THIS EXISTS -- AND WHAT IT IS *NOT* FOR ANY MORE.
 #
-# Four apps build ONE engine checkout, and two things they share are not
-# per-app:
+# It used to be ONE checkout-wide mutex, because four apps sharing one engine
+# checkout shared two things that were not per-app. Only one of those is still
+# true, and conflating them made every build queue behind every other build --
+# including a CLI build of one app blocking an Xcode build of a different one,
+# which is the case a maintainer actually hits.
 #
-#   1. .mtengine-ide/_current/engine.xcconfig -- the engine target cannot know
-#      WHICH app is building it, so the IDE channel writes one file and the most
-#      recent writer wins. A second app's build that lands between this build's
-#      pre-action and its settings resolution silently hands the engine target
-#      the OTHER app's capability set. MEASURED: xcodebuild -scheme runs the
-#      pre-action too, so the script path is an aggressor here, not just Xcode.
-#   2. The engine's own in-checkout writes. The STAGED ARCHIVES have since moved
-#      out (see mt_caps_lib_dir), but the work that produces them has not: the
-#      vendored uSockets tree is `make`d in place, and the codec scripts
-#      configure and compile under other/lib/*/build and install into
-#      other/lib/*/install -- all inside the checkout, all shared. Two concurrent
-#      runs there is a plain collision (MEASURED: a second build's `rm -rf` of the
-#      shared libvpx build directory makes the first one fail with
-#      "vpx_config.h file not found"), and it has nothing to do with
-#      capabilities.
+# STILL TRUE -- the IDE channel is ONE file.
+#   .mtengine-ide/_current/engine.xcconfig: the engine target cannot know WHICH
+#   app is building it, so the IDE channel writes one file and the most recent
+#   writer wins. Two Xcode builds of different apps genuinely cannot both have
+#   it. The alternative -- making the xcconfig include path per-build -- was
+#   measured impossible (Xcode processes includes BEFORE interpreting any build
+#   setting; nine probes with a literal control, all negative).
 #
-# So the lock is not a capability mechanism; it is a checkout-wide mutex, and it
-# covers both. Serializing is the honest answer: the alternative -- making the
-# xcconfig include path per-build -- was measured impossible (Xcode processes
-# includes BEFORE interpreting any build setting, so no variable of any spelling
-# expands there; nine probes with a literal control, all negative).
+#   This does NOT apply to a driver build. app-build-macos.sh passes
+#   MT_CAPS_WRAPPER=1, the pre-action then exits before resolving or writing
+#   anything, and every setting the build depends on rides the xcodebuild COMMAND
+#   LINE, which outranks any xcconfig. So a CLI build does not mutate that file
+#   and does not depend on any value it may parse through the optional include.
+#
+# NO LONGER TRUE -- the engine's in-checkout writes.
+#   This header used to say the vendored uSockets tree is `make`d in place and
+#   the codec scripts configure under other/lib/*/build. Both have since moved:
+#   uSockets copies itself to mt_caps_work_dir before building
+#   (build-usockets.sh), SDL3/mbedtls/ftxui/llama build in mt_caps_work_dir, and
+#   the codecs build in their own CACHE_DIR. MEASURED 2026-09-09: a full app
+#   build wrote ZERO files inside the engine checkout and left `git status`
+#   clean. The one exception is repo ACQUISITION -- the guarded submodule init
+#   and the uSockets git restore -- which runs only when something is missing.
+#
+# SO THERE ARE TWO LOCKS NOW, and which you take depends on what you can
+# actually collide with:
+#
+#   app-<APP>.lock    Both channels take it. It protects the things that are
+#                     per-app and shared between the two ways of building that
+#                     app -- one DerivedData, one $MT_OUT. Two agents building
+#                     the same app still serialize, which is correct.
+#
+#   ide-channel.lock  ONLY the IDE path takes it, on top of the app lock. It is
+#                     the mutex for _current/engine.xcconfig above.
+#
+# The order is always app-then-ide, so two IDE builds cannot deadlock against
+# each other.
+#
+# What that buys: a CLI build of one app and an Xcode build of another
+# hold disjoint locks and run at the same time. Two CLI builds of different apps
+# likewise. Dependency stores are serialized separately and much more finely --
+# see MTENGINE_LOCK_DIR below.
 #
 # WHERE IT LIVES: beside the five repos, inside none of them. Same reasoning and
 # same directory as the IDE channel's own files -- THE RULE forbids writing in
@@ -45,9 +70,10 @@
 # inside it records who took it. Releasing is the happy path, and there are two
 # releasers:
 #
-#   * the scheme's build POST-action (both channels -- MEASURED: post-actions do
-#     run under `xcodebuild -scheme`);
-#   * the app's build-macos.sh, from an EXIT trap.
+#   * the scheme's build POST-action for the IDE channel -- MEASURED:
+#     post-actions do run under `xcodebuild -scheme`, but wrapper post-actions
+#     do not own the IDE channel;
+#   * the app's build-macos.sh, from an EXIT trap, for wrapper-owned app locks.
 #
 # Neither is sufficient alone, because MEASURED: a post-action does NOT run when
 # the build FAILS. A compile error would otherwise leak the lock and block every
@@ -76,16 +102,24 @@ APP="${2:-}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENGINE_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 IDE_ROOT="$(cd "$ENGINE_DIR/.." && pwd)/.mtengine-ide"
-LOCK_DIR="$IDE_ROOT/build.lock"
+
+# PER-APP BY DEFAULT. The old default was one `build.lock` for the whole
+# checkout; see the header for why that is now two locks. A caller that names an
+# app gets that app's lock, and callers that need the IDE-channel mutex ask for
+# it explicitly through MTENGINE_LOCK_DIR.
+if [[ -n "$APP" ]]; then
+    LOCK_DIR="$IDE_ROOT/app-$APP.lock"
+else
+    LOCK_DIR="$IDE_ROOT/build.lock"
+fi
 
 # A SECOND THING TO SERIALIZE, with the same rules (L16).
 #
-# The lock above is per engine CHECKOUT: it is what stops four apps sharing one
-# checkout from configuring the same other/lib/*/build tree at once. The per-unit
-# dependency stores are not per checkout -- they hang off the cache root, so a
-# SECOND clone of the engine builds into the very same `_depstore/.../sdl3/common`
-# while holding a different build lock. That is not exotic for the shared units:
-# `common` means one bucket per machine, so two clones collide there by design.
+# The default lock above is per app/checkout. MTENGINE_LOCK_DIR lets callers use
+# the same hardened recovery logic for other shared resources: the IDE-channel
+# file beside the checkouts, or dependency stores under the cache root. The store
+# case is not per checkout: a second clone of the engine builds into the very
+# same `_depstore/.../sdl3/common` while holding a different app lock.
 #
 # The recovery logic below -- dead owner, idle owner, the atomic rename that stops
 # two waiters from both "winning" a stale lock -- is the part that was hard to get
@@ -108,10 +142,10 @@ now() { date +%s; }
 read_owner() {
     # Reset ALL of them: acquire re-reads in a loop, and a field missing from an
     # older owner file would otherwise keep the previous iteration's value.
-    LOCK_APP=""; LOCK_PID=""; LOCK_AT=""; LOCK_HOST=""; LOCK_KIND=""; LOCK_OBJROOT=""
-    [[ -f "$OWNER_FILE" ]] || return 1
-    # shellcheck disable=SC1090
-    . "$OWNER_FILE" 2>/dev/null || return 1
+    LOCK_APP=""; LOCK_PID=""; LOCK_AT=""; LOCK_HOST=""; LOCK_KIND=""; LOCK_OBJROOT=""; LOCK_OWNER_RECORD=""
+    [[ -f "$OWNER_FILE" && -r "$OWNER_FILE" ]] || return 1
+    LOCK_OWNER_RECORD="$(<"$OWNER_FILE")"
+    eval "$LOCK_OWNER_RECORD" 2>/dev/null || return 1
     return 0
 }
 
@@ -243,7 +277,9 @@ holder_is_idle() {
 # lock -- the pid was alive and the lock was taken anyway. The atomic write above
 # should make a torn record impossible; this makes it harmless if one appears.
 holder_expired() {
-    [[ -z "${LOCK_AT:-}" ]] && return 1
+    case "${LOCK_AT:-}" in
+        ''|*[!0-9]*) return 1 ;;
+    esac
     local age=$(( $(now) - LOCK_AT ))
     [[ "$age" -gt "$TTL" ]]
 }
@@ -283,10 +319,17 @@ break_lock() {
         echo "error: build-lock: could not remove $LOCK_DIR -- check its ownership and permissions." >&2
         exit 1
     fi
-    # We moved SOMETHING. Prove it was the record we judged stale: between our
-    # read and this rename another waiter may have broken and re-taken the lock.
-    if [[ -n "${LOCK_PID:-}" && -f "$dead/owner" ]] \
-       && ! grep -q "LOCK_PID='${LOCK_PID}'" "$dead/owner" 2>/dev/null; then
+    # We moved SOMETHING. Prove it was the exact record we judged stale: between
+    # our read and this rename another waiter may have broken and re-taken the
+    # lock. PID alone is not enough for Xcode.app, whose process can outlive one
+    # failed build and publish a fresh lock for the next build with the same PID.
+    local moved_owner_record="" moved_has_owner=0
+    if [[ -f "$dead/owner" ]]; then
+        moved_has_owner=1
+        [[ -r "$dead/owner" ]] && moved_owner_record="$(<"$dead/owner")"
+    fi
+    if { [[ -n "${LOCK_OWNER_RECORD:-}" ]] && [[ "$moved_owner_record" != "$LOCK_OWNER_RECORD" ]]; } \
+       || { [[ -z "${LOCK_OWNER_RECORD:-}" ]] && [[ "$moved_has_owner" == "1" ]]; }; then
         mv "$dead" "$LOCK_DIR" 2>/dev/null || rm -rf "$dead" 2>/dev/null || true
         return 1
     fi
@@ -372,24 +415,6 @@ acquire)
             continue
         fi
 
-        # OUR OWN WRAPPER -- and "ours" means the same PROCESS TREE, not merely
-        # the same app name.
-        #
-        # build-macos.sh takes the lock and then runs xcodebuild, whose
-        # pre-action lands here for the same app; that is one build and must
-        # pass through rather than deadlock against itself. But two AGENTS
-        # building the SAME app are two builds, and a name-only test let both
-        # proceed -- straight into the concurrent `make` in the vendored
-        # uSockets tree and the shared other/lib/*/build intermediate trees that
-        # this lock exists to serialize.
-        #
-        # So: pass through only when the holder's pid is this process or an
-        # ancestor of it. That is exactly "the lock was taken by the build I am
-        # part of".
-        if [[ "${LOCK_APP:-}" == "$APP" ]] && pid_is_self_or_ancestor "${LOCK_PID:-}"; then
-            exit 0
-        fi
-
         if holder_is_dead; then
             echo "mtcaps build-lock: holder '${LOCK_APP:-?}' (pid ${LOCK_PID:-?}) is gone -- breaking its lock." >&2
             break_lock || true
@@ -402,6 +427,25 @@ acquire)
             echo "  (a failed build never releases: post-actions do not run on failure)" >&2
             break_lock || true
             continue
+        fi
+
+        # OUR OWN WRAPPER -- and "ours" means the same PROCESS TREE, not merely
+        # the same app name.
+        #
+        # build-macos.sh takes the lock and then runs xcodebuild, whose
+        # pre-action lands here for the same app; that is one build and must
+        # pass through rather than deadlock against itself. But two AGENTS
+        # building the SAME app are two builds, and a name-only test let both
+        # proceed against the same DerivedData and app output root.
+        #
+        # The dead/idle probes above still run first. Xcode.app can outlive a
+        # failed build and then start another one from the same process tree; a
+        # passthrough before the idle probe would preserve the failed build's
+        # stale OBJROOT forever and let another waiter break this fresh build.
+        # TTL stays below this block because a long live wrapper can legitimately
+        # re-enter before OBJROOT has been annotated.
+        if [[ "${LOCK_APP:-}" == "$APP" ]] && pid_is_self_or_ancestor "${LOCK_PID:-}"; then
+            exit 0
         fi
 
         # ONLY when the idle probe cannot decide. Consulting the TTL
@@ -488,7 +532,7 @@ annotate)
     [[ -n "${OBJROOT:-}" ]] || exit 0
     read_owner || exit 0
     [[ "${LOCK_APP:-}" == "$APP" ]] || exit 0
-    [[ -z "${LOCK_OBJROOT:-}" ]] || exit 0          # already recorded, leave it
+    [[ "${LOCK_OBJROOT:-}" != "$OBJROOT" ]] || exit 0
     pid_is_self_or_ancestor "${LOCK_PID:-}" || exit 0
     TMP="$IDE_ROOT/.annot.$$"
     { sed '/^LOCK_OBJROOT=/d' "$OWNER_FILE"; echo "LOCK_OBJROOT='$OBJROOT'"; } > "$TMP" \
@@ -498,6 +542,22 @@ annotate)
     ;;
 
 status)
+    # WITH NO APP AND NO EXPLICIT DIR, REPORT EVERY LOCK. There is no single
+    # "the" lock any more, and a status that silently inspected one name would
+    # report "free" while three builds were running.
+    if [[ -z "$APP" && -z "${MTENGINE_LOCK_DIR:-}" ]]; then
+        FOUND=0
+        for d in "$IDE_ROOT"/*.lock; do
+            [[ -d "$d" ]] || continue
+            FOUND=1
+            LOCK_DIR="$d"; OWNER_FILE="$LOCK_DIR/owner"
+            echo "mtcaps build-lock: HELD -- $(basename "$d")"
+            read_owner && describe_holder || echo "  (owner record unreadable)"
+        done
+        [[ "$FOUND" == "1" ]] && exit 0
+        echo "mtcaps build-lock: free (no lock held)"
+        exit 1
+    fi
     if [[ ! -d "$LOCK_DIR" ]]; then
         echo "mtcaps build-lock: free"
         exit 1
@@ -512,6 +572,23 @@ status)
     ;;
 
 steal)
+    # Same reasoning as status: with no app named, clear them all, or the
+    # documented escape hatch would leave the lock that is actually stuck.
+    if [[ -z "$APP" && -z "${MTENGINE_LOCK_DIR:-}" ]]; then
+        FOUND=0
+        for d in "$IDE_ROOT"/*.lock; do
+            [[ -d "$d" ]] || continue
+            FOUND=1
+            LOCK_DIR="$d"; OWNER_FILE="$LOCK_DIR/owner"
+            echo "mtcaps build-lock: breaking $(basename "$d"), held by:"
+            read_owner || true
+            describe_holder
+            break_lock || true
+        done
+        [[ "$FOUND" == "1" ]] || echo "mtcaps build-lock: already free, nothing to steal"
+        echo "mtcaps build-lock: cleared"
+        exit 0
+    fi
     if [[ ! -d "$LOCK_DIR" ]]; then
         echo "mtcaps build-lock: already free, nothing to steal"
         exit 0
@@ -524,8 +601,17 @@ steal)
     exit 0
     ;;
 
+owns)
+    [[ -n "$APP" ]] || { echo "build-lock: owns needs an app name" >&2; exit 2; }
+    [[ -d "$LOCK_DIR" ]] || exit 1
+    read_owner || exit 1
+    [[ "${LOCK_APP:-}" == "$APP" ]] || exit 1
+    [[ "$(owning_pid)" == "${LOCK_PID:-}" ]] || exit 1
+    exit 0
+    ;;
+
 *)
-    echo "usage: build-lock.sh {acquire <app>|release <app>|annotate <app>|status|steal}" >&2
+    echo "usage: build-lock.sh {acquire <app>|release <app>|owns <app>|annotate <app>|status|steal}" >&2
     exit 2
     ;;
 esac

@@ -4808,7 +4808,7 @@ TextEditor::LineState TextEditor::Colorizer::updateLine(Line& line) {
 
 			if (glyph == start) {
 				// nothing worked so far so it's time to do some tokenizing
-				Color color;
+				Color color = Color::text;
 				Iterator tokenEnd;
 
 				// handle custom tokenizer (if we have one)
@@ -8351,10 +8351,19 @@ TextEditor::DocPos TextEditor::TypeSetter::visPos2DocPos(const Document& documen
 	}
 
 	auto& row = at(pos.row);
+	if (row.line >= document.size()) {
+		return document.getBottom();
+	}
+
 	auto& line = document[row.line];
 
 	DocPos docPos;
 	docPos.line = row.line;
+
+	if (document.isUpdated()) {
+		docPos.index = std::min(pos.column, line.size());
+		return docPos;
+	}
 
 	size_t index;
 	size_t leftColumn;

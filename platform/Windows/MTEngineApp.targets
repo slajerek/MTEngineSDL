@@ -200,7 +200,7 @@
              BEFORE any target runs, and on the IDE path that property is still
              empty there, so both entries expanded to bogus relative paths.
              Re-add them here, where the property has a value. -->
-        <AdditionalIncludeDirectories>$(MTCapsIncludeDir);$(MTCapsLibsDir)\image-codecs\include;$(MTCapsLibsDir)\ffmpeg\include;%(ClCompile.AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+        <AdditionalIncludeDirectories>$(MTCapsIncludeDir);$(MTCapsLibsDir)\image-codecs\include;$(MTCapsLibsDir)\ffmpeg\include;$(MTCapsLibsDir)\opencv\include;%(ClCompile.AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       </ClCompile>
       <!-- Keyed directory FIRST, ahead of the tracked prebuilts in
            platform\Windows\libs, so a freshly built archive wins over any

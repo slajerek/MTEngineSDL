@@ -39,4 +39,15 @@ public:
 
 	// Get the path to the current executable.
 	static string GetExecutablePath();
+
+	// Build a Windows CreateProcess command-line string from an argv-style
+	// vector, applying the quoting rules CreateProcess's argument parser
+	// expects (Microsoft's "Parsing C++ Command-Line Arguments"): an argument
+	// is quoted when it is empty or contains a space, tab, or '"'. Inside a
+	// quoted argument, a run of n backslashes immediately preceding a '"'
+	// becomes 2n+1 backslashes followed by an escaped quote; a run of n
+	// backslashes at the very end of the argument (right before the closing
+	// quote) is doubled to 2n. Pure string logic -- compiled on all
+	// platforms so it is unit-testable outside of _WIN32.
+	static string BuildWindowsCommandLine(const vector<string> &args);
 };

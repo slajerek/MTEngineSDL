@@ -20,9 +20,13 @@
 // for Pro) -- so Init() takes all of them, exactly as FFmpeg's
 // AVCodecParameters carries them out of the ASF demuxer. Compiles to
 // nothing anywhere except a Windows FFmpeg-enabled build.
-#if defined(_WIN32) && (!defined(MT_ENABLE_FFMPEG) || (MT_ENABLE_FFMPEG))
+// Platform only. This used to also require MT_ENABLE_FFMPEG, which switched
+// the OS-native decoder off together with the software one it exists to
+// replace -- see MT_MediaPacket.h.
+#if defined(_WIN32)
 
 #include "SYS_Defs.h"
+#include "MT_MediaPacket.h"
 #include <string>
 #include <vector>
 
@@ -34,14 +38,14 @@ public:
 	CAudioDecoderWMAMF();
 	~CAudioDecoderWMAMF();
 
-	// avCodecId is the plain AVCodecID value (AV_CODEC_ID_WMAV1/WMAV2/
+	// codecId is the engine's own EMediaCodecId (WMAV1/WMAV2/
 	// WMAPRO), kept as int so this header needs no FFmpeg includes.
 	// extradata is codecpar->extradata verbatim (may be null/empty only for
 	// streams that genuinely carry none -- the MFT then decides whether it
 	// can cope). Re-callable on an already-initialized instance (e.g. to
 	// reset internal MFT state across a Seek()) -- tears down any existing
 	// transform first. Same reset-by-re-Init contract as the AAC twin.
-	bool Init(int avCodecId, const u8 *extradata, int extradataSize,
+	bool Init(EMediaCodecId codecId, const u8 *extradata, int extradataSize,
 			  int channels, int sampleRate, int blockAlign, int avgBytesPerSec);
 
 	// One ASF audio payload in -> interleaved s16 PCM out. Returns true
@@ -75,7 +79,7 @@ private:
 	u32 outputSampleRate = 0;
 };
 
-#endif // _WIN32 && MT_ENABLE_FFMPEG
+#endif // _WIN32
 
 #endif
 //_CAUDIODECODERWMAMF_H_

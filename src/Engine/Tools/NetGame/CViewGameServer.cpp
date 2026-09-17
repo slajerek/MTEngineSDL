@@ -1,9 +1,16 @@
+// CAPABILITY GUARD (MT_ENABLE_NET_GAME). The file stays in all three build lists and
+// compiles to nothing when the capability is off -- an Xcode PBXBuildFile
+// cannot be conditioned on a build setting, so the condition lives here.
+// MT_CAP_NET_GAME implies NET_TRANSPORT and HTTP, so this whole stack rides on one flag -- which did not exist until 2026-09-06 (enables was an empty list).
+#if MT_ENABLE_NET_GAME
+
 #include "CViewGameServer.h"
 #include "CGuiMain.h"
 #include "CNetGameServer.h"
 #include "CNetServer.h"
 #include "CNetClientData.h"
 #include "CGuiViewMessages.h"
+#include <vector>
 
 using namespace ImGui;
 
@@ -45,11 +52,41 @@ void CViewGameServer::RenderImGui()
 		// Port
 		Text("Port: %d", server->serverPort);
 
-		// Connected clients count
-		int connectedCount = 0;
+		// Snapshot clients[] under the network thread's clientsMutex: ConnectPeer()
+		// and Disconnected() mutate state/clientName on the network thread while
+		// this render thread would otherwise read them unguarded (Phase A final
+		// review, Minor 1). Copy what we need, release the lock, then render.
+		struct SClientSnapshot
+		{
+			u16 id;
+			u8 state;
+			std::string stateName;
+			std::string clientName;
+		};
+		std::vector<SClientSnapshot> clientsSnapshot;
+		clientsSnapshot.reserve(NET_MAX_CLIENTS);
+
+		server->netServer->clientsMutex->Lock();
 		for (u16 i = 0; i < NET_MAX_CLIENTS; i++)
 		{
-			if (server->netServer->clients[i]->state == NET_CLIENT_STATE_ONLINE)
+			CNetClientData *clientData = server->netServer->clients[i];
+			if (clientData == NULL)
+				continue;
+
+			SClientSnapshot snap;
+			snap.id = i;
+			snap.state = clientData->state;
+			snap.stateName = clientData->GetStateName();
+			snap.clientName = clientData->clientName;
+			clientsSnapshot.push_back(snap);
+		}
+		server->netServer->clientsMutex->Unlock();
+
+		// Connected clients count
+		int connectedCount = 0;
+		for (const SClientSnapshot &snap : clientsSnapshot)
+		{
+			if (snap.state == NET_CLIENT_STATE_ONLINE)
 				connectedCount++;
 		}
 		Text("Connected: %d / %d", connectedCount, (int)server->allowedPlayers.size());
@@ -64,14 +101,14 @@ void CViewGameServer::RenderImGui()
 			TableSetupColumn("Name");
 			TableHeadersRow();
 
-			for (u16 i = 0; i < NET_MAX_CLIENTS; i++)
+			for (const SClientSnapshot &snap : clientsSnapshot)
 			{
-				if (server->netServer->clients[i]->state != NET_CLIENT_STATE_EMPTY)
+				if (snap.state != NET_CLIENT_STATE_EMPTY)
 				{
 					TableNextRow();
-					TableNextColumn(); Text("%d", i);
-					TableNextColumn(); Text("%s", server->netServer->clients[i]->GetStateName());
-					TableNextColumn(); Text("%s", server->netServer->clients[i]->clientName.c_str());
+					TableNextColumn(); Text("%d", snap.id);
+					TableNextColumn(); Text("%s", snap.stateName.c_str());
+					TableNextColumn(); Text("%s", snap.clientName.c_str());
 				}
 			}
 			EndTable();
@@ -103,3 +140,5 @@ void CViewGameServer::DeactivateView()
 {
 	LOGG("CViewGameServer::DeactivateView()");
 }
+
+#endif // MT_ENABLE_NET_GAME

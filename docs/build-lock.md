@@ -1,33 +1,64 @@
-# The build lock — why four apps cannot build this engine at once
+# The build lock — what still collides, and what no longer does
 
-Four apps share one MTEngineSDL checkout. `tools/mtcaps/build-lock.sh` serializes
-their builds. This document is why it exists, what it does not fix, and what an
-agent driving several apps needs to know.
+`tools/mtcaps/build-lock.sh` serializes builds that would otherwise corrupt each
+other. It used to be a single checkout-wide mutex; it is now **two locks**,
+because only one of the two things it was written for is still true.
 
 ## What actually collides
 
-Two things, and only the first is about capabilities:
+**1. `.mtengine-ide/_current/engine.xcconfig` — still one file, still a real
+mutex.** The engine target cannot know which app is building it, so the IDE
+capability channel writes one file and the most recent writer wins. A second
+app's build landing between this build's pre-action and its settings resolution
+hands the engine target the *other* app's capability set — while the app target,
+which reads a per-app file, gets the right one. The result is a binary whose app
+and engine translation units disagree about capabilities, with no error.
 
-**1. `.mtengine-ide/_current/engine.xcconfig`.** The engine target cannot know
-which app is building it, so the IDE capability channel writes one file and the
-most recent writer wins. A second app's build landing between this build's
-pre-action and its settings resolution hands the engine target the *other* app's
-capability set — while the app target, which reads a per-app file, gets the right
-one. The result is a binary whose app and engine translation units disagree about
-capabilities, with no error.
+**This applies to the IDE channel only.** A driver build passes
+`MT_CAPS_WRAPPER=1`; the pre-action then exits before resolving or writing
+anything, and every setting the build depends on rides the `xcodebuild` command
+line, which outranks any xcconfig. A CLI build may still parse the optional
+include because the tracked engine xcconfig names it, but it does not depend on
+those values and it must not mutate that file.
 
-**2. The engine's own in-checkout writes.** `build-macos.sh` builds vendored
-uSockets *inside* the checkout, and the six dependency scripts configure and
-compile under `other/lib/*/build` and install into `other/lib/*/install` — all
-inside the checkout, all shared by the four apps. Two concurrent `make` runs in
-one source tree collide regardless of capabilities. MEASURED: a second build's
-`rm -rf` of the shared libvpx build directory makes the first one fail with
-`vpx_config.h file not found`.
+**2. The engine's in-checkout writes — GONE (2026-09-09).** This document used to
+say that `build-macos.sh` builds vendored uSockets inside the checkout and the
+dependency scripts configure under `other/lib/*/build`. They have all moved:
+`build-usockets.sh` copies the tree to `mt_caps_work_dir` first, SDL3/mbedtls/
+ftxui/llama build in `mt_caps_work_dir`, and the codecs build in their own
+`CACHE_DIR`. MEASURED: a full app build wrote **zero** files inside the engine
+checkout and left `git status` clean.
 
-The finished *archives* no longer live in the checkout — they moved to
-`$MT_CAPS_LIBS_DIR` (see below) — but the intermediate trees that produce them
-did not, so this remains a standing THE RULE violation, recorded in the
-modularization tracker. The lock contains the damage; it does not fix it.
+What remains is repo **acquisition** — the guarded submodule init and the
+uSockets git restore — which runs only when something is genuinely missing, not
+on an ordinary build.
+
+## The two locks
+
+| lock | taken by | protects |
+|---|---|---|
+| `app-<APP>.lock` | both channels | that app's DerivedData and `$MT_OUT`, which a CLI build and an Xcode build of the *same* app share |
+| `ide-channel.lock` | the IDE path only, on top of the app lock | `_current/engine.xcconfig` |
+
+Always **app first, then IDE**: two IDE builds of different apps hold different
+app locks and queue on the IDE lock, and a consistent order is what stops them
+deadlocking.
+
+### What that buys
+
+- **A CLI build of one private app and an Xcode build of another run at the same
+  time.** They hold disjoint locks. Under the single checkout-wide mutex the
+  Xcode build queued behind the CLI one, which is the case a maintainer hits.
+- Two CLI builds of different apps likewise. MEASURED: two drivers running
+  concurrently, both locks held at once, neither log containing `waiting`, both
+  builds succeeding.
+- Two builds of the **same** app still serialize, whichever channel they come
+  from. That is not a limitation to remove — they share one DerivedData.
+
+The dependency stores are serialized separately and far more finely, through
+`MTENGINE_LOCK_DIR`: one lock under each selected store, held only while that
+store is being synced or built.
+
 
 ## Why not fix it properly instead
 
@@ -120,54 +151,41 @@ So serializing is the honest answer, not a shortcut.
 
 Since the CLI wrapper supplies the whole resolved set on the `xcodebuild` command
 line, and a command-line setting outranks the tracked xcconfig's `#include?`, it
-**never reads** `_current/engine.xcconfig`. It used to write it anyway, which made
-every agent build a hazard to any concurrent IDE build for no benefit to itself —
-two agents on two apps could silently hand a third app's Xcode build the wrong
-engine capability set.
+does not depend on `_current/engine.xcconfig`. Xcode may still parse the optional
+include, because the tracked engine xcconfig names it, but the command-line
+settings win. The wrapper used to write the shared file anyway, which made every
+agent build a hazard to any concurrent IDE build for no benefit to itself — two
+agents on two apps could silently hand a third app's Xcode build the wrong engine
+capability set.
 
 `build-macos.sh` now passes `MT_CAPS_WRAPPER=1` (measured: a command-line build
 setting does reach a pre-action, as does an exported environment variable) and the
-pre-action skips writing the shared file. Verified: with a foreign `_current` in
-place, a CLI build succeeds *and* leaves the file byte-identical.
+pre-action skips the IDE resolve and shared-file write. It still calls
+`build-lock.sh annotate <app>` so the outer app-lock gains `OBJROOT` for stale
+recovery. The post-action also treats `MT_CAPS_WRAPPER=1` as not owning the IDE
+channel, so it does not delete `_current/engine.xcconfig` for a file it never
+wrote.
 
 `MT_CAPS_APP` had to move onto the command line for this to work. It previously
 existed only in the shared file, so a wrapper build that no longer writes that
 file would read a **previous** build's app name and the backstop's cross-app check
 would fire on a perfectly correct build. It did, the first time this was tried.
 
-**This does not remove the lock**, and the reason is worth being precise about:
-all six of the engine's dependency phases build inside the checkout. Their
-outputs now go to `$MT_CAPS_LIBS_DIR` —
-
-```
-Build llama_cpp    -> $(MT_CAPS_LIBS_DIR)/libllama_cpp.a
-Build mbedtls      -> $(MT_CAPS_LIBS_DIR)/libmbedtls_bundle.a
-Build ftxui        -> $(PROJECT_DIR)/libs/libftxui.a
-Build image_codecs -> $(PROJECT_DIR)/libs/libmt_image_codecs.a
-Build video_codecs -> $(PROJECT_DIR)/libs/libmt_video_codecs.a
-Build SDL3         -> $(PROJECT_DIR)/libs/libSDL3.a
-```
-
-— inside the engine checkout, shared by all four apps, and **those archives differ
-per capability set**: one app with `MT_CAP_LLM=1` and another with `0` genuinely
-fight over `libllama_cpp.a`. Plus `build-macos.sh` builds vendored uSockets in the
-checkout's own source tree.
+**This does not remove the app lock.** It still protects the app's DerivedData and
+`$MT_OUT`, which are shared by the CLI and IDE channels for the same app. The
+dependency outputs and work directories have moved outside the checkout, but they
+are now guarded by their own store locks instead of by the app lock.
 
 So the honest split is:
 
 | risk | status |
 |---|---|
-| a CLI build silently corrupting an IDE build's capability set | **removed** — the wrapper no longer writes the shared file |
+| a CLI build silently corrupting an IDE build's capability set | **removed** — the wrapper no longer writes or deletes the shared file |
 | concurrent builds fighting over the staged `*.a` | **removed** — the archives moved to `$MT_CAPS_LIBS_DIR`, keyed by capability set |
-| concurrent builds fighting over `other/lib/*/build` and the vendored uSockets tree | **serialized by the lock**, not fixed |
+| concurrent builds fighting over dependency work directories | **moved out of the checkout and guarded per store** |
 
-Moving the six archives out was the first half of that work and is done. Making
-three builds actually run *in parallel* now needs the second half: the
-intermediate trees — `other/lib/*/build`, `other/lib/*/install`, and the
-vendored uSockets source tree — are still inside the checkout and still shared,
-which is the remaining deviation recorded in the modularization tracker. That is
-not something the lock can substitute for. The lock makes concurrency **safe**;
-it does not make it **parallel**.
+Repo acquisition is the remaining special case: guarded submodule init and the
+uSockets restore write tracked checkout state only when something is missing.
 
 ## How it behaves
 
@@ -176,26 +194,30 @@ tools/mtcaps/build-lock.sh status          # who holds it, and whether it is bui
 tools/mtcaps/build-lock.sh steal           # manual escape hatch
 ```
 
-**Three scripts take it**, and all three matter: an app's `build-macos.sh`, the
-scheme pre-action, and **MTEngineSDL's own `build-macos.sh`** — that last one
-because it is the script that actually writes inside the checkout (`make` in the
-vendored uSockets tree, and the codec scripts' `other/lib/*/build`), and running it
-directly is documented usage. Nested calls pass through on process ancestry, so
+**Three entry points participate**, and all three matter: the central app driver
+takes the app lock for CLI builds, the scheme pre-action takes app+IDE locks for
+Xcode.app builds, and **MTEngineSDL's own `build-macos.sh`** takes an app-style
+lock for standalone engine builds. Store-producing dependency scripts use their
+own `MTENGINE_LOCK_DIR` locks. Nested calls pass through on process ancestry, so
 an app wrapper driving the engine script is one build, not three.
 
 `--print-settings` deliberately takes no lock: it is a pure query, called from
 inside an app's build, where blocking to answer a question would be a deadlock
 waiting to happen.
 
-**Acquire is in the scheme's build PRE-ACTION**, which is the one choke point
-both channels pass through — measured: `xcodebuild -scheme` runs pre-actions too,
-so a script build queues behind an IDE build and vice versa. It **blocks** rather
-than failing: three agents on three apps should queue, not error.
+**IDE acquire is in the scheme's build PRE-ACTION.** Measured:
+`xcodebuild -scheme` runs pre-actions too, so the wrapper marks that invocation
+with `MT_CAPS_WRAPPER=1`. The pre-action then skips the IDE resolve and the
+IDE-channel lock, because command-line settings already carry the resolved set.
+Without that wrapper marker, the pre-action takes the app lock and then the
+IDE-channel lock. It **blocks** rather than failing: two IDE builds should queue,
+not error.
 
 **Release has two paths, and neither alone is sufficient:**
 
 - the scheme's build POST-action — measured to run under `xcodebuild -scheme`
-  as well, but measured **not** to run when the build **fails**;
+  as well, but measured **not** to run when the build **fails**. Wrapper
+  post-actions do not release or clean up the IDE channel they never owned;
 - the app's `build-macos.sh`, from an `EXIT` trap, which does survive a failure.
 
 **The real guarantee is two liveness probes, because one is not enough.**
@@ -231,10 +253,14 @@ waiter queues.
 `building: yes|NO`), so a stuck lock can be diagnosed rather than guessed at.
 
 Passthrough is keyed on the **owning process**, not the app name. The wrapper
-takes the lock and then runs `xcodebuild`, whose pre-action asks for it again;
-that is one build and passes through. Two *independent* builds of the same app
-are two builds and the second one **queues** — a name-only test let both proceed,
-straight into the concurrent `make` in the vendored uSockets tree.
+takes the lock and then runs `xcodebuild`, whose pre-action annotates that same
+lock; that is one build and must not deadlock against itself. Two *independent*
+builds of the same app are two builds and the second one **queues** — a name-only
+test let both proceed.
+
+The dead/idle probes run before passthrough. Xcode.app can outlive a failed
+build, and a later build from that same process must refresh the stale lock
+rather than pass through it with the old `OBJROOT` still recorded.
 
 Release is stricter still: it requires an **exact** owner match, because ancestry
 alone let the nested post-action free the outer wrapper's lock mid-invocation. A
@@ -244,13 +270,12 @@ holder whose process is gone is exempt, since its lock is breakable anyway.
 directory is treated as a claim in progress rather than as wreckage.
 
 **`annotate` exists because of an ordering problem.** `build-macos.sh` must take
-the lock *before* `xcodebuild` — it stages dependencies into the checkout first —
-and at that moment `OBJROOT` does not exist, so the lock records no build
-directory and the idle probe can never decide for the entire CLI channel. That
-left the TTL as its only recovery: exactly what the idle probe was added to
-remove, still present in the channel whose long clean build justified adding it.
-The pre-action runs *inside* `xcodebuild`, where `OBJROOT` is real, and fills the
-field in as it passes through.
+the app lock *before* `xcodebuild`, and at that moment `OBJROOT` does not exist,
+so the lock records no build directory and the idle probe can never decide for
+the entire CLI channel. That left the TTL as its only recovery: exactly what the
+idle probe was added to remove, still present in the channel whose long clean
+build justified adding it. The wrapper pre-action runs *inside* `xcodebuild`,
+where `OBJROOT` is real, and fills the field before it exits.
 
 ## The net under the lock
 
@@ -291,8 +316,9 @@ Note that `xcodebuild -target` cannot reach this check: without `-scheme`,
 branch never matches. `-target` remains the reason the phase exists, but it is
 the *stamp re-resolution* below that catches it, not this check.
 
-The post-action deletes `_current/engine.xcconfig` when the build succeeds, so
-the shared file exists only while a build needs it. A failed build still leaves
+The IDE post-action deletes `_current/engine.xcconfig` while it still owns
+`ide-channel.lock`, before releasing that lock. Wrapper post-actions skip that
+cleanup because they never owned the IDE channel. A failed IDE build still leaves
 one behind — post-actions do not run then — which is exactly what the standalone
 case above detects.
 
@@ -303,18 +329,12 @@ case above detects.
    — both need `<EnvironmentBuildable>` naming the app target, or Xcode passes
    them no build settings and `$PROJECT_DIR` is empty. For the post-action that
    fails the whole build, on an action whose only job is cleanup.
-3. `build-macos.sh` → acquire with `MT_BUILD_LOCK_PID=$$` before the build and
-   release from an `EXIT` trap. The explicit pid matters: without it the lock
-   records the short-lived helper process and looks abandoned to the next waiter.
+3. `build-macos.sh` should be the current thin stub that execs the engine-owned
+   `tools/appbuild/app-build-macos.sh`. The central driver acquires the app lock
+   with `MT_BUILD_LOCK_PID=$$` before the build and releases from an `EXIT` trap.
+   The explicit pid matters: without it the lock records the short-lived helper
+   process and looks abandoned to the next waiter.
 
-All four apps now have the scheme pre-action and post-action. Only
-`MTEngineSDLDummyApp` also has step 3 — the other three `build-macos.sh` scripts
-do not take the lock themselves, so their CLI builds are protected only from the
-pre-action onward, and the dependency staging that runs before `xcodebuild`
-is not covered.
-
-An earlier version of this section said those three had *none* of it. That was
-wrong in the way that mattered: they had the pre-action, which **acquires**, and
-no post-action, which **releases** — so every IDE build of them took the lock and
-left it, and never cleaned up the shared engine xcconfig either. Taking a lock
-without releasing it is worse than not taking one.
+All four apps need the scheme pre-action and post-action, plus the current thin
+stub. The app repos do not own the wrapper-level lock code any more; keeping it
+central is what stops one app from drifting out of the lock protocol.

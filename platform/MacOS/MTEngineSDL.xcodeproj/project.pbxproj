@@ -175,6 +175,12 @@
 		4154FF1E2397A93A00EB6387 /* CMusicChannel.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 415EEA5F238EC29D00C0A32A /* CMusicChannel.cpp */; };
 		4154FF1F2397A93A00EB6387 /* CSlrMusicFile.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 415EEA61238EC29D00C0A32A /* CSlrMusicFile.cpp */; };
 		4154FF202397A93A00EB6387 /* CSlrMusicFileOgg.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 415EEA63238EC29D00C0A32A /* CSlrMusicFileOgg.cpp */; };
+		FA070021279999990000E004 /* miniaudio_impl.c in Sources */ = {isa = PBXBuildFile; fileRef = FA070021279999990000E002 /* miniaudio_impl.c */; };
+		FA070020279999990000E004 /* CSlrMusicFileMiniaudio.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FA070020279999990000E002 /* CSlrMusicFileMiniaudio.cpp */; };
+		FA070023279999990000E004 /* CSlrMusicFileResampled.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FA070023279999990000E002 /* CSlrMusicFileResampled.cpp */; };
+		FA070026279999990000E004 /* MT_MusicFileFactory.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FA070026279999990000E002 /* MT_MusicFileFactory.cpp */; };
+		FA070025279999990000E004 /* CSlrMusicFileMFAudio.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FA070025279999990000E002 /* CSlrMusicFileMFAudio.cpp */; };
+		FA070024279999990000E004 /* CSlrMusicFileAVFAudio.mm in Sources */ = {isa = PBXBuildFile; fileRef = FA070024279999990000E002 /* CSlrMusicFileAVFAudio.mm */; };
 		4154FF212397A93A00EB6387 /* CSlrMusicSwitcher.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 415EEA65238EC29D00C0A32A /* CSlrMusicSwitcher.cpp */; };
 		34EEE8C1B900D7DD997F48E3 /* CSlrMusicPlaylistController.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B4227B0599F95FDA063CC755 /* CSlrMusicPlaylistController.cpp */; };
 		91B7D53C4EFA1029384756AB /* CSlrMusicPlaylistPersistence.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A6F4C2D8E0B13579C2468ACE /* CSlrMusicPlaylistPersistence.cpp */; };
@@ -386,6 +392,7 @@
 		417C8654245E2BA8001D67E9 /* CNetClient.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 417C8649245E2BA8001D67E9 /* CNetClient.cpp */; };
 		417C8655245E2BA8001D67E9 /* NET_Main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 417C864A245E2BA8001D67E9 /* NET_Main.cpp */; };
 		417C8656245E2BA8001D67E9 /* CNetClientData.h in Headers */ = {isa = PBXBuildFile; fileRef = 417C864B245E2BA8001D67E9 /* CNetClientData.h */; };
+		779720E1B54E5CE328025318 /* NET_AuthPw2.h in Headers */ = {isa = PBXBuildFile; fileRef = 01D43B5874C6CF84DBC83FB6 /* NET_AuthPw2.h */; };
 		417C8657245E2BA8001D67E9 /* CNetPacket.h in Headers */ = {isa = PBXBuildFile; fileRef = 417C864C245E2BA8001D67E9 /* CNetPacket.h */; };
 		417C8658245E2BA8001D67E9 /* CNetClientData.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 417C864D245E2BA8001D67E9 /* CNetClientData.cpp */; };
 		417C8659245E2BA8001D67E9 /* CNetPacket.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 417C864E245E2BA8001D67E9 /* CNetPacket.cpp */; };
@@ -612,6 +619,9 @@
 		61E4E7EB7494E06159ABDBF5 /* CVideoSourceWebMVpx.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A16F836A0B7CD9BF622AF5E5 /* CVideoSourceWebMVpx.cpp */; };
 		FA0600FF27999999FFFF0001 /* CVideoSourceFFmpeg.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FA0600FF27999999FFFF0002 /* CVideoSourceFFmpeg.cpp */; };
 		FA07001B279999990000E004 /* CVideoDecoderHEVCVT.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FA07001B279999990000E002 /* CVideoDecoderHEVCVT.cpp */; };
+		FA07001C279999990000E004 /* IVideoPacketDecoder.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FA07001C279999990000E002 /* IVideoPacketDecoder.cpp */; };
+		FA07001D279999990000E004 /* CVideoSourceAVFoundation.mm in Sources */ = {isa = PBXBuildFile; fileRef = FA07001D279999990000E002 /* CVideoSourceAVFoundation.mm */; };
+		FA07001F279999990000E004 /* CVideoSourceMediaFoundation.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FA07001F279999990000E002 /* CVideoSourceMediaFoundation.cpp */; };
 		AA07001B279999990000E010 /* CVideoDecoderHEVCMF.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AA07001B279999990000E011 /* CVideoDecoderHEVCMF.cpp */; };
 		AA07001B279999990000E020 /* CVideoDecoderWMVMF.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AA07001B279999990000E021 /* CVideoDecoderWMVMF.cpp */; };
 		AA07001B279999990000E023 /* CAudioDecoderWMAMF.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AA07001B279999990000E024 /* CAudioDecoderWMAMF.cpp */; };
@@ -619,6 +629,13 @@
 		60F7FD543E404694B25CC600 /* CAudioDecoderAACApple.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9D439D4CF0424485B190F062 /* CAudioDecoderAACApple.cpp */; };
 		96BE968EBC844049BCD66EDC /* CAudioDecoderAACMF.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CE09EC20F044D71B53D6685 /* CAudioDecoderAACMF.cpp */; };
 		96850BDA37774909941F6F94 /* AacAscParser.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1C17DC45A49A41678684DB85 /* AacAscParser.cpp */; };
+		A11B0001CE7742AABB110001 /* MT_AnnexB.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A11B0002CE7742AABB110002 /* MT_AnnexB.cpp */; };
+		A11B0017CE7742AABB110017 /* MT_Mp4vEsds.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A11C0017CE7742AABB110017 /* MT_Mp4vEsds.cpp */; };
+		A11B0018CE7742AABB110018 /* MT_AudioFrames.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A11C0018CE7742AABB110018 /* MT_AudioFrames.cpp */; };
+		A11B0019CE7742AABB110019 /* CAudioConverterApple.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A11C0019CE7742AABB110019 /* CAudioConverterApple.cpp */; };
+		A11B0020CE7742AABB110020 /* CAudioDecoderCompressedApple.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A11C0020CE7742AABB110020 /* CAudioDecoderCompressedApple.cpp */; };
+		A11B0021CE7742AABB110021 /* CAudioDecoderCompressedMF.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A11C0021CE7742AABB110021 /* CAudioDecoderCompressedMF.cpp */; };
+		A11B0022CE7742AABB110022 /* CVideoSourceAvi.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A11C0022CE7742AABB110022 /* CVideoSourceAvi.cpp */; };
 		FA09001C279999990000F001 /* CVideoFrameExtractor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FA09001C279999990000F003 /* CVideoFrameExtractor.cpp */; };
 		FA09001C279999990000F002 /* VideoFrameTransform.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FA09001C279999990000F005 /* VideoFrameTransform.cpp */; };
 		FA06001B279999990000B003 /* CVideoYUVShader.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FA06001B279999990000B004 /* CVideoYUVShader.cpp */; };
@@ -725,6 +742,7 @@
 		1A273BC7C2350B351F01D2CB /* CRenderShaderCustomFragmentOpenGL4.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3F83590B4D210977150DDB59 /* CRenderShaderCustomFragmentOpenGL4.cpp */; };
 		35EC122609A6C07012CFEDA4 /* CTestSurfaceEncoding.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B08518B19F8FDC2F255CE17C /* CTestSurfaceEncoding.cpp */; };
 		549F556C554B62B6E8B28510 /* CTestScissorClamp.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F4BF4F7D192F9991FBF29216 /* CTestScissorClamp.cpp */; };
+		A7E56C0C3F9A45A98B12D3E1 /* CTestTextEditorMutation.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A7E56C0C3F9A45A98B12D3E2 /* CTestTextEditorMutation.cpp */; };
 		537A95FB36E13A182AF484FA /* CTestResidentFunnel.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4F1034DAE412B14FE8EFA3EC /* CTestResidentFunnel.cpp */; };
 		E63B320D29D53B38700AFC51 /* CTestImageDataFloat.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E3A8CD49FA4E20BEE3D3F2CE /* CTestImageDataFloat.cpp */; };
 		F347734AA687F2E455DA28E1 /* MT_ShaderProbe.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B95A0871446E81379AD693D3 /* MT_ShaderProbe.cpp */; };
@@ -822,8 +840,21 @@
 		B1C2D3E4F5A6B7C8D9E0F1A2 /* CTest.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F4 /* CTest.cpp */; };
 		B1C2D3E4F5A6B7C8D9E0F1A3 /* CTestRunner.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F6 /* CTestRunner.cpp */; };
 		B1C2D3E4F5A6B7C8D9E0F1A4 /* CTestSuite.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F8 /* CTestSuite.cpp */; };
+		B1C2D3E4F5A6B7C8D9E0F6A1 /* CTestWebMVpxLane.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E7F2 /* CTestWebMVpxLane.cpp */; };
+		A21A0001CE7742AABB210001 /* CTestAviLane.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A21B0001CE7742AABB210001 /* CTestAviLane.cpp */; };
+		FA07001E279999990000E004 /* CTestVideoSourceAVF.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FA07001E279999990000E002 /* CTestVideoSourceAVF.cpp */; };
+		FA070022279999990000E004 /* CTestMusicFormats.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FA070022279999990000E002 /* CTestMusicFormats.cpp */; };
+		B1C2D3E4F5A6B7C8D9E0F5A1 /* CTestMusicResampling.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E5F2 /* CTestMusicResampling.cpp */; };
+		B1C2D3E4F5A6B7C8D9E0F4A1 /* CTestAudioResampler.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E4F2 /* CTestAudioResampler.cpp */; };
+		B1C2D3E4F5A6B7C8D9E0F3A1 /* MT_AudioResampler.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E3F2 /* MT_AudioResampler.cpp */; };
+		B1C2D3E4F5A6B7C8D9E0F2A1 /* CTestEngineSampleRate.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E2F2 /* CTestEngineSampleRate.cpp */; };
 		B1C2D3E4F5A6B7C8D9E0F1A5 /* CTestI18nEngine.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1FA /* CTestI18nEngine.cpp */; };
 		B1C2D3E4F5A6B7C8D9E0F2A5 /* CTestKtx2Transcode.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E2FA /* CTestKtx2Transcode.cpp */; };
+		0PENCV0000000000000A001 /* MT_OpenCV.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 0PENCV0000000000000A003 /* MT_OpenCV.cpp */; };
+		0YOLO0000000000000BA01 /* MT_YoloDetector.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 0YOLO0000000000000CA01 /* MT_YoloDetector.cpp */; };
+		0YOLO0000000000000BA02 /* CYoloModelManager.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 0YOLO0000000000000CA02 /* CYoloModelManager.cpp */; };
+		0YOLO0000000000000BA03 /* CTestYoloDetector.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 0YOLO0000000000000CA03 /* CTestYoloDetector.cpp */; };
+		0PENCV0000000000000A002 /* CTestOpenCVBridge.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 0PENCV0000000000000A005 /* CTestOpenCVBridge.cpp */; };
 		A0E1F00000000000000000F3 /* CTestExifEngine.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A0E1F00000000000000000F1 /* CTestExifEngine.cpp */; };
 		A0E1F00000000000000000FA /* CTestExifMetadataReach.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A0E1F00000000000000000FB /* CTestExifMetadataReach.cpp */; };
 		B0E1FA0000000000000000A3 /* RawTestFixtures.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B0E1FA0000000000000000A1 /* RawTestFixtures.cpp */; };
@@ -848,6 +879,12 @@
 		C1D2E3F4A5B6C7D8E9F0A1B3 /* CTest.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F3 /* CTest.h */; };
 		C1D2E3F4A5B6C7D8E9F0A1B4 /* CTestRunner.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F5 /* CTestRunner.h */; };
 		C1D2E3F4A5B6C7D8E9F0A1B5 /* CTestSuite.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F7 /* CTestSuite.h */; };
+		C1D2E3F4A5B6C7D8E9F0A6B1 /* CTestWebMVpxLane.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E7F1 /* CTestWebMVpxLane.h */; };
+		A21A0002CE7742AABB210002 /* CTestAviLane.h in Headers */ = {isa = PBXBuildFile; fileRef = A21B0002CE7742AABB210002 /* CTestAviLane.h */; };
+		C1D2E3F4A5B6C7D8E9F0A5B1 /* CTestMusicResampling.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E5F1 /* CTestMusicResampling.h */; };
+		C1D2E3F4A5B6C7D8E9F0A4B1 /* CTestAudioResampler.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E4F1 /* CTestAudioResampler.h */; };
+		C1D2E3F4A5B6C7D8E9F0A3B1 /* MT_AudioResampler.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E3F1 /* MT_AudioResampler.h */; };
+		C1D2E3F4A5B6C7D8E9F0A2B1 /* CTestEngineSampleRate.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E2F1 /* CTestEngineSampleRate.h */; };
 		C1D2E3F4A5B6C7D8E9F0A1B6 /* CTestI18nEngine.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F9 /* CTestI18nEngine.h */; };
 		C1D2E3F4A5B6C7D8E9F0A2B6 /* CTestKtx2Transcode.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E2F9 /* CTestKtx2Transcode.h */; };
 		C3BF29054846FED34F5443D2 /* imgui_te_exporters.h in Headers */ = {isa = PBXBuildFile; fileRef = 6214FCE73133E41773F7CF0F /* imgui_te_exporters.h */; };
@@ -1263,6 +1300,12 @@
 		415EEA61238EC29D00C0A32A /* CSlrMusicFile.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CSlrMusicFile.cpp; sourceTree = "<group>"; };
 		415EEA62238EC29D00C0A32A /* CSlrMusicFile.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CSlrMusicFile.h; sourceTree = "<group>"; };
 		415EEA63238EC29D00C0A32A /* CSlrMusicFileOgg.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CSlrMusicFileOgg.cpp; sourceTree = "<group>"; };
+		FA070021279999990000E002 /* miniaudio_impl.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = miniaudio_impl.c; path = ../Libs/miniaudio/miniaudio_impl.c; sourceTree = "<group>"; };
+		FA070020279999990000E002 /* CSlrMusicFileMiniaudio.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CSlrMusicFileMiniaudio.cpp; sourceTree = "<group>"; };
+		FA070023279999990000E002 /* CSlrMusicFileResampled.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CSlrMusicFileResampled.cpp; sourceTree = "<group>"; };
+		FA070026279999990000E002 /* MT_MusicFileFactory.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = MT_MusicFileFactory.cpp; sourceTree = "<group>"; };
+		FA070025279999990000E002 /* CSlrMusicFileMFAudio.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CSlrMusicFileMFAudio.cpp; sourceTree = "<group>"; };
+		FA070024279999990000E002 /* CSlrMusicFileAVFAudio.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = CSlrMusicFileAVFAudio.mm; sourceTree = "<group>"; };
 		415EEA64238EC29D00C0A32A /* CSlrMusicFileOgg.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CSlrMusicFileOgg.h; sourceTree = "<group>"; };
 		415EEA65238EC29D00C0A32A /* CSlrMusicSwitcher.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CSlrMusicSwitcher.cpp; sourceTree = "<group>"; };
 		415EEA66238EC29D00C0A32A /* CSlrMusicSwitcher.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CSlrMusicSwitcher.h; sourceTree = "<group>"; };
@@ -1399,6 +1442,7 @@
 		417C8649245E2BA8001D67E9 /* CNetClient.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CNetClient.cpp; sourceTree = "<group>"; };
 		417C864A245E2BA8001D67E9 /* NET_Main.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = NET_Main.cpp; sourceTree = "<group>"; };
 		417C864B245E2BA8001D67E9 /* CNetClientData.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CNetClientData.h; sourceTree = "<group>"; };
+		01D43B5874C6CF84DBC83FB6 /* NET_AuthPw2.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NET_AuthPw2.h; sourceTree = "<group>"; };
 		417C864C245E2BA8001D67E9 /* CNetPacket.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CNetPacket.h; sourceTree = "<group>"; };
 		417C864D245E2BA8001D67E9 /* CNetClientData.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CNetClientData.cpp; sourceTree = "<group>"; };
 		417C864E245E2BA8001D67E9 /* CNetPacket.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CNetPacket.cpp; sourceTree = "<group>"; };
@@ -1642,8 +1686,12 @@
 		BAF7D8FBBB7093FEDBCD8970 /* CVideoSourceWebMVpx.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CVideoSourceWebMVpx.h; sourceTree = "<group>"; };
 		FA0600FF27999999FFFF0002 /* CVideoSourceFFmpeg.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CVideoSourceFFmpeg.cpp; sourceTree = "<group>"; };
 		FA0600FF27999999FFFF0003 /* CVideoSourceFFmpeg.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CVideoSourceFFmpeg.h; sourceTree = "<group>"; };
+		A1B2C3D4E5F6A7B8C9D0E6F1 /* MT_MediaPacket.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = MT_MediaPacket.h; path = ../../src/Engine/Video/MT_MediaPacket.h; sourceTree = SOURCE_ROOT; };
 		FA07001B279999990000E001 /* IVideoPacketDecoder.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = IVideoPacketDecoder.h; sourceTree = "<group>"; };
 		FA07001B279999990000E002 /* CVideoDecoderHEVCVT.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CVideoDecoderHEVCVT.cpp; sourceTree = "<group>"; };
+		FA07001C279999990000E002 /* IVideoPacketDecoder.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = IVideoPacketDecoder.cpp; sourceTree = "<group>"; };
+		FA07001D279999990000E002 /* CVideoSourceAVFoundation.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = CVideoSourceAVFoundation.mm; sourceTree = "<group>"; };
+		FA07001F279999990000E002 /* CVideoSourceMediaFoundation.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CVideoSourceMediaFoundation.cpp; sourceTree = "<group>"; };
 		FA07001B279999990000E003 /* CVideoDecoderHEVCVT.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CVideoDecoderHEVCVT.h; sourceTree = "<group>"; };
 		AA07001B279999990000E011 /* CVideoDecoderHEVCMF.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CVideoDecoderHEVCMF.cpp; sourceTree = "<group>"; };
 		AA07001B279999990000E012 /* CVideoDecoderHEVCMF.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CVideoDecoderHEVCMF.h; sourceTree = "<group>"; };
@@ -1661,6 +1709,21 @@
 		0C282663D75848D5846F09E4 /* CAudioDecoderAACNative.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CAudioDecoderAACNative.h; sourceTree = "<group>"; };
 		1C17DC45A49A41678684DB85 /* AacAscParser.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = AacAscParser.cpp; sourceTree = "<group>"; };
 		3B35C8AE0779404F84962D55 /* AacAscParser.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AacAscParser.h; sourceTree = "<group>"; };
+		A11B0002CE7742AABB110002 /* MT_AnnexB.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = MT_AnnexB.cpp; sourceTree = "<group>"; };
+		A11B0003CE7742AABB110003 /* MT_AnnexB.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MT_AnnexB.h; sourceTree = "<group>"; };
+		A11C0017CE7742AABB110017 /* MT_Mp4vEsds.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = MT_Mp4vEsds.cpp; sourceTree = "<group>"; };
+		A11D0017CE7742AABB110017 /* MT_Mp4vEsds.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MT_Mp4vEsds.h; sourceTree = "<group>"; };
+		A11C0018CE7742AABB110018 /* MT_AudioFrames.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = MT_AudioFrames.cpp; sourceTree = "<group>"; };
+		A11D0018CE7742AABB110018 /* MT_AudioFrames.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MT_AudioFrames.h; sourceTree = "<group>"; };
+		A11C0019CE7742AABB110019 /* CAudioConverterApple.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CAudioConverterApple.cpp; sourceTree = "<group>"; };
+		A11D0019CE7742AABB110019 /* CAudioConverterApple.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CAudioConverterApple.h; sourceTree = "<group>"; };
+		A11C0020CE7742AABB110020 /* CAudioDecoderCompressedApple.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CAudioDecoderCompressedApple.cpp; sourceTree = "<group>"; };
+		A11D0020CE7742AABB110020 /* CAudioDecoderCompressedApple.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CAudioDecoderCompressedApple.h; sourceTree = "<group>"; };
+		A11C0021CE7742AABB110021 /* CAudioDecoderCompressedMF.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CAudioDecoderCompressedMF.cpp; sourceTree = "<group>"; };
+		A11D0021CE7742AABB110021 /* CAudioDecoderCompressedMF.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CAudioDecoderCompressedMF.h; sourceTree = "<group>"; };
+		A11C0022CE7742AABB110022 /* CVideoSourceAvi.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CVideoSourceAvi.cpp; sourceTree = "<group>"; };
+		A11D0022CE7742AABB110022 /* CVideoSourceAvi.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CVideoSourceAvi.h; sourceTree = "<group>"; };
+		A11D0023CE7742AABB110023 /* CAudioDecoderCompressedNative.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CAudioDecoderCompressedNative.h; sourceTree = "<group>"; };
 		FA09001C279999990000F003 /* CVideoFrameExtractor.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CVideoFrameExtractor.cpp; sourceTree = "<group>"; };
 		FA09001C279999990000F004 /* CVideoFrameExtractor.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CVideoFrameExtractor.h; sourceTree = "<group>"; };
 		FA09001C279999990000FA51 /* CVideoTransferFunctions.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CVideoTransferFunctions.h; sourceTree = "<group>"; };
@@ -1786,6 +1849,8 @@
 		5EA9D8BACF3EC9927342474D /* MT_SurfaceEncoding.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = MT_SurfaceEncoding.h; path = ../../src/Engine/Core/Render/MT_SurfaceEncoding.h; sourceTree = SOURCE_ROOT; };
 		F4BF4F7D192F9991FBF29216 /* CTestScissorClamp.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CTestScissorClamp.cpp; path = ../../src/Engine/Tests/CTestScissorClamp.cpp; sourceTree = SOURCE_ROOT; };
 		881A67E32B732D1DD94C4E9D /* CTestScissorClamp.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CTestScissorClamp.h; path = ../../src/Engine/Tests/CTestScissorClamp.h; sourceTree = SOURCE_ROOT; };
+		A7E56C0C3F9A45A98B12D3E2 /* CTestTextEditorMutation.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CTestTextEditorMutation.cpp; path = ../../src/Engine/Tests/CTestTextEditorMutation.cpp; sourceTree = SOURCE_ROOT; };
+		A7E56C0C3F9A45A98B12D3E3 /* CTestTextEditorMutation.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CTestTextEditorMutation.h; path = ../../src/Engine/Tests/CTestTextEditorMutation.h; sourceTree = SOURCE_ROOT; };
 		4F1034DAE412B14FE8EFA3EC /* CTestResidentFunnel.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CTestResidentFunnel.cpp; path = ../../src/Engine/Tests/CTestResidentFunnel.cpp; sourceTree = SOURCE_ROOT; };
 		13CE95646B20484C9F9F9F52 /* CTestResidentFunnel.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CTestResidentFunnel.h; path = ../../src/Engine/Tests/CTestResidentFunnel.h; sourceTree = SOURCE_ROOT; };
 		C59CB244DC21F77AF78D9F23 /* ERenderTextureFormat.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ERenderTextureFormat.h; path = ../../src/Engine/Core/Render/ERenderTextureFormat.h; sourceTree = SOURCE_ROOT; };
@@ -1897,10 +1962,34 @@
 		A1B2C3D4E5F6A7B8C9D0E1F6 /* CTestRunner.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CTestRunner.cpp; path = ../../src/Engine/Tests/CTestRunner.cpp; sourceTree = SOURCE_ROOT; };
 		A1B2C3D4E5F6A7B8C9D0E1F7 /* CTestSuite.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CTestSuite.h; path = ../../src/Engine/Tests/CTestSuite.h; sourceTree = SOURCE_ROOT; };
 		A1B2C3D4E5F6A7B8C9D0E1F8 /* CTestSuite.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CTestSuite.cpp; path = ../../src/Engine/Tests/CTestSuite.cpp; sourceTree = SOURCE_ROOT; };
+		A1B2C3D4E5F6A7B8C9D0E7F1 /* CTestWebMVpxLane.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CTestWebMVpxLane.h; path = ../../src/Engine/Tests/CTestWebMVpxLane.h; sourceTree = SOURCE_ROOT; };
+		A1B2C3D4E5F6A7B8C9D0E5F1 /* CTestMusicResampling.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CTestMusicResampling.h; path = ../../src/Engine/Tests/CTestMusicResampling.h; sourceTree = SOURCE_ROOT; };
+		A1B2C3D4E5F6A7B8C9D0E4F1 /* CTestAudioResampler.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CTestAudioResampler.h; path = ../../src/Engine/Tests/CTestAudioResampler.h; sourceTree = SOURCE_ROOT; };
+		A1B2C3D4E5F6A7B8C9D0E3F1 /* MT_AudioResampler.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = MT_AudioResampler.h; path = ../../src/Engine/Audio/MT_AudioResampler.h; sourceTree = SOURCE_ROOT; };
+		A1B2C3D4E5F6A7B8C9D0E2F1 /* CTestEngineSampleRate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CTestEngineSampleRate.h; path = ../../src/Engine/Tests/CTestEngineSampleRate.h; sourceTree = SOURCE_ROOT; };
 		A1B2C3D4E5F6A7B8C9D0E1F9 /* CTestI18nEngine.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CTestI18nEngine.h; path = ../../src/Engine/Tests/CTestI18nEngine.h; sourceTree = SOURCE_ROOT; };
 		A1B2C3D4E5F6A7B8C9D0E2F9 /* CTestKtx2Transcode.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CTestKtx2Transcode.h; path = ../../src/Engine/Tests/CTestKtx2Transcode.h; sourceTree = SOURCE_ROOT; };
+		A1B2C3D4E5F6A7B8C9D0E7F2 /* CTestWebMVpxLane.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CTestWebMVpxLane.cpp; path = ../../src/Engine/Tests/CTestWebMVpxLane.cpp; sourceTree = SOURCE_ROOT; };
+		A21B0001CE7742AABB210001 /* CTestAviLane.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CTestAviLane.cpp; path = ../../src/Engine/Tests/CTestAviLane.cpp; sourceTree = SOURCE_ROOT; };
+		A21B0002CE7742AABB210002 /* CTestAviLane.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CTestAviLane.h; path = ../../src/Engine/Tests/CTestAviLane.h; sourceTree = SOURCE_ROOT; };
+		FA07001E279999990000E002 /* CTestVideoSourceAVF.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CTestVideoSourceAVF.cpp; path = ../../src/Engine/Tests/CTestVideoSourceAVF.cpp; sourceTree = SOURCE_ROOT; };
+		FA070022279999990000E002 /* CTestMusicFormats.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CTestMusicFormats.cpp; path = ../../src/Engine/Tests/CTestMusicFormats.cpp; sourceTree = SOURCE_ROOT; };
+		A1B2C3D4E5F6A7B8C9D0E5F2 /* CTestMusicResampling.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CTestMusicResampling.cpp; path = ../../src/Engine/Tests/CTestMusicResampling.cpp; sourceTree = SOURCE_ROOT; };
+		A1B2C3D4E5F6A7B8C9D0E4F2 /* CTestAudioResampler.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CTestAudioResampler.cpp; path = ../../src/Engine/Tests/CTestAudioResampler.cpp; sourceTree = SOURCE_ROOT; };
+		A1B2C3D4E5F6A7B8C9D0E3F2 /* MT_AudioResampler.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = MT_AudioResampler.cpp; path = ../../src/Engine/Audio/MT_AudioResampler.cpp; sourceTree = SOURCE_ROOT; };
+		A1B2C3D4E5F6A7B8C9D0E2F2 /* CTestEngineSampleRate.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CTestEngineSampleRate.cpp; path = ../../src/Engine/Tests/CTestEngineSampleRate.cpp; sourceTree = SOURCE_ROOT; };
 		A1B2C3D4E5F6A7B8C9D0E1FA /* CTestI18nEngine.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CTestI18nEngine.cpp; path = ../../src/Engine/Tests/CTestI18nEngine.cpp; sourceTree = SOURCE_ROOT; };
 		A1B2C3D4E5F6A7B8C9D0E2FA /* CTestKtx2Transcode.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CTestKtx2Transcode.cpp; path = ../../src/Engine/Tests/CTestKtx2Transcode.cpp; sourceTree = SOURCE_ROOT; };
+		0PENCV0000000000000A003 /* MT_OpenCV.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = MT_OpenCV.cpp; path = ../../src/Engine/OpenCV/MT_OpenCV.cpp; sourceTree = SOURCE_ROOT; };
+		0YOLO0000000000000CA01 /* MT_YoloDetector.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = MT_YoloDetector.cpp; path = ../../src/Engine/OpenCV/MT_YoloDetector.cpp; sourceTree = SOURCE_ROOT; };
+		0YOLO0000000000000DA01 /* MT_YoloDetector.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = MT_YoloDetector.h; path = ../../src/Engine/OpenCV/MT_YoloDetector.h; sourceTree = SOURCE_ROOT; };
+		0YOLO0000000000000CA02 /* CYoloModelManager.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CYoloModelManager.cpp; path = ../../src/Engine/OpenCV/CYoloModelManager.cpp; sourceTree = SOURCE_ROOT; };
+		0YOLO0000000000000DA02 /* CYoloModelManager.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CYoloModelManager.h; path = ../../src/Engine/OpenCV/CYoloModelManager.h; sourceTree = SOURCE_ROOT; };
+		0YOLO0000000000000CA03 /* CTestYoloDetector.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CTestYoloDetector.cpp; path = ../../src/Engine/Tests/CTestYoloDetector.cpp; sourceTree = SOURCE_ROOT; };
+		0YOLO0000000000000DA03 /* CTestYoloDetector.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CTestYoloDetector.h; path = ../../src/Engine/Tests/CTestYoloDetector.h; sourceTree = SOURCE_ROOT; };
+		0PENCV0000000000000A004 /* MT_OpenCV.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = MT_OpenCV.h; path = ../../src/Engine/OpenCV/MT_OpenCV.h; sourceTree = SOURCE_ROOT; };
+		0PENCV0000000000000A005 /* CTestOpenCVBridge.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CTestOpenCVBridge.cpp; path = ../../src/Engine/Tests/CTestOpenCVBridge.cpp; sourceTree = SOURCE_ROOT; };
+		0PENCV0000000000000A006 /* CTestOpenCVBridge.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CTestOpenCVBridge.h; path = ../../src/Engine/Tests/CTestOpenCVBridge.h; sourceTree = SOURCE_ROOT; };
 		A0E1F00000000000000000F1 /* CTestExifEngine.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CTestExifEngine.cpp; path = ../../src/Engine/Tests/CTestExifEngine.cpp; sourceTree = SOURCE_ROOT; };
 		A0E1F00000000000000000F2 /* CTestExifEngine.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CTestExifEngine.h; path = ../../src/Engine/Tests/CTestExifEngine.h; sourceTree = SOURCE_ROOT; };
 		A0E1F00000000000000000FB /* CTestExifMetadataReach.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CTestExifMetadataReach.cpp; path = ../../src/Engine/Tests/CTestExifMetadataReach.cpp; sourceTree = SOURCE_ROOT; };
@@ -2387,6 +2476,7 @@
 				415EE8DC238EB93800C0A32A /* Funct */,
 				415EE8F6238EB93800C0A32A /* Libs */,
 				FA06001B279999990000C001 /* Video */,
+				0PENCV0000000000000A007 /* OpenCV */,
 			);
 			name = Engine;
 			path = ../../src/Engine;
@@ -2411,6 +2501,19 @@
 			path = System;
 			sourceTree = "<group>";
 		};
+		0PENCV0000000000000A007 /* OpenCV */ = {
+			isa = PBXGroup;
+			children = (
+				0PENCV0000000000000A003 /* MT_OpenCV.cpp */,
+				0PENCV0000000000000A004 /* MT_OpenCV.h */,
+				0YOLO0000000000000CA01 /* MT_YoloDetector.cpp */,
+				0YOLO0000000000000DA01 /* MT_YoloDetector.h */,
+				0YOLO0000000000000CA02 /* CYoloModelManager.cpp */,
+				0YOLO0000000000000DA02 /* CYoloModelManager.h */,
+			);
+			name = OpenCV;
+			sourceTree = "<group>";
+		};
 		FA06001B279999990000C001 /* Video */ = {
 			isa = PBXGroup;
 			children = (
@@ -2421,8 +2524,12 @@
 				BAF7D8FBBB7093FEDBCD8970 /* CVideoSourceWebMVpx.h */,
 				FA0600FF27999999FFFF0002 /* CVideoSourceFFmpeg.cpp */,
 				FA0600FF27999999FFFF0003 /* CVideoSourceFFmpeg.h */,
+				A1B2C3D4E5F6A7B8C9D0E6F1 /* MT_MediaPacket.h */,
 				FA07001B279999990000E001 /* IVideoPacketDecoder.h */,
 				FA07001B279999990000E002 /* CVideoDecoderHEVCVT.cpp */,
+				FA07001C279999990000E002 /* IVideoPacketDecoder.cpp */,
+				FA07001D279999990000E002 /* CVideoSourceAVFoundation.mm */,
+				FA07001F279999990000E002 /* CVideoSourceMediaFoundation.cpp */,
 				FA07001B279999990000E003 /* CVideoDecoderHEVCVT.h */,
 				AA07001B279999990000E011 /* CVideoDecoderHEVCMF.cpp */,
 				AA07001B279999990000E012 /* CVideoDecoderHEVCMF.h */,
@@ -2439,6 +2546,21 @@
 				AA07001B279999990000E013 /* MFComThreadGuard.h */,
 				1C17DC45A49A41678684DB85 /* AacAscParser.cpp */,
 				3B35C8AE0779404F84962D55 /* AacAscParser.h */,
+				A11B0002CE7742AABB110002 /* MT_AnnexB.cpp */,
+				A11B0003CE7742AABB110003 /* MT_AnnexB.h */,
+				A11C0017CE7742AABB110017 /* MT_Mp4vEsds.cpp */,
+				A11D0017CE7742AABB110017 /* MT_Mp4vEsds.h */,
+				A11C0018CE7742AABB110018 /* MT_AudioFrames.cpp */,
+				A11D0018CE7742AABB110018 /* MT_AudioFrames.h */,
+				A11C0019CE7742AABB110019 /* CAudioConverterApple.cpp */,
+				A11D0019CE7742AABB110019 /* CAudioConverterApple.h */,
+				A11C0020CE7742AABB110020 /* CAudioDecoderCompressedApple.cpp */,
+				A11D0020CE7742AABB110020 /* CAudioDecoderCompressedApple.h */,
+				A11C0021CE7742AABB110021 /* CAudioDecoderCompressedMF.cpp */,
+				A11D0021CE7742AABB110021 /* CAudioDecoderCompressedMF.h */,
+				A11C0022CE7742AABB110022 /* CVideoSourceAvi.cpp */,
+				A11D0022CE7742AABB110022 /* CVideoSourceAvi.h */,
+				A11D0023CE7742AABB110023 /* CAudioDecoderCompressedNative.h */,
 				FA09001C279999990000F003 /* CVideoFrameExtractor.cpp */,
 				FA09001C279999990000F004 /* CVideoFrameExtractor.h */,
 				FA09001C279999990000FA51 /* CVideoTransferFunctions.h */,
@@ -2903,6 +3025,12 @@
 				415EEA61238EC29D00C0A32A /* CSlrMusicFile.cpp */,
 				415EEA62238EC29D00C0A32A /* CSlrMusicFile.h */,
 				415EEA63238EC29D00C0A32A /* CSlrMusicFileOgg.cpp */,
+				FA070021279999990000E002 /* miniaudio_impl.c */,
+				FA070020279999990000E002 /* CSlrMusicFileMiniaudio.cpp */,
+				FA070023279999990000E002 /* CSlrMusicFileResampled.cpp */,
+				FA070026279999990000E002 /* MT_MusicFileFactory.cpp */,
+				FA070025279999990000E002 /* CSlrMusicFileMFAudio.cpp */,
+				FA070024279999990000E002 /* CSlrMusicFileAVFAudio.mm */,
 				415EEA64238EC29D00C0A32A /* CSlrMusicFileOgg.h */,
 				415EEA65238EC29D00C0A32A /* CSlrMusicSwitcher.cpp */,
 				415EEA66238EC29D00C0A32A /* CSlrMusicSwitcher.h */,
@@ -3182,6 +3310,7 @@
 				417C864D245E2BA8001D67E9 /* CNetClientData.cpp */,
 				417C864B245E2BA8001D67E9 /* CNetClientData.h */,
 				417C8650245E2BA8001D67E9 /* NET_Includes.h */,
+				01D43B5874C6CF84DBC83FB6 /* NET_AuthPw2.h */,
 			);
 			path = Net;
 			sourceTree = "<group>";
@@ -3584,6 +3713,8 @@
 				5EA9D8BACF3EC9927342474D /* MT_SurfaceEncoding.h */,
 				F4BF4F7D192F9991FBF29216 /* CTestScissorClamp.cpp */,
 				881A67E32B732D1DD94C4E9D /* CTestScissorClamp.h */,
+				A7E56C0C3F9A45A98B12D3E2 /* CTestTextEditorMutation.cpp */,
+				A7E56C0C3F9A45A98B12D3E3 /* CTestTextEditorMutation.h */,
 				4F1034DAE412B14FE8EFA3EC /* CTestResidentFunnel.cpp */,
 				13CE95646B20484C9F9F9F52 /* CTestResidentFunnel.h */,
 				C59CB244DC21F77AF78D9F23 /* ERenderTextureFormat.h */,
@@ -3873,10 +4004,28 @@
 				A1B2C3D4E5F6A7B8C9D0E1F6 /* CTestRunner.cpp */,
 				A1B2C3D4E5F6A7B8C9D0E1F7 /* CTestSuite.h */,
 				A1B2C3D4E5F6A7B8C9D0E1F8 /* CTestSuite.cpp */,
+				A1B2C3D4E5F6A7B8C9D0E7F1 /* CTestWebMVpxLane.h */,
+				A21B0002CE7742AABB210002 /* CTestAviLane.h */,
+				A21B0001CE7742AABB210001 /* CTestAviLane.cpp */,
+				A1B2C3D4E5F6A7B8C9D0E5F1 /* CTestMusicResampling.h */,
+				A1B2C3D4E5F6A7B8C9D0E4F1 /* CTestAudioResampler.h */,
+				A1B2C3D4E5F6A7B8C9D0E3F1 /* MT_AudioResampler.h */,
+				A1B2C3D4E5F6A7B8C9D0E2F1 /* CTestEngineSampleRate.h */,
 				A1B2C3D4E5F6A7B8C9D0E1F9 /* CTestI18nEngine.h */,
 				A1B2C3D4E5F6A7B8C9D0E2F9 /* CTestKtx2Transcode.h */,
+				A1B2C3D4E5F6A7B8C9D0E7F2 /* CTestWebMVpxLane.cpp */,
+				FA07001E279999990000E002 /* CTestVideoSourceAVF.cpp */,
+				FA070022279999990000E002 /* CTestMusicFormats.cpp */,
+				A1B2C3D4E5F6A7B8C9D0E5F2 /* CTestMusicResampling.cpp */,
+				A1B2C3D4E5F6A7B8C9D0E4F2 /* CTestAudioResampler.cpp */,
+				A1B2C3D4E5F6A7B8C9D0E3F2 /* MT_AudioResampler.cpp */,
+				A1B2C3D4E5F6A7B8C9D0E2F2 /* CTestEngineSampleRate.cpp */,
 				A1B2C3D4E5F6A7B8C9D0E1FA /* CTestI18nEngine.cpp */,
 				A1B2C3D4E5F6A7B8C9D0E2FA /* CTestKtx2Transcode.cpp */,
+				0PENCV0000000000000A005 /* CTestOpenCVBridge.cpp */,
+				0PENCV0000000000000A006 /* CTestOpenCVBridge.h */,
+				0YOLO0000000000000CA03 /* CTestYoloDetector.cpp */,
+				0YOLO0000000000000DA03 /* CTestYoloDetector.h */,
 				A0E1F00000000000000000F1 /* CTestExifEngine.cpp */,
 				A0E1F00000000000000000F2 /* CTestExifEngine.h */,
 				A0E1F00000000000000000FB /* CTestExifMetadataReach.cpp */,
@@ -3967,6 +4116,12 @@
 				C1D2E3F4A5B6C7D8E9F0A1B3 /* CTest.h in Headers */,
 				C1D2E3F4A5B6C7D8E9F0A1B4 /* CTestRunner.h in Headers */,
 				C1D2E3F4A5B6C7D8E9F0A1B5 /* CTestSuite.h in Headers */,
+				C1D2E3F4A5B6C7D8E9F0A6B1 /* CTestWebMVpxLane.h in Headers */,
+				A21A0002CE7742AABB210002 /* CTestAviLane.h in Headers */,
+				C1D2E3F4A5B6C7D8E9F0A5B1 /* CTestMusicResampling.h in Headers */,
+				C1D2E3F4A5B6C7D8E9F0A4B1 /* CTestAudioResampler.h in Headers */,
+				C1D2E3F4A5B6C7D8E9F0A3B1 /* MT_AudioResampler.h in Headers */,
+				C1D2E3F4A5B6C7D8E9F0A2B1 /* CTestEngineSampleRate.h in Headers */,
 				C1D2E3F4A5B6C7D8E9F0A1B6 /* CTestI18nEngine.h in Headers */,
 				C1D2E3F4A5B6C7D8E9F0A2B6 /* CTestKtx2Transcode.h in Headers */,
 				C0DEFACE0000000000000204 /* CTestLlamaAvailability.h in Headers */,
@@ -4049,6 +4204,7 @@
 				41D5E23B239D890700143F1C /* CGuiViewMessageBox.h in Headers */,
 				41D5E2EF239D891200143F1C /* CSlrTexture.h in Headers */,
 				417C8656245E2BA8001D67E9 /* CNetClientData.h in Headers */,
+				779720E1B54E5CE328025318 /* NET_AuthPw2.h in Headers */,
 				41D5E1FC239D890700143F1C /* CGuiViewConsole.h in Headers */,
 				4189FFA52790AD6D006432AE /* CMidiInKeyboard.h in Headers */,
 				41DAE4B723BA18C90011FEA9 /* SYS_MacOS.h in Headers */,
@@ -4331,6 +4487,7 @@
 				C0DEFACE0000000000000B04 /* Build image_codecs */,
 				C0DEFACE0000000000000B05 /* Build video_codecs */,
 				C0DEFACE0000000000000B06 /* Build SDL3 */,
+				C0DEFACE0000000000000B07 /* Build opencv */,
 				410CAEED2397A470009DA199 /* Sources */,
 				410CAEEE2397A470009DA199 /* Frameworks */,
 				410CAEEF2397A470009DA199 /* Headers */,
@@ -4461,6 +4618,28 @@
 			shellScript = "\"$PROJECT_DIR/build-ftxui.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
+		C0DEFACE0000000000000B07 /* Build opencv */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(PROJECT_DIR)/build-opencv.sh",
+			);
+			name = "Build opencv";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(MT_CAPS_LIBS_DIR)/libmt_opencv.a",
+				"$(MT_CAPS_LIBS_DIR)/libmt_opencv.stamp",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "\"$PROJECT_DIR/build-opencv.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
 		C0DEFACE0000000000000B04 /* Build image_codecs */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
@@ -4550,8 +4729,21 @@
 				B1C2D3E4F5A6B7C8D9E0F1A2 /* CTest.cpp in Sources */,
 				B1C2D3E4F5A6B7C8D9E0F1A3 /* CTestRunner.cpp in Sources */,
 				B1C2D3E4F5A6B7C8D9E0F1A4 /* CTestSuite.cpp in Sources */,
+				B1C2D3E4F5A6B7C8D9E0F6A1 /* CTestWebMVpxLane.cpp in Sources */,
+				A21A0001CE7742AABB210001 /* CTestAviLane.cpp in Sources */,
+				FA07001E279999990000E004 /* CTestVideoSourceAVF.cpp in Sources */,
+				FA070022279999990000E004 /* CTestMusicFormats.cpp in Sources */,
+				B1C2D3E4F5A6B7C8D9E0F5A1 /* CTestMusicResampling.cpp in Sources */,
+				B1C2D3E4F5A6B7C8D9E0F4A1 /* CTestAudioResampler.cpp in Sources */,
+				B1C2D3E4F5A6B7C8D9E0F3A1 /* MT_AudioResampler.cpp in Sources */,
+				B1C2D3E4F5A6B7C8D9E0F2A1 /* CTestEngineSampleRate.cpp in Sources */,
 				B1C2D3E4F5A6B7C8D9E0F1A5 /* CTestI18nEngine.cpp in Sources */,
 				B1C2D3E4F5A6B7C8D9E0F2A5 /* CTestKtx2Transcode.cpp in Sources */,
+				0PENCV0000000000000A001 /* MT_OpenCV.cpp in Sources */,
+				0PENCV0000000000000A002 /* CTestOpenCVBridge.cpp in Sources */,
+				0YOLO0000000000000BA01 /* MT_YoloDetector.cpp in Sources */,
+				0YOLO0000000000000BA02 /* CYoloModelManager.cpp in Sources */,
+				0YOLO0000000000000BA03 /* CTestYoloDetector.cpp in Sources */,
 				A0E1F00000000000000000F3 /* CTestExifEngine.cpp in Sources */,
 				A0E1F00000000000000000FA /* CTestExifMetadataReach.cpp in Sources */,
 				B0E1FA0000000000000000A3 /* RawTestFixtures.cpp in Sources */,
@@ -4597,12 +4789,22 @@
 				61E4E7EB7494E06159ABDBF5 /* CVideoSourceWebMVpx.cpp in Sources */,
 				FA0600FF27999999FFFF0001 /* CVideoSourceFFmpeg.cpp in Sources */,
 				FA07001B279999990000E004 /* CVideoDecoderHEVCVT.cpp in Sources */,
+				FA07001C279999990000E004 /* IVideoPacketDecoder.cpp in Sources */,
+				FA07001D279999990000E004 /* CVideoSourceAVFoundation.mm in Sources */,
+				FA07001F279999990000E004 /* CVideoSourceMediaFoundation.cpp in Sources */,
 				AA07001B279999990000E010 /* CVideoDecoderHEVCMF.cpp in Sources */,
 				AA07001B279999990000E020 /* CVideoDecoderWMVMF.cpp in Sources */,
 				AA07001B279999990000E023 /* CAudioDecoderWMAMF.cpp in Sources */,
 				60F7FD543E404694B25CC600 /* CAudioDecoderAACApple.cpp in Sources */,
 				96BE968EBC844049BCD66EDC /* CAudioDecoderAACMF.cpp in Sources */,
 				96850BDA37774909941F6F94 /* AacAscParser.cpp in Sources */,
+				A11B0001CE7742AABB110001 /* MT_AnnexB.cpp in Sources */,
+				A11B0017CE7742AABB110017 /* MT_Mp4vEsds.cpp in Sources */,
+				A11B0018CE7742AABB110018 /* MT_AudioFrames.cpp in Sources */,
+				A11B0019CE7742AABB110019 /* CAudioConverterApple.cpp in Sources */,
+				A11B0020CE7742AABB110020 /* CAudioDecoderCompressedApple.cpp in Sources */,
+				A11B0021CE7742AABB110021 /* CAudioDecoderCompressedMF.cpp in Sources */,
+				A11B0022CE7742AABB110022 /* CVideoSourceAvi.cpp in Sources */,
 				FA09001C279999990000F001 /* CVideoFrameExtractor.cpp in Sources */,
 				FA09001C279999990000F002 /* VideoFrameTransform.cpp in Sources */,
 				FA06001B279999990000B003 /* CVideoYUVShader.cpp in Sources */,
@@ -4932,6 +5134,7 @@
 				1A273BC7C2350B351F01D2CB /* CRenderShaderCustomFragmentOpenGL4.cpp in Sources */,
 				35EC122609A6C07012CFEDA4 /* CTestSurfaceEncoding.cpp in Sources */,
 				549F556C554B62B6E8B28510 /* CTestScissorClamp.cpp in Sources */,
+				A7E56C0C3F9A45A98B12D3E1 /* CTestTextEditorMutation.cpp in Sources */,
 				537A95FB36E13A182AF484FA /* CTestResidentFunnel.cpp in Sources */,
 				E63B320D29D53B38700AFC51 /* CTestImageDataFloat.cpp in Sources */,
 				F347734AA687F2E455DA28E1 /* MT_ShaderProbe.cpp in Sources */,
@@ -4942,6 +5145,12 @@
 				4154FF1E2397A93A00EB6387 /* CMusicChannel.cpp in Sources */,
 				4154FF1F2397A93A00EB6387 /* CSlrMusicFile.cpp in Sources */,
 				4154FF202397A93A00EB6387 /* CSlrMusicFileOgg.cpp in Sources */,
+				FA070021279999990000E004 /* miniaudio_impl.c in Sources */,
+				FA070020279999990000E004 /* CSlrMusicFileMiniaudio.cpp in Sources */,
+				FA070023279999990000E004 /* CSlrMusicFileResampled.cpp in Sources */,
+				FA070026279999990000E004 /* MT_MusicFileFactory.cpp in Sources */,
+				FA070025279999990000E004 /* CSlrMusicFileMFAudio.cpp in Sources */,
+				FA070024279999990000E004 /* CSlrMusicFileAVFAudio.mm in Sources */,
 				41D5E22A239D890700143F1C /* CGuiSlider.cpp in Sources */,
 				413E03AA26791B900032D02B /* imguiComboFilter.cpp in Sources */,
 				4154FF212397A93A00EB6387 /* CSlrMusicSwitcher.cpp in Sources */,
@@ -5069,6 +5278,8 @@
 				GCC_C_LANGUAGE_STANDARD = c17;
 				HEADER_SEARCH_PATHS = (
 					"$(MT_CAPS_INCLUDE_DIR)",
+					"$(MT_CAPS_LIBS_DIR)/opencv/include",
+					"$(PROJECT_DIR)/../../src/Engine/OpenCV",
 					"$(HOME)/.cache/mtengine/_standalone/include",
 					"$(PROJECT_DIR)/include",
 					/usr/local/include/freetype2,
@@ -5132,6 +5343,8 @@
 				GCC_OPTIMIZATION_LEVEL = 3;
 				HEADER_SEARCH_PATHS = (
 					"$(MT_CAPS_INCLUDE_DIR)",
+					"$(MT_CAPS_LIBS_DIR)/opencv/include",
+					"$(PROJECT_DIR)/../../src/Engine/OpenCV",
 					"$(HOME)/.cache/mtengine/_standalone/include",
 					"$(PROJECT_DIR)/include",
 					/usr/local/include/freetype2,

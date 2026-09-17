@@ -203,6 +203,19 @@ typedef unsigned int UINT16;
 
 /* INT16 must hold at least the values -32768..32767. */
 
+/* MTEngineSDL: pull in the Windows SDK typedefs BEFORE deciding anything.
+ * The INT32 block below already defers to Microsoft when _BASETSD_H_ is
+ * defined -- but only if basetsd.h happened to be included first. Whether it
+ * was is pure include order in the calling TU: a header that reaches
+ * windows.h after this one leaves INT32 as `long` here and `int` there, and
+ * the SDK is the one that reports the redefinition. Including basetsd.h here
+ * makes the order irrelevant. It is small, self-contained, and defines the
+ * very guard this file tests.
+ */
+#if defined(_WIN32)
+#include <basetsd.h>
+#endif
+
 #ifndef XMD_H			/* X11/xmd.h correctly defines INT16 */
 typedef short INT16;
 #endif

@@ -1,3 +1,10 @@
+// CAPABILITY GUARD (MT_ENABLE_ENET). The file stays in all three build lists and
+// compiles to nothing when the capability is off -- the guard-the-body,
+// keep-the-file idiom, which exists because an Xcode PBXBuildFile cannot be
+// conditioned on a build setting the way a CMake or MSBuild item can.
+// MT_CAP_NET_TRANSPORT declared this removable and nothing enforced it: MT_ENABLE_ENET appeared in no source, so the code shipped whatever the manifest said.
+#if MT_ENABLE_ENET
+
 /** 
  @file compress.c
  @brief An adaptive order-2 PPM range coder
@@ -652,3 +659,5 @@ enet_host_compress_with_range_coder (ENetHost * host)
 /** @} */
     
      
+
+#endif // MT_ENABLE_ENET

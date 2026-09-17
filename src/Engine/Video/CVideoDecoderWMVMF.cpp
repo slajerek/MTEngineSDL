@@ -5,12 +5,14 @@
 
 #include "CVideoDecoderWMVMF.h"
 
-#if defined(_WIN32) && (!defined(MT_ENABLE_FFMPEG) || (MT_ENABLE_FFMPEG))
+// Platform only -- the gate no longer includes MT_ENABLE_FFMPEG. See the
+// header and MT_MediaPacket.h: this decoder is the destination of the FFmpeg
+// removal and must not be switched off by it.
+#if defined(_WIN32)
 
 #include "MFComThreadGuard.h"
 
 extern "C" {
-#include <libavcodec/avcodec.h>
 }
 
 #include <mfapi.h>
@@ -22,21 +24,21 @@ using MFComThreadGuard::EnsureMFStarted;
 
 namespace
 {
-	CVideoDecoderHEVCMF::ECodec CodecFromAVCodecID(int avCodecId)
+	CVideoDecoderHEVCMF::ECodec CodecFromMediaCodecId(EMediaCodecId codecId)
 	{
-		switch (avCodecId)
+		switch (codecId)
 		{
-			case AV_CODEC_ID_WMV1: return CVideoDecoderHEVCMF::ECodec::WMV1;
-			case AV_CODEC_ID_WMV2: return CVideoDecoderHEVCMF::ECodec::WMV2;
-			case AV_CODEC_ID_WMV3: return CVideoDecoderHEVCMF::ECodec::WMV3;
-			case AV_CODEC_ID_VC1:  return CVideoDecoderHEVCMF::ECodec::WVC1;
+			case EMediaCodecId::WMV1: return CVideoDecoderHEVCMF::ECodec::WMV1;
+			case EMediaCodecId::WMV2: return CVideoDecoderHEVCMF::ECodec::WMV2;
+			case EMediaCodecId::WMV3: return CVideoDecoderHEVCMF::ECodec::WMV3;
+			case EMediaCodecId::VC1:  return CVideoDecoderHEVCMF::ECodec::WVC1;
 			default:               return CVideoDecoderHEVCMF::ECodec::WMV3;
 		}
 	}
 }
 
-CVideoDecoderWMVMF::CVideoDecoderWMVMF(int avCodecId)
-	: CVideoDecoderHEVCMF(CodecFromAVCodecID(avCodecId))
+CVideoDecoderWMVMF::CVideoDecoderWMVMF(EMediaCodecId codecId)
+	: CVideoDecoderHEVCMF(CodecFromMediaCodecId(codecId))
 {
 }
 
@@ -83,4 +85,4 @@ bool IVideoPacketDecoder::IsWMVDecodeAvailable()
 	return AnyWMVDecoderActivate(kWmvHardwareFlags) || AnyWMVDecoderActivate(kWmvSoftwareFlags);
 }
 
-#endif // _WIN32 && MT_ENABLE_FFMPEG
+#endif // _WIN32

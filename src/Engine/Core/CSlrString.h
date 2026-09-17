@@ -37,6 +37,23 @@ public:
 #endif
 	virtual ~CSlrString();
 
+	// NO COPYING. `chars` is not owned -- it is borrowed from a global pool
+	// (_CSlrString_GetCharsVector) and handed back in ~CSlrString. The
+	// compiler-generated copy would duplicate the POINTER, so two live strings
+	// would share one vector and the second destructor would push it into the
+	// pool a SECOND time. The pool then serves that one vector to two more
+	// strings, and they corrupt each other: one clears it while the other
+	// fills it, so GetUTF16's `new u16[GetLength()]` can allocate zero
+	// elements and the loop right after it still writes the other string's
+	// characters -- a heap-buffer-overflow that scatters UTF-16 text through
+	// unrelated live objects. Diagnosed with ASan 2026-09-09; see
+	// c64d/src/TODO.txt "FIRST RUN".
+	//
+	// Copy deliberately with CSlrString(CSlrString *copy), which takes its own
+	// vector from the pool.
+	CSlrString(const CSlrString &) = delete;
+	CSlrString &operator=(const CSlrString &) = delete;
+
 	void Serialize(CByteBuffer *byteBuffer);
 	void Deserialize(CByteBuffer *byteBuffer);
 

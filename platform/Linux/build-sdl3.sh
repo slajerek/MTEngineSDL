@@ -92,7 +92,8 @@ cmake -S "$SDL3_SRC_DIR" -B "$BUILD_DIR" \
   -DBUILD_SHARED_LIBS=OFF \
   -DSDL_CAMERA=OFF
 
-cmake --build "$BUILD_DIR" --config Release --target SDL3-static -j "$(nproc)"
+# MT_BUILD_JOBS, as everywhere else; see the note in build-opencv.sh.
+cmake --build "$BUILD_DIR" --config Release --target SDL3-static -j "${MT_BUILD_JOBS:-$(nproc)}"
 
 found=""
 for f in libSDL3.a libSDL3-static.a; do

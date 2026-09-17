@@ -1,7 +1,8 @@
 #pragma once
 #include "IVideoSource.h"
+#include "MT_MediaPacket.h"
 #include <functional>
-struct AVPacket;
+
 class IVideoPacketDecoder
 {
 public:
@@ -32,7 +33,9 @@ public:
 	// means a genuine decode failure the caller (CVideoSourceFFmpeg::ReadVideoFrame)
 	// must propagate as an error rather than silently skip toward a false
 	// "clean EOS".
-	virtual bool DecodePacket(const AVPacket *pkt, SDecodedVideoFrame &out) = 0;
+	// pkt == NULL drains whatever the decoder still holds (used after EOF and
+	// around a seek). SVideoPacket rather than AVPacket: see MT_MediaPacket.h.
+	virtual bool DecodePacket(const SVideoPacket *pkt, SDecodedVideoFrame &out) = 0;
 
 	// --- Abort plumbing (spec #2.3 "Blocking work must be interruptible") -----
 	//
@@ -85,7 +88,28 @@ public:
 	// consumes hvcC directly and never overrides this -- default false keeps
 	// that path bsf-free and byte-identical to before this seam existed.
 	virtual bool WantsAnnexB() const { return false; }
-	static bool IsHEVCDecodeAvailable();   // implemented per platform; false stub elsewhere
+	// Is a HEVC decoder available that reads the SPS VUI colour description?
+	//
+	// NOT the same question as IsHEVCDecodeAvailable(). VideoToolbox decodes
+	// HEVC but takes its transfer characteristic from the container, so for a
+	// clip whose container is untagged -- tests/fixtures/video/
+	// hevc_main10_hlg.mp4 has no `colr` box at all -- it cannot report HLG and
+	// selects an 8-bit output format. Only a decoder that parses the VUI can,
+	// and today the only one in the tree is libavcodec's software HEVC.
+	//
+	// Tests gate HDR colour assertions on this. It exists so they can ask
+	// without naming FFmpeg: an app's test fixture header used to
+	// answer it with avcodec_find_decoder(), which dragged an UNGUARDED
+	// <libavcodec/avcodec.h> into all 18 translation units that include that
+	// header -- five of which are not video tests -- and was a hard build
+	// failure at MT_ENABLE_FFMPEG=0.
+	static bool IsHEVCSoftwareDecodeAvailable();
+
+	// Implemented per platform; the false stubs for platforms without a native
+	// decoder live in IVideoPacketDecoder.cpp, which is NEVER FFmpeg-gated.
+	// They used to live at the end of CVideoSourceFFmpeg.cpp, which erased them
+	// at MT_ENABLE_FFMPEG=0 -- the one configuration they are most needed in.
+	static bool IsHEVCDecodeAvailable();
 	// WMV family (WMV1/WMV2/WMV3/WVC1): true only on Windows when the in-box
 	// WMVideo Decoder MFT resolves (absent on N editions without the Media
 	// Feature Pack). No other platform has a native WMV story -- Apple/Linux

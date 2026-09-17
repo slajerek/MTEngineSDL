@@ -28,12 +28,16 @@
 # identically, and a command-line setting still overrides the include when the
 # wrapper is driving.
 #
-# The two sets are close but NOT identical, and the differences are deliberate:
-#   * only the pre-action writes MT_CAPS_INCLUDE_DIR, because only the IDE path
-#     needs it -- the targets' HEADER_SEARCH_PATHS reference $(MT_CAPS_INCLUDE_DIR)
-#     and the wrapper instead passes HEADER_SEARCH_PATHS outright;
-#   * only the wrapper passes HEADER_SEARCH_PATHS, for that same reason.
-# Anything else appearing in one and not the other is a bug: a setting present
+# BOTH channels now supply MT_CAPS_INCLUDE_DIR and NEITHER assigns
+# HEADER_SEARCH_PATHS. The targets' HEADER_SEARCH_PATHS reference
+# $(MT_CAPS_INCLUDE_DIR), so supplying the value is enough, and it is the only
+# shape in which the two channels produce the SAME compile command. The wrapper
+# used to pass HEADER_SEARCH_PATHS="<path>" $(inherited) instead, which put the
+# capability include in the list twice -- a different -I list on every
+# translation unit, so alternating the channels recompiled everything both ways
+# (measured 2026-09-09 on c64d).
+#
+# Anything appearing in one and not the other is a bug: a setting present
 # here but absent from the CLI list leaks a stale value into a wrapper build,
 # because the wrapper no longer rewrites this file.
 #
@@ -47,9 +51,9 @@
 # in Xcode produces; two SCRIPT builds racing never touch these files". BOTH
 # HALVES WERE FALSE, and measurement is what showed it:
 #
-#   * `xcodebuild -scheme` runs this pre-action too, so the SCRIPT path writes
-#     this file on every build -- it is an aggressor, not a bystander. (It is
-#     never a VICTIM: its command-line settings outrank the include.)
+#   * `xcodebuild -scheme` runs this pre-action too, so an unguarded SCRIPT path
+#     would write this file on every build -- an aggressor, not a bystander. (It
+#     is never a VICTIM: its command-line settings outrank the include.)
 #   * so the dangerous pairing is not "two IDE builds" but "any build while an
 #     IDE build is in flight", which three agents on three apps produce trivially.
 #
@@ -75,34 +79,63 @@ ENGINE_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 # criterion, so a second resolve here is not a redundancy, it is a defect.
 # On the IDE path (no driver) MT_CAPS_WRAPPER is unset and the pre-action's
 # resolve IS the one resolve, exactly as before.
+#
+# The one thing a wrapper build still does here is annotate the already-held
+# app-lock with OBJROOT. That does not touch the IDE channel and does not run a
+# second resolve; it only gives stale-lock recovery the build directory that the
+# outer driver could not know before it invoked xcodebuild.
 if [[ "${MT_CAPS_WRAPPER:-0}" == "1" ]]; then
+    "$SCRIPT_DIR/build-lock.sh" annotate "$APP_NAME" || true
     echo "mtcaps pre-action: driver build (MT_CAPS_WRAPPER=1) -- settings ride the command line, skipping the IDE resolve."
     exit 0
 fi
 
 MANIFEST="$APP_DIR/mtengine.caps"
 
-# THE BUILD LOCK, taken before anything else this build does.
+# Where both locks live: beside the five repos, inside none of them -- the same
+# directory and the same reasoning as the IDE channel's own files. IDE_ROOT is
+# recomputed further down for the xcconfig paths; this is the same expression,
+# needed earlier because the locks come first.
+IDE_LOCK_DIR="$(cd "$ENGINE_DIR/.." && pwd)/.mtengine-ide/ide-channel.lock"
+
+# THE TWO BUILD LOCKS, taken before anything else this build does, app first.
 #
-# The engine checkout is shared by four apps and cannot serve two at once -- see
-# build-lock.sh's header for the two things that actually collide. Acquiring HERE
-# is what makes one choke point serve both channels: MEASURED, `xcodebuild
-# -scheme` runs this pre-action too, so the script path queues behind an IDE
-# build and vice versa.
+# Only the IDE path reaches this line -- a driver build exited above -- and the
+# IDE path is the one that has to hold both:
+#
+#   app-<APP>.lock    this app's DerivedData and $MT_OUT, shared with a CLI
+#                     build of the SAME app, which must not run beside us.
+#   ide-channel.lock  _current/engine.xcconfig, which is ONE file for every app
+#                     and is what genuinely stops two IDE builds coexisting.
+#
+# They are separate because conflating them is what made a CLI build of one app
+# block an Xcode build of a DIFFERENT one: there was a single checkout-wide
+# mutex, and the CLI channel took it although it collides with nothing here (it
+# does not write _current or depend on it -- its settings ride the command line,
+# which outranks any xcconfig). Now those two builds hold disjoint locks and run
+# together, which is the point of the split.
+#
+# ALWAYS app THEN ide. Two IDE builds of different apps hold different app locks
+# and queue on the ide lock; a consistent order is what stops them deadlocking.
 #
 # It BLOCKS rather than failing: three agents building three apps should queue,
 # not error. A lock held by a build that has already died is broken
 # automatically, so a crashed or cancelled build cannot wedge the others.
 "$SCRIPT_DIR/build-lock.sh" acquire "$APP_NAME" || {
-    echo "mtcaps pre-action: could not acquire the build lock; see the note above." >&2
+    echo "mtcaps pre-action: could not acquire the app build lock; see the note above." >&2
+    exit 1
+}
+MTENGINE_LOCK_DIR="$IDE_LOCK_DIR" "$SCRIPT_DIR/build-lock.sh" acquire "$APP_NAME" || {
+    echo "mtcaps pre-action: could not acquire the IDE-channel lock; see the note above." >&2
+    "$SCRIPT_DIR/build-lock.sh" release "$APP_NAME" || true
     exit 1
 }
 
-# Fill in what the outer acquire could not know. build-macos.sh takes the lock
-# BEFORE xcodebuild -- it stages dependencies inside the engine checkout first --
-# so OBJROOT does not exist yet and the lock records no build directory. Without
-# this the idle probe can never decide for the whole CLI channel, leaving the TTL
-# as its only recovery. We are inside xcodebuild now, so OBJROOT is real.
+# Fill in what the outer acquire could not know. build-macos.sh takes the app
+# lock BEFORE xcodebuild, so OBJROOT does not exist yet and the lock records no
+# build directory. Without this the idle probe can never decide for the whole CLI
+# channel, leaving the TTL as its only recovery. We are inside xcodebuild now, so
+# OBJROOT is real.
 "$SCRIPT_DIR/build-lock.sh" annotate "$APP_NAME" || true
 
 # `.mtengine-ide/` BESIDE the five repos, not under $XDG_CACHE_HOME, and the
@@ -273,16 +306,15 @@ write_xcconfig "$APP_XCCONFIG"    "For the APP target." ""
 # build-macos.sh passes MT_CAPS_WRAPPER=1 (measured: a command-line build setting
 # does reach a pre-action). A wrapper build supplies the whole resolved set on
 # the xcodebuild command line, and a command-line setting outranks the tracked
-# xcconfig's `#include?` -- so the wrapper never READS this file. Writing it
-# anyway made every CLI build an aggressor against any concurrent IDE build, for
-# no benefit to itself: two agents building two apps could silently hand a third
-# app's Xcode build the wrong engine capability set.
+# xcconfig's `#include?` -- so the wrapper does not depend on this file even if
+# Xcode parses the optional include. Writing it anyway made every CLI build an
+# aggressor against any concurrent IDE build, for no benefit to itself: two
+# agents building two apps could silently hand a third app's Xcode build the
+# wrong engine capability set.
 #
-# This is defence in depth, NOT a replacement for the build lock. The lock still
-# has to exist for a collision this cannot touch: the engine's six dependency
-# phases configure and compile under other/lib/*/build INSIDE the checkout,
-# shared by all four apps. Their finished archives now land outside it, keyed by
-# capability set, but the intermediate trees that produce them do not.
+# This is defence in depth, NOT a replacement for the app lock. The app lock
+# still serializes the two channels for the same app, which share DerivedData and
+# the same app output root; dependency stores have their own finer-grained locks.
 if [[ "${MT_CAPS_WRAPPER:-0}" == "1" ]]; then
     echo "mtcaps pre-action: wrapper build -- not writing the shared engine xcconfig"
 else

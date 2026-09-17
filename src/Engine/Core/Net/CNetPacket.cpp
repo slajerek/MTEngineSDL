@@ -1,3 +1,10 @@
+// CAPABILITY GUARD (MT_ENABLE_ENET). The file stays in all three build lists and
+// compiles to nothing when the capability is off -- the guard-the-body,
+// keep-the-file idiom, which exists because an Xcode PBXBuildFile cannot be
+// conditioned on a build setting the way a CMake or MSBuild item can.
+// MT_CAP_NET_TRANSPORT declared this removable and nothing enforced it: MT_ENABLE_ENET appeared in no source, so the code shipped whatever the manifest said.
+#if MT_ENABLE_ENET
+
 /*
  *
  *  MTEngine framework (c) 2009 Marcin Skoczylas
@@ -205,3 +212,5 @@ void LOGCCFROM(std::string clientName, u8 protocolType, u16 packetType, const ch
     LOGCC("%s <FROM< %2.2x/%4.4x: %s", clientName, protocolType, packetType, buffer);
 #endif
 }
+
+#endif // MT_ENABLE_ENET

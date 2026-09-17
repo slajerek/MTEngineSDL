@@ -1,3 +1,9 @@
+// CAPABILITY GUARD (MT_ENABLE_NET_GAME). The file stays in all three build lists and
+// compiles to nothing when the capability is off -- an Xcode PBXBuildFile
+// cannot be conditioned on a build setting, so the condition lives here.
+// MT_CAP_NET_GAME implies NET_TRANSPORT and HTTP, so this whole stack rides on one flag -- which did not exist until 2026-09-06 (enables was an empty list).
+#if MT_ENABLE_NET_GAME
+
 #include "CNetGameServer.h"
 #include "NET_Main.h"
 #include "SYS_Main.h"
@@ -48,6 +54,23 @@ CNetGameServer::CNetGameServer(json serverConfig, int serverPort)
 
 CNetGameServer::~CNetGameServer()
 {
+	// netServer is allocated by this class's own constructor and was never
+	// freed. B3b made `delete server` the normal path (every hibernation, every
+	// stop), so this leaked a CNetServer, its NET_MAX_CLIENTS CNetClientData,
+	// three CByteBuffers and two mutexes on each one (final-review Minor 8).
+	//
+	// Safe: the only callers that reach a delete do so after Shutdown()
+	// returned true, i.e. the network thread has already exited (Shutdown()
+	// refuses and the caller leaks the object instead when it has not).
+	// StopServer() is idempotent -- it returns immediately when the server is
+	// already OFFLINE and not running -- and ~CNetServer() itself joins the
+	// thread before freeing anything.
+	if (netServer)
+	{
+		netServer->StopServer();
+		delete netServer;
+		netServer = NULL;
+	}
 }
 
 void CNetGameServer::Init(CNetServer *netServer)
@@ -417,7 +440,7 @@ void CNetGameServer::SaveState()
 	LOGD("CNetGameServer::SaveState: state saved for gameId=%s, periodic timer reset", gameId.c_str());
 }
 
-void CNetGameServer::Shutdown()
+bool CNetGameServer::Shutdown()
 {
 	isShuttingDown = true;
 
@@ -437,20 +460,20 @@ void CNetGameServer::Shutdown()
 			}
 		}
 
-		// Signal the server thread to stop
-		netServer->status = NET_SERVER_STATUS_SHUTDOWN;
+		// Signal the server thread to stop and wait for it to actually exit.
+		// StopServer() waits for BOTH status==OFFLINE and isRunning==false
+		// (5s cap) and logs its own timeout error -- this replaces the old
+		// advisory-only 2s poll that returned void regardless of outcome.
+		netServer->StopServer();
 
-		// Wait for the network thread to finish (max ~2 seconds)
-		for (int i = 0; i < 100; i++)
-		{
-			if (!netServer->isRunning)
-				break;
-			SYS_Sleep(20);
-		}
-
-		if (netServer->isRunning)
+		bool stopped = (netServer->status == NET_SERVER_STATUS_OFFLINE && !netServer->isRunning);
+		if (!stopped)
 		{
 			LOGError("CNetGameServer::Shutdown: network thread did not stop in time for gameId=%s", gameId.c_str());
+			// Do not touch chatHistory (or anything else the network thread
+			// might still be executing inside) -- the caller must not delete
+			// this object either. Report failure and stop here.
+			return false;
 		}
 	}
 
@@ -461,6 +484,8 @@ void CNetGameServer::Shutdown()
 	}
 
 	LOGM("CNetGameServer::Shutdown: gameId=%s", gameId.c_str());
+
+	return true;
 }
 
 void CNetGameServer::SendJson(CNetClientData *clientData, json sendJson)
@@ -666,3 +691,5 @@ void CNetGameServer::ProcessPendingAuth()
 
 	pendingAuthQueue.clear();
 }
+
+#endif // MT_ENABLE_NET_GAME

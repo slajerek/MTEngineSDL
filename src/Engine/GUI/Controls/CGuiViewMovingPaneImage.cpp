@@ -119,7 +119,10 @@ CGuiViewMovingPaneImage::~CGuiViewMovingPaneImage()
 
 void CGuiViewMovingPaneImage::SetImageData(CImageData *imageIn)
 {
-	SetImageData(imageData, true);
+	// imageIn, not the MEMBER imageData. This passed the member for years, so
+	// the one-argument overload re-set whatever the pane already held and
+	// silently dropped the caller's image -- a no-op that looked like a set.
+	SetImageData(imageIn, true);
 }
 
 void CGuiViewMovingPaneImage::SetImageData(CImageData *imageIn, bool clearZoom)

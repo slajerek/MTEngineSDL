@@ -103,7 +103,22 @@ void SYS_InitFileSystem()
 	const char *settingsFolderName = MT_GetSettingsFolderName();
 
 	gPathToSettings = new char[PATH_MAX];
-	sprintf(gPathToSettings, "%s/.%s/", homeDir, settingsFolderName);
+	// MT_SETTINGS_DIR redirects the settings folder wholesale. An automated
+	// run MUST use it -- the app rewrites layouts/imgui.ini/settings on every
+	// shutdown, so a test run pointed at the real folder overwrites the user's
+	// workspace. tests/run_test.sh sets it.
+	const char *settingsDirOverride = getenv("MT_SETTINGS_DIR");
+	if (settingsDirOverride != NULL && settingsDirOverride[0] != 0)
+	{
+		size_t len = strlen(settingsDirOverride);
+		bool endsWithSlash = (len > 0 && settingsDirOverride[len - 1] == '/');
+		snprintf(gPathToSettings, PATH_MAX, "%s%s", settingsDirOverride, endsWithSlash ? "" : "/");
+		LOGD("pathToSettings redirected by MT_SETTINGS_DIR");
+	}
+	else
+	{
+		sprintf(gPathToSettings, "%s/.%s/", homeDir, settingsFolderName);
+	}
 	LOGD("pathToSettings=%s", gPathToSettings);
 	gCPathToSettings = gPathToSettings;
 	gUTFPathToSettings = new CSlrString(gCPathToSettings);
@@ -234,7 +249,9 @@ std::vector<CFileItem *> *SYS_GetFilesInFolder(const char *directoryPath, std::l
 					{
 						const char *extension = *itExtensions;
 
-						if (!strcmp(extension, fileExtension))
+						// Case-insensitive: a caller asking for "ins" means
+						// Snare.ins, Snare.INS and Snare.Ins alike.
+						if (!strcasecmp(extension, fileExtension))
 						{
 							LOGD("adding file %s", dirp->d_name);
 							//LOGD(fname);
@@ -284,7 +301,7 @@ char *SYS_GetFileExtension(const char *fileName)
 		if (fileName[i] == SYS_FILE_SYSTEM_PATH_SEPARATOR)
 		{
 			// no extension separator
-			char *buf = new char[1];
+			char *buf = (char*)malloc(1);
 			buf[0] = 0x00;
 			return buf;
 		}
@@ -297,7 +314,7 @@ char *SYS_GetFileExtension(const char *fileName)
 
 	if (index == -1)
 	{
-		char *empty = new char[1];
+		char *empty = (char*)malloc(1);
 		empty[0] = 0x00;
 		return empty;
 	}
@@ -846,5 +863,46 @@ void SYS_OpenURLInBrowser(const char *url)
 	if (result == -1) 
 	{
 		LOGError("SYS_OpenURLInBrowser: failed to open url %s", url);
+	}
+}
+
+void SYS_ShowFileInFileManager(const char *filePath)
+{
+	if (filePath == NULL || filePath[0] == 0)
+		return;
+
+	// There is no portable "reveal and select" on Linux, so open the folder
+	// the item lives in -- a directory opens itself, a file opens its parent.
+	namespace fs = std::filesystem;
+	std::error_code ec;
+	fs::path path(filePath);
+	fs::path folder = fs::is_directory(path, ec) ? path : path.parent_path();
+	if (folder.empty())
+		folder = path;
+
+	std::string target = folder.string();
+
+	// fork/exec rather than system(): no shell means no quoting rules to get
+	// wrong, so a folder name with a space or a quote in it still opens.
+	pid_t pid = fork();
+	if (pid == 0)
+	{
+		execlp("xdg-open", "xdg-open", target.c_str(), (char *)NULL);
+		_exit(127);
+	}
+	if (pid < 0)
+	{
+		LOGError("SYS_ShowFileInFileManager: fork failed for %s", target.c_str());
+		return;
+	}
+
+	// Reap it so the child does not linger as a zombie; xdg-open returns as
+	// soon as it has handed the path to the file manager.
+	int status = 0;
+	waitpid(pid, &status, 0);
+	if (WIFEXITED(status) && WEXITSTATUS(status) != 0)
+	{
+		LOGError("SYS_ShowFileInFileManager: xdg-open returned %d for %s",
+				 WEXITSTATUS(status), target.c_str());
 	}
 }

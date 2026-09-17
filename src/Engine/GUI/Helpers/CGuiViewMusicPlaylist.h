@@ -119,6 +119,12 @@ private:
 	void RenderWaveformPanel(const CMusicWaveformCache &cache, int64_t maxSample, int64_t cueIn, int64_t cueOut);
 	void RenderCueEditor();
 
+	// Windows N/KN ships no Media Foundation AAC decoder, so .m4a/.aac simply do
+	// not open there. Surfaced here rather than left as a silent load failure,
+	// because it is the rare unsupported-format case the USER can fix -- same
+	// shape as the host's HEIF notice, and for the same reason.
+	void RenderAacAvailabilityNotice();
+
 	const char *L(const char *key, const char *fallback) const;
 
 private:

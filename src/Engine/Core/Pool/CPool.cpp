@@ -1,5 +1,6 @@
 #include "CPool.h"
 #include "DBG_Log.h"
+#include <cstring>
 
 // Create a new pool by defining the number of items to preallocate, and the
 // size of each item.  For situations where you do not want the allocation
@@ -17,6 +18,10 @@ CPool::CPool(const WORD nPoolSize, const size_t nItemSize, const bool bGrow) :
 	m_pFreeStack = new BYTE*[m_nPoolSize];
 	m_pAvailable = m_pPool;
 	m_pLast = m_pPool + m_nItemSize * m_nPoolSize;
+#if defined(MT_POOL_GUARD)
+	m_pSlotInUse = new BYTE[m_nPoolSize];
+	memset(m_pSlotInUse, 0, m_nPoolSize);
+#endif
 	
 	mutex = new CSlrMutex("CPool");
 }
@@ -36,6 +41,10 @@ CPool::CPool(CPool* const pPrev) :
 	m_pFreeStack = new BYTE*[m_nPoolSize];
 	m_pAvailable = m_pPool;
 	m_pLast = m_pPool + m_nItemSize * m_nPoolSize;
+#if defined(MT_POOL_GUARD)
+	m_pSlotInUse = new BYTE[m_nPoolSize];
+	memset(m_pSlotInUse, 0, m_nPoolSize);
+#endif
 	
 	mutex = new CSlrMutex("CPool");
 }
@@ -46,9 +55,52 @@ CPool::~CPool()
 	delete m_pNext;
 	delete m_pPool;
 	delete [] m_pFreeStack;
+#if defined(MT_POOL_GUARD)
+	delete [] m_pSlotInUse;
+#endif
 
 	delete mutex;
 }
+
+#if defined(MT_POOL_GUARD)
+// Both are called with the pool's mutex HELD and with pItem already known to
+// lie inside [m_pPool, m_pLast).
+void CPool::GuardOnNew(BYTE *pItem)
+{
+	m_pSlotInUse[(pItem - m_pPool) / m_nItemSize] = 1;
+}
+
+bool CPool::GuardOnDelete(BYTE *pItem)
+{
+	size_t offset = (size_t)(pItem - m_pPool);
+
+	// A pointer into the middle of a slot is never something this pool handed
+	// out. Deleting one would corrupt the free stack with an unaligned address
+	// that a later New() would return as if it were an object.
+	if (offset % m_nItemSize != 0)
+	{
+		LOGError("CPool::Delete: pointer %p is not on an item boundary (pool=%p itemSize=%d) -- NOT freed",
+				 pItem, m_pPool, (int)m_nItemSize);
+		return false;
+	}
+
+	BYTE *slot = &m_pSlotInUse[offset / m_nItemSize];
+	if (*slot == 0)
+	{
+		// The bug this exists for. Pushing it again would put one slot on the
+		// free stack twice, and the pool would then hand the SAME object to two
+		// owners -- silent, and invisible to AddressSanitizer because no system
+		// allocator is involved. Refusing the second free keeps the pool
+		// consistent, so the run continues and the log names the culprit.
+		LOGError("CPool::Delete: DOUBLE FREE of %p (pool=%p itemSize=%d) -- ignored, pool left consistent",
+				 pItem, m_pPool, (int)m_nItemSize);
+		return false;
+	}
+
+	*slot = 0;
+	return true;
+}
+#endif
 
 void* CPool::New(const size_t size)
 {
@@ -74,6 +126,9 @@ void* CPool::New(const size_t size)
 		{
 			BYTE*	pReturn = m_pAvailable;
 			m_pAvailable += m_nItemSize;
+#if defined(MT_POOL_GUARD)
+			GuardOnNew(pReturn);
+#endif
 			mutex->Unlock();
 //			LOGD("CPool::New: pool=%x pReturn=%x", m_pPool, pReturn);
 			return reinterpret_cast<void*>(pReturn);
@@ -106,8 +161,14 @@ void* CPool::New(const size_t size)
 	}
 	else
 	{
-		mutex->Unlock();
+		// NOTE: the unlock used to happen BEFORE this line, so `--m_nTOS` and the
+		// read of m_pFreeStack ran unlocked -- two threads could pop the same
+		// slot and each treat it as their own object. Moved below the read.
 		void *pReturn = reinterpret_cast<void*>(m_pFreeStack[--m_nTOS]);
+#if defined(MT_POOL_GUARD)
+		GuardOnNew(reinterpret_cast<BYTE*>(pReturn));
+#endif
+		mutex->Unlock();
 //		LOGD("CPool::New: pool=%x pReturn=%x", m_pPool, pReturn);
 		return pReturn;
 	}
@@ -136,6 +197,13 @@ void CPool::Delete(void* pVoid)
 		}
 		else
 		{
+#if defined(MT_POOL_GUARD)
+			if (!GuardOnDelete(pItem))
+			{
+				mutex->Unlock();
+				return;
+			}
+#endif
 			// Add a hole to the free stack.
 			m_pFreeStack[m_nTOS++] = pItem;
 
@@ -169,6 +237,12 @@ void CPool::Purge()
 {
 	m_nTOS = 0;
 	m_pAvailable = m_pPool;
+#if defined(MT_POOL_GUARD)
+	// Every slot is free again by definition. Without this the map would keep
+	// saying "in use" for slots Purge just reclaimed, and the guard would miss
+	// a stray free of one of them.
+	memset(m_pSlotInUse, 0, m_nPoolSize);
+#endif
 	if (m_pNext)
 		m_pNext->Purge();
 }

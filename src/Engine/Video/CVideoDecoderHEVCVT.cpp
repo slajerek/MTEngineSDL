@@ -1,13 +1,15 @@
 #include "CVideoDecoderHEVCVT.h"
+#include "MT_Mp4vEsds.h"
 #include "CVideoTransferFunctions.h"
 
-#if defined(__APPLE__) && (!defined(MT_ENABLE_FFMPEG) || (MT_ENABLE_FFMPEG))
+// Platform only -- the gate no longer includes MT_ENABLE_FFMPEG. See the
+// header and MT_MediaPacket.h: this decoder is the destination of the FFmpeg
+// removal and must not be switched off by it.
+#if defined(__APPLE__)
 
 #include "DBG_Log.h"
 
 extern "C" {
-#include <libavcodec/avcodec.h>
-#include <libavutil/avutil.h>
 }
 
 #include <algorithm>
@@ -73,26 +75,94 @@ bool CVideoDecoderHEVCVT::Init(const u8 *extradata, int extradataSize, int w, in
 	sessionRecreateAttempted = false;
 	this->colorTrc = colorTrc;
 
-	if (!extradata || extradataSize <= 0)
+	// WHAT DIFFERS BETWEEN CODECS HERE, and it is only ever three things: the
+	// CMVideoCodecType, the name of the configuration atom, and whether a
+	// configuration is required at all.
+	CMVideoCodecType cmCodec = kCMVideoCodecType_HEVC;
+	const char *atomName = "hvcC";
+	bool configRequired = true;
+	std::vector<u8> builtConfig;   // owns bytes only the MPEG-4 path creates
+
+	switch (codecId)
 	{
-		// Annex-B/TS-carried HEVC (no hvcC configuration record) is out of
-		// scope for v1 -- refuse cleanly rather than guess a format.
-		errorReason = "HEVC stream has no hvcC extradata (raw Annex-B HEVC not supported)";
+		case EMediaCodecId::H264:
+			cmCodec = kCMVideoCodecType_H264;  atomName = "avcC"; break;
+		case EMediaCodecId::MPEG4Part2:
+			// The container hands us the raw VOS/VOL header; VideoToolbox
+			// wants it wrapped in an esds. MEASURED: a bare format
+			// description here is kVTVideoDecoderBadDataErr, and the wrapper
+			// this builds is byte-for-byte the size of the one a muxer writes.
+			cmCodec = kCMVideoCodecType_MPEG4Video; atomName = "esds"; break;
+		case EMediaCodecId::MJPEG:
+			// Every JPEG frame carries its own tables. There is no
+			// configuration record and demanding one would refuse every
+			// MJPEG file that exists.
+			cmCodec = kCMVideoCodecType_JPEG; atomName = NULL; configRequired = false; break;
+		case EMediaCodecId::HEVC:
+		default:
+			break;
+	}
+	const bool isH264 = (codecId == EMediaCodecId::H264);
+
+	if (configRequired && (!extradata || extradataSize <= 0))
+	{
+		// Annex-B/TS-carried streams (no configuration record) are out of
+		// scope -- refuse cleanly rather than guess a format.
+		errorReason = isH264
+			? "H.264 stream has no avcC extradata (raw Annex-B H.264 not supported)"
+			: (codecId == EMediaCodecId::MPEG4Part2
+			   ? "MPEG-4 Part 2 stream has no VOL header (nothing to build an esds from)"
+			   : "HEVC stream has no hvcC extradata (raw Annex-B HEVC not supported)");
+		return false;
+	}
+
+	if (codecId == EMediaCodecId::MPEG4Part2)
+	{
+		builtConfig = MT_Mp4vEsds::Build(extradata, (size_t)extradataSize);
+		if (builtConfig.empty())
+		{
+			errorReason = "could not build an esds from the MPEG-4 VOL header";
+			return false;
+		}
+		extradata = builtConfig.data();
+		extradataSize = (int)builtConfig.size();
+	}
+
+	// MJPEG: no atoms at all. Handing VideoToolbox an extensions dictionary
+	// it does not want is how a working codec gets refused.
+	if (!configRequired)
+	{
+		OSStatus st = CMVideoFormatDescriptionCreate(kCFAllocatorDefault, cmCodec,
+													  width, height, NULL, &formatDesc);
+		if (st != noErr || !formatDesc)
+		{
+			errorReason = "CMVideoFormatDescriptionCreate failed for MJPEG";
+			formatDesc = nullptr;
+			return false;
+		}
+		use10Bit = false;
+		if (CreateSession(kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange))
+			return true;
+		errorReason = "VTDecompressionSessionCreate failed for MJPEG";
+		CFRelease(formatDesc);
+		formatDesc = nullptr;
 		return false;
 	}
 
 	CFDataRef hvcCData = CFDataCreate(kCFAllocatorDefault, extradata, extradataSize);
 	if (!hvcCData)
 	{
-		errorReason = "CFDataCreate failed for hvcC extradata";
+		errorReason = "CFDataCreate failed for configuration-record extradata";
 		return false;
 	}
 
-	CFStringRef hvccKey = CFSTR("hvcC");
+	CFStringRef hvccKey = CFStringCreateWithCString(kCFAllocatorDefault, atomName,
+													kCFStringEncodingASCII);
 	CFDictionaryRef atoms = CFDictionaryCreate(kCFAllocatorDefault,
 												(const void **)&hvccKey, (const void **)&hvcCData, 1,
 												&kCFCopyStringDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
 	CFRelease(hvcCData);
+	CFRelease(hvccKey);
 
 	CFStringRef extKey = kCMFormatDescriptionExtension_SampleDescriptionExtensionAtoms;
 	CFDictionaryRef extensions = CFDictionaryCreate(kCFAllocatorDefault,
@@ -100,13 +170,13 @@ bool CVideoDecoderHEVCVT::Init(const u8 *extradata, int extradataSize, int w, in
 													 &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
 	CFRelease(atoms);
 
-	OSStatus status = CMVideoFormatDescriptionCreate(kCFAllocatorDefault, kCMVideoCodecType_HEVC,
+	OSStatus status = CMVideoFormatDescriptionCreate(kCFAllocatorDefault, cmCodec,
 													  width, height, extensions, &formatDesc);
 	CFRelease(extensions);
 
 	if (status != noErr || !formatDesc)
 	{
-		errorReason = "CMVideoFormatDescriptionCreate failed for HEVC hvcC extradata";
+		errorReason = "CMVideoFormatDescriptionCreate failed for the configuration record";
 		formatDesc = nullptr;
 		return false;
 	}
@@ -206,7 +276,7 @@ bool CVideoDecoderHEVCVT::CreateSession(uint32_t pixelFormat)
 // ============================================================================
 // DecodePacket
 // ============================================================================
-bool CVideoDecoderHEVCVT::DecodePacket(const AVPacket *pkt, SDecodedVideoFrame &out)
+bool CVideoDecoderHEVCVT::DecodePacket(const SVideoPacket *pkt, SDecodedVideoFrame &out)
 {
 	if (!pkt)
 	{
@@ -236,9 +306,9 @@ bool CVideoDecoderHEVCVT::DecodePacket(const AVPacket *pkt, SDecodedVideoFrame &
 
 	CMBlockBufferRef blockBuffer = nullptr;
 	// kCFAllocatorNull as the block allocator: the memory block stays owned
-	// by the caller's AVPacket (unreffed only after this call returns), we
+	// by the caller's packet (whose data is borrowed for this call only), we
 	// never want CMBlockBuffer to try to free or copy it.
-	OSStatus status = CMBlockBufferCreateWithMemoryBlock(kCFAllocatorDefault, pkt->data, (size_t)pkt->size,
+	OSStatus status = CMBlockBufferCreateWithMemoryBlock(kCFAllocatorDefault, (void *)pkt->data, (size_t)pkt->size,
 														  kCFAllocatorNull, nullptr, 0, (size_t)pkt->size, 0, &blockBuffer);
 	if (status != noErr || !blockBuffer)
 	{
@@ -246,7 +316,7 @@ bool CVideoDecoderHEVCVT::DecodePacket(const AVPacket *pkt, SDecodedVideoFrame &
 		return false;
 	}
 
-	double ptsSeconds = (pkt->pts != AV_NOPTS_VALUE) ? (double)pkt->pts / (double)AV_TIME_BASE : 0.0;
+	double ptsSeconds = pkt->PtsSeconds();
 	CMSampleTimingInfo timing;
 	timing.duration = kCMTimeInvalid;
 	timing.presentationTimeStamp = CMTimeMakeWithSeconds(ptsSeconds, 1000000);
@@ -446,4 +516,4 @@ bool IVideoPacketDecoder::IsHEVCDecodeAvailable()
 	return true;
 }
 
-#endif // __APPLE__ && MT_ENABLE_FFMPEG
+#endif // __APPLE__

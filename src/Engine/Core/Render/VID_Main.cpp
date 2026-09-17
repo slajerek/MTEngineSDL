@@ -640,6 +640,11 @@ double previousFrameStep;
 double frameTimeStep;
 long frameMaxTimeInMillis = 0;
 
+double VID_GetTargetFPS()
+{
+	return gTargetFPS;
+}
+
 void VID_SetFPS(float fps)
 {
 	LOGM("VID_SetFPS: %3.2f", fps);
@@ -1924,14 +1929,28 @@ void VID_RaiseMainWindow()
 	SDL_RaiseWindow(gMainWindow);
 }
 
+// How many times THIS thread currently holds the render mutex. Only the
+// imgui_test_engine coroutine bridge reads it (VID_GetRenderMutexDepth), to
+// hand the lock back while a UI test runs -- see CImGuiTestEngine.cpp. The
+// mutex is recursive, so a plain bool would not survive nesting.
+static thread_local int gRenderMutexDepthOnThisThread = 0;
+
 void VID_LockRenderMutex()
 {
 	guiMain->LockMutex(); //"SYS_LockRenderMutex");
+	gRenderMutexDepthOnThisThread++;
 }
 
 void VID_UnlockRenderMutex()
 {
+	if (gRenderMutexDepthOnThisThread > 0)
+		gRenderMutexDepthOnThisThread--;
 	guiMain->UnlockMutex(); //"SYS_LockRenderMutex");
+}
+
+int VID_GetRenderMutexDepth()
+{
+	return gRenderMutexDepthOnThisThread;
 }
 
 // Which display "the screen" means: the one our window is on, falling back to

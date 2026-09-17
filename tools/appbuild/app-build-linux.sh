@@ -188,14 +188,31 @@ cd "$APP_DIR/build"
 MT_BUILD_TYPE=$([[ "$CONFIGURATION" == "Debug" ]] && echo Debug || echo RelWithDebInfo)
 export MT_BUILD_TYPE
 cmake ../ -DCMAKE_BUILD_TYPE="$MT_BUILD_TYPE" "${MT_CAPS_ARGS[@]}" ${CMAKE_EXTRA_ARGS:-}
-make -j"$(nproc)" "$MT_CMAKE_TARGET"
+# PARALLELISM: every core unless MT_BUILD_JOBS says otherwise. The default is
+# unchanged -- nproc is what this has always used. The knob exists because -j
+# scales with core count and not with available RAM: on a box with little
+# memory per core the OOM killer takes the compiler, and make reports that as a
+# plain build failure with no hint that memory was the cause. Same variable,
+# same meaning, as the Windows driver.
+MT_JOBS="${MT_BUILD_JOBS:-$(nproc)}"
+case "$MT_JOBS" in
+    ""|*[!0-9]*|0) echo "ERROR: MT_BUILD_JOBS must be a positive integer, got '${MT_BUILD_JOBS}'" >&2; exit 1 ;;
+esac
+if [[ -n "${MT_BUILD_JOBS:-}" ]]; then
+    echo "Build parallelism: -j$MT_JOBS (MT_BUILD_JOBS)"
+fi
+export CMAKE_BUILD_PARALLEL_LEVEL="$MT_JOBS"
+make -j"$MT_JOBS" "$MT_CMAKE_TARGET"
 APP_BINARY="$APP_DIR/build/$MT_CMAKE_TARGET"
 [[ -f "$APP_BINARY" ]] || { echo "ERROR: build reported success but no binary at $APP_BINARY" >&2; exit 1; }
 
 # ---------------------------------------------------------------------------
 # licence gate
 # ---------------------------------------------------------------------------
-case "$MT_CAPS_RESOLVED" in *MT_CAP_VIDEO_PLAYBACK=1*)
+# Keyed on the FLAG, not the capability -- see the note in app-build-macos.sh.
+# MT_ENABLE_FFMPEG is already in scope here: this driver has always read the
+# emitted fragment through mt_caps_read_flags.
+if [[ "${MT_ENABLE_FFMPEG:-1}" == "1" ]]; then
     MARKER="$MT_CAPS_LIBS_DIR/ffmpeg/.ffmpeg-build-mode"
     MARKER_MODE="$(cat "$MARKER" 2>/dev/null || echo missing)"
     if [[ "$COMMERCIAL" == "1" && "$MARKER_MODE" != "commercial" ]]; then
@@ -208,7 +225,17 @@ case "$MT_CAPS_RESOLVED" in *MT_CAP_VIDEO_PLAYBACK=1*)
         bash "$SCRIPT_DIR/scan-forbidden-symbols.sh" --mode "$MT_FFMPEG_BUILD_MODE" \
             --libs "$MT_CAPS_LIBS_DIR/ffmpeg/lib"
     fi
-;; esac
+fi
+
+# The POSITIVE half -- see app-build-macos.sh for why it exists and why it runs
+# in both directions on every build. UNVERIFIED ON LINUX: written from the macOS
+# version, where both directions were proven. The scanner uses ldd and
+# `nm -D --undefined-only` here rather than otool/nm -gu.
+if [[ "${MT_ENABLE_FFMPEG:-1}" == "1" ]]; then
+    bash "$SCRIPT_DIR/scan-no-ffmpeg.sh" --binary "$APP_BINARY" --expect present
+else
+    bash "$SCRIPT_DIR/scan-no-ffmpeg.sh" --binary "$APP_BINARY" --expect absent
+fi
 
 
 # ---------------------------------------------------------------------------
@@ -293,9 +320,53 @@ if [[ "$MAKE_PROD" == "true" ]]; then
         fi
     done
 
+    # FFMPEG IS SHIPPED, NOT BORROWED.
+    #
+    # This package staged no shared library at all, while macOS copies
+    # Contents/Frameworks and Windows copies the DLLs. The binary carries
+    # DT_NEEDED libavcodec.so.61, so without these files it resolves against
+    # whatever libavcodec the distribution installed -- and a distro build has
+    # aac, hevc, eac3 and the whole WMA family compiled in: precisely the set
+    # decoders_withheld exists to keep out of a distributed build. Every gate
+    # in this tree (the nm scan, scan-forbidden-symbols) inspects the libraries
+    # we STAGE; not one of them inspects the library actually loaded.
+    #
+    # MT_CAPS_LIBS_DIR is exported above and already names this tree for the
+    # link line further up. The lib*.so.* glob shape is the one the app's own
+    # CMakeLists already uses to put these beside the DEV binary, which is why
+    # the defect was package-only and invisible in development.
+    if [[ "${MT_ENABLE_FFMPEG:-1}" != "0" ]]; then
+        _ff_lib_dir="$MT_CAPS_LIBS_DIR/ffmpeg/lib"
+        shopt -s nullglob
+        _ff_libs=("$_ff_lib_dir"/lib{avcodec,avformat,avutil,swscale,swresample}.so.*)
+        shopt -u nullglob
+        if [[ ${#_ff_libs[@]} -eq 0 ]]; then
+            echo "ERROR: FFmpeg is enabled but $_ff_lib_dir holds no libav*.so.* to stage." >&2
+            echo "       Refusing to package a binary that would load the distribution's" >&2
+            echo "       libavcodec, which carries every decoder this build withholds." >&2
+            exit 1
+        fi
+        cp -a "${_ff_libs[@]}" "$PROD_DIR/"
+    fi
+
     # Belt for the symbols contract: the separated debug info lives in
     # $MT_OUT/symbols and never rides the package.
     find "$PROD_DIR" -name '*.debug' -delete 2>/dev/null || true
+
+    # THE GATE, not the rpath, is what proves the above. This driver serves all
+    # five apps and must not assume every one of them sets $ORIGIN; if a libav*
+    # still resolves outside the package, the staging did not take and the
+    # package must not ship.
+    if [[ "${MT_ENABLE_FFMPEG:-1}" != "0" ]] && command -v ldd >/dev/null 2>&1; then
+        _ff_stray="$(ldd "$PROD_DIR/$PROD_NAME" 2>/dev/null \
+                     | grep -E 'libav(codec|format|util)|libsw(scale|resample)' \
+                     | grep -v "$PROD_DIR" || true)"
+        if [[ -n "$_ff_stray" ]]; then
+            echo "ERROR: packaged binary resolves FFmpeg outside the package:" >&2
+            echo "$_ff_stray" >&2
+            exit 1
+        fi
+    fi
 
     [[ -f "$PROD_DIR/LICENSES.txt" ]] || { echo "ERROR: release package has no LICENSES.txt: $PROD_DIR" >&2; exit 1; }
     echo "Deployed: $PROD_DIR/$PROD_NAME"

@@ -65,6 +65,13 @@ def find_cxx():
     return None
 
 
+def _read(out, name):
+    """Read an emitted fragment from a resolve's out_dir. Module-level because
+    the read_at() helper lives on the fragment-test class, not on Base."""
+    with open(os.path.join(out, name), encoding="utf-8") as f:
+        return f.read()
+
+
 class Base(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp(prefix="mtcaps-test-")
@@ -116,7 +123,14 @@ class TestCommercialModeSemantics(Base):
     effects applied at resolve, the commercial_safe deny-list, and the
     MT_RELEASE_SYMBOLS mode key."""
 
-    STORE = ("--set", "MT_COMMERCIAL_BUILD=1", "--set", "MT_PRIVATE_BUILD=0")
+    # MT_ENABLE_FFMPEG=0 IS PART OF "STORE" NOW, and that is the point rather
+    # than a workaround for these tests. FFmpeg became commercial_safe: false
+    # on 2026-09-10 (tracker 3.4), so a commercial resolve that leaves it on
+    # is REFUSED -- which is exactly the rule the media-codecs programme
+    # exists to enforce. A store fixture that still enabled it would be
+    # testing a configuration that may not ship.
+    STORE = ("--set", "MT_COMMERCIAL_BUILD=1", "--set", "MT_PRIVATE_BUILD=0",
+             "--set", "MT_ENABLE_FFMPEG=0")
 
     def test_capability_off_effect_applies_at_commercial(self):
         """MT_CAP_TEST_ENGINE=1 + MT_COMMERCIAL_BUILD=1 auto-disables the
@@ -163,6 +177,44 @@ class TestCommercialModeSemantics(Base):
         m = self.manifest("MT_CAP_PHOTO_CODECS=1\nMT_CAP_RAW=1\n")
         proc = self.resolve(m, *self.STORE)
         self.assertEqual(proc.returncode, 0, proc.stderr)
+
+    def test_ffmpeg_flag_can_be_forced_off_with_video_on(self):
+        """Video-on / FFmpeg-off is the store configuration the media-codecs
+        programme exists to produce, and until this landed it could not be
+        EXPRESSED: enabled_flags derived every MT_ENABLE_* from
+        max(capability values) with no per-flag override, so every =0 arm in
+        the build scripts and drivers was unreachable by any resolve."""
+        m = self.manifest("MT_CAP_VIDEO_PLAYBACK=1\nMT_ENABLE_FFMPEG=0\n")
+        proc = self.resolve(m)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn("MT_CAP_VIDEO_PLAYBACK=1", self.resolved_of(proc))
+        cmake = _read(self.out_of(proc), "MTEngineCapabilities.cmake")
+        self.assertIn("set(MT_ENABLE_FFMPEG 0)", cmake)
+        # The WebM lane is a separate flag on the same capability and must
+        # survive: libvpx/opus are BSD, royalty-free, and ship in a store build.
+        self.assertIn("set(MT_ENABLE_WEBM_VPX 1)", cmake)
+
+    def test_ffmpeg_override_cannot_turn_the_flag_ON(self):
+        """The override forces OFF only. Allowing =1 to beat a capability that
+        is off would link FFmpeg into a build that declared no video at all --
+        the opposite of the safe direction every other forcing table takes."""
+        m = self.manifest("MT_CAP_VIDEO_PLAYBACK=0\nMT_ENABLE_FFMPEG=1\n")
+        proc = self.resolve(m)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        cmake = _read(self.out_of(proc), "MTEngineCapabilities.cmake")
+        self.assertIn("set(MT_ENABLE_FFMPEG 0)", cmake)
+        # ...and a no-op override must not fork the output bucket either.
+        plain = self.manifest("MT_CAP_VIDEO_PLAYBACK=0\n", "plain.caps")
+        self.assertEqual(self.out_of(self.resolve(plain)), self.out_of(proc))
+
+    def test_ffmpeg_override_gives_the_build_its_own_bucket(self):
+        """Two configurations that compile different code must not share an
+        output directory. The override is folded into the caps identity ONLY
+        when present, so every existing bucket keeps its hash."""
+        base = self.manifest("MT_CAP_VIDEO_PLAYBACK=1\n", "base.caps")
+        off = self.manifest("MT_CAP_VIDEO_PLAYBACK=1\nMT_ENABLE_FFMPEG=0\n", "off.caps")
+        self.assertNotEqual(self.out_of(self.resolve(base)),
+                            self.out_of(self.resolve(off)))
 
     def test_symbols_default_on_and_forced_off_by_commercial(self):
         m = self.manifest("MT_CAP_LLM=0\n")
@@ -737,9 +789,16 @@ class TestOutputRootKey(Base):
     def test_commercial_mode_keys_the_root(self):
         """The same FFmpeg archive NAME holds different decoder sets under
         MT_COMMERCIAL_BUILD, so two modes must not share a root."""
-        m = self.manifest("MT_CAP_LLM=0\n")
+        m = self.manifest("MT_CAP_LLM=0\nMT_PRIVATE_BUILD=1\n")
         a = self.out_of(self.resolve(m))
-        b = self.out_of(self.resolve(m, "--set", "MT_COMMERCIAL_BUILD=1"))
+        # MT_ENABLE_FFMPEG=0 alongside, because a commercial resolve that
+        # leaves FFmpeg on is refused since 2026-09-10 (see STORE above). The
+        # claim under test is unaffected: it is about the mode SEGMENT in the
+        # output root, which derives from MT_PRIVATE_BUILD, not about whether
+        # FFmpeg is linked.
+        b = self.out_of(self.resolve(m, "--set", "MT_COMMERCIAL_BUILD=1",
+                                        "--set", "MT_PRIVATE_BUILD=0",
+                                        "--set", "MT_ENABLE_FFMPEG=0"))
         self.assertNotEqual(a, b)
         # separator-agnostic: the same segment reads "\full\" on Windows
         self.assertIn("/full/", a.replace(os.sep, "/"))
@@ -895,7 +954,12 @@ class TestEmittedFragments(Base):
         props = self.read("MTEngineCaps.props")
         pre = props.split("<PreprocessorDefinitions>", 1)[1].split("</", 1)[0]
         self.assertNotIn("MT_COMMERCIAL_BUILD", pre)
-        on = self.out_of(self.resolve(self.m, "--set", "MT_COMMERCIAL_BUILD=1"))
+        # MT_ENABLE_FFMPEG=0 alongside: a commercial resolve that leaves
+        # FFmpeg on is refused since 2026-09-10 (tracker 3.4). Unrelated to the
+        # define this test is about.
+        on = self.out_of(self.resolve(self.m, "--set", "MT_COMMERCIAL_BUILD=1",
+                                              "--set", "MT_PRIVATE_BUILD=0",
+                                              "--set", "MT_ENABLE_FFMPEG=0"))
         with open(os.path.join(on, "MTEngineCaps.props"), encoding="utf-8") as f:
             self.assertIn("MT_COMMERCIAL_BUILD=1", f.read())
         on_defs = self.cmake_defines_for(on)
@@ -1064,10 +1128,30 @@ class TestEmittedFragments(Base):
         self.assertIn("foreach(_k IN LISTS MT_CAPS_CAPABILITY_KEYS MT_CAPS_FLAG_KEYS)", cmake)
 
     def test_caps_defines_carries_app_visible_flags_only(self):
+        """The app define set is exactly the app_visible flags.
+
+        MT_ENABLE_LLAMA_CPP used to be asserted ABSENT here, on the measurement
+        that no app guarded on it. That measurement was true and the test it
+        justified was wrong: the criterion is FFmpeg's, not a grep for guards --
+        a flag is app-visible if it appears in a header app TUs include. On
+        2026-09-06 CGuiViewLlamaModelLoader.h was guarded on it (it owns a
+        downloader that needs httplib), the template includes that header, and
+        an engine-only flag made the header declare nothing while the app
+        believed the capability was on. So it is app-visible now, and this test
+        checks the RULE rather than one flag's membership."""
         text = self.read("MTEngineCaps.xcconfig")
         line = [l for l in text.splitlines() if l.startswith("MT_CAPS_DEFINES = ")][0]
         self.assertIn("MT_ENABLE_MBEDTLS=0", line, "httplib.h:21 -- the ODR case")
-        self.assertNotIn("MT_ENABLE_LLAMA_CPP", line, "no app guards on it")
+
+        vocab = V.load()
+        for key in vocab.keys:
+            for flag in vocab.enables(key):
+                if vocab.app_visible(key):
+                    self.assertIn("%s=" % flag, line,
+                                  "%s is app_visible, so %s must reach app TUs" % (key, flag))
+                else:
+                    self.assertNotIn("%s=" % flag, line,
+                                     "%s is engine-only, so %s must not" % (key, flag))
 
     def test_generated_header_compiles_AND_LINKS_through_MT_HAS_CAP(self):
         """Compile-only proved nothing three rounds running: `inline bool f();`
@@ -1228,13 +1312,21 @@ class TestDepsDir(Base):
         b = self.deps_of(self.resolve(m, app="AppTwo"))
         self.assertEqual(a, b)
 
-    def test_engine_revision_does_not_appear(self):
-        """out_dir carries the engine revision; deps_dir must not. An engine
-        commit is worse than irrelevant to a third-party archive."""
+    def test_engine_revision_appears_in_no_path_at_all(self):
+        """An engine commit -- or a dirty edit, since engine_rev() hashes
+        `git diff HEAD` -- must not move ANY of the three roots.
+
+        deps_dir never carried it: an engine commit is worse than irrelevant to
+        a third-party archive. build_dir dropped it in 2026-09-01 because a
+        moving path recompiled every object. out_dir dropped it on 2026-09-10
+        for the same reason one level up: it is written into the generated
+        xcconfigs, and a changed xcconfig is a changed configuration for every
+        Xcode target that includes it, so an edit for one app rebuilt all four."""
         proc = self.resolve(self.manifest(self.CAPS))
         rev = R.engine_rev(ENGINE)
-        self.assertIn(rev, self.out_of(proc))
+        self.assertNotIn(rev, self.out_of(proc))
         self.assertNotIn(rev, self.deps_of(proc))
+        self.assertNotIn(rev, self.build_of(proc))
 
     def test_print_deps_dir_gives_one_bare_line(self):
         proc = self.resolve(self.manifest(self.CAPS), "--print", "deps-dir")
@@ -1530,6 +1622,34 @@ class TestDepsKey(unittest.TestCase):
                            "MT_FFMPEG_BUILD_MODE", "MT_RELEASE_SYMBOLS",
                            "MT_DEBUG_LOGS"})
 
+    def test_ffmpeg_override_forks_the_video_codecs_store(self):
+        """video_codecs builds a DIFFERENT set of archives at
+        MT_ENABLE_FFMPEG=0 with video still on, so the two must not share a
+        _depstore bucket. That directory is written additively and never
+        cleaned, and each app's CMakeLists auto-defaults MT_ENABLE_FFMPEG from
+        directory existence -- so a shared bucket would let a previous build's
+        libav* turn FFmpeg back on in a build that asked for none."""
+        for platform in ("macos", "linux", "windows"):
+            unit = R.build_units(platform)["video_codecs"]
+            base = {"MT_CAP_VIDEO_PLAYBACK": 1, "MT_COMMERCIAL_BUILD": 0,
+                    "MT_PRIVATE_BUILD": 1}
+            off = dict(base, MT_ENABLE_FFMPEG=0)
+            self.assertNotEqual(R.unit_form(unit, base), R.unit_form(unit, off),
+                                "%s: FFmpeg-on and FFmpeg-off share a store form" % platform)
+
+    def test_ffmpeg_override_absent_keeps_every_existing_store_hash(self):
+        """The fork must cost nothing to anyone who does not use it: a manifest
+        that never names the flag has to keep the bucket it has today, or this
+        change silently invalidates every warm _depstore on every machine."""
+        for platform in ("macos", "linux", "windows"):
+            for name, unit in R.build_units(platform).items():
+                vals = {k: 1 for k in unit["reads"]}
+                vals.update({"MT_COMMERCIAL_BUILD": 0, "MT_PRIVATE_BUILD": 1})
+                # A no-op override (=1) must not fork either.
+                self.assertEqual(R.unit_form(unit, vals),
+                                 R.unit_form(unit, dict(vals, MT_ENABLE_FFMPEG=1)),
+                                 "%s/%s: a no-op override moved the store hash" % (platform, name))
+
     @staticmethod
     def _strip_comments(text, is_ps1):
         """A flag NAMED IN A COMMENT is not a read. Three of this scan's first
@@ -1694,6 +1814,92 @@ class TestFFmpegPolicy(unittest.TestCase):
             self.assertIn("decoders_withheld", text, "%s does not read the new home" % scanner)
         self.assertIn("hevc", names)
         self.assertIn("heif", names)
+
+
+
+class TestDefaultZeroCapabilities(Base):
+    """OpenCV is the first capability whose default is 0.
+
+    Every other capability defaults to 1, and a good deal of the system spells
+    that as "absent means on" -- the acquisition scripts' ${MT_ENABLE_X:-1},
+    the xcconfig's standalone list, CMake's option(... ON). A capability that
+    defaults OFF has to survive all of those, or a bare clone downloads 154 MB
+    it was promised it would not."""
+
+    def test_empty_manifest_resolves_both_opencv_keys_off(self):
+        m = self.manifest("MT_CAP_MIDI=1\n")
+        values, prov = R.resolve(self.vocab, m, "macos")
+        self.assertEqual(values["MT_CAP_OPENCV"], 0)
+        self.assertEqual(values["MT_CAP_OPENCV_NONFREE"], 0)
+        self.assertEqual(prov["MT_CAP_OPENCV"], "default")
+
+    def test_emitted_flags_spell_the_zero_rather_than_omitting_it(self):
+        """An omitted flag is what "absent means on" reads as. The fragments
+        must carry MT_ENABLE_OPENCV=0 explicitly."""
+        m = self.manifest("MT_CAP_MIDI=1\n")
+        values, _ = R.resolve(self.vocab, m, "macos")
+        flags = R.enabled_flags(self.vocab, values, platform="macos")
+        self.assertIn("MT_ENABLE_OPENCV", flags)
+        self.assertEqual(flags["MT_ENABLE_OPENCV"], 0)
+        self.assertEqual(flags["MT_ENABLE_OPENCV_NONFREE"], 0)
+
+    def test_nonfree_implies_opencv(self):
+        m = self.manifest("MT_CAP_OPENCV_NONFREE=1\n")
+        values, prov = R.resolve(self.vocab, m, "macos")
+        self.assertEqual(values["MT_CAP_OPENCV"], 1)
+        self.assertIn("implied", prov["MT_CAP_OPENCV"])
+
+    def test_commercial_tier_forces_nonfree_off_and_leaves_opencv_on(self):
+        """SURF is patented. A commercial build must not carry it, and the
+        maintainer must not have to remember that in five manifests."""
+        m = self.manifest("MT_CAP_OPENCV=1\nMT_CAP_OPENCV_NONFREE=1\n"
+                          "MT_COMMERCIAL_BUILD=1\nMT_PRIVATE_BUILD=0\n")
+        values, prov = R.resolve(self.vocab, m, "macos")
+        self.assertEqual(values["MT_CAP_OPENCV_NONFREE"], 0)
+        self.assertIn("commercial", prov["MT_CAP_OPENCV_NONFREE"])
+        self.assertEqual(values["MT_CAP_OPENCV"], 1)
+
+    def test_yolo_defaults_off_and_implies_opencv_http_https(self):
+        """Every catalogue URL is an https HuggingFace URL, and httplib on an
+        https host without TLS fails at runtime -- the same reason MT_CAP_LLM
+        implies HTTPS rather than merely HTTP."""
+        m = self.manifest("MT_CAP_MIDI=1\n")
+        values, _ = R.resolve(self.vocab, m, "macos")
+        self.assertEqual(values["MT_CAP_YOLO"], 0)
+
+        m = self.manifest("MT_CAP_YOLO=1\n")
+        values, prov = R.resolve(self.vocab, m, "macos")
+        for implied in ("MT_CAP_OPENCV", "MT_CAP_HTTP", "MT_CAP_HTTPS"):
+            self.assertEqual(values[implied], 1, implied)
+        # Only OPENCV gets "implied" provenance: HTTP and HTTPS already default
+        # to 1 and the implication rung skips a target that is already on.
+        self.assertIn("implied", prov["MT_CAP_OPENCV"])
+
+    def test_yolo_is_in_the_opencv_units_reads(self):
+        """One CMake configure builds with or without dnn, so the per-unit
+        store must be keyed by this capability or a flip would reuse a tree
+        configured the other way."""
+        for platform in ("macos", "linux", "windows"):
+            unit = R.build_units(platform)["opencv"]
+            self.assertIn("MT_CAP_YOLO", unit["reads"], platform)
+
+    def test_yolo_keys_the_deps_bucket(self):
+        """It changes the archive -- 45 MB with dnn, 16.6 MB without -- so it
+        must key the bucket, or the two would share one path."""
+        self.assertIn("MT_CAP_YOLO", R.deps_key_capabilities(self.vocab))
+
+    def test_yolo_is_app_visible(self):
+        """The template guards its own views on it; an engine-only flag would
+        evaluate to 0 in an app TU on macOS and Windows."""
+        self.assertTrue(self.vocab.app_visible("MT_CAP_YOLO"))
+
+    def test_both_opencv_keys_are_in_the_deps_key(self):
+        """Both carry an acquisition table, so both key the shared _deps
+        bucket -- otherwise two apps with different OpenCV settings would
+        fight over one archive."""
+        keys = R.deps_key_capabilities(self.vocab)
+        self.assertIn("MT_CAP_OPENCV", keys)
+        self.assertIn("MT_CAP_OPENCV_NONFREE", keys)
 
 
 if __name__ == "__main__":

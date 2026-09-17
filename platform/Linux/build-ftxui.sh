@@ -87,7 +87,8 @@ cmake -S "$FTXUI_SRC_DIR" -B "$BUILD_DIR" \
   -DFTXUI_QUIET=ON
 
 echo "Building FTXUI"
-cmake --build "$BUILD_DIR" --config Release --target screen dom component -j "$(nproc)"
+# MT_BUILD_JOBS, as everywhere else; see the note in build-opencv.sh.
+cmake --build "$BUILD_DIR" --config Release --target screen dom component -j "${MT_BUILD_JOBS:-$(nproc)}"
 
 # Collect and merge
 LIBS=()
