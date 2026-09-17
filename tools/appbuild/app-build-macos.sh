@@ -281,6 +281,16 @@ XCODE_ARGS=(
     -project "$APP_DIR/$MT_MACOS_PROJECT"
     -scheme "$MT_MACOS_SCHEME"
     -configuration "$CONFIGURATION"
+    # Pin the build products to the app repo's own build-macos tree. Without
+    # this xcodebuild uses the global DerivedData directory, whose path is
+    # machine-specific and invisible to the surrounding tooling -- the release
+    # script stages "build-macos/Build/Products/<config>" and an IDE-side
+    # assumption that the bundle lives beside the checkout is dead code. The
+    # query below (-showBuildSettings) follows the same setting, so every
+    # consumer of BUILT_PRODUCTS_DIR agrees on one place. Matches the old
+    # app-owned build-macos.sh, which passed -derivedDataPath for the same
+    # reason before the driver took the flow over.
+    -derivedDataPath "$APP_DIR/build-macos"
     CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
 )
 if [[ "$CLEAN" == "true" ]]; then
