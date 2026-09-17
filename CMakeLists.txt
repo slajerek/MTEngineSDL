@@ -563,7 +563,10 @@ add_library(MTEngineSDL STATIC
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Audio/CSlrMusicFileOgg.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Audio/CSlrMusicFileResampled.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Audio/MT_MusicFileFactory.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Audio/CSlrMusicFileAVFAudio.mm"
+    # CSlrMusicFileAVFAudio.mm is listed in the APPLE block below: an .mm source
+    # needs the Objective-C++ back end from CMake's compiler choice, and Linux
+    # GCC has none (fatal: cannot execute 'cc1objplus'). The Apple .cpp files
+    # compile to empty TUs here instead; an .mm cannot do that.
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Audio/CSlrMusicFileMFAudio.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Audio/CSlrMusicFileMiniaudio.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/miniaudio/miniaudio_impl.c"
@@ -920,7 +923,8 @@ add_library(MTEngineSDL STATIC
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Video/CVideoSourceWebMVpx.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Video/CVideoSourceFFmpeg.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Video/IVideoPacketDecoder.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Video/CVideoSourceAVFoundation.mm"
+    # CVideoSourceAVFoundation.mm is listed in the APPLE block below, like
+    # CSlrMusicFileAVFAudio.mm: there is no Objective-C++ back end on Linux.
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Video/CVideoSourceMediaFoundation.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Video/CVideoDecoderHEVCVT.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Video/CVideoDecoderHEVCMF.cpp"
@@ -1170,7 +1174,15 @@ target_compile_definitions(MTEngineSDL PUBLIC
 
 
 if(APPLE)
+    # Every .mm source has to live behind this guard: on macOS the file CANNOT
+    # compile as an empty TU the way the Apple .cpp files do -- GCC on Linux
+    # picks the Objective-C++ back end by extension and dies at cc1objplus
+    # before ever reading the #if defined(__APPLE__) guards inside. Consumers
+    # reference these classes only behind their own platform gates, so the
+    # symbols they would provide are not needed on other platforms.
     target_sources(MTEngineSDL PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/Audio/CSlrMusicFileAVFAudio.mm"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/Video/CVideoSourceAVFoundation.mm"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/Core/CImageDataHEIF_Apple.mm"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/Color/CCmsColorSync.mm"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/System/SYS_SecurityScopedAccess.mm")
