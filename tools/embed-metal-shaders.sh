@@ -71,7 +71,17 @@ for src in "$SHADER_DIR"/*.metal; do
     # -ffast-math is NOT passed. The Metal ports are judged against their GLSL
     # originals pixel for pixel, and relaxed floating point is exactly the kind
     # of difference that shows up as a small, hard-to-attribute colour shift.
-    xcrun -sdk macosx metal -std=macos-metal2.0 -c "$src" -o "$air"
+    # (Note the Metal compiler's OWN default is fast math ON, so not passing the
+    # flag does not turn it off; a shader that needs it off says so below.)
+    # PER-FILE FLAGS: a shader may name extra compiler flags on a line of its own,
+    #     // embed-metal-shaders-flags: -fno-fast-math
+    # They live IN the .metal file, so the source hash --check compares covers them
+    # too. The Metal compiler's default is fast math ON. (MTGainMap.metal used this
+    # for -fno-fast-math until 2026-10-08; fast math was measured to keep its CPU-twin
+    # parity unchanged, and the line was dropped. No shader uses it today.)
+    extra_flags="$(sed -n 's|^// embed-metal-shaders-flags:[[:space:]]*||p' "$src" | head -1)"
+    # shellcheck disable=SC2086  # word-splitting the flag list is the point
+    xcrun -sdk macosx metal -std=macos-metal2.0 $extra_flags -c "$src" -o "$air"
     xcrun -sdk macosx metallib "$air" -o "$lib"
 
     python3 "$REPO/tools/bin2header.py" "$name" "$src" "$lib" "$out"

@@ -42,6 +42,7 @@ public:
 	static const std::vector<u8> &GetRec709ProfileBytes();
 	// CM-F: Display P3 (export output space). Same pattern and caveat.
 	static const std::vector<u8> &GetDisplayP3ProfileBytes();
+	static const std::vector<u8> &GetDisplayP3SrgbCurveProfileBytes();   // P3b: the gain-map base's profile
 
 	// Lease a src->dst transform. NEVER returns NULL:
 	//   - equal content digests            -> identity lease

@@ -21,12 +21,12 @@ within two capabilities, which is why this one is not hand-written.
 | `MT_CAP_KTX2` | 1 | engine-compiled | — | `MT_ENABLE_KTX2` | no |
 | `MT_CAP_LLM` | 1 | engine-compiled | `MT_CAP_HTTP`, `MT_CAP_HTTPS` | `MT_ENABLE_LLAMA_CPP` | yes |
 | `MT_CAP_MIDI` | 1 | engine-compiled | — | `MT_ENABLE_RTMIDI` | no |
-| `MT_CAP_MUSIC_PLAYER` | 1 | engine-compiled | — | — | no |
+| `MT_CAP_MUSIC_PLAYER` | 1 | engine-compiled | — | `MT_ENABLE_MUSIC_PLAYER` | no |
 | `MT_CAP_NET_GAME` | 1 | engine-compiled | `MT_CAP_NET_TRANSPORT`, `MT_CAP_HTTP` | `MT_ENABLE_NET_GAME` | yes |
 | `MT_CAP_NET_TRANSPORT` | 1 | engine-compiled | — | `MT_ENABLE_ENET` | yes |
 | `MT_CAP_OPENCV` | 0 | engine-compiled | — | `MT_ENABLE_OPENCV` | yes |
 | `MT_CAP_OPENCV_NONFREE` | 0 | dependency-only | `MT_CAP_OPENCV` | `MT_ENABLE_OPENCV_NONFREE` | yes |
-| `MT_CAP_PHOTO_CODECS` | 1 | engine-compiled | — | `MT_ENABLE_LIBTIFF`, `MT_ENABLE_LIBWEBP`, `MT_ENABLE_LIBAVIF`, `MT_ENABLE_LIBHEIF` | yes |
+| `MT_CAP_PHOTO_CODECS` | 1 | engine-compiled | — | `MT_ENABLE_LIBTIFF`, `MT_ENABLE_LIBWEBP`, `MT_ENABLE_LIBAVIF`, `MT_ENABLE_LIBHEIF`, `MT_ENABLE_LIBULTRAHDR` | yes |
 | `MT_CAP_RAW` | 1 | engine-compiled | — | `MT_ENABLE_LIBRAW` | no |
 | `MT_CAP_TERMINAL` | 1 | engine-compiled | — | `MT_ENABLE_LIBTMT` | no |
 | `MT_CAP_TEST_ENGINE` | 1 | engine-compiled | — | `MT_ENABLE_IMGUI_TEST_ENGINE` | yes |
@@ -47,6 +47,7 @@ within two capabilities, which is why this one is not hand-written.
 | `MT_CAP_KTX2` | basis_universal | Apache-2.0 | vendored | vendored source |
 | `MT_CAP_LLM` | llama.cpp | MIT | submodule other/lib/llama.cpp | git submodule |
 | `MT_CAP_MIDI` | RtMidi | MIT-like (RtMidi licence) | vendored | vendored source |
+| `MT_CAP_MUSIC_PLAYER` | miniaudio | public domain (or MIT-0, at the user's choice) | 0.11.25 | vendored source |
 | `MT_CAP_NET_TRANSPORT` | ENet | MIT | vendored | vendored source |
 | `MT_CAP_OPENCV` | OpenCV | Apache-2.0 | 5.0.0 | source tarball https://github.com/opencv/opencv/archive/refs/tags/5.0.0.tar.gz, sha256 b0528f5a1d379d59d4701cb28c36e22214cc51cf64594e5b56f2d3e6c0233095 pinned in platform/*/build-opencv.*; downloaded only when MT_ENABLE_OPENCV=1 |
 | `MT_CAP_OPENCV_NONFREE` | opencv_contrib (xfeatures2d) | Apache-2.0; SURF is patent-encumbered and may not be distributed commercially without a licence | 5.0.0 | source tarball https://github.com/opencv/opencv_contrib/archive/refs/tags/5.0.0.tar.gz, sha256 c58f6344170c39abf187c56f3843b59cab1fd3e89cf19ba2ce25dc061659b27f pinned in platform/*/build-opencv.*; downloaded only when MT_ENABLE_OPENCV_NONFREE=1 |
@@ -56,10 +57,11 @@ within two capabilities, which is why this one is not hand-written.
 | `MT_CAP_PHOTO_CODECS` | libgav1 | Apache-2.0 | see build-image_codecs | git clone (call sites Linux:293, MacOS:396, Windows:258) |
 | `MT_CAP_PHOTO_CODECS` | libjxl | BSD-3-Clause | see build-image_codecs | git clone + its own submodules highway/brotli/skcms (Linux:296, MacOS:398, Windows:399/:401) |
 | `MT_CAP_PHOTO_CODECS` | libheif | LGPL-3.0 (container); its HEVC decoder is the licence question | system package on Linux today; vendored in #5.5a | pkg_check_modules on Linux, ImageIO on macOS, absent on Windows |
+| `MT_CAP_PHOTO_CODECS` | libultrahdr | Apache-2.0 AND MIT (bundled image_io: Apache-2.0; its modp_b64: BSD-3-Clause) | 2.0.2 (e5f5a022) | downloaded tarball, SHA-256 pinned; built against the engine's libjpeg-turbo (build-jpeg) by platform/*/build-image_codecs.*; MODIFIED: other/lib/image-codecs/patches/apply_libultrahdr_jpeg9_raw.py turns libjpeg 9's raw-mode DCT scaling off in lib/src/jpegdecoderhelper.cpp and lib/src/jpegencoderhelper.cpp (a no-op against libjpeg-turbo, kept so a jpeg-9 build stays safe), and each modified file carries a notice (Apache-2.0 4(b)) |
 | `MT_CAP_RAW` | LibRaw | CDDL-1.0 or LGPL-2.1 (dual; the CDDL option is what makes a commercial build possible) | see build-image_codecs | downloaded tarball |
 | `MT_CAP_TERMINAL` | libtmt | BSD-2-Clause | vendored | vendored source |
 | `MT_CAP_TEST_ENGINE` | imgui_test_engine | Dear ImGui Test Engine licence (free for open source; commercial use requires a licence from Omar Cornut) | vendored | vendored source |
-| `MT_CAP_VIDEO_PLAYBACK` | FFmpeg | LGPL-2.1 (GPL components excluded) | see platform/*/build-video_codecs.* | downloaded tarball |
+| `MT_CAP_VIDEO_PLAYBACK` | FFmpeg | LGPL-2.1 (GPL components excluded) | 7.1.2 | downloaded tarball |
 | `MT_CAP_VIDEO_PLAYBACK` | libvpx | BSD-3-Clause | see build-video_codecs | downloaded tarball |
 | `MT_CAP_VIDEO_PLAYBACK` | opus | BSD-3-Clause | see build-video_codecs | downloaded tarball |
 | `MT_CAP_VIDEO_PLAYBACK` | nestegg | ISC | vendored | vendored source |
@@ -160,6 +162,7 @@ legally incomplete SBOM while looking complete.
 | Dear ImGui | MIT | 1.93.0 WIP | vendored source, src/Engine/Libs/imgui |
 | ImPlot | MIT | vendored | vendored source; core because VID_Main.cpp:198 creates its context and ImPlotColorsExtensionGetterCallback is in the MT_API.h contract |
 | zlib | Zlib | vendored | compiled straight into the engine, CMakeLists.txt:899-913 |
+| libjpeg-turbo | IJG AND BSD-3-Clause AND Zlib | 3.2.0 | built by platform/*/build-jpeg.* from the release archive (SHA-256 pinned); core: JPEGWriter and lossless JPEG rotation (jpegtran's transupp) need it on every configuration; merged into the codec bundle (stub included). This software is based in part on the work of the Independent JPEG Group. |
 | ALSA | LGPL-2.1 | system | system package, find_package(ALSA REQUIRED) at CMakeLists.txt:147 (Linux) |
 | GTK3 | LGPL-2.1 | system | system package, pkg_check_modules(GTK3 REQUIRED) (Linux) |
 | freetype | FTL or GPL-2.0 | 2.10.4 (vendored) | vendored source (other/lib/freetype-2.10.4), built by build-freetype.ps1 on Windows; tracked prebuilt as fallback |
@@ -323,7 +326,7 @@ MIDI input and output via rtmidi.
 
 ### `MT_CAP_MUSIC_PLAYER`
 
-Music player and playlists. Used by one host app today.
+Music player and playlists: Ogg via Tremor, MP3/FLAC/WAV via miniaudio, AAC/ALAC via the OS decoder where one exists.
 
 *It does NOT imply an AUDIO capability: audio is CORE and has no vocabulary key, so an implication onto it would make mtcaps exit 2 on an unknown key. The coupling is real and is stated here as prose: the music player needs the core audio path, which is always present.*
 
@@ -363,7 +366,7 @@ opencv_contrib xfeatures2d built with OPENCV_ENABLE_NONFREE: SURF (patented) plu
 
 ### `MT_CAP_PHOTO_CODECS`
 
-Still-image codecs beyond the core set: TIFF, WebP, AVIF and HEIF.
+Still-image codecs beyond the core set: TIFF, WebP, AVIF, HEIF and the ISO 21496-1 gain-map JPEG (libultrahdr).
 
 *one host app guards on MT_ENABLE_LIBTIFF, MT_ENABLE_LIBWEBP (x2), MT_ENABLE_LIBAVIF and MT_ENABLE_LIBHEIF in its own format-support test. Decision E was reversed on this measurement.*
 

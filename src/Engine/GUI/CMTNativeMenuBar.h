@@ -60,4 +60,48 @@ public:
                                            bool control, bool super) { return false; }
 };
 
+// --- Which menu bar the engine creates ---------------------------------------
+// PLATFORM_UpdateMenus() runs before MT_PostInit() and creates the bar. An app
+// that wants a different backend sets the mode in MT_PreInit(); nothing else
+// may create or replace guiMain->nativeMenuBar (replacing it leaks the old bar,
+// and on Windows leaves its HMENU attached to the window). See docs/menu-bar.md.
+//
+//   Native  macOS: native NSMenu (none when headless); Windows: Win32 HMENU;
+//           Linux: ImGui. The default; existing apps are unchanged.
+//   ImGui   CMTNativeMenuBarImGui on every platform, headless included.
+//   None    no bar; guiMain->nativeMenuBar stays null. For apps that draw
+//           ImGui::BeginMainMenuBar() themselves.
+enum class EMTMenuBarMode { Native, ImGui, None };
+
+inline EMTMenuBarMode &MT_MenuBarModeStorage()
+{
+	static EMTMenuBarMode mode = EMTMenuBarMode::Native;
+	return mode;
+}
+
+inline void SYS_SetMenuBarMode(EMTMenuBarMode mode) { MT_MenuBarModeStorage() = mode; }
+inline EMTMenuBarMode SYS_GetMenuBarMode() { return MT_MenuBarModeStorage(); }
+
+// What a mode yields on this platform. The ONE mapping: every PLATFORM_UpdateMenus()
+// switches on it, and CTestMenuBarMode checks it for every mode. Pure, no state.
+enum class EMTMenuBarKind { None, ImGui, Native };
+
+inline EMTMenuBarKind MT_MenuBarKindFor(EMTMenuBarMode mode, bool headless)
+{
+	switch (mode)
+	{
+		case EMTMenuBarMode::None:  return EMTMenuBarKind::None;
+		case EMTMenuBarMode::ImGui: return EMTMenuBarKind::ImGui;
+		case EMTMenuBarMode::Native:
+#if defined(LINUX)
+			return EMTMenuBarKind::ImGui;     // no native backend on Linux
+#elif defined(MACOS)
+			return headless ? EMTMenuBarKind::None : EMTMenuBarKind::Native;
+#else
+			return EMTMenuBarKind::Native;    // Windows: unchanged from before the mode existed
+#endif
+	}
+	return EMTMenuBarKind::None;
+}
+
 #endif

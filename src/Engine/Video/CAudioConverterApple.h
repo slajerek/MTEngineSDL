@@ -39,11 +39,9 @@ public:
 	CAudioConverterApple &operator=(const CAudioConverterApple &) = delete;
 
 	// `inASBD` fully describes the compressed input. `cookie` is optional
-	// out-of-band configuration (AAC's ASC); it is applied BEST-EFFORT and a
-	// failure is deliberately not fatal -- see the note at the call site in
-	// the .cpp, which records that AudioConverter rejects even a textbook
-	// cookie on the OS this was developed against while decoding correctly
-	// from the ASBD alone.
+	// out-of-band configuration -- for AAC an ES_Descriptor
+	// (AacBuildEsdsCookie), NOT a bare ASC, which AudioConverter rejects. A
+	// rejected cookie is logged but not fatal; see the note in the .cpp.
 	bool Init(const AudioStreamBasicDescription &inASBD,
 			  const u8 *cookie, int cookieSize);
 	void Teardown();

@@ -9,17 +9,14 @@
 // decodes them (LC and HE/SBR profiles alike) with the OS-provided (and
 // OS-licensed) AudioConverter. Compiles to nothing anywhere this isn't Apple.
 //
-// SBR (HE-AAC) detection: Init() hand-parses the AudioSpecificConfig's fixed
-// bit layout itself (channel count, core sample rate, and -- if explicitly
-// signaled -- SBR presence and its extension sample rate) via the shared,
-// platform-neutral AacAscParser.h/.cpp (also consumed by CAudioDecoderAACMF
-// on Windows) rather than leaning on AudioConverter to derive it from the
-// magic cookie. See AacAscParser.cpp's header comment for why: empirically,
-// on the OS version this was developed against,
-// AudioConverterSetProperty(kAudioConverterDecompressionMagicCookie) and
-// AudioFormatGetProperty(kAudioFormatProperty_FormatList) both reject even a
-// textbook-correct cookie, while decoding via an explicit input
-// AudioStreamBasicDescription (rate/channels/framesPerPacket) works fine.
+// SBR/PS (HE-AAC v1/v2) detection: Init() wraps the AudioSpecificConfig in an
+// ES_Descriptor (AacBuildEsdsCookie, AacAscParser.h) and lets AudioToolbox
+// describe the stream from it (FormatInfo + FormatList: the richest layer,
+// with its rate, channels and 2048 frames/packet for HE). Earlier versions
+// passed the bare ASC, which AudioToolbox rejects ('!dat'); that rejection
+// was taken to mean "the cookie and FormatList never work", and HE-AAC then
+// decoded ~1 packet in 70 (2026-10-13). A hand-built description from the
+// shared parser remains as the fallback if the property calls fail.
 #ifdef __APPLE__
 
 #include "SYS_Defs.h"

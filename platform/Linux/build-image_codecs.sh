@@ -65,6 +65,25 @@ LCMS2_URL="https://github.com/mm2/Little-CMS/archive/refs/tags/lcms${LCMS2_VERSI
 # match.
 LCMS2_SHA256="267705e278e2f7c2fb886c259dadcbaeb2be52748bcbc71c79f08aacacb7a709"
 
+# libultrahdr -- the ISO 21496-1 gain-map JPEG ("Ultra HDR") codec, for the
+# photo app's HDR rendered-edit cache. Licence: Apache-2.0 AND
+# MIT, with the bundled image_io under Apache-2.0; it includes Adobe gain-map
+# technology whose NOTICE travels in LICENSES.txt (vocabulary.json). Pinned by
+# the SHA-256 of GitHub's archive of tag v2.0.2 (commit
+# e5f5a022fe96fc4dc2ee35c19f733a50df807abe), downloaded into $DOWNLOAD_DIR --
+# the image-codec work root, outside every checkout -- like every tarball here.
+# Built against the engine's ONE libjpeg -- libjpeg-turbo, built by
+# build-jpeg.sh into $(mt_caps_work_dir jpeg)/install-$(uname -m) before this
+# script runs: a second libjpeg (the distro's) in one process would be two
+# jpeg_* ABIs, one of them chosen by link order.
+LIBULTRAHDR_VERSION="2.0.2"
+LIBULTRAHDR_URL="https://github.com/google/libultrahdr/archive/refs/tags/v${LIBULTRAHDR_VERSION}.tar.gz"
+LIBULTRAHDR_SHA256="aa8d193bb887c348c419780511dd03b374f4e07af8812b6d3f80c8537cf1ef2c"
+UHDR_WANTED="${MT_ENABLE_LIBULTRAHDR:-1}"
+# The revision of our own libultrahdr source patches (patches/apply_libultrahdr_
+# jpeg9_raw.py). It is part of the stamp, so a new patch rebuilds the archive.
+LIBULTRAHDR_PATCH_REV="jpeg9-raw-1"
+
 mkdir -p "$DOWNLOAD_DIR" "$SRC_DIR" "$OUT_LIB_DIR"
 
 if [[ "${1:-}" == "clean" ]]; then
@@ -73,6 +92,20 @@ if [[ "${1:-}" == "clean" ]]; then
   echo "Done. Source downloads remain cached in $DOWNLOAD_DIR."
   exit 0
 fi
+
+# libjpeg-turbo (build-jpeg.sh, the jpeg unit) -- the engine's one libjpeg. Its
+# archive is read from the jpeg unit's STORE (MT_STORE_JPEG), else from the
+# view -- never from this script's own $OUT_LIB_DIR (the image-codecs store).
+# Its stamp joins both of this bundle's stamps, so a new turbo rebuilds it.
+JPEG_LIB_DIR="${MT_STORE_JPEG:-$MT_VIEW_LIB_DIR}"
+JPEG_LIB="$JPEG_LIB_DIR/libmt_jpeg.a"
+JPEG_STAMP_FILE="$JPEG_LIB_DIR/libmt_jpeg.stamp"
+JPEG_PREFIX="$(mt_caps_work_dir jpeg)/install-$(uname -m)"
+if [[ ! -f "$JPEG_LIB" || ! -f "$JPEG_STAMP_FILE" ]]; then
+  echo "ERROR: $JPEG_LIB (or its stamp) is missing -- run platform/Linux/build-jpeg.sh first" >&2
+  exit 1
+fi
+JPEG_STAMP="$(cat "$JPEG_STAMP_FILE")"
 
 script_sha="unknown"
 if command -v sha256sum >/dev/null 2>&1; then
@@ -84,7 +117,7 @@ fi
 # with MT_CAP_RAW=0 and MT_CAP_PHOTO_CODECS=0 still built LibRaw, libtiff,
 # libwebp, libavif, libgav1 and libjxl.
 #
-# One archive serves six flags, so it is skipped only when EVERY one is off: any
+# One archive serves seven flags, so it is skipped only when EVERY one is off: any
 # single codec still wanted means building the bundle, as there is no per-codec
 # archive to stub. libjxl has no capability of its own -- it decodes JPEG XL
 # DNGs, a RAW concern -- so it travels with MT_ENABLE_LIBRAW.
@@ -92,7 +125,8 @@ fi
 # Absent means ON, and this comes before any download.
 codecs_wanted=0
 for flag in "${MT_ENABLE_LIBTIFF:-1}" "${MT_ENABLE_LIBWEBP:-1}" "${MT_ENABLE_LIBAVIF:-1}" \
-            "${MT_ENABLE_LIBHEIF:-1}" "${MT_ENABLE_LIBRAW:-1}" "${MT_ENABLE_LCMS2:-1}"; do
+            "${MT_ENABLE_LIBHEIF:-1}" "${MT_ENABLE_LIBRAW:-1}" "${MT_ENABLE_LCMS2:-1}" \
+            "${MT_ENABLE_LIBULTRAHDR:-1}"; do
   if [[ "$flag" != "0" ]]; then
     codecs_wanted=1
     break
@@ -100,16 +134,28 @@ for flag in "${MT_ENABLE_LIBTIFF:-1}" "${MT_ENABLE_LIBWEBP:-1}" "${MT_ENABLE_LIB
 done
 
 if [[ "$codecs_wanted" == "0" ]]; then
-  STUB_STAMP="disabled:${script_sha}"
+  STUB_STAMP="disabled:${script_sha}:jpeg=${JPEG_STAMP}"
   if [[ -f "$OUT_LIB" && -f "$STAMP_FILE" && "$(cat "$STAMP_FILE" 2>/dev/null)" == "$STUB_STAMP" ]]; then
     exit 0
   fi
-  mt_caps_stub_archive "$OUT_LIB" "mt_image_codecs"
+  # The stub STILL carries libjpeg-turbo: JPEGWriter (libMTEngineSDL.a) needs
+  # jpeg_* on every configuration, and this is the archive every app links.
+  mt_caps_stub_archive "$OUT_LIB.stub.a" "mt_image_codecs"
+  rm -f "$OUT_LIB"
+  MRI_SCRIPT="$(mktemp)"
+  printf 'CREATE %s\nADDLIB %s\nADDLIB %s\nSAVE\nEND\n' "$OUT_LIB" "$OUT_LIB.stub.a" "$JPEG_LIB" > "$MRI_SCRIPT"
+  ar -M < "$MRI_SCRIPT"
+  rm -f "$MRI_SCRIPT" "$OUT_LIB.stub.a"
+  ranlib "$OUT_LIB" 2>/dev/null || true
+  if ! nm -g "$OUT_LIB" 2>/dev/null | grep "jpeg_skip_scanlines" >/dev/null; then
+    echo "ERROR: the stub bundle $OUT_LIB does not carry libjpeg-turbo (jpeg_skip_scanlines)" >&2
+    exit 1
+  fi
   echo -n "$STUB_STAMP" > "$STAMP_FILE"
   exit 0
 fi
 
-stamp_value="${script_sha}:tiff-${TIFF_VERSION}:webp-${WEBP_VERSION}:avif-${AVIF_VERSION}:libgav1-${LIBGAV1_VERSION}:libraw-${LIBRAW_VERSION}:libjxl-${LIBJXL_VERSION}:lcms2-${LCMS2_VERSION}:linux"
+stamp_value="${script_sha}:jpeg=${JPEG_STAMP}:tiff-${TIFF_VERSION}:webp-${WEBP_VERSION}:avif-${AVIF_VERSION}:libgav1-${LIBGAV1_VERSION}:libraw-${LIBRAW_VERSION}:libjxl-${LIBJXL_VERSION}:lcms2-${LCMS2_VERSION}:libultrahdr-${LIBULTRAHDR_VERSION}-${UHDR_WANTED}-${LIBULTRAHDR_PATCH_REV}:linux"
 if [[ -f "$OUT_LIB" && -f "$STAMP_FILE" ]]; then
   if [[ "$(cat "$STAMP_FILE")" == "$stamp_value" ]]; then
     # Stamp hit: backfill the Phase 2 header staging into this keyed bucket.
@@ -127,23 +173,60 @@ download_archive() {
   local url="$2"
   local sha256="$3"
   local archive="$DOWNLOAD_DIR/$name.tar.gz"
-  if [[ ! -f "$archive" ]]; then
-    if ! command -v curl >/dev/null 2>&1; then
-      echo "ERROR: curl is required to download image codec sources." >&2
-      echo "Install curl and rerun this script (Debian/Ubuntu: sudo apt install curl)." >&2
-      exit 1
-    fi
-    echo "Downloading $name..."
-    curl -L --fail --show-error "$url" -o "$archive"
-  fi
+  local part="$archive.part"
   local actual_sha
-  actual_sha="$(sha256sum "$archive" | cut -d ' ' -f 1)"
+
+  # A file at $archive is only ever one that passed the hash below (it is
+  # renamed into place after the check). A mismatch here therefore means the
+  # PIN changed under the same name -- a same-version re-pin -- so the old
+  # file is discarded and fetched again instead of blocking every later run.
+  if [[ -f "$archive" ]]; then
+    actual_sha="$(sha256sum "$archive" | cut -d ' ' -f 1)"
+    if [[ "$actual_sha" == "$sha256" ]]; then
+      return
+    fi
+    echo "Cached $archive does not match the pinned SHA-256 (pin changed?) -- downloading again." >&2
+    rm -f "$archive"
+  fi
+  if ! command -v curl >/dev/null 2>&1; then
+    echo "ERROR: curl is required to download image codec sources." >&2
+    echo "Install curl and rerun this script (Debian/Ubuntu: sudo apt install curl)." >&2
+    exit 1
+  fi
+
+  # Into a .part file, verified, THEN renamed: an interrupted or corrupt
+  # download must never sit at the final name, where the check above would
+  # stop every later run with a checksum error nobody can act on.
+  rm -f "$part"
+  echo "Downloading $name..."
+  curl -L --fail --show-error "$url" -o "$part"
+  actual_sha="$(sha256sum "$part" | cut -d ' ' -f 1)"
   if [[ "$actual_sha" != "$sha256" ]]; then
-    echo "ERROR: checksum mismatch for $archive" >&2
+    rm -f "$part"
+    echo "ERROR: checksum mismatch for $name (downloaded from $url); the partial file was deleted" >&2
     echo "Expected: $sha256" >&2
     echo "Actual:   $actual_sha" >&2
     exit 1
   fi
+  mv -f "$part" "$archive"
+}
+
+# The extraction guard: a marker written INSIDE the tree after tar finished,
+# holding the archive's (verified, so pinned) SHA-256. A tree without it -- an
+# interrupted extraction -- or with another hash -- a same-version re-pin --
+# is removed and extracted again. The Windows script's Assert-Extracted is the
+# same idea. "The directory exists" alone made a half-extracted tree permanent.
+extracted_ok() {
+  local archive="$1"
+  local dest="$2"
+  [[ -d "$dest" && -f "$dest/.mt-extracted" ]] || return 1
+  [[ "$(cat "$dest/.mt-extracted")" == "$(sha256sum "$archive" | cut -d ' ' -f 1)" ]]
+}
+
+mark_extracted() {
+  local archive="$1"
+  local dest="$2"
+  sha256sum "$archive" | cut -d ' ' -f 1 | tr -d '\n' > "$dest/.mt-extracted"
 }
 
 extract_archive() {
@@ -151,11 +234,19 @@ extract_archive() {
   local top_dir="$2"
   local archive="$DOWNLOAD_DIR/$name.tar.gz"
   local dest="$SRC_DIR/$top_dir"
-  if [[ -d "$dest" ]]; then
+
+  if extracted_ok "$archive" "$dest"; then
     return
   fi
+
+  rm -rf "$dest"
   echo "Extracting $name..."
   tar -xzf "$archive" -C "$SRC_DIR"
+  if [[ ! -d "$dest" ]]; then
+    echo "ERROR: $archive did not extract to $dest" >&2
+    exit 1
+  fi
+  mark_extracted "$archive" "$dest"
 }
 
 checkout_git_tag() {
@@ -199,40 +290,35 @@ build_cmake() {
   cmake --install "$build" --config Release
 }
 
-# RD-A: compile the engine's own vendored jpeg-9a and zlib into static
-# archives so LibRaw's configure can link-test them (jpeg is AC_CHECK_LIB, a
-# real link). One copy of each library in the repo (roadmap #2.11); the
-# archives are ALSO merged into libmt_image_codecs.a below, which keeps the
-# bundle self-contained -- Linux is the single-pass-GNU-ld platform the RD-A
-# design #4.2.1 route (a) exists for.
+# RD-A: compile the engine's own vendored zlib into a static archive for
+# LibRaw. One copy of the library in the repo (roadmap #2.11); the archive is
+# ALSO merged into libmt_image_codecs.a below, which keeps the bundle
+# self-contained -- Linux is the single-pass-GNU-ld platform the RD-A design
+# #4.2.1 route (a) exists for. jpeg is no longer built here: the engine's one
+# libjpeg is libjpeg-turbo, from build-jpeg.sh ($JPEG_PREFIX), merged the same way.
 build_engine_codec_deps() {
   local prefix="$1"
-  local jpeg_src="$ROOT_DIR/src/Engine/Libs/jpeg/jpeg-9a"
   local zlib_src="$ROOT_DIR/src/Engine/Libs/zlib"
   local deps_build="$BUILD_DIR/engine-deps"
 
   rm -rf "$deps_build"
-  mkdir -p "$deps_build/jpeg" "$deps_build/zlib" "$prefix/lib" "$prefix/include"
+  mkdir -p "$deps_build/zlib" "$prefix/lib" "$prefix/include"
 
   local f base
-  for f in "$jpeg_src"/*.c; do
-    base="$(basename "${f%.c}")"
-    cc -c -O2 -fPIC -I"$jpeg_src" -o "$deps_build/jpeg/$base.o" "$f"
-  done
-  ar rcs "$prefix/lib/libjpeg.a" "$deps_build"/jpeg/*.o
-
   for f in "$zlib_src"/*.c; do
     base="$(basename "${f%.c}")"
     cc -c -O2 -fPIC -I"$zlib_src" -o "$deps_build/zlib/$base.o" "$f"
   done
   ar rcs "$prefix/lib/libz.a" "$deps_build"/zlib/*.o
 
-  # Headers for LibRaw's compile and configure's AC_CHECK_HEADERS probe -- a
-  # library that links but whose headers are missing WARNS AND DISABLES
-  # SILENTLY (configure.ac:53-62).
-  cp "$jpeg_src/jpeglib.h" "$jpeg_src/jconfig.h" "$jpeg_src/jmorecfg.h" \
-     "$jpeg_src/jerror.h" "$prefix/include/"
   cp "$zlib_src/zlib.h" "$zlib_src/zconf.h" "$prefix/include/"
+
+  # The jpeg-9a outputs older builds of this script left in the codec prefix,
+  # removed unconditionally before LibRaw and libultrahdr are configured:
+  # LibRaw's include list also carries $prefix/include, and a leftover jpeg-9a
+  # jpeglib.h there is exactly the shadowing MT_jpeglib.h exists to stop.
+  rm -f "$prefix/include/jpeglib.h" "$prefix/include/jconfig.h" \
+        "$prefix/include/jmorecfg.h" "$prefix/include/jerror.h" "$prefix/lib/libjpeg.a"
 }
 
 checkout_libjxl() {
@@ -278,8 +364,10 @@ build_libraw() {
     autoreconf --force --install --verbose
   fi
   make distclean >/dev/null 2>&1 || true
-  # RD-A (#2.11): jpeg + zlib ON, from the engine's vendored copies staged in
-  # $prefix by build_engine_codec_deps. jpeg is a real AC_CHECK_LIB link test
+  # RD-A (#2.11): jpeg + zlib ON -- jpeg from libjpeg-turbo's prefix
+  # (build-jpeg.sh, FIRST on both flags so the link test is against turbo),
+  # zlib from the engine's vendored copy staged in $prefix by
+  # build_engine_codec_deps. jpeg is a real AC_CHECK_LIB link test
   # (LDFLAGS) plus AC_CHECK_HEADERS (CPPFLAGS); zlib is PKG_CHECK_MODULES,
   # which honours ZLIB_CFLAGS/ZLIB_LIBS directly without pkg-config.
   ./configure \
@@ -291,8 +379,8 @@ build_libraw() {
     --disable-examples \
     CFLAGS="-fPIC" \
     CXXFLAGS="-fPIC" \
-    CPPFLAGS="-I$prefix/include -DUSE_JXL" \
-    LDFLAGS="-L$prefix/lib" \
+    CPPFLAGS="-I$JPEG_PREFIX/include -I$prefix/include -DUSE_JXL" \
+    LDFLAGS="-L$JPEG_PREFIX/lib -L$prefix/lib" \
     ZLIB_CFLAGS="-I$prefix/include" \
     ZLIB_LIBS="-L$prefix/lib -lz"
 
@@ -339,6 +427,9 @@ download_archive "libwebp-${WEBP_VERSION}" "$WEBP_URL" "$WEBP_SHA256"
 download_archive "libavif-${AVIF_VERSION}" "$AVIF_URL" "$AVIF_SHA256"
 download_archive "LibRaw-${LIBRAW_VERSION}" "$LIBRAW_URL" "$LIBRAW_SHA256"
 download_archive "lcms${LCMS2_VERSION}" "$LCMS2_URL" "$LCMS2_SHA256"
+if [[ "$UHDR_WANTED" != "0" ]]; then
+  download_archive "libultrahdr-${LIBULTRAHDR_VERSION}" "$LIBULTRAHDR_URL" "$LIBULTRAHDR_SHA256"
+fi
 
 extract_archive "tiff-${TIFF_VERSION}" "tiff-${TIFF_VERSION}"
 extract_archive "libwebp-${WEBP_VERSION}" "libwebp-${WEBP_VERSION}"
@@ -346,6 +437,14 @@ extract_archive "libavif-${AVIF_VERSION}" "libavif-${AVIF_VERSION}"
 checkout_git_tag "libgav1-v${LIBGAV1_VERSION}" "$LIBGAV1_GIT_URL" "v${LIBGAV1_VERSION}" "$LIBGAV1_GIT_REV"
 extract_archive "LibRaw-${LIBRAW_VERSION}" "LibRaw-${LIBRAW_VERSION}"
 extract_archive "lcms${LCMS2_VERSION}" "Little-CMS-lcms${LCMS2_VERSION}"
+if [[ "$UHDR_WANTED" != "0" ]]; then
+  extract_archive "libultrahdr-${LIBULTRAHDR_VERSION}" "libultrahdr-${LIBULTRAHDR_VERSION}"
+  # libultrahdr assumes libjpeg-turbo's raw mode; on jpeg-9a it overflowed its
+  # chroma planes on every 4:2:0 JPEG. Built against libjpeg-turbo now, where
+  # the patch is a no-op (see its header); kept so a jpeg-9 build stays safe.
+  # Idempotent; fails loudly on a bump.
+  python3 "$PATCHES_DIR/apply_libultrahdr_jpeg9_raw.py" "$SRC_DIR/libultrahdr-${LIBULTRAHDR_VERSION}"
+fi
 checkout_libjxl
 
 # Link libgav1 into libavif ext dir
@@ -439,8 +538,13 @@ build_cmake "$SRC_DIR/libjxl-${LIBJXL_VERSION}" "$BUILD_DIR/libjxl" "$PREFIX_DIR
   -DJPEGXL_ENABLE_COVERAGE=OFF \
   -DJPEGXL_WARNINGS_AS_ERRORS=OFF
 
-# Build engine jpeg/zlib archives, then LibRaw (patched for JPEG XL) against them
+# Build the engine zlib archive, then LibRaw (patched for JPEG XL) against it
+# and libjpeg-turbo's prefix.
 build_engine_codec_deps "$PREFIX_DIR"
+if [[ ! -f "$JPEG_PREFIX/lib/libjpeg.a" || ! -f "$JPEG_PREFIX/include/jpeglib.h" ]]; then
+  echo "ERROR: libjpeg-turbo prefix $JPEG_PREFIX is incomplete -- run platform/Linux/build-jpeg.sh first" >&2
+  exit 1
+fi
 patch_libraw_jxl
 build_libraw "$PREFIX_DIR"
 
@@ -469,6 +573,30 @@ build_cmake "$SRC_DIR/Little-CMS-lcms${LCMS2_VERSION}" "$BUILD_DIR/lcms2" "$PREF
   -DLCMS2_BUILD_TESTS=OFF \
   -DCMAKE_POSITION_INDEPENDENT_CODE=ON
 
+# libultrahdr (P3b): against libjpeg-turbo's prefix (build-jpeg.sh). Same pins
+# as the macOS script, for the same reasons
+# -- here the thing find_package(JPEG) would otherwise find is the distro's
+# libjpeg-turbo, a second jpeg_* ABI beside the engine's. CMAKE_INSTALL_LIBDIR
+# is pinned to lib: libultrahdr installs through GNUInstallDirs, which says
+# lib64 on Fedora-family hosts, and everything below reads $PREFIX_DIR/lib.
+if [[ "$UHDR_WANTED" != "0" ]]; then
+  build_cmake "$SRC_DIR/libultrahdr-${LIBULTRAHDR_VERSION}" "$BUILD_DIR/libultrahdr" "$PREFIX_DIR" \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DUHDR_BUILD_EXAMPLES=OFF -DUHDR_BUILD_TESTS=OFF -DUHDR_BUILD_BENCHMARK=OFF \
+    -DUHDR_BUILD_FUZZERS=OFF -DUHDR_BUILD_DEPS=OFF -DUHDR_BUILD_JAVA=OFF -DUHDR_BUILD_PACKAGING=OFF \
+    -DUHDR_ENABLE_LOGS=OFF -DUHDR_ENABLE_INSTALL=ON -DUHDR_ENABLE_INTRINSICS=ON \
+    -DUHDR_ENABLE_GLES=OFF -DUHDR_ENABLE_WERROR=OFF -DUHDR_ENABLE_SMPTE2094_50=OFF \
+    -DUHDR_ENABLE_HEIF=OFF -DUHDR_WRITE_XMP=OFF -DUHDR_WRITE_ISO=ON \
+    -DUHDR_MAX_DIMENSION=32768 \
+    -DCMAKE_INSTALL_LIBDIR=lib \
+    -DJPEG_INCLUDE_DIR="$JPEG_PREFIX/include" \
+    -DJPEG_LIBRARY="$JPEG_PREFIX/lib/libjpeg.a" \
+    -DJPEG_LIBRARY_RELEASE="$JPEG_PREFIX/lib/libjpeg.a" \
+    "-DCMAKE_IGNORE_PREFIX_PATH=/usr/local"
+  require_file "$PREFIX_DIR/lib/libuhdr.a"
+  require_file "$PREFIX_DIR/include/ultrahdr_api.h"
+fi
+
 # Collect all static libs
 INPUT_LIBS=(
   "$PREFIX_DIR/lib/libtiff.a"
@@ -477,7 +605,7 @@ INPUT_LIBS=(
   "$PREFIX_DIR/lib/libsharpyuv.a"
   "$PREFIX_DIR/lib/libavif.a"
   "$PREFIX_DIR/lib/libraw.a"
-  "$PREFIX_DIR/lib/libjpeg.a"
+  "$JPEG_LIB"
   "$PREFIX_DIR/lib/libz.a"
   "$PREFIX_DIR/lib/liblcms2.a"
   "$PREFIX_DIR/lib/libjxl.a"
@@ -486,6 +614,10 @@ INPUT_LIBS=(
   "$PREFIX_DIR/lib/libbrotlidec.a"
   "$PREFIX_DIR/lib/libbrotlicommon.a"
 )
+
+if [[ "$UHDR_WANTED" != "0" ]]; then
+  INPUT_LIBS+=("$PREFIX_DIR/lib/libuhdr.a")
+fi
 
 # Find libgav1 (built inside avif build tree)
 GAV1_LIB="$(find "$BUILD_DIR/avif" -name "libgav1.a" -type f | head -n 1 || true)"
@@ -521,6 +653,10 @@ require_symbol "WebPDemuxGetFrame"
 require_symbol "avifDecoderCreate"
 require_symbol "LibRaw::open_file(char const*)"
 require_symbol "jpeg_mem_src"
+# libjpeg-turbo, not any other libjpeg (jpeg_skip_scanlines is turbo-only), and
+# jpegtran's transupp, which lossless JPEG rotation calls.
+require_symbol "jpeg_skip_scanlines"
+require_symbol "jtransform_execute_transform"
 require_symbol "uncompress"
 require_symbol "cmsCreateTransform"
 require_symbol "JxlDecoderCreate"
@@ -528,10 +664,32 @@ require_symbol "JxlDecoderCreate"
 # libjxl while every JPEG XL DNG stays unreadable -- checked on the shipped
 # artifact, not on a Makefile.
 require_symbol "LibRaw::jxl_dng_load_raw()"
+# The three entry points the engine's MT_UltraHdr wrapper calls.
+if [[ "$UHDR_WANTED" != "0" ]]; then
+  require_symbol "uhdr_encode"
+  require_symbol "uhdr_decode"
+  require_symbol "is_uhdr_image"
+fi
 
 # Headers travel WITH the archive (Phase 2).
 rm -rf "$OUT_LIB_DIR/image-codecs/include"
 mkdir -p "$OUT_LIB_DIR/image-codecs"
 cp -R "$PREFIX_DIR/include" "$OUT_LIB_DIR/image-codecs/include"
+# libultrahdr's licence texts travel with the archive -- before the stamp, as
+# on macOS: a stamp-hit run never stages them again.
+rm -rf "$OUT_LIB_DIR/image-codecs/licenses/libultrahdr"
+if [[ "$UHDR_WANTED" != "0" ]]; then
+  UHDR_SRC="$SRC_DIR/libultrahdr-${LIBULTRAHDR_VERSION}"
+  mkdir -p "$OUT_LIB_DIR/image-codecs/licenses/libultrahdr"
+  cp "$UHDR_SRC/LICENSE" "$UHDR_SRC/LICENSE-APACHE" "$UHDR_SRC/LICENSE-MIT" \
+     "$OUT_LIB_DIR/image-codecs/licenses/libultrahdr/"
+  cp "$UHDR_SRC/adobe-hdr-gain-map-license/NOTICE" \
+     "$OUT_LIB_DIR/image-codecs/licenses/libultrahdr/NOTICE-adobe-gain-map"
+  cp "$UHDR_SRC/third_party/image_io/LICENSE" \
+     "$OUT_LIB_DIR/image-codecs/licenses/libultrahdr/LICENSE-image_io"
+  # modp_b64.cc is compiled into image_io (BSD-3-Clause): its licence ships too.
+  cp "$UHDR_SRC/third_party/image_io/src/modp_b64/LICENSE" \
+     "$OUT_LIB_DIR/image-codecs/licenses/libultrahdr/LICENSE-modp_b64"
+fi
 echo -n "$stamp_value" > "$STAMP_FILE"
 echo "Image codec bundle built: $OUT_LIB (headers staged to $OUT_LIB_DIR/image-codecs/include)"

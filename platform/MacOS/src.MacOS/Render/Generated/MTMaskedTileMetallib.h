@@ -14,7 +14,7 @@
 #define _MTMaskedTile_Metallib_h_
 
 // sha256 of the .metal source this header was generated from.
-static const char *kMTMaskedTileSourceSha256 = "fce108112190aabe3344e9f571db4a061ed8d83ab3ffe44f2b4da694b3000459";
+static const char *kMTMaskedTileSourceSha256 = "75b8e3ba6c629aba983f55425c33c71c6128dcc253dd255d7ee1b7fd1b91cc84";
 
 // The MSL source. DEVELOPMENT path: newLibraryWithSource.
 static const char *kMTMaskedTileMetalSource = R"MTMSL(

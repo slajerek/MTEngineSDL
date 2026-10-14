@@ -92,6 +92,21 @@ public:
 	bool Execute(std::vector<float> &rgb, int &w, int &h,
 	             SDevelopChainStats *outStats) const;
 
+	// True for every kind whose output pixel depends on that pixel alone --
+	// everything except SpatialOp and CropResample.
+	static bool IsPointwise(EDevelopOpKind kind);
+
+	// Runs ONE pointwise op over `pixelCount` interleaved RGB pixels starting
+	// at `px` -- the exact loop Execute runs for that kind, over a sub-range.
+	// It exists so a caller can split a long op into bands and ask a cancel
+	// between them: one pointwise op over a 24 Mpx buffer can run for seconds
+	// in a Debug build, and a cancel asked only between ops waits for all of
+	// it. Each pixel is independent of every other, so any banding of a
+	// buffer gives the same bytes as one call over all of it; no copy is made.
+	// Returns false on a malformed op (Execute's own answer) and for a
+	// non-pointwise kind, which has no sub-range to run.
+	static bool ExecuteOpRange(const SDevelopOp &op, float *px, size_t pixelCount);
+
 private:
 	std::vector<SDevelopOp> ops_;
 };

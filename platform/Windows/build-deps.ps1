@@ -159,6 +159,12 @@ Write-Host "`n=== Building FTXUI ($Platform $Configuration $Compiler) ===" -Fore
 Write-Host "`n=== Building mbedTLS ($Platform $Configuration $Compiler) ===" -ForegroundColor Cyan
 & "$scriptDir\build-mbedtls.ps1" -OutLibDir $OutLibDir -Platform $Platform -Configuration $Configuration -Compiler $Compiler
 
+# libjpeg-turbo -- the engine's one libjpeg (core: JPEGWriter needs it on every
+# configuration). BEFORE the codecs, which build libultrahdr and LibRaw against
+# its per-configuration prefix and merge MTJpeg.lib into their bundle.
+Write-Host "`n=== Building libjpeg-turbo ($Platform $Configuration) ===" -ForegroundColor Cyan
+& "$scriptDir\build-jpeg.ps1" -OutLibDir $OutLibDir -Platform $Platform -Configuration $Configuration
+
 Write-Host "`n=== Building Image Codecs ($Platform $Configuration) ===" -ForegroundColor Cyan
 & "$scriptDir\build-image_codecs.ps1" -OutLibDir $OutLibDir -Platform $Platform -Configuration $Configuration
 

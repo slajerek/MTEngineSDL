@@ -10,6 +10,7 @@
 #include "SYS_CommandLine.h"  // sysCommandLineArguments
 #include <cstring>
 #include <cstdio>
+#include <cstdlib>   // getenv
 #include <signal.h>
 #include <vector>
 #include "Core/Render/VID_Main.h"
@@ -236,8 +237,16 @@ void CImGuiTestEngine::ShowUI()
 
 void CImGuiTestEngine::QueueAllTests()
 {
-	if (engine)
-		ImGuiTestEngine_QueueTests(engine, ImGuiTestGroup_Tests);
+	if (!engine)
+		return;
+	// MT_IMGUI_TEST_FILTER narrows a run to the named tests (imgui_test_engine
+	// filter syntax: comma-separated, "^" anchors a prefix) -- a developer's
+	// red/green loop on one test without the whole ten-minute suite. Unset or
+	// empty: every test, as before.
+	const char *filter = getenv("MT_IMGUI_TEST_FILTER");
+	if (filter != NULL && filter[0] == '\0')
+		filter = NULL;
+	ImGuiTestEngine_QueueTests(engine, ImGuiTestGroup_Tests, filter);
 }
 
 bool CImGuiTestEngine::IsTestQueueEmpty()

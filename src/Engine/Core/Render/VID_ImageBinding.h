@@ -22,6 +22,11 @@
 // destroy full CSlrImage object (delete)
 #define BINDING_MODE_DESTROY		4
 #define BINDING_MODE_DONT_FREE_IMAGEDATA		5
+// bind; then FreeLoadImage() once the texture exists. Unlike BINDING_MODE_BIND,
+// a CreateTexture that produced no handle keeps its data (its owner decides),
+// and the destination is always written. For images whose texture IS the
+// image: keeping the CPU copy beside it doubles their memory.
+#define BINDING_MODE_BIND_FREE_IMAGEDATA	6
 
 void VID_InitImageBindings();
 void VID_LockImageBindingMutex();
@@ -30,6 +35,17 @@ void VID_PostImageBinding(CSlrImage *image, CSlrImage **dest);
 void VID_PostImageBinding(CSlrImage *image, CSlrImage **dest, u8 mode);
 void VID_PostImageDealloc(CSlrImage *image);
 void VID_PostImageDestroy(CSlrImage *image);
+
+// Option C: the pair's strong guarantee. Queues `first` then `second` under ONE
+// lock, or neither: both CBindingImageData are allocated before the lock; if the
+// second push_back throws, the first is popped and the exception rethrown. The bind
+// loop processes them in that order, and a frame-budget stop that splits them is
+// harmless when `first` is the gain map: a base bound a frame later sees its map
+// already bound. No destination is written (NULL). The mode it is called with is
+// BINDING_MODE_BIND_FREE_IMAGEDATA in production (Decision R-3), DONT_FREE in tests.
+// VID_PostImageDealloc(second) while `second` is still queued cancels both, or
+// queues `first`'s DEALLOC when a frame-budget stop already bound it.
+void VID_PostImageBindingPair(CSlrImage *first, CSlrImage *second, u8 mode);
 
 // Defer glDeleteTextures(textureId) to the start of the NEXT frame's
 // VID_BindImages() -- the point after the previous frame's ImGui draw data has

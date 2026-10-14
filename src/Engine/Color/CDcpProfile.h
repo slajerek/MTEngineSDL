@@ -102,9 +102,29 @@ public:
 		std::string asShotProfileName;            // 0xC6F6
 		std::vector<u32> extraProfileOffsets;     // 0xC6F5
 	};
+	// READS THE HEAD OF THE FILE, not the whole file, and reads the whole file
+	// only when the head could not answer.
+	//
+	// These tags live in IFD0, which writers put at the start: across 300 of
+	// the Adobe profiles installed on a 2026-09-08 dev Mac the furthest byte
+	// any of them needed was 456, while the median profile FILE was 278 KB. A
+	// caller that indexes a profile folder -- a real one holds 4373 of them --
+	// therefore read 854 MB to use a few hundred kilobytes of it. Whenever the
+	// head does not hold every wanted tag (a writer that puts its strings
+	// after its tables, a truncated file, a container this does not
+	// understand), the whole file is read and parsed exactly as before, so the
+	// ANSWER never depends on the window: only the cost does.
 	static bool ReadFileTags(const char *utf8Path, SFileTags *out);
 	static bool ReadFileTagsFromBytes(const u8 *data, size_t len,
 	                                  SFileTags *out);
+
+	// Test seams for the bounded read above. The window is a byte count, and
+	// 0 restores the shipped default; the counter reports how many
+	// ReadFileTags calls had to fall back to the whole file, which is what
+	// tells a test whether the fast path engaged at all.
+	static void PC_TestSetTagsWindow(size_t bytes);
+	static int  PC_TestWholeFileFallbackCount();
+	static void PC_TestResetWholeFileFallbackCount();
 
 	// dng_sdk's CalculateFingerprint, byte-for-byte (spec F10). A
 	// VERIFICATION key only (#5.3): primary matching is name + camera.

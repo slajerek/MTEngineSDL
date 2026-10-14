@@ -64,6 +64,13 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ -n "$APP_DIR" ]] || { echo "ERROR: --app-dir is required (the stub passes it)." >&2; exit 2; }
+
+# A final build tells the dependency scripts so: build-jpeg.sh then REFUSES a
+# slice without SIMD (x86_64 without nasm, aarch64 without Neon) instead of
+# warning. Exported before the deps and compile stages.
+# The driver OWNS the variable (like the Windows driver): a value inherited from
+# the calling shell never turns a development build into a final one.
+if [[ "$MAKE_PROD" == "true" ]]; then export MT_PROD_BUILD=1; else unset MT_PROD_BUILD; fi
 APP_DIR="$(cd "$APP_DIR" && pwd)"
 
 # ---------------------------------------------------------------------------
@@ -372,6 +379,16 @@ if [[ "$MAKE_PROD" == "true" ]]; then
     echo "Deployed: $PROD_DIR/$PROD_NAME"
 fi
 
+# THE BINARY, BY ABSOLUTE PATH, ONCE, AT THE END -- after the strip above,
+# so the mtime is final. Same shape as the macOS and Windows drivers and as
+# the runners' "=== Using binary:" line, so a stale binary run from another
+# location shows up as two different paths. The bare path on the last line
+# stays: it is the machine-readable answer.
+_mt_mtime() { date -r "$1" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || echo "mtime unknown"; }
 echo ""
+echo "=== Built binary: $(readlink -f "$APP_BINARY") ($CONFIGURATION, $(_mt_mtime "$APP_BINARY")) ==="
+if [[ "$MAKE_PROD" == "true" ]]; then
+    echo "=== Deployed binary: $(readlink -f "$PROD_DIR/$PROD_NAME") ($CONFIGURATION, $(_mt_mtime "$PROD_DIR/$PROD_NAME")) ==="
+fi
 echo "$MT_APP_NAME built successfully."
 echo "$APP_BINARY"

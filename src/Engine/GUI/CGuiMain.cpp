@@ -611,6 +611,7 @@ CGuiMain::CGuiMain()
 	currentLayoutBeforeFullScreen = NULL;
 	temporaryLayoutToGoBackFromFullScreen = new CLayoutData();
 	viewFullScreen = NULL;
+	viewFullScreenInWindow = false;
 	appWasFullScreenBeforeViewFullScreen = false;
 	isChangingFullScreenState = false;
 	
@@ -620,6 +621,8 @@ CGuiMain::CGuiMain()
 	mousePosY = 0;
 	
 	mouseScrollWheelScaleX = 1.0f;
+	pinchView = NULL;
+	tapDragView = NULL;
 
 #if defined(WIN32)
 	mouseScrollWheelScaleY = 5.0f;
@@ -664,6 +667,10 @@ void CGuiMain::RemoveViewSkippingLayout(CGuiView *view)
 {
 //	LOGG("CGuiMain::RemoveViewNoLayout view=%x '%s'", view, view->name?view->name:"<NULL>");
 	LockMutex();
+	if (pinchView == view)
+		pinchView = NULL;   // never deliver a gesture to a view that is gone
+	if (tapDragView == view)
+		tapDragView = NULL;
 	this->views.remove(view);
 	this->DebugPrintViews();
 	UnlockMutex();
@@ -2027,6 +2034,27 @@ void CGuiMain::DoNotTouchedMove(float x, float y)
 	}
 }
 
+CGuiView *CGuiMain::FindTopmostViewAt(float x, float y)
+{
+	// TODO: iteration top-down by ImGui windows is not valid after system open file dialog on macos
+	ImGuiContext *context = ImGui::GetCurrentContext();
+	for (int i = context->Windows.Size - 1; i >= 0; i--) // Iterate front to back
+	{
+		ImGuiWindow *window = context->Windows[i];
+		if (!window->WasActive || window->Hidden)
+			continue;
+
+		CGuiView *view = (CGuiView*)window->userData;
+		if (view == NULL || !view->visible)
+			continue;
+
+		LOGG("  view->IsInside(%f %f)  window: posX=%5.2f posEndX=%5.2f posY=%5.2f posEndY=%5.2f", x, y, view->windowPosX, view->windowPosEndX, view->windowPosY, view->windowPosEndY);
+		if (view->IsInsideView(x, y))
+			return view;
+	}
+	return NULL;
+}
+
 void CGuiMain::DoScrollWheel(float deltaX, float deltaY)
 {
 	LOGG("CGuiMain::DoScrollWheel: %f %f", deltaX, deltaY);
@@ -2049,41 +2077,14 @@ void CGuiMain::DoScrollWheel(float deltaX, float deltaY)
 		return;
 	}
 
-	// TODO: iteration top-down by ImGui windows is not valid after system open file dialog on macos
-
-	// iterate top-down by ImGui windows
-	ImGuiContext *context = ImGui::GetCurrentContext();
-	
-	for (int i = context->Windows.Size - 1; i >= 0; i--) // Iterate front to back
+	// Topmost view under the cursor owns the wheel; do not fall through to
+	// views rendered behind it even if it doesn't consume the event.
+	CGuiView *view = FindTopmostViewAt(mousePosX, mousePosY);
+	if (view != NULL)
 	{
-		ImGuiWindow *window = context->Windows[i];
-		if (!window->WasActive || window->Hidden)
-			continue;
-
-		CGuiView *view = (CGuiView*)window->userData;
-
-		if (view != NULL)
-		{
-			LOGG("  view->name=%s visible=%s", view->name, STRBOOL(view->visible));
-			
-			if (!view->visible)
-				continue;
-			
-			LOGG("  view->IsInside(%f %f)  window: posX=%5.2f posEndX=%5.2f posY=%5.2f posEndY=%5.2f", mousePosX, mousePosY, view->windowPosX, view->windowPosEndX, view->windowPosY, view->windowPosEndY);
-			if (view->IsInsideView(mousePosX, mousePosY))
-			{
-				LOGG("  view %s ->DoScrollWheel(%f %f)", view->name, deltaX, deltaY);
-				// Topmost view under the cursor owns the wheel; do not fall
-				// through to views rendered behind it even if it doesn't
-				// consume the event.
-				view->DoScrollWheel(deltaX, deltaY);
-				return;
-			}
-			else
-			{
-//				LOGG("  NOT inside view %s", view->name);
-			}
-		}
+		LOGG("  view %s ->DoScrollWheel(%f %f)", view->name, deltaX, deltaY);
+		view->DoScrollWheel(deltaX, deltaY);
+		return;
 	}
 	
 	/*
@@ -2113,6 +2114,85 @@ void CGuiMain::DoScrollWheel(float deltaX, float deltaY)
 	{
 		focusedView->DoScrollWheel(deltaX, deltaY);
 	}
+}
+
+void CGuiMain::DoPinchBegin(float x, float y)
+{
+	LOGG("CGuiMain::DoPinchBegin: %f %f", x, y);
+
+	// A BEGIN while latched means the END never arrived (focus change mid-
+	// gesture). Close the old one so its owner can drop any gesture state.
+	if (pinchView != NULL)
+		DoPinchEnd(x, y);
+
+	if (IsOnAnyOpenedPopup(x, y))
+		return;
+
+	// Same gate as the wheel: a pinch over the filmstrip, the grid or a
+	// floating panel must not zoom the pane behind it.
+	if (IsMouseOverBlockingImGuiWindow())
+		return;
+
+	// Unlike the wheel there is no focused-view fallback: a pinch that starts
+	// on no view zooms nothing.
+	CGuiView *view = FindTopmostViewAt(x, y);
+	if (view != NULL && view->DoPinchBegin(x, y))
+		pinchView = view;
+}
+
+void CGuiMain::DoPinchUpdate(float x, float y, float scale)
+{
+	if (pinchView == NULL)
+		return;   // no owner: BEGIN was gated or never arrived
+
+	// SDL sends 1 + NSEvent.magnification; a non-finite or non-positive
+	// factor would collapse or invert the image. Drop it, keep the latch.
+	if (!std::isfinite(scale) || scale <= 0.0f)
+		return;
+
+	if (!pinchView->visible)
+	{
+		DoPinchEnd(x, y);
+		return;
+	}
+
+	LOGG("CGuiMain::DoPinchUpdate: %s scale=%f", pinchView->name, scale);
+	pinchView->DoPinchZoom(x, y, scale);
+}
+
+void CGuiMain::DoPinchEnd(float x, float y)
+{
+	CGuiView *view = pinchView;
+	pinchView = NULL;   // cleared first: an owner that re-enters DoPinchBegin must not see itself latched
+	if (view != NULL)
+		view->DoPinchEnd(x, y);
+}
+
+void CGuiMain::DoTapDragBegin(float x, float y)
+{
+	LOGG("CGuiMain::DoTapDragBegin: %f %f", x, y);
+
+	if (tapDragView != NULL)
+		DoTapDragEnd(x, y);
+
+	// The pinch's gates: a drag that starts over a popup, the filmstrip, the
+	// grid or a floating panel must not move the pane behind it.
+	if (IsOnAnyOpenedPopup(x, y))
+		return;
+	if (IsMouseOverBlockingImGuiWindow())
+		return;
+
+	CGuiView *view = FindTopmostViewAt(x, y);
+	if (view != NULL && view->DoTapDragBegin(x, y))
+		tapDragView = view;
+}
+
+void CGuiMain::DoTapDragEnd(float x, float y)
+{
+	CGuiView *view = tapDragView;
+	tapDragView = NULL;   // cleared first, as DoPinchEnd
+	if (view != NULL)
+		view->DoTapDragEnd(x, y);
 }
 
 bool CGuiMain::DoGamePadButtonDown(CGamePad *gamePad, u8 button)
@@ -5708,6 +5788,8 @@ const char *GetFullScreenModeText(SetFullScreenMode setFullScreenMode)
 			return "ViewEnterFullScreen";
 		case SetFullScreenMode::ViewLeaveFullScreen:
 			return "ViewLeaveFullScreen";
+		case SetFullScreenMode::ViewEnterWindowFill:
+			return "ViewEnterWindowFill";
 	}
 	return "UnknownFullScreen";
 }
@@ -5717,9 +5799,11 @@ void CGuiMain::SetViewFullScreen(SetFullScreenMode setFullScreenMode, CGuiView *
 	LOGD("CGuiMain::SetViewFullScreen: setFullScreenMode=%s view=%s currentLayout=%x '%s'", GetFullScreenModeText(setFullScreenMode), view ? view->name : "NULL", layoutManager->currentLayout, layoutManager->currentLayout ? layoutManager->currentLayout->layoutName : "NULL");
 
 	if (setFullScreenMode == SetFullScreenMode::ViewEnterFullScreen
+		|| setFullScreenMode == SetFullScreenMode::ViewEnterWindowFill
 		|| setFullScreenMode == SetFullScreenMode::MainWindowEnterFullScreen)
 	{
-		if (setFullScreenMode == SetFullScreenMode::ViewEnterFullScreen && view == NULL)
+		if ((setFullScreenMode == SetFullScreenMode::ViewEnterFullScreen
+			 || setFullScreenMode == SetFullScreenMode::ViewEnterWindowFill) && view == NULL)
 		{
 			LOGError("CGuiMain::SetViewFullScreen: ViewEnterFullScreen view==NULL");
 			return;
@@ -5740,6 +5824,10 @@ void CGuiMain::SetViewFullScreen(SetFullScreenMode setFullScreenMode, CGuiView *
 		LockMutex();
 		
 		isChangingFullScreenState = true;
+
+		// set now, not only in the task: IsViewFullScreen() is already true
+		// for the frame in between, and IsViewFullScreenInWindow must agree
+		viewFullScreenInWindow = (setFullScreenMode == SetFullScreenMode::ViewEnterWindowFill);
 		
 		// when going full screen a layout is saved and restored when going back to windowed mode.
 		// because currentLayout may have doNotUpdateViewsPositions we make a temporary copy
@@ -5785,6 +5873,11 @@ bool CGuiMain::IsViewFullScreen()
 	return (viewFullScreen != NULL) || isChangingFullScreenState;
 }
 
+bool CGuiMain::IsViewFullScreenInWindow()
+{
+	return IsViewFullScreen() && viewFullScreenInWindow;
+}
+
 CUiThreadTaskSetViewFullScreen::CUiThreadTaskSetViewFullScreen(SetFullScreenMode setFullScreenMode, CGuiView *view, float fullScreenSizeX, float fullScreenSizeY)
 {
 	this->setFullScreenMode = setFullScreenMode;
@@ -5798,7 +5891,8 @@ void CUiThreadTaskSetViewFullScreen::RunUIThreadTask()
 	LOGD("CUiThreadTaskSetViewFullScreen::RunUIThreadTask");
 	
 	//
-	if (setFullScreenMode == SetFullScreenMode::ViewEnterFullScreen)
+	if (setFullScreenMode == SetFullScreenMode::ViewEnterFullScreen
+		|| setFullScreenMode == SetFullScreenMode::ViewEnterWindowFill)
 	{
 		if (view == NULL)
 		{
@@ -5827,8 +5921,18 @@ void CUiThreadTaskSetViewFullScreen::RunUIThreadTask()
 		// make black background
 		guiMain->SetImGuiStyleWindowFullScreenBackground();
 
+		guiMain->viewFullScreenInWindow = (setFullScreenMode == SetFullScreenMode::ViewEnterWindowFill);
+
 		// the fullscreen mode is started after frame has been rendered and layout stored
-		if (VID_IsMainApplicationWindowFullScreen())
+		if (guiMain->viewFullScreenInWindow)
+		{
+			// fill the application window only: the OS window is left as it is,
+			// and claiming it was already fullscreen keeps ViewLeaveFullScreen
+			// from switching it out of a fullscreen it never entered
+			LOGD("window fill: OS window state unchanged");
+			guiMain->appWasFullScreenBeforeViewFullScreen = true;
+		}
+		else if (VID_IsMainApplicationWindowFullScreen())
 		{
 			LOGD("set appWasFullScreenBeforeViewFullScreen true");
 			// main window is already in fullscreen
@@ -5868,6 +5972,7 @@ void CUiThreadTaskSetViewFullScreen::RunUIThreadTask()
 		guiMain->currentLayoutBeforeFullScreen = NULL;
 		
 		guiMain->viewFullScreen = NULL;
+		guiMain->viewFullScreenInWindow = false;
 		guiMain->isChangingFullScreenState = false;
 	}
 	else if (setFullScreenMode == SetFullScreenMode::MainWindowLeaveFullScreen)
@@ -5888,6 +5993,7 @@ void CUiThreadTaskSetViewFullScreen::RunUIThreadTask()
 		guiMain->currentLayoutBeforeFullScreen = NULL;
 				
 		guiMain->viewFullScreen = NULL;
+		guiMain->viewFullScreenInWindow = false;
 		guiMain->isChangingFullScreenState = false;
 	}
 }

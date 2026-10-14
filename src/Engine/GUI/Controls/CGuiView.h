@@ -105,6 +105,26 @@ public:
 
 	virtual bool DoScrollWheel(float deltaX, float deltaY);
 
+	// Pinch gesture (trackpad magnify on macOS, touch pinch on Wayland/X11/
+	// mobile -- SDL_EVENT_PINCH_*). (x, y) is the cursor, in the same space as
+	// DoTap. scale is the MULTIPLICATIVE change since the previous DoPinchZoom
+	// (>1 zoom in), always finite and > 0. Return true from DoPinchBegin to own
+	// the gesture: every update and the end then come to this view, wherever
+	// the cursor goes, until DoPinchEnd. Not the legacy InitZoom/DoZoomBy pair
+	// above, whose zoomValue is additive and unit-less.
+	virtual bool DoPinchBegin(float x, float y);
+	virtual bool DoPinchZoom(float x, float y, float scale);
+	virtual void DoPinchEnd(float x, float y);
+
+	// Trackpad double-tap-and-drag (tap, then tap again and keep the finger
+	// down; see VID_TapDragOnFinger). (x, y) is the cursor. Return true from
+	// DoTapDragBegin to own the drag until DoTapDragEnd. There is no move
+	// callback: the pointer follows the finger, so the drag's motion is the
+	// ordinary DoNotTouchedMove stream -- a view pans exactly as it does for a
+	// held key (CGuiViewMovingPane's isForcedMovingMap).
+	virtual bool DoTapDragBegin(float x, float y);
+	virtual void DoTapDragEnd(float x, float y);
+
 	virtual bool DoNotTouchedMove(float x, float y);
 
 	virtual bool DoGamePadButtonDown(CGamePad *gamePad, u8 button);

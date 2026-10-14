@@ -37,6 +37,7 @@ option(MT_GGML_NATIVE "Enable native CPU optimizations for ggml (disable for VMs
 # to an identity transform with NO diagnostic at all. That is the purest instance
 # of the succeeds-and-lies failure the hard-error rule exists to abolish.
 option(MT_ENABLE_LCMS2 "Enable colour management via Little CMS" ON)
+option(MT_ENABLE_LIBULTRAHDR "Enable the ISO 21496-1 gain-map JPEG codec (libultrahdr)" ON)
 
 # These two moved out of add_definitions() (see the comment there). They need an
 # option() so a STANDALONE build -- no manifest, no fragment -- still gets them,
@@ -179,11 +180,25 @@ endif()
 find_package(PkgConfig REQUIRED)
 # Image codec libraries are built from source via build-image_codecs.sh
 # The combo lib bundles TIFF, WebP, AVIF, LibRaw, and libgav1 as static archives.
-# Run: bash platform/Linux/build-image_codecs.sh (produces ${MT_CAPS_LIBS_DIR}/libmt_image_codecs.a)
+# Run: bash platform/Linux/build-jpeg.sh, then
+#      bash platform/Linux/build-image_codecs.sh (produces ${MT_CAPS_LIBS_DIR}/libmt_image_codecs.a)
 set(MT_IMAGE_CODECS_LIB "${MT_CAPS_LIBS_DIR}/libmt_image_codecs.a")
 # Headers come from the keyed deps dir the codec build stages them into
 # (Phase 2) -- never from inside this checkout.
 set(MT_IMAGE_CODECS_INCLUDE "${MT_CAPS_LIBS_DIR}/image-codecs/include")
+
+# libjpeg-turbo -- the engine's ONE libjpeg, built by build-jpeg.sh (core: it
+# runs on every configuration, before the codecs). Its headers are MANDATORY:
+# JPEGWriter/JPEGReader include them on every configuration through
+# MT_jpeglib.h, which #errors on any other jpeglib.h. Its archive is merged
+# into the codec bundle (stub included), which every app links.
+# Run: bash platform/Linux/build-jpeg.sh (produces ${MT_CAPS_LIBS_DIR}/libmt_jpeg.a and jpeg/include)
+set(MT_JPEG_INCLUDE "${MT_CAPS_LIBS_DIR}/jpeg/include")
+if(NOT EXISTS "${MT_JPEG_INCLUDE}/jpeglib.h")
+    message(FATAL_ERROR
+        "libjpeg-turbo headers not found at ${MT_JPEG_INCLUDE}.\n"
+        "Run: bash ${CMAKE_CURRENT_SOURCE_DIR}/platform/Linux/build-jpeg.sh")
+endif()
 
 # Merged into ONE message deliberately: the remedy used to be a second
 # message(), and FATAL_ERROR halts on the first, so a naive in-place conversion
@@ -193,10 +208,10 @@ set(MT_IMAGE_CODECS_INCLUDE "${MT_CAPS_LIBS_DIR}/image-codecs/include")
 # RAW and COLOR_MANAGEMENT all off does not need the bundle and must not be made
 # to build it.
 if(NOT EXISTS "${MT_IMAGE_CODECS_LIB}")
-    if(MT_ENABLE_LIBTIFF OR MT_ENABLE_LIBWEBP OR MT_ENABLE_LIBAVIF OR MT_ENABLE_LIBRAW OR MT_ENABLE_LCMS2)
+    if(MT_ENABLE_LIBTIFF OR MT_ENABLE_LIBWEBP OR MT_ENABLE_LIBAVIF OR MT_ENABLE_LIBRAW OR MT_ENABLE_LCMS2 OR MT_ENABLE_LIBULTRAHDR)
         message(FATAL_ERROR
             "Image codec bundle not found at ${MT_IMAGE_CODECS_LIB}, but this "
-            "build asks for TIFF/WebP/AVIF/RAW/colour management.\n"
+            "build asks for TIFF/WebP/AVIF/RAW/gain-map JPEG/colour management.\n"
             "Run: bash ${CMAKE_CURRENT_SOURCE_DIR}/platform/Linux/build-image_codecs.sh")
     endif()
 endif()
@@ -357,7 +372,7 @@ include_directories(
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Develop"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/implot"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a"
+    "${MT_JPEG_INCLUDE}"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/libjson"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/libjson/_internal/Dependencies/libbase64++"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/libjson/_internal/Dependencies/mempool++"
@@ -594,6 +609,9 @@ add_library(MTEngineSDL STATIC
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/Render/VID_Main.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/Render/VID_ImageBinding.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/Render/CRenderBackend.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Tests/CTestMenuBarMode.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/Render/VID_GainMapDraw.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/MT_UltraHdr.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/GUI/Controls/CGuiViewCodeEditor.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/imgui_textedit/TextDiff.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/imgui_textedit/TextEditor.cpp"
@@ -973,66 +991,6 @@ add_library(MTEngineSDL STATIC
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Tools/NetGame/CViewServerAdmin.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Tools/NetGame/CImGuiChatRenderer.cpp"
 
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jcapimin.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/transupp.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jdmerge.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jfdctflt.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/cdjpeg.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jidctfst.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/rdcolmap.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jcinit.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jcarith.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jmemansi.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jdapistd.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/wrtarga.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jdmaster.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jdarith.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/rdppm.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jdpostct.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jfdctfst.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jcapistd.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jcsample.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jcmarker.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jdmainct.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/rdtarga.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/rdgif.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jutils.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jddctmgr.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/rdswitch.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jcdctmgr.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jcparam.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jdcoefct.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/wrgif.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jidctint.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/wrppm.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jdmarker.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jdcolor.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jdsample.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jccoefct.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jerror.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/rdrle.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jctrans.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/wrbmp.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/rdbmp.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jchuff.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jdatadst.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jccolor.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jidctflt.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jmemmgr.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jdapimin.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jcmaster.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jdatasrc.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jcmainct.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jcomapi.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/wrrle.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jdinput.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jdhuff.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jfdctint.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jcprepct.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jdtrans.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jquant1.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jquant2.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/jpeg-9a/jaricom.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/JPEGWriter.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Libs/jpeg/JPEGReader.cpp"
 
@@ -1275,6 +1233,18 @@ if(EXISTS "${MT_IMAGE_CODECS_LIB}")
         target_compile_definitions(MTEngineSDL PUBLIC MT_ENABLE_LCMS2=1)
     else()
         target_compile_definitions(MTEngineSDL PUBLIC MT_ENABLE_LCMS2=0)
+    endif()
+    # P3b: gated on the OPTION, with the header checked -- the lcms2 rule above:
+    # a flag that is on must find its header or stop, never degrade in silence.
+    if(MT_ENABLE_LIBULTRAHDR)
+        if(NOT EXISTS "${MT_IMAGE_CODECS_INCLUDE}/ultrahdr_api.h")
+            message(FATAL_ERROR
+                "MT_ENABLE_LIBULTRAHDR is on but ultrahdr_api.h is not in the image-codecs bundle.\n"
+                "Run: bash ${CMAKE_CURRENT_SOURCE_DIR}/platform/Linux/build-image_codecs.sh")
+        endif()
+        target_compile_definitions(MTEngineSDL PUBLIC MT_ENABLE_LIBULTRAHDR=1)
+    else()
+        target_compile_definitions(MTEngineSDL PUBLIC MT_ENABLE_LIBULTRAHDR=0)
     endif()
     target_link_libraries(MTEngineSDL PRIVATE "${MT_IMAGE_CODECS_LIB}")
 endif()

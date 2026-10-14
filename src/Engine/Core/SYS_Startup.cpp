@@ -166,6 +166,16 @@ void SYS_MTEngineStartup()
 	else
 	{
 		// Normal mode: full initialization with rendering, audio, GUI
+		// A MacBook trackpad's raw fingers (the double-tap-and-drag
+		// recogniser, VID_TapDragOnFinger). By default SDL tags them
+		// SDL_MOUSE_TOUCHID and DROPS them unless SDL_HINT_MOUSE_TOUCH_EVENTS
+		// is on -- which would also turn every real mouse click into a fake
+		// finger. "Touch only" gives them the pad's own device id instead;
+		// on Cocoa that is its only effect: mouse events still come from the
+		// mouse handlers, and pad touches carry no window, so SDL synthesises
+		// no mouse events from them.
+		SDL_SetHint(SDL_HINT_TRACKPAD_IS_TOUCH_ONLY, "1");
+
 		// SDL_INIT_TIMER is gone in SDL3 (timers always initialise), and
 		// SDL_Init returns BOOL now -- `!= 0` compiles and is true on SUCCESS.
 		if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD | SDL_INIT_HAPTIC))

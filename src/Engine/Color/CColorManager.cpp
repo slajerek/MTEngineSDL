@@ -347,6 +347,12 @@ const std::vector<u8> &CColorManager::GetDisplayP3ProfileBytes()
 	return bytes;
 }
 
+const std::vector<u8> &CColorManager::GetDisplayP3SrgbCurveProfileBytes()
+{
+	static const std::vector<u8> bytes = ICC_BuildDisplayP3SrgbCurveProfileV2();
+	return bytes;
+}
+
 CCmsTransformLease *CColorManager::AcquireTransform(const u8 *srcProfile, u32 srcSize,
                                                     const u8 *dstProfile, u32 dstSize,
                                                     CmsRenderingIntent intent, bool bpc)

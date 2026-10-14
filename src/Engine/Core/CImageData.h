@@ -216,6 +216,9 @@ typedef enum
 */
 
 
+struct SMTUltraHdrOutputTransform;   // MT_UltraHdr.h: LoadUltraHdrLinear's optional output transform
+struct SMTGainMapApply;              // MT_UltraHdr.h: LoadUltraHdrBaseAndMap's apply parameters
+
 class CImageData
 {
 public:
@@ -540,6 +543,38 @@ public:
 	// Any other outcome returns false with the image untouched and the caller
 	// falls through to the ordinary 8-bit path.
 	bool LoadWithImageIO_AppleHDR(const char *fileName);
+	// For edits-while-browsing: an ISO 21496-1 / Ultra HDR
+	// gain-map JPEG decoded with its map applied IN FULL -> IMG_TYPE_RGBA_16F,
+	// LINEAR sRGB primaries, 1.0 = SDR reference white, contentMaxComponent
+	// measured: the SAME product as LoadWithImageIO_AppleHDR, on every
+	// platform (libultrahdr, MT_UltraHdr.cpp). FAILS CLOSED: false with the
+	// image untouched for a plain JPEG, a build without MT_ENABLE_LIBULTRAHDR,
+	// or any decode error -- the caller then loads the base like any JPEG.
+	//
+	// `output` (MT_UltraHdr.h, may be null): the host's surface encoding, fused
+	// into the decode's copy pass. With one, the pixels are in ITS primaries
+	// and encoding, floatIsSurfaceEncoded is set, and contentMaxComponent is the
+	// peak of the output's LINEAR values (its primaries, before its LUT). With
+	// none, the product is exactly the contract above.
+	bool LoadUltraHdrLinear(const char *fileName, const SMTUltraHdrOutputTransform *output = nullptr);
+	// Option C (2026-10-07): the gain-map JPEG as its 8-bit SDR base (this, RGBA8,
+	// sRGB-encoded, in the BASE's gamut -- no colour management) plus its 8-bit map
+	// (mapOut, RGBA8; a single-channel map replicated into R, G and B) and what a
+	// shader needs to apply it (applyOut, with `output`'s matrix and encoding folded
+	// in exactly as LoadUltraHdrLinear folds them). False -- both images untouched --
+	// for a plain JPEG, a decode failure, a map that applies in the alternate colour
+	// space, a map whose ICC names another gamut than the base's (Decision R-2 as
+	// libultrahdr applies it, MT_GainMapIccGamutMatchesBase), a map of another aspect (> 1 %)
+	// or larger than the base, a BT.2100 base, or a build without libultrahdr.
+	bool LoadUltraHdrBaseAndMap(const char *fileName, CImageData *mapOut,
+	                            struct SMTGainMapApply *applyOut,
+	                            const struct SMTUltraHdrOutputTransform *output);
+	// Does this file carry an HDR gain map (Apple's legacy aux image, or ISO
+	// 21496-1)? The cheap half of LoadWithImageIO_AppleHDR on its own: reads
+	// the auxiliary-data METADATA, never the image. macOS 14+ only; false on
+	// every other platform and OS, where no gain-map decode exists -- so the
+	// two answers can never disagree about what the decode would do.
+	static bool HasGainMap(const char *fileName);
 	bool LoadWithWIC_Windows(const char *fileName);
 	// Last resort: hand the file to the operating system's own decoder after
 	// ours has refused it. Returns false on platforms without one (Linux).
@@ -586,6 +621,20 @@ public:
 private:
 	png_bytep *row_pointers;
 };
+
+// Test seams for CImageData::Load's libjpeg-turbo JPEG decode (relaxed atomics,
+// monotonic, process-wide). MT_TestJpegTurboDecodes: decodes that turbo
+// completed warning-free and that Load therefore kept (no stb, no repair, no
+// platform decoder). MT_TestJpegTurboRefusedOversize: files turbo refused
+// BEFORE allocating, because a dimension exceeds the decode limit or the
+// RGBA8 buffer size overflows -- the oversized-header guard.
+// MT_TestSetJpegTurboForceCmyk(true): CMYK/YCCK JPEGs take turbo's naive
+// conversion even on Apple, where Load otherwise routes them to ImageIO
+// (colour-managed) -- so the naive formulas are testable on every platform.
+// Process-wide; a test sets it and restores false.
+int MT_TestJpegTurboDecodes();
+int MT_TestJpegTurboRefusedOversize();
+void MT_TestSetJpegTurboForceCmyk(bool force);
 
 
 #endif /*IMG_CIMAGEDATA_H_*/

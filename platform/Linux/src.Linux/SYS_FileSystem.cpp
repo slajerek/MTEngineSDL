@@ -138,6 +138,32 @@ char *SYS_GetPathToDocuments()
 	return gCPathToDocuments;
 }
 
+std::string SYS_GetCacheDir()
+{
+	// XDG Base Directory: $XDG_CACHE_HOME when it is set to an ABSOLUTE path
+	// (the spec says a relative value is invalid and must be ignored), else
+	// $HOME/.cache. DBG_Log.cpp:209-212 follows the same rule for its logs.
+	std::string base;
+	const char *xdg = getenv("XDG_CACHE_HOME");
+	if (xdg != NULL && xdg[0] == '/')
+		base = xdg;
+	else
+	{
+		const char *home = getenv("HOME");
+		if (home == NULL || home[0] == 0)
+		{
+			struct passwd *pw = getpwuid(getuid());
+			home = (pw != NULL) ? pw->pw_dir : NULL;
+		}
+		if (home == NULL || home[0] == 0)
+			return std::string();
+		base = std::string(home) + "/.cache";
+	}
+	while (base.size() > 1 && base.back() == '/')
+		base.pop_back();
+	return base + "/" + MT_GetSettingsFolderName() + "/";
+}
+
 CFileItem::CFileItem(char *name, char *fullPath, char *modDate, bool isDir)
 {
 	this->name = STRALLOC(name);

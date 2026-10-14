@@ -1,6 +1,7 @@
 #include "CTestJpegMarkers.h"
 #include "DBG_Log.h"
 #include "JPEGWriter.h"
+#include "MT_JpegTestHelpers.h"   // LumaSampling
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
@@ -78,32 +79,7 @@ vector<unsigned char> MarkerSequence(const vector<unsigned char> &j)
 	return seq;
 }
 
-// Sampling factors of component 0, read straight out of the SOF0 segment:
-// len(2) precision(1) height(2) width(2) nComp(1) then per component
-// id(1) sampling(1: h<<4 | v) qtable(1).
-bool LumaSampling(const vector<unsigned char> &j, int &h, int &v)
-{
-	size_t i = 2;
-	while (i + 3 < j.size() && j[i] == 0xFF)
-	{
-		unsigned char m = j[i + 1];
-		size_t len = ((size_t)j[i + 2] << 8) | j[i + 3];
-		if (m == 0xC0 || m == 0xC1)                 // SOF0 / SOF1
-		{
-			// From the 0xFF at i: len(2) precision(1) height(2) width(2)
-			// nComp(1) = 8 bytes, so component 0 begins at i+2+8. Its second
-			// byte packs the sampling factors as h<<4 | v.
-			size_t comp0 = i + 2 + 8;
-			if (comp0 + 2 >= j.size()) return false;
-			h = (j[comp0 + 1] >> 4) & 0x0F;
-			v =  j[comp0 + 1]       & 0x0F;
-			return true;
-		}
-		if (m == 0xDA || m == 0xD9) break;
-		i += 2 + len;
-	}
-	return false;
-}
+// LumaSampling(): MT_JpegTestHelpers.h (shared with host apps' JPEG tests).
 
 string TempPath(const char *name)
 {

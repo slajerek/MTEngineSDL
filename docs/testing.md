@@ -118,11 +118,15 @@ under Git Bash (`bash tests/run_test.sh --binary <exe>`, which is what CI
 does); an application may additionally provide `tests\run_test.ps1` with
 the same contract (`-Package`).
 
+`MT_IMGUI_TEST_FILTER=<names>` narrows the UI suite to the named tests
+(imgui_test_engine filter syntax, comma-separated) for a red/green loop on one
+test; the others are reported as not run. The whole suite is still the proof.
+
 By hand, from the root. Where a development binary is:
 
 | platform | development binary |
 |---|---|
-| macOS | `~/Library/Developer/Xcode/DerivedData/<App>-*/Build/Products/Release/<App>.app/Contents/MacOS/<App>` (the runner finds the newest; `tests/run_test.sh` prints `Using binary:`) |
+| macOS | `build-macos/Build/Products/<Config>/<App>.app/Contents/MacOS/<App>` after `./build-macos.sh`; `~/Library/Developer/Xcode/DerivedData/<App>-*/Build/Products/<Config>/...` after an Xcode build (the runner should pick the newest across both; `tests/run_test.sh` prints `Using binary:`) |
 | Linux | `build/<target>` (the CMake target name from `mtengine-app.conf`, e.g. `build/retrodebugger`) |
 | Windows | `platform\Windows\bin\<Platform>\<Configuration>\<App>.exe` |
 
@@ -133,6 +137,15 @@ By hand, from the root. Where a development binary is:
 ```
 
 (`--log-dir` takes any directory; on Windows use e.g. `%TEMP%\mt-tests`.)
+
+**Which binary ran.** Every app-build driver ends with
+`=== Built binary: <absolute path> (<Config>, <mtime>) ===` (plus
+`=== Deployed binary: ... ===` under `--prod`/`-Prod`), printed after the strip
+and re-sign so the mtime is final. Compare it with the runner's
+`Using binary:` line and with the app's own startup line where the app prints
+one (for example `MyApp: running <path>`). Two different paths mean a
+stale binary was run; an app's runner can also print a `WARNING:` when a newer
+binary sits at another known location.
 
 * **Results** always land in `<root>/tests/results/last_run.txt`; the runner
   passes that path absolutely in both modes. A `RESULT: n/m passed` line ends

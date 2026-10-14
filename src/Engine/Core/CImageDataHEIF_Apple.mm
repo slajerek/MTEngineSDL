@@ -22,6 +22,57 @@
 // macOS ONLY, and macOS 14+ at that. Windows has no HEIC decode at all, and
 // libheif gain-map reconstruction is out of scope, so this degrades to today's
 // 8-bit decode everywhere else -- by returning false, not by #error.
+// Stage 1 of the HDR arm, shared with CImageData::HasGainMap so the question
+// "is there a gain map" has exactly one answer in this file.
+//
+// BOTH aux types. kCGImageAuxiliaryDataTypeHDRGainMap is Apple's legacy
+// flavour; since iOS 18 / macOS 15 Apple writes ISO 21496-1 ("Adaptive HDR")
+// exposed as kCGImageAuxiliaryDataTypeISOGainMap instead. Checking only the
+// legacy type would silently decode a CURRENT iPhone's HDR photo as SDR --
+// fail-closed pointing the wrong way. Reads the auxiliary payload's
+// DICTIONARY only, never the full image.
+static bool MT_ImageSourceHasGainMap(CGImageSourceRef src)
+{
+    if (@available(macOS 14.0, *))
+    {
+        CFDictionaryRef legacyGain = CGImageSourceCopyAuxiliaryDataInfoAtIndex(
+            src, 0, kCGImageAuxiliaryDataTypeHDRGainMap);
+        CFDictionaryRef isoGain = NULL;
+        if (@available(macOS 15.0, *))
+        {
+            isoGain = CGImageSourceCopyAuxiliaryDataInfoAtIndex(
+                src, 0, kCGImageAuxiliaryDataTypeISOGainMap);
+        }
+        const bool has = (legacyGain != NULL) || (isoGain != NULL);
+        if (legacyGain) CFRelease(legacyGain);
+        if (isoGain)    CFRelease(isoGain);
+        return has;
+    }
+    return false;
+}
+
+bool CImageData::HasGainMap(const char *fileName)
+{
+    if (fileName == NULL || fileName[0] == 0)
+        return false;
+    if (@available(macOS 14.0, *))
+    {
+        @autoreleasepool
+        {
+            NSURL *url = [NSURL fileURLWithPath:[NSString stringWithUTF8String:fileName]];
+            NSDictionary *srcOpts = @{(__bridge NSString *)kCGImageSourceShouldCache: @NO};
+            CGImageSourceRef src = CGImageSourceCreateWithURL(
+                (__bridge CFURLRef)url, (__bridge CFDictionaryRef)srcOpts);
+            if (!src)
+                return false;
+            const bool has = MT_ImageSourceHasGainMap(src);
+            CFRelease(src);
+            return has;
+        }
+    }
+    return false;
+}
+
 bool CImageData::LoadWithImageIO_AppleHDR(const char *fileName)
 {
     if (@available(macOS 14.0, *))
@@ -52,17 +103,7 @@ bool CImageData::LoadWithImageIO_AppleHDR(const char *fileName)
     //
     // This reads the auxiliary payload only, never the full image, so the cost
     // on an ordinary SDR HEIC is a metadata read and nothing more.
-    CFDictionaryRef legacyGain = CGImageSourceCopyAuxiliaryDataInfoAtIndex(
-        src, 0, kCGImageAuxiliaryDataTypeHDRGainMap);
-    CFDictionaryRef isoGain = NULL;
-    if (@available(macOS 15.0, *))
-    {
-        isoGain = CGImageSourceCopyAuxiliaryDataInfoAtIndex(
-            src, 0, kCGImageAuxiliaryDataTypeISOGainMap);
-    }
-    const bool hasGainMap = (legacyGain != NULL) || (isoGain != NULL);
-    if (legacyGain) CFRelease(legacyGain);
-    if (isoGain)    CFRelease(isoGain);
+    const bool hasGainMap = MT_ImageSourceHasGainMap(src);
 
     if (!hasGainMap)
     {

@@ -2,6 +2,7 @@
 #include "MD5.h"
 #include "SYS_FileUtf8.h"
 
+#include <atomic>
 #include <cmath>
 #include <cstring>
 #include <algorithm>
@@ -142,11 +143,22 @@ struct SDcpEntry
 	u32 count = 0;
 	size_t valueOffset = 0;   // absolute offset of the value bytes
 	bool valid = false;       // offsets checked
+	// The entry is real but its VALUE lies past the end of the buffer we were
+	// given. Only a tolerant read produces these (ReadFileTags' bounded head
+	// read); a strict read fails the file instead, which is what a genuinely
+	// truncated profile deserves. It is the difference between "this profile
+	// has no ProfileName" and "the window did not reach it", and answering the
+	// first when the second is true would silently mis-index a profile.
+	bool truncated = false;
 };
 
 // Reads one IFD's entries. Returns false on structural damage.
+// `tolerateTruncatedValues`: an entry whose value lies past the buffer is
+// recorded as truncated instead of failing the file. ONLY the bounded head read
+// passes true -- for every other caller a value past EOF is corruption.
 static bool ReadIfdEntries(const SDcpReader &r, u32 ifdOffset,
-                           std::vector<SDcpEntry> *out, std::string *outError)
+                           std::vector<SDcpEntry> *out, std::string *outError,
+                           bool tolerateTruncatedValues = false)
 {
 	if (!r.InRange(ifdOffset, 2))
 	{
@@ -191,8 +203,18 @@ static bool ReadIfdEntries(const SDcpReader &r, u32 ifdOffset,
 			const u32 off = r.U32(e + 8);
 			if (!r.InRange(off, (size_t)total))
 			{
-				*outError = "dcp: entry value offset past EOF";
-				return false;
+				if (!tolerateTruncatedValues)
+				{
+					*outError = "dcp: entry value offset past EOF";
+					return false;
+				}
+				// Kept, not dropped: the caller must be able to tell that this
+				// tag EXISTS before it concludes anything from its absence.
+				entry.valueOffset = off;
+				entry.valid = false;
+				entry.truncated = true;
+				out->push_back(entry);
+				continue;
 			}
 			entry.valueOffset = off;
 			entry.valid = true;
@@ -655,21 +677,91 @@ bool CDcpProfile::ParseDngEmbeddedFromFile(const char *utf8Path, u32 ifdOffset,
 	return ParseDngEmbedded(bytes.data(), bytes.size(), ifdOffset, out, outError);
 }
 
-bool CDcpProfile::ReadFileTagsFromBytes(const u8 *data, size_t len,
-                                        SFileTags *out)
+// Any entry with this tag, truncated or not -- FindEntry deliberately hides
+// the truncated ones, and here their existence is the whole point.
+static const SDcpEntry *FindEntryIncludingTruncated(
+	const std::vector<SDcpEntry> &entries, u16 tag)
 {
-	*out = SFileTags();
+	for (const SDcpEntry &e : entries)
+		if (e.tag == tag)
+			return &e;
+	return nullptr;
+}
+
+namespace
+{
+	enum class ETagsRead { Ok, NeedWholeFile, NotOurs };
+
+	// The bytes ReadFileTags reads before it decides whether it needs the
+	// rest. See CDcpProfile.h for the measurement behind the number: 16 KB is
+	// about 35x the worst case observed across 300 shipped Adobe profiles, and
+	// still a fraction of what those files hold.
+	const size_t kTagsWindowDefault = 16 * 1024;
+	// ATOMIC: two indexes can scan at once (an app's shared index and its
+	// Preferences profile count), so this counter is written from two threads
+	// in an ordinary run even though only a test ever writes the window.
+	std::atomic<size_t> gTagsWindow{ kTagsWindowDefault };
+	std::atomic<int>    gWholeFileFallbacks{ 0 };
+}
+
+void CDcpProfile::PC_TestSetTagsWindow(size_t bytes)
+{
+	gTagsWindow.store((bytes == 0) ? kTagsWindowDefault : bytes,
+	                  std::memory_order_relaxed);
+}
+
+int CDcpProfile::PC_TestWholeFileFallbackCount()
+{
+	return gWholeFileFallbacks.load(std::memory_order_relaxed);
+}
+
+void CDcpProfile::PC_TestResetWholeFileFallbackCount()
+{
+	gWholeFileFallbacks.store(0, std::memory_order_relaxed);
+}
+
+// `tolerateTruncated` is what makes a head read possible: a DCP's IFD0 lists
+// big tables (a HueSatMap is hundreds of kilobytes) whose values are nowhere
+// near the head, and failing on those would mean falling back for every file
+// ever written. They are not tags this reads, so they are allowed to be out of
+// reach -- but a WANTED tag out of reach ends the attempt.
+static ETagsRead ReadFileTagsBounded(const u8 *data, size_t len,
+                                     bool tolerateTruncated,
+                                     CDcpProfile::SFileTags *out)
+{
+	*out = CDcpProfile::SFileTags();
 	SDcpReader r;
 	u32 firstIfd = 0;
 	std::string err;
 	// Either container: a .dcp's own IFD or a DNG's IFD0.
 	if (!SetupReader(data, len, kDcpMagic, &r, &firstIfd, &err)
 	    && !SetupReader(data, len, kTiffMagic, &r, &firstIfd, &err))
-		return false;
+		return tolerateTruncated ? ETagsRead::NeedWholeFile : ETagsRead::NotOurs;
 
 	std::vector<SDcpEntry> entries;
-	if (!ReadIfdEntries(r, firstIfd, &entries, &err))
-		return false;
+	if (!ReadIfdEntries(r, firstIfd, &entries, &err, tolerateTruncated))
+	{
+		// On a head read EVERY failure is inconclusive, not a verdict: an IFD
+		// past the window and a corrupt entry count are indistinguishable from
+		// here, and only the whole file can tell them apart. The window is
+		// allowed to be a fast path; it is never allowed to be an answer the
+		// full read would not have given.
+		return tolerateTruncated ? ETagsRead::NeedWholeFile : ETagsRead::NotOurs;
+	}
+
+	static const u16 kWanted[] = { kTagUniqueCameraModel, kTagProfileName,
+	                               kTagCameraCalibrationSig,
+	                               kTagAsShotProfileName,
+	                               kTagExtraCameraProfiles };
+	if (tolerateTruncated)
+	{
+		for (u16 tag : kWanted)
+		{
+			const SDcpEntry *w = FindEntryIncludingTruncated(entries, tag);
+			if (w != nullptr && w->truncated)
+				return ETagsRead::NeedWholeFile;
+		}
+	}
 
 	const SDcpEntry *e;
 	if ((e = FindEntry(entries, kTagUniqueCameraModel)) != nullptr)
@@ -687,11 +779,59 @@ bool CDcpProfile::ReadFileTagsFromBytes(const u8 *data, size_t len,
 			out->extraProfileOffsets.push_back(
 				r.U32(e->valueOffset + (size_t)i * 4));
 	}
+	return ETagsRead::Ok;
+}
+
+bool CDcpProfile::ReadFileTagsFromBytes(const u8 *data, size_t len,
+                                        SFileTags *out)
+{
+	// Unchanged: a caller that already holds the bytes holds ALL of them, so
+	// there is nothing to be tolerant about.
+	return ReadFileTagsBounded(data, len, /*tolerateTruncated=*/false, out)
+	       == ETagsRead::Ok;
+}
+
+// Reads at most `max` bytes. Fewer means the file ended, which is how the
+// caller knows a fallback would read nothing new.
+static bool ReadFilePrefix(const char *utf8Path, size_t max,
+                           std::vector<u8> *out, bool *outWasWholeFile)
+{
+	FILE *f = SYS_FopenUtf8(utf8Path, "rb");
+	if (f == nullptr)
+		return false;
+	out->resize(max);
+	const size_t got = fread(out->data(), 1, max, f);
+	// One byte past the window: present means there IS more to fall back to.
+	u8 probe;
+	*outWasWholeFile = (got < max) || (fread(&probe, 1, 1, f) == 0);
+	fclose(f);
+	if (got == 0)
+		return false;
+	out->resize(got);
 	return true;
 }
 
 bool CDcpProfile::ReadFileTags(const char *utf8Path, SFileTags *out)
 {
+	std::vector<u8> head;
+	bool headWasWholeFile = false;
+	if (ReadFilePrefix(utf8Path, gTagsWindow.load(std::memory_order_relaxed),
+	                   &head, &headWasWholeFile))
+	{
+		const ETagsRead r = ReadFileTagsBounded(head.data(), head.size(),
+		                                        /*tolerateTruncated=*/true, out);
+		if (r == ETagsRead::Ok)
+			return true;
+		// The head WAS the file: there is no more to read, so the strict pass
+		// below would see the same bytes and reach the same verdict. Answer it
+		// here rather than reading the file a second time to say so.
+		if (headWasWholeFile)
+			return ReadFileTagsBounded(head.data(), head.size(),
+			                           /*tolerateTruncated=*/false, out)
+			       == ETagsRead::Ok;
+		gWholeFileFallbacks.fetch_add(1, std::memory_order_relaxed);
+	}
+
 	std::vector<u8> bytes;
 	if (!ReadWholeFile(utf8Path, &bytes))
 		return false;

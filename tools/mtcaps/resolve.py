@@ -746,6 +746,10 @@ BUILD_UNITS = {
                           "scripts": ["platform/MacOS/build-sdl3.sh"]},
         "usockets":      {"reads": [], "mode": False, "backend": False,
                           "scripts": ["platform/MacOS/build-usockets.sh"]},
+        # libjpeg-turbo: core (JPEGWriter needs it on every configuration), so
+        # it reads nothing; the codec bundle merges its archive.
+        "jpeg":          {"reads": [], "mode": False, "backend": False,
+                          "scripts": ["platform/MacOS/build-jpeg.sh"]},
         "mbedtls":       {"reads": ["MT_CAP_HTTPS"], "mode": False, "backend": False,
                           "scripts": ["platform/MacOS/build-mbedtls.sh"]},
         "ftxui":         {"reads": ["MT_CAP_FTXUI"], "mode": False, "backend": False,
@@ -774,6 +778,8 @@ BUILD_UNITS = {
                           "scripts": ["platform/Linux/build-sdl3.sh"]},
         "usockets":      {"reads": [], "mode": False, "backend": False,
                           "scripts": ["platform/Linux/build-usockets.sh"]},
+        "jpeg":          {"reads": [], "mode": False, "backend": False,
+                          "scripts": ["platform/Linux/build-jpeg.sh"]},
         "mbedtls":       {"reads": ["MT_CAP_HTTPS"], "mode": False, "backend": False,
                           "scripts": ["platform/Linux/build-mbedtls.sh"]},
         "ftxui":         {"reads": ["MT_CAP_FTXUI"], "mode": False, "backend": False,
@@ -804,6 +810,8 @@ BUILD_UNITS = {
                           "scripts": ["platform/Windows/build-libuv.ps1"]},
         "usockets":      {"reads": [], "mode": False, "backend": False,
                           "scripts": ["platform/Windows/build-usockets.ps1"]},
+        "jpeg":          {"reads": [], "mode": False, "backend": False,
+                          "scripts": ["platform/Windows/build-jpeg.ps1"]},
         "mbedtls":       {"reads": ["MT_CAP_HTTPS"], "mode": False, "backend": False,
                           "scripts": ["platform/Windows/build-mbedtls.ps1"]},
         "ftxui":         {"reads": ["MT_CAP_FTXUI"], "mode": False, "backend": False,

@@ -19,6 +19,7 @@
 #include "SYS_FileSystem.h"
 #include "VID_ImageBinding.h"
 #include "VID_Main.h"   // gRenderBackend, for the resident-format funnel
+#include "Core/Render/VID_GainMapDraw.h"   // VID_GainMapCompositeForget (option C Task 3c)
 
 ERenderTextureFormat SlrResidentFormatFor(u8 decodeType, bool backendSupportsFloat)
 {
@@ -66,8 +67,11 @@ void CSlrImage::ApplyResidentFormat(CImageData *imageData)
 	// funnel just tone-mapped to 8 bits, the peak is gone with it, and carrying
 	// the old number forward would have the surface's HDR10 metadata describe
 	// range the texture no longer contains.
-	this->contentMaxComponent = (want == RENDER_TEXTURE_RGBA16F)
-		? imageData->contentMaxComponent : 0.0f;
+	// A gain-mapped base is above-white content although its texture is RGBA8:
+	// the map makes it HDR at draw time (option C), so its peak is the map's.
+	this->contentMaxComponent = (want == RENDER_TEXTURE_RGBA16F) ? imageData->contentMaxComponent
+	                          : (this->gainMap != NULL)          ? this->gainMapPeak
+	                                                             : 0.0f;
 }
 
 CSlrImage::CSlrImage(CImageData *imageData)
@@ -1164,10 +1168,19 @@ CSlrImage::~CSlrImage()
 	 }
 	 */
 
+	// Option C Task 3c: a composite keyed by this image (or by its base, if this is
+	// a map) must never outlive it -- a new image at the same address would draw it.
+	VID_GainMapCompositeForget(this);
+
 	if (this->isFromAtlas == false && this->isBound == true)
 	{
 		gRenderBackend->DeleteTexture(this);
 	}
+
+	// Option C: the base owns its companion map. Its Deallocate() already ran
+	// through the base's (Deallocate below), when the owner deallocated first.
+	delete gainMap;
+	gainMap = NULL;
 }
 void CSlrImage::SetImageData(CImageData *imageData)
 {
@@ -1250,6 +1263,11 @@ void CSlrImage::ReBindImage()
 	}
 #endif
 
+	// Option C Task 3c (review round 1): ReBindTexture may rewrite the texture IN
+	// PLACE (same pointer), which the composite LRU's validation cannot see -- so a
+	// rebind of a base (or of its map) drops its composite. ReBindImageData comes
+	// through here too.
+	VID_GainMapCompositeForget(this);
 	gRenderBackend->ReBindTexture(this);
 }
 
@@ -1275,6 +1293,12 @@ void CSlrImage::Deallocate()
 //	LOGD("CSlrImage::Deallocate");
 
 //	RES_DebugPrintMemory();
+
+	// Option C: the companion map goes with its base (the cache frees an image
+	// as Deallocate(); delete image;), and so does its one-time composite (Task 3c).
+	VID_GainMapCompositeForget(this);
+	if (gainMap != NULL)
+		gainMap->Deallocate();
 
 	this->FreeLoadImage();
 

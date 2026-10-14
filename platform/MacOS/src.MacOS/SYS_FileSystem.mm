@@ -1127,6 +1127,26 @@ char *SYS_GetPathToDocuments()
 	return gCPathToDocuments;
 }
 
+std::string SYS_GetCacheDir()
+{
+	@autoreleasepool
+	{
+		NSArray *paths = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES);
+		NSString *caches = [paths firstObject];
+		if (caches == nil || [caches length] == 0)
+			return std::string();
+		// The BUNDLE identifier, as Apple's caches convention asks -- and what a
+		// sandboxed build's container is keyed on. A bare binary has none, so
+		// the settings folder name stands in (it is what this file already
+		// names the temp and settings folders after, :91-95).
+		NSString *bundleId = [[NSBundle mainBundle] bundleIdentifier];
+		if (bundleId == nil || [bundleId length] == 0)
+			bundleId = [NSString stringWithUTF8String:MT_GetSettingsFolderName()];
+		NSString *dir = [caches stringByAppendingPathComponent:bundleId];
+		return std::string([dir UTF8String]) + "/";
+	}
+}
+
 
 // NOTE, THE CODE BELOW TAKES 13-20 SECONDS TO EXECUTE COMMAND ON MACOS 10.15.7 in XCode, but in production is OK
 // https://stackoverflow.com/questions/67558091/nstask-launch-or-popen-takes-15-20-seconds-to-start-simple-bash-scripts-in-macos

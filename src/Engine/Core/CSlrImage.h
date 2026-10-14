@@ -20,6 +20,7 @@
 #include "CSlrFile.h"
 #include "CSlrImageTexture.h"
 #include "Render/ERenderTextureFormat.h"
+#include "MT_UltraHdr.h"   // SMTGainMapApply (only SYS_Defs.h + std headers)
 
 #include <atomic>
 
@@ -160,6 +161,27 @@ public:
 	// funnel so the viewer can describe what it is displaying without holding
 	// on to the decode buffer.
 	float contentMaxComponent = 0.0f;
+
+	// Option C (gain-map resident HDR). A gain-mapped base is an RGBA8 texture
+	// that is ABOVE-WHITE content: the companion map makes it HDR at draw time
+	// (VID_ScopedGainMapDraw). The base OWNS the map: Deallocate() deallocates it
+	// and ~CSlrImage deletes it. Set all three BEFORE LoadImageForRebinding, so the
+	// resident funnel reports gainMapPeak as contentMaxComponent.
+	// RESTRICTION: after Deallocate() the map OBJECT, gainMapApply and gainMapPeak
+	// stay (the map is not deleted there: its own bind may still be queued, and the
+	// bind loop calls Deallocate under the binding mutex), but the map holds no
+	// texture and no pixels. A deallocated gain-mapped base is for deletion only --
+	// it is never re-bound (its map would draw as unbound, i.e. suppressed); a new
+	// load makes a new CSlrImage pair. VID_PostImageDealloc on a base whose bind is
+	// still queued cancels its map's queued bind too, or -- when a frame-budget stop
+	// already bound the map -- queues the map's DEALLOC. Base and map may come from
+	// either load path: the shader clamps to each image's texel rect (defaultTex*),
+	// never into a power-of-two texture's padding.
+	CSlrImage *gainMap = NULL;          // owned companion (RGBA8); freed with the base
+	SMTGainMapApply gainMapApply;       // valid when gainMap != NULL
+	float gainMapPeak = 0.0f;           // LINEAR peak; the funnel's contentMaxComponent when gainMap != NULL
+	// Set by a suppressed draw (render thread, Decision R-4), read by the app's browser.
+	std::atomic<bool> gainMapDrawFailed{ false };
 
 	u64 cacheKey;
 	bool cacheLinearScaling;

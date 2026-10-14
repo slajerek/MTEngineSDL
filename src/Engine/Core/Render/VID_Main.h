@@ -64,6 +64,56 @@ void VID_Shutdown();
 void VID_ResetLogicClock();
 u64  VID_GetCurrentFrameNumber();
 
+// SDL 3.4.14 does not agree with itself on SDL_PinchFingerEvent.scale: Cocoa,
+// UIKit and Android send the change since the previous UPDATE, Wayland
+// (zwp_pointer_gesture_pinch_v1) and X11 (XI 2.4) the running total since
+// BEGIN. Returns the per-update factor CGuiMain::DoPinchUpdate expects.
+// cumulative: the backend sends totals. *runningTotal: the last good total,
+// reset to 1 on BEGIN (unused when !cumulative). A non-finite or non-positive
+// total returns 0 -- which CGuiMain drops -- and leaves *runningTotal alone.
+float VID_PinchUpdateFactor(float sdlScale, bool cumulative, float *runningTotal);
+
+// Trackpad "double-tap and drag" (the macOS gesture: tap, then tap again and
+// keep the finger down -- moving it drags, lifting it ends). Recognised from
+// the pad's raw SDL_EVENT_FINGER_* stream, which SDL 3 delivers for a MacBook
+// trackpad (touch device SDL_TOUCH_DEVICE_INDIRECT_*), with or without
+// tap-to-click and without the OS "Dragging" accessibility option. Pure, so it
+// is unit-tested: feed every finger event, act on the returned action.
+//
+// A TAP is one finger, down and up within kTapMaxSec, travelling at most
+// kTapMaxTravel (normalised pad units). The second press must land within
+// kSecondPressMaxSec of the tap's release and kSecondPressMaxDist of it. A
+// second finger at any point is a scroll or a pinch: it cancels the gesture.
+enum VID_TapDragAction
+{
+	VID_TapDragNone = 0,
+	VID_TapDragBegin,   // the second press of a double-tap: the drag starts
+	VID_TapDragEnd,     // the dragging finger lifted, or a second finger landed
+};
+enum VID_TapDragPhase
+{
+	VID_TapDragFingerDown = 0,
+	VID_TapDragFingerMotion,
+	VID_TapDragFingerUp,
+	VID_TapDragFingerCanceled,
+};
+struct VID_TapDragState
+{
+	int    fingers   = 0;       // on the pad now
+	bool   dragging  = false;
+	double downT     = -1.0;    // the current single press
+	float  downX     = 0.0f, downY = 0.0f;
+	float  maxTravel = 0.0f;
+	double tapUpT    = -1.0;    // the last qualifying tap's release, -1 none
+	float  tapX      = 0.0f, tapY = 0.0f;
+};
+constexpr double kVID_TapDragTapMaxSec         = 0.30;
+constexpr float  kVID_TapDragTapMaxTravel      = 0.03f;
+constexpr double kVID_TapDragSecondPressMaxSec = 0.35;
+constexpr float  kVID_TapDragSecondPressMaxDist = 0.10f;
+VID_TapDragAction VID_TapDragOnFinger(VID_TapDragState *st, VID_TapDragPhase phase,
+                                      float x, float y, double tSec);
+
 // True while VID_Render() is between ImGui::NewFrame() and ImGui::Render().
 // Code that mutates OS window/menu state can check this to defer work that
 // would otherwise re-enter the renderer (see the guard in VID_Render()).

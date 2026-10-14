@@ -103,6 +103,19 @@ $libjxlSkcmsRev   = "b2e692629c1fb19342517d7fb61f1cf83d075492"
 # on Windows (CmsEngineVariant::CMS_VARIANT_LCMS2). 2.19 is the first release
 # with a root CMakeLists.txt -- matches the version pinned by the Linux build.
 $lcms2Version   = "2.19.1"
+# libultrahdr (P3b) -- see the macOS script's pin comment. Built against the
+# engine's one libjpeg, libjpeg-turbo (build-jpeg.ps1's per-configuration
+# prefix, $jpegPrefix below). Its own CMakeLists forces
+# CMAKE_MSVC_RUNTIME_LIBRARY to MultiThreaded$<Debug> for a static MSVC build
+# (CMakeLists.txt:215-217) -- the same /MT this script passes -- and names the
+# archive uhdr-static.lib (:921-925).
+$libultrahdrVersion = "2.0.2"
+$libultrahdrUrl  = "https://github.com/google/libultrahdr/archive/refs/tags/v$libultrahdrVersion.tar.gz"
+$libultrahdrHash = "aa8d193bb887c348c419780511dd03b374f4e07af8812b6d3f80c8537cf1ef2c"
+$uhdrWanted = ((Get-Item -Path 'env:MT_ENABLE_LIBULTRAHDR' -ErrorAction SilentlyContinue).Value -ne '0')
+# The revision of our own libultrahdr source patches (patches\apply_libultrahdr_
+# jpeg9_raw.py). It is part of the stamp, so a new patch rebuilds the archive.
+$libultrahdrPatchRev = "jpeg9-raw-1"
 
 $tiffUrl    = "https://download.osgeo.org/libtiff/tiff-$tiffVersion.tar.gz"
 $webpUrl    = "https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-$webpVersion.tar.gz"
@@ -126,8 +139,24 @@ $libgav1GitRev = "c05bf9be660cf170d7c26bd06bb42b3322180e58"
 
 New-Item -ItemType Directory -Force -Path $downloadDir, $srcDir, $outLibDir | Out-Null
 
+# libjpeg-turbo (build-jpeg.ps1, the jpeg unit) -- the engine's one libjpeg. Its
+# archive is read from the jpeg unit's STORE ($env:MT_STORE_JPEG, emitted for
+# every unit), else from the -OutLibDir ARGUMENT -- the view, which
+# build-jpeg.ps1's Complete-MTStore has already filled -- never from this
+# script's own $outLibDir, the image-codecs store. Its stamp joins both of this
+# bundle's stamps, so a new turbo rebuilds the bundle (full and stub alike).
+$jpegStoreDir = if ($env:MT_STORE_JPEG) { $env:MT_STORE_JPEG } else { $OutLibDir }
+$jpegLib = Join-Path $jpegStoreDir 'MTJpeg.lib'
+$jpegStampFile = Join-Path $jpegStoreDir 'MTJpeg.stamp'
+$jpegPrefix = Join-Path (Get-MTCapsWorkDir 'jpeg') "install-$Platform-$Configuration"
+$jpegPrefixFwd = ($jpegPrefix -replace '\\','/')
+if (-not ((Test-Path $jpegLib) -and (Test-Path $jpegStampFile))) {
+    throw "$jpegLib (or its stamp) is missing -- run platform\Windows\build-jpeg.ps1 first"
+}
+$jpegStamp = (Get-Content $jpegStampFile -Raw).Trim()
+
 # Stale stamp check -- if versions changed, force rebuild
-$stampValue = "$tiffVersion|$webpVersion|$avifVersion|$libgav1Version|$librawVersion|$libjxlVersion|$lcms2Version|$Platform|$Configuration"
+$stampValue = "jpeg=$jpegStamp|$tiffVersion|$webpVersion|$avifVersion|$libgav1Version|$librawVersion|$libjxlVersion|$lcms2Version|libultrahdr-$libultrahdrVersion-$uhdrWanted-$libultrahdrPatchRev|$Platform|$Configuration"
 $scriptHash = (Get-FileHash -Path $MyInvocation.MyCommand.Path -Algorithm SHA256).Hash
 $stampValue = "$scriptHash|$stampValue"
 
@@ -138,14 +167,14 @@ $stampValue = "$scriptHash|$stampValue"
 # debugger with MT_CAP_RAW=0 and MT_CAP_PHOTO_CODECS=0 still downloaded and
 # compiled LibRaw, libtiff, libwebp, libavif, libgav1 and libjxl.
 #
-# The bundle is one archive serving six flags, so it is skipped only when EVERY
+# The bundle is one archive serving seven flags, so it is skipped only when EVERY
 # one of them is off. Any single codec still wanted means building the bundle --
 # there is no per-codec archive to stub.
 #
 # libjxl has no capability of its own: it exists to decode JPEG XL DNGs, which is
 # a RAW concern and therefore travels with MT_ENABLE_LIBRAW.
 $codecFlags = @('MT_ENABLE_LIBTIFF','MT_ENABLE_LIBWEBP','MT_ENABLE_LIBAVIF',
-                'MT_ENABLE_LIBHEIF','MT_ENABLE_LIBRAW','MT_ENABLE_LCMS2')
+                'MT_ENABLE_LIBHEIF','MT_ENABLE_LIBRAW','MT_ENABLE_LCMS2','MT_ENABLE_LIBULTRAHDR')
 $anyCodecWanted = $false
 foreach ($flag in $codecFlags) {
     # Absent means ON, matching the standalone default in Import-MTCapsEnvironment.
@@ -160,8 +189,23 @@ if (-not $anyCodecWanted) {
         -not (Get-Command lib -ErrorAction SilentlyContinue)) {
         throw "Image codecs are disabled by the capability set, but cl/lib are needed to write the stub archive. Run from 'Developer PowerShell for VS 2022'."
     }
-    New-MTCapsStubArchive -OutLib $outLib -Stamp $stampFile -Symbol 'mt_image_codecs' `
-                          -StampValue "disabled|$scriptHash|$Platform|$Configuration"
+    # The stub STILL carries libjpeg-turbo: JPEGWriter (MTEngineSDL.lib) needs
+    # jpeg_* on every configuration, and this is the archive every app links.
+    $stubStampValue = "disabled|$scriptHash|$Platform|$Configuration|jpeg=$jpegStamp"
+    if ((Test-Path $outLib) -and (Test-Path $stampFile) -and
+        ((Get-Content $stampFile -Raw).Trim() -eq $stubStampValue)) {
+        exit 0
+    }
+    $stubLib = "$outLib.stub.lib"
+    $stubStamp = "$stampFile.stub"
+    Remove-Item -Force $stubLib, $stubStamp -ErrorAction SilentlyContinue
+    New-MTCapsStubArchive -OutLib $stubLib -Stamp $stubStamp -Symbol 'mt_image_codecs' `
+                          -StampValue $stubStampValue
+    Remove-Item -Force $outLib -ErrorAction SilentlyContinue
+    & $libExe /NOLOGO "/OUT:$outLib" $stubLib $jpegLib
+    if ($LASTEXITCODE -ne 0) { throw "lib.exe failed to merge libjpeg-turbo into the stub $outLib" }
+    Remove-Item -Force $stubLib, $stubStamp -ErrorAction SilentlyContinue
+    $stubStampValue | Out-File -FilePath $stampFile -Encoding ASCII -NoNewline
     exit 0
 }
 
@@ -188,15 +232,28 @@ function Get-Sha256($filePath) {
 
 function Download-Archive($name, $url, $expectedHash) {
     $archive = Join-Path $downloadDir "$name.tar.gz"
-    if (-not (Test-Path $archive)) {
-        Write-Host "Downloading $name..."
-        Invoke-WebRequest -Uri $url -OutFile $archive
+    $part = "$archive.part"
+    # A file at $archive only ever got there by passing the hash below (it is
+    # renamed into place after the check), so a mismatch here means the PIN
+    # changed under the same name: discard it and fetch again rather than
+    # blocking every later run.
+    if (Test-Path $archive) {
+        if ((Get-Sha256 $archive) -eq $expectedHash) { return }
+        Write-Warning "Cached $archive does not match the pinned SHA-256 (pin changed?) -- downloading again."
+        Remove-Item -Force $archive
     }
-    $actualHash = Get-Sha256 $archive
+    # Into a .part file, verified, THEN renamed: an interrupted or corrupt
+    # download must never sit at the final name.
+    Remove-Item -Force $part -ErrorAction SilentlyContinue
+    Write-Host "Downloading $name..."
+    Invoke-WebRequest -Uri $url -OutFile $part
+    $actualHash = Get-Sha256 $part
     if ($actualHash -ne $expectedHash) {
-        Write-Error "Checksum mismatch for $archive`nExpected: $expectedHash`nActual:   $actualHash"
+        Remove-Item -Force $part -ErrorAction SilentlyContinue
+        Write-Error "Checksum mismatch for $name (downloaded from $url); the partial file was deleted`nExpected: $expectedHash`nActual:   $actualHash"
         exit 1
     }
+    Move-Item -Force $part $archive
 }
 
 # Fails if any of $Expect (paths relative to $dest) is missing. Separate from
@@ -329,6 +386,7 @@ Download-Archive "libwebp-$webpVersion" $webpUrl    $webpHash
 Download-Archive "libavif-$avifVersion" $avifUrl    $avifHash
 Download-Archive "LibRaw-$librawVersion" $librawUrl $librawHash
 Download-Archive "lcms$lcms2Version"    $lcms2Url   $lcms2Hash
+if ($uhdrWanted) { Download-Archive "libultrahdr-$libultrahdrVersion" $libultrahdrUrl $libultrahdrHash }
 
 Extract-Archive "tiff-$tiffVersion"    "tiff-$tiffVersion" @("CMakeLists.txt")
 Extract-Archive "libwebp-$webpVersion" "libwebp-$webpVersion" @("CMakeLists.txt")
@@ -342,6 +400,9 @@ Clone-GitTag "libgav1-v$libgav1Version" $libgav1GitUrl "v$libgav1Version" $libga
 # the build actually consumes.
 Extract-Archive "LibRaw-$librawVersion" "LibRaw-$librawVersion" @("libraw/libraw.h")
 Extract-Archive "lcms$lcms2Version"    "Little-CMS-lcms$lcms2Version" @("CMakeLists.txt")
+if ($uhdrWanted) {
+    Extract-Archive "libultrahdr-$libultrahdrVersion" "libultrahdr-$libultrahdrVersion" @("CMakeLists.txt", "ultrahdr_api.h")
+}
 
 # Link libgav1 into avif ext dir
 $libgav1Src = Join-Path $srcDir "libgav1-v$libgav1Version"
@@ -426,32 +487,29 @@ Build-CMake `
         "-DAVIF_LIBXML2=OFF"
     )
 
-# RD-A: build the engine's own vendored jpeg-9a and zlib as static libs so
-# LibRaw's full decode gains USE_JPEG/USE_ZLIB from the one in-repo copy of
-# each library (roadmap #2.11). CMake shims live in the build cache and point
-# at the engine tree; the archives are merged into MTImageCodecs.lib below so
-# the bundle stays self-contained (RD-A design #4.2.1 route (a)).
-$engineJpegSrc = ("$rootDir\src\Engine\Libs\jpeg\jpeg-9a" -replace '\\','/')
+# RD-A: build the engine's own vendored zlib as a static lib so LibRaw's full
+# decode gains USE_ZLIB from the one in-repo copy (roadmap #2.11); USE_JPEG
+# comes from libjpeg-turbo's headers ($jpegPrefix, build-jpeg.ps1). The CMake
+# shim lives in the build cache and points at the engine tree; the archives are
+# merged into MTImageCodecs.lib below so the bundle stays self-contained (RD-A
+# design #4.2.1 route (a)).
+if (-not (Test-Path (Join-Path $jpegPrefix 'lib\jpeg-static.lib'))) {
+    throw "libjpeg-turbo prefix $jpegPrefix is incomplete -- run platform\Windows\build-jpeg.ps1 first"
+}
+# The jpeg-9a outputs older builds of this script left in the codec prefix --
+# removed unconditionally before LibRaw and libultrahdr are configured (LibRaw's
+# include list carries the prefix's include, and a leftover jpeg-9a jpeglib.h
+# there is exactly the shadowing MT_jpeglib.h exists to stop). The prefix is
+# wiped above on every full build; this is the belt to those braces.
+foreach ($stale in @('include\jpeglib.h', 'include\jconfig.h', 'include\jmorecfg.h', 'include\jerror.h', 'lib\jpeg.lib')) {
+    Remove-Item -Force (Join-Path $prefixDir $stale) -ErrorAction SilentlyContinue
+}
 $engineZlibSrc = ("$rootDir\src\Engine\Libs\zlib" -replace '\\','/')
 # The engine's zlib carries a deliberate unconditional '#include <unistd.h>'
 # in gzlib/gzread/gzwrite (POSIX prototypes); MSVC resolves it via the
 # engine's shim header, which must therefore be on THIS shim's include path
 # too or the standalone build dies at C1083 before ever reaching LibRaw.
 $engineWinShim = ("$rootDir\platform\Windows\src.Windows" -replace '\\','/')
-
-$engineJpegShim = Join-Path $srcDir "engine-jpeg"
-New-Item -ItemType Directory -Force -Path $engineJpegShim | Out-Null
-@"
-cmake_minimum_required(VERSION 3.10)
-project(enginejpeg C)
-file(GLOB JPEG_SOURCES "$engineJpegSrc/*.c")
-add_library(jpeg STATIC `${JPEG_SOURCES})
-target_include_directories(jpeg PRIVATE "$engineJpegSrc")
-install(TARGETS jpeg ARCHIVE DESTINATION lib)
-install(FILES "$engineJpegSrc/jpeglib.h" "$engineJpegSrc/jconfig.h"
-              "$engineJpegSrc/jmorecfg.h" "$engineJpegSrc/jerror.h"
-        DESTINATION include)
-"@ | Out-File -FilePath (Join-Path $engineJpegShim "CMakeLists.txt") -Encoding UTF8
 
 $engineZlibShim = Join-Path $srcDir "engine-zlib"
 New-Item -ItemType Directory -Force -Path $engineZlibShim | Out-Null
@@ -465,7 +523,6 @@ install(TARGETS zlib ARCHIVE DESTINATION lib)
 install(FILES "$engineZlibSrc/zlib.h" "$engineZlibSrc/zconf.h" DESTINATION include)
 "@ | Out-File -FilePath (Join-Path $engineZlibShim "CMakeLists.txt") -Encoding UTF8
 
-Build-CMake $engineJpegShim (Join-Path $buildDir "engine-jpeg") $prefixDir @()
 Build-CMake $engineZlibShim (Join-Path $buildDir "engine-zlib") $prefixDir @()
 
 # --- libjxl -----------------------------------------------------------------
@@ -530,7 +587,8 @@ Build-CMake `
 # --- patch LibRaw for JPEG XL ------------------------------------------------
 # One patcher shared by all three platforms, so the decoder cannot drift
 # between them. It is idempotent and fails loudly if a LibRaw bump moves its
-# anchors. NEEDS PYTHON 3 -- the only Python dependency in the Windows build;
+# anchors. NEEDS PYTHON 3 -- the only Python dependency in the Windows build (the
+# libultrahdr patcher after it reuses the same interpreter);
 # reimplementing it in PowerShell would mean two copies of the same edit and
 # exactly the drift this avoids.
 $pythonExe = $null
@@ -566,6 +624,22 @@ try {
     $ErrorActionPreference = $savedEap
 }
 
+# libultrahdr assumes libjpeg-turbo's raw mode; on jpeg-9a it overflowed its
+# chroma planes on every 4:2:0 JPEG (see the patcher's header). Built against
+# libjpeg-turbo now, where the patch is a no-op; kept so a jpeg-9 build stays
+# safe. Idempotent; fails loudly on a libultrahdr bump.
+if ($uhdrWanted) {
+    Write-Host "Patching libultrahdr for IJG libjpeg 9 raw mode..."
+    $savedEap = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        & $pythonExe (Join-Path $patchesDir "apply_libultrahdr_jpeg9_raw.py") (Join-Path $srcDir "libultrahdr-$libultrahdrVersion")
+        if ($LASTEXITCODE -ne 0) { throw "apply_libultrahdr_jpeg9_raw.py failed" }
+    } finally {
+        $ErrorActionPreference = $savedEap
+    }
+}
+
 # LibRaw does not ship CMakeLists.txt (removed since 2014). Generate one.
 $librawSrc = Join-Path $srcDir "LibRaw-$librawVersion"
 $librawCMake = Join-Path $librawSrc "CMakeLists.txt"
@@ -586,7 +660,7 @@ include_directories(
     `${CMAKE_CURRENT_SOURCE_DIR}
     `${CMAKE_CURRENT_SOURCE_DIR}/internal
     `${CMAKE_CURRENT_SOURCE_DIR}/src
-    "$engineJpegSrc"
+    "$jpegPrefixFwd/include"
     "$engineZlibSrc"
     "$($prefixDir -replace '\\','/')/include"
 )
@@ -636,6 +710,34 @@ Build-CMake `
         "-DLCMS2_BUILD_TESTS=OFF"
     )
 
+# libultrahdr (P3b). build-jpeg.ps1 installed jpeg-static.lib + jpeglib.h into
+# $jpegPrefix; pointing JPEG_* at them keeps find_package(JPEG) from searching
+# anything else. Intrinsics are OFF on BOTH Windows platforms:
+# upstream's intrinsics path adds GCC-style -march flags that cl.exe rejects,
+# v2.0.2 has no x86 SIMD sources to gain from it anyway, and on an ARM64
+# cross-build its arch probe reads the HOST processor, not the target.
+if ($uhdrWanted) {
+    $prefixFwd = ($prefixDir -replace '\\','/')
+    $uhdrArgs = @(
+        "-DUHDR_BUILD_EXAMPLES=OFF", "-DUHDR_BUILD_TESTS=OFF", "-DUHDR_BUILD_BENCHMARK=OFF",
+        "-DUHDR_BUILD_FUZZERS=OFF", "-DUHDR_BUILD_DEPS=OFF", "-DUHDR_BUILD_JAVA=OFF",
+        "-DUHDR_BUILD_PACKAGING=OFF", "-DUHDR_ENABLE_LOGS=OFF", "-DUHDR_ENABLE_INSTALL=ON",
+        "-DUHDR_ENABLE_GLES=OFF", "-DUHDR_ENABLE_WERROR=OFF", "-DUHDR_ENABLE_SMPTE2094_50=OFF",
+        "-DUHDR_ENABLE_HEIF=OFF", "-DUHDR_WRITE_XMP=OFF", "-DUHDR_WRITE_ISO=ON",
+        "-DUHDR_MAX_DIMENSION=32768",
+        "-DJPEG_INCLUDE_DIR=$jpegPrefixFwd/include",
+        "-DJPEG_LIBRARY=$jpegPrefixFwd/lib/jpeg-static.lib",
+        "-DJPEG_LIBRARY_RELEASE=$jpegPrefixFwd/lib/jpeg-static.lib"
+    )
+    $uhdrArgs += "-DUHDR_ENABLE_INTRINSICS=OFF"
+    Build-CMake `
+        (Join-Path $srcDir "libultrahdr-$libultrahdrVersion") `
+        (Join-Path $buildDir "libultrahdr") `
+        $prefixDir `
+        $uhdrArgs
+    if (-not (Test-Path (Join-Path $prefixDir "include\ultrahdr_api.h"))) { throw "libultrahdr: ultrahdr_api.h was not installed" }
+}
+
 # ---- find libraries to combine ----
 
 $libDir = Join-Path $prefixDir "lib"
@@ -652,8 +754,8 @@ $allFoundLibs = Get-ChildItem -Path $libDir -Recurse -Filter "*.lib" -ErrorActio
 # script's first Debug run on any machine -- LNK2019 on every TIFF symbol at the photo app
 # link time, with no warning from this script because the "not found" check only fires
 # for names ALREADY in $inputLibs, never for a name the regex never matched at all).
-$wantedLibs = @("tiff", "libwebp", "libwebpdemux", "libsharpyuv", "avif", "raw", "gav1", "lcms2", "jpeg", "zlib",
-                "jxl", "jxl_cms", "hwy", "brotlidec", "brotlicommon")
+$wantedLibs = @("tiff", "libwebp", "libwebpdemux", "libsharpyuv", "avif", "raw", "gav1", "lcms2", "zlib",
+                "jxl", "jxl_cms", "hwy", "brotlidec", "brotlicommon", "uhdr-static")
 $inputLibs = @()
 foreach ($name in $wantedLibs) {
     # lcms2 applies MSVC's DEBUG_POSTFIX "d" per-target (cmake/Lcms2Library.cmake),
@@ -664,6 +766,10 @@ foreach ($name in $wantedLibs) {
         $inputLibs += $found
     }
 }
+
+# libjpeg-turbo, from the jpeg unit's store: appended explicitly, because the
+# recursive scan above looks only under $prefixDir\lib and would never find it.
+$inputLibs += $jpegLib
 
 foreach ($lib in $inputLibs) {
     if (-not (Test-Path $lib)) {
@@ -693,14 +799,20 @@ Write-Host "Image codec bundle built: $outLib" -ForegroundColor Green
 $dumpbin = Get-Command dumpbin -ErrorAction SilentlyContinue
 if ($dumpbin) {
     $syms = & dumpbin /SYMBOLS $outLib 2>$null | Out-String
-    foreach ($want in @("JxlDecoderCreate", "jxl_dng_load_raw")) {
+    # P3b: plus the three libultrahdr entry points the engine's MT_UltraHdr
+    # wrapper calls, when the codec is wanted.
+    # jpeg_skip_scanlines is turbo-only (not any other libjpeg); transupp is
+    # what lossless JPEG rotation calls.
+    $wants = @("JxlDecoderCreate", "jxl_dng_load_raw", "jpeg_skip_scanlines", "jtransform_execute_transform")
+    if ($uhdrWanted) { $wants += @("uhdr_encode", "uhdr_decode", "is_uhdr_image") }
+    foreach ($want in $wants) {
         if ($syms -notmatch [regex]::Escape($want)) {
-            throw "expected symbol not found in ${outLib}: $want -- JPEG XL DNGs will not decode"
+            throw "expected symbol not found in ${outLib}: $want"
         }
     }
-    Write-Host "Verified JPEG XL symbols in $outLib"
+    Write-Host "Verified codec symbols in $outLib"
 } else {
-    Write-Warning "dumpbin not on PATH -- skipped the JPEG XL symbol check"
+    Write-Warning "dumpbin not on PATH -- skipped the codec symbol check"
 }
 
 # Headers travel WITH the archive (Phase 2).
@@ -708,6 +820,18 @@ $stagedInc = Join-Path $outLibDir 'image-codecs\include'
 if (Test-Path $stagedInc) { Remove-Item -Recurse -Force $stagedInc }
 New-Item -ItemType Directory -Force -Path (Split-Path $stagedInc) | Out-Null
 Copy-Item -Recurse -Force (Join-Path $cacheDir "$prefixDirLabel\include") $stagedInc
+# libultrahdr's licence texts travel with the archive -- before the stamp, as
+# on macOS and Linux: a stamp-hit run never stages them again.
+$uhdrLic = Join-Path $outLibDir 'image-codecs\licenses\libultrahdr'
+if (Test-Path $uhdrLic) { Remove-Item -Recurse -Force $uhdrLic }
+if ($uhdrWanted) {
+    $uhdrSrc = Join-Path $srcDir "libultrahdr-$libultrahdrVersion"
+    New-Item -ItemType Directory -Force -Path $uhdrLic | Out-Null
+    Copy-Item (Join-Path $uhdrSrc 'LICENSE'), (Join-Path $uhdrSrc 'LICENSE-APACHE'), (Join-Path $uhdrSrc 'LICENSE-MIT') $uhdrLic
+    Copy-Item (Join-Path $uhdrSrc 'adobe-hdr-gain-map-license\NOTICE') (Join-Path $uhdrLic 'NOTICE-adobe-gain-map')
+    Copy-Item (Join-Path $uhdrSrc 'third_party\image_io\LICENSE') (Join-Path $uhdrLic 'LICENSE-image_io')
+    Copy-Item (Join-Path $uhdrSrc 'third_party\image_io\src\modp_b64\LICENSE') (Join-Path $uhdrLic 'LICENSE-modp_b64')
+}
 $stampValue | Out-File -FilePath $stampFile -Encoding ASCII -NoNewline
 
 } finally {

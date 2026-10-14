@@ -42,7 +42,12 @@ enum SetFullScreenMode
 	ViewEnterFullScreen,
 	ViewLeaveFullScreen,
 	MainWindowEnterFullScreen,
-	MainWindowLeaveFullScreen
+	MainWindowLeaveFullScreen,
+
+	// The view fills the application window -- other views hidden, layout
+	// stored, IsViewFullScreen() true -- but the OS window is NOT switched to
+	// fullscreen. Left with ViewLeaveFullScreen, like the OS variant.
+	ViewEnterWindowFill
 };
 
 enum LayoutStorageTask
@@ -210,6 +215,26 @@ public:
 	void DoNotTouchedMove(float x, float y);
 	void DoScrollWheel(float deltaX, float deltaY);
 
+	// Pinch gesture router (SDL_EVENT_PINCH_*). BEGIN picks the view exactly
+	// like the wheel (popup gate, non-view overlay gate, topmost view under
+	// the point owns it, no fall-through); the gesture is then latched to that
+	// view until END. See CGuiView::DoPinchBegin.
+	void DoPinchBegin(float x, float y);
+	void DoPinchUpdate(float x, float y, float scale);
+	void DoPinchEnd(float x, float y);
+	CGuiView *pinchView;
+
+	// Trackpad double-tap-and-drag router (VID_TapDragOnFinger). BEGIN picks
+	// the view exactly like a pinch BEGIN and latches it until END. See
+	// CGuiView::DoTapDragBegin.
+	void DoTapDragBegin(float x, float y);
+	void DoTapDragEnd(float x, float y);
+	CGuiView *tapDragView;
+
+	// Front-most visible CGuiView whose IsInsideView() contains (x, y), walking
+	// ImGui windows front to back; NULL if none. Shared by wheel and pinch.
+	CGuiView *FindTopmostViewAt(float x, float y);
+
 //	float prevZoomValue;
 //	bool DoZoomBy(float x, float y, float zoomValue);
 
@@ -273,6 +298,9 @@ public:
 	CGuiView *viewFullScreen;
 	
 	bool appWasFullScreenBeforeViewFullScreen;
+
+	// true while viewFullScreen came from ViewEnterWindowFill
+	bool viewFullScreenInWindow;
 	
 	bool isChangingFullScreenState;
 
@@ -280,6 +308,7 @@ public:
 	void SetViewFullScreen(SetFullScreenMode setFullScreenMode, CGuiView *view, float fullScreenSizeX, float fullScreenSizeY);
 	void SetViewFullScreen(SetFullScreenMode setFullScreenMode, CGuiView *view);
 	bool IsViewFullScreen();
+	bool IsViewFullScreenInWindow();
 	
 	//
 	void SetApplicationWindowAlwaysOnTop(bool alwaysOnTop);

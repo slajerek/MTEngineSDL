@@ -2,7 +2,7 @@
 #define AJS_JPEG_H
 
 extern "C" {
-    #include "jpeglib.h"
+    #include "MT_jpeglib.h"
 }
 
 /// Collection of libjpeg-related constants.

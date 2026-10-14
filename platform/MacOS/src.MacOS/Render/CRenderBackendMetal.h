@@ -77,6 +77,7 @@ public:
 
 	virtual CRenderTarget *CreateRenderTarget() override;
 	virtual CMaskedTileShader *CreateMaskedTileShader(bool queued) override;
+	virtual CGainMapShader *CreateGainMapShader() override;
 	virtual CRenderShader *CreateFlatColorShader(float r, float g, float b, float a) override;
 	virtual CRenderShaderCustomFragment *CreateCustomFragmentShader(const char *name) override;
 
@@ -85,6 +86,12 @@ public:
 	virtual bool ImageNeedsSamplerOverride(CSlrImage *image) override;
 	virtual void QueueSamplerForImage(CSlrImage *image) override;
 	virtual void QueueDefaultSampler() override;
+	// The two sampler states QueueSamplerForImage binds (id<MTLSamplerState>, not
+	// retained): linear, or magnify-nearest / minify-linear for an image whose
+	// linearScaling is false. For a draw encoded outside ImGui that must sample an
+	// image exactly as its production blit does (the gain-map shader's test draw).
+	// NULL before the layer exists.
+	void *GetImageSamplerState(bool linearScaling);
 	virtual CVideoYUVConverter *CreateVideoYUVConverter() override;
 
 	virtual void *CreatePlaneTexture(int width, int height, int channels, int bytesPerChannel) override;

@@ -91,6 +91,13 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ -n "$APP_DIR" ]] || { echo "ERROR: --app-dir is required (the stub passes it)." >&2; exit 2; }
+
+# A final build tells the dependency scripts so: build-jpeg.sh then REFUSES an
+# x86_64 slice without SIMD (no nasm) instead of warning. Exported before the
+# deps and compile stages; the Xcode script phases inherit it from xcodebuild.
+# The driver OWNS the variable (like the Windows driver): a value inherited from
+# the calling shell never turns a development build into a final one.
+if [[ "$MAKE_PROD" == "true" ]]; then export MT_PROD_BUILD=1; else unset MT_PROD_BUILD; fi
 APP_DIR="$(cd "$APP_DIR" && pwd)"
 
 # ---------------------------------------------------------------------------
@@ -562,6 +569,20 @@ if [[ -d "$MT_ROOT/$MT_APP_NAME" ]]; then
     fi
 fi
 
+# THE BINARY, BY ABSOLUTE PATH, ONCE, AT THE END. Printed after the strip and
+# re-sign above (both rewrite the file, so its mtime is final only here). A
+# runner that picks a binary by searching can then be checked against this
+# line by eye: tests/run_test.sh prints "=== Using binary: <abs> (<mtime>)"
+# in the same shape, and the app itself prints its own path at startup. A
+# stale binary run from somewhere else -- the DerivedData product of an older
+# Xcode build, for instance -- shows up as two different paths.
+_mt_mtime() { stat -f '%Sm' -t '%Y-%m-%d %H:%M:%S' "$1" 2>/dev/null || echo "mtime unknown"; }
+_mt_abs()   { (cd "$(dirname "$1")" && printf '%s/%s\n' "$(pwd -P)" "$(basename "$1")"); }
 echo ""
+echo "=== Built binary: $(_mt_abs "$APP_BINARY") ($CONFIGURATION, $(_mt_mtime "$APP_BINARY")) ==="
+if [[ "$MAKE_PROD" == "true" ]]; then
+    PROD_BINARY="$PROD_DIR/$PROD_NAME/Contents/MacOS/$MT_MACOS_SCHEME"
+    echo "=== Deployed binary: $(_mt_abs "$PROD_BINARY") ($CONFIGURATION, $(_mt_mtime "$PROD_BINARY")) ==="
+fi
 echo "$MT_APP_NAME built successfully."
 echo "$APP_BUNDLE"

@@ -30,6 +30,11 @@ std::vector<uint8_t> ICC_BuildRec709ProfileV2();
 // needed. Deterministic, same rationale as the builders above.
 std::vector<uint8_t> ICC_BuildDisplayP3ProfileV2();
 
+// P3b: Display P3 with the EXACT sRGB transfer (1024-entry curv table) -- the
+// base image of a gain-map JPEG, whose codec assumes that curve. Deliberately
+// NOT an export space: exports keep ICC_BuildDisplayP3ProfileV2.
+std::vector<uint8_t> ICC_BuildDisplayP3SrgbCurveProfileV2();
+
 // RD-C: linear ProPhoto (ROMM) -- the develop pipeline's working-space
 // profile, handed to CM-B's 16-bit entry point as the transform SOURCE.
 // UNLIKE every sibling above, ProPhoto is natively D50: the colorants are

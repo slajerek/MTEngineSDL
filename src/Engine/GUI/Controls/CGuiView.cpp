@@ -995,6 +995,29 @@ bool CGuiView::DoScrollWheel(float deltaX, float deltaY)
 	return false;
 }
 
+bool CGuiView::DoPinchBegin(float x, float y)
+{
+	return false;
+}
+
+bool CGuiView::DoPinchZoom(float x, float y, float scale)
+{
+	return false;
+}
+
+void CGuiView::DoPinchEnd(float x, float y)
+{
+}
+
+bool CGuiView::DoTapDragBegin(float x, float y)
+{
+	return false;
+}
+
+void CGuiView::DoTapDragEnd(float x, float y)
+{
+}
+
 bool CGuiView::DoMultiTapNoBackground(COneTouchData *touch, float x, float y)
 {
 	for (std::map<float, CGuiElement *, compareZdownwards>::iterator enumGuiElems = guiElementsDownwards.begin();

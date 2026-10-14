@@ -6,7 +6,7 @@
 #include <cassert>
 
 extern "C" {
-    #include "jpeglib.h"
+    #include "MT_jpeglib.h"
     #include "jerror.h"
 }
 

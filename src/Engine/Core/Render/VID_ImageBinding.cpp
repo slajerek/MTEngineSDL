@@ -14,6 +14,7 @@
 #include <atomic>
 #include <chrono>
 #include <list>
+#include <memory>
 #include <vector>
 #include "SYS_Threading.h"
 
@@ -229,6 +230,29 @@ void VID_PostImageDealloc(CSlrImage *image)
 		{
 			imageBindings.remove(bindingData);
 			delete bindingData;
+			// Option C: a gain-mapped base's map was queued with it
+			// (VID_PostImageBindingPair); a cancelled base must not leave its map
+			// to bind a texture nothing will draw.
+			if (image->gainMap != NULL)
+			{
+				bool mapCancelled = false;
+				for (std::list<CBindingImageData *>::iterator mt = imageBindings.begin(); mt != imageBindings.end(); mt++)
+				{
+					if ((*mt)->image == image->gainMap)
+					{
+						CBindingImageData *mapBinding = *mt;
+						imageBindings.erase(mt);
+						delete mapBinding;
+						mapCancelled = true;
+						break;
+					}
+				}
+				// A frame-budget stop can split the pair: the map already bound, the
+				// base still queued. Then the map's texture is released through the
+				// queue (render thread), under this same lock (review round 2).
+				if (!mapCancelled && image->gainMap->isBound)
+					imageBindings.push_back(new CBindingImageData(image->gainMap, NULL, BINDING_MODE_DEALLOC));
+			}
 			VID_UnlockImageBindingMutex();
 			return;
 		}
@@ -238,6 +262,40 @@ void VID_PostImageDealloc(CSlrImage *image)
 	imageBindings.push_back(bindingData);
 	
 	VID_UnlockImageBindingMutex();
+}
+
+void VID_PostImageBindingPair(CSlrImage *first, CSlrImage *second, u8 mode)
+{
+	LOGR("VID_PostImageBindingPair: %f x %f then %f x %f mode=%d",
+		 first->width, first->height, second->width, second->height, mode);
+	// Both allocated BEFORE the lock: an allocation failure leaves nothing queued.
+	std::unique_ptr<CBindingImageData> a(new CBindingImageData(first, NULL, mode));
+	std::unique_ptr<CBindingImageData> b(new CBindingImageData(second, NULL, mode));
+
+	VID_LockImageBindingMutex();
+	try
+	{
+		imageBindings.push_back(a.get());
+		try
+		{
+			imageBindings.push_back(b.get());
+		}
+		catch (...)
+		{
+			imageBindings.pop_back();   // `first` again: neither stays queued
+			throw;
+		}
+	}
+	catch (...)
+	{
+		VID_UnlockImageBindingMutex();
+		throw;
+	}
+	VID_UnlockImageBindingMutex();
+
+	// The queue owns them now (the bind loop deletes each entry).
+	a.release();
+	b.release();
 }
 
 void VID_PostImageDestroy(CSlrImage *image)
@@ -426,6 +484,23 @@ bool VID_BindImages()
 			{
 				bindModeDebugText = "bound (image data kept)";
 				bindingData->image->BindImage();
+				if (bindingData->destination != NULL)
+				{
+					*bindingData->destination = bindingData->image;
+				}
+			}
+			else if (mode == BINDING_MODE_BIND_FREE_IMAGEDATA)
+			{
+				// The texture IS the image: keeping the CPU copy beside it
+				// doubles the image's memory (a photo browser's cache,
+				// option C). Not BINDING_MODE_BIND: that one frees
+				// even when CreateTexture produced no handle, and on a snapshot
+				// mismatch it drops the destination write. A failed texture
+				// keeps its data -- its owner decides.
+				bindModeDebugText = "bound (image data freed)";
+				bindingData->image->BindImage();
+				if (bindingData->image->TexturePtr() != NULL)
+					bindingData->image->FreeLoadImage();
 				if (bindingData->destination != NULL)
 				{
 					*bindingData->destination = bindingData->image;

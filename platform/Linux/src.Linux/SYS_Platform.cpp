@@ -11,6 +11,7 @@
 #undef None
 #include "CMTNativeMenuBarImGui.h"
 #include "CGuiMain.h"
+#include "VID_Main.h"
 
 Display *dpy;
 Cursor cur;
@@ -112,6 +113,10 @@ void PLATFORM_SetThreadName(const char *name)
 
 void PLATFORM_UpdateMenus()
 {
+	// Linux has no native backend: MT_MenuBarKindFor maps Native to ImGui.
+	if (MT_MenuBarKindFor(SYS_GetMenuBarMode(), gHeadlessMode) == EMTMenuBarKind::None)
+		return;
+
 	CMTNativeMenuBarImGui *menuBar = new CMTNativeMenuBarImGui();
 	guiMain->SetNativeMenuBar(menuBar);
 }

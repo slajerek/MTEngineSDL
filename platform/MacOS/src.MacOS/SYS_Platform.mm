@@ -3,6 +3,7 @@
 #import <AppKit/AppKit.h>
 #include "DBG_Log.h"
 #include "CMTNativeMenuBarMacOS.h"
+#include "CMTNativeMenuBarImGui.h"
 #include "CGuiMain.h"
 #include "VID_Main.h"
 
@@ -102,8 +103,21 @@ bool VID_IsMouseCursorVisible()
 
 void PLATFORM_UpdateMenus()
 {
-	if (gHeadlessMode)
-		return;
+	switch (MT_MenuBarKindFor(SYS_GetMenuBarMode(), gHeadlessMode))
+	{
+		case EMTMenuBarKind::None:
+			LOGD("PLATFORM_UpdateMenus: no menu bar");
+			return;
+
+		case EMTMenuBarKind::ImGui:
+			// SDL's application menu (About/Hide/Quit) is left as SDL made it.
+			guiMain->SetNativeMenuBar(new CMTNativeMenuBarImGui());
+			LOGD("PLATFORM_UpdateMenus: ImGui menu bar");
+			return;
+
+		case EMTMenuBarKind::Native:
+			break;
+	}
 
 	// Create native menu bar backend (constructor strips SDL's auto-generated menus)
 	CMTNativeMenuBarMacOS *menuBar = new CMTNativeMenuBarMacOS();

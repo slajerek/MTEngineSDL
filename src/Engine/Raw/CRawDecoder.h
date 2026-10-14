@@ -62,6 +62,14 @@ struct SRawDecodeResult
 	bool     defaultCropApplied = false;  // and we successfully cropped to it
 	unsigned defaultCropRequested[4] = {}; // x,y,w,h, visible-area coords, pre-snap
 
+	// The EMBEDDED PREVIEW LibRaw selected at open (imgdata.thumbnail, the one
+	// CImageData::LoadRAWPreview unpacks), as STORED -- not rotated, so only
+	// its long edge is orientation-free. 0 x 0 when the file carries none.
+	// A photo browser sizes an edited RAW's small browse preview from it, so
+	// landing on the edit costs what landing on the unedited RAW does.
+	int   thumbWidth          = 0;
+	int   thumbHeight         = 0;
+
 	float baselineExposure    = 0.f;   // color.dng_levels.baseline_exposure
 	bool  hasBaselineExposure = false; // sentinel is -999.f, not 0
 
@@ -203,6 +211,9 @@ public:
 	// overflows the 512 KB macOS secondary-thread default -- the SIGBUS the
 	// internal Decode thread exists for). Exported so other LibRaw callers
 	// (ReadEmbeddedXmp) share the guard instead of rediscovering the crash.
+	// macOS: the new thread inherits the CALLER's thread-scope dataless
+	// materialisation policy (IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES), so a
+	// worker that fails fast on iCloud stubs still does inside LibRaw.
 	static bool RunWithBigStack(void (*fn)(void *), void *arg);
 
 	static void GetBuildCapabilities(bool *hasLibRaw, bool *hasJpeg,

@@ -1,4 +1,5 @@
 #include "VID_Blits.h"
+#include "VID_GainMapDraw.h"
 #include "GUI_Main.h"
 #include "CSlrImage.h"
 #include "CContinuousParamSin.h"
@@ -225,10 +226,12 @@ void Blit(CSlrImage *image, float destX, float destY, float z, float sizeX, floa
 	ImVec2 pMin(destX,			destY);
 	ImVec2 pMax(destX + sizeX,	destY + sizeY);
 	
-	ScopedImageSampler samplerScope(image);
 	ImDrawList *drawList = ImGui::GetWindowDrawList();
-	drawList->AddImage(image->TexturePtr(), pMin, pMax, uv0, uv1,
-					   ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 1.0f, 1.0f, 1.0f)));
+	ScopedImageSampler samplerScope(image);
+	VID_ScopedGainMapDraw gainMapScope(image, drawList);
+	if (!gainMapScope.Suppressed())
+		drawList->AddImage(gainMapScope.Texture(), pMin, pMax, uv0, uv1,
+						   ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 1.0f, 1.0f, 1.0f)));
 
 	
 }
@@ -575,10 +578,12 @@ void BlitAlphaColor(CSlrImage *image, float destX, float destY, float z, float s
 	ImVec2 pMin(destX,			destY);
 	ImVec2 pMax(destX + sizeX,	destY + sizeY);
 	
-	ScopedImageSampler samplerScope(image);
 	ImDrawList *drawList = ImGui::GetWindowDrawList();
-	drawList->AddImage(image->TexturePtr(), pMin, pMax, uv0, uv1,
-					   ImGui::ColorConvertFloat4ToU32(ImVec4(colorR, colorG, colorB, alpha)));
+	ScopedImageSampler samplerScope(image);
+	VID_ScopedGainMapDraw gainMapScope(image, drawList);
+	if (!gainMapScope.Suppressed())
+		drawList->AddImage(gainMapScope.Texture(), pMin, pMax, uv0, uv1,
+						   ImGui::ColorConvertFloat4ToU32(ImVec4(colorR, colorG, colorB, alpha)));
 	
 #ifdef LOG_BLITS
 	LOGG("BlitAlphaColor done: %s", what->name);
@@ -641,10 +646,12 @@ void Blit(CSlrImage *image, float destX, float destY, float z, float size,
 	ImVec2 pMin(destX,			destY);
 	ImVec2 pMax(destX + sizeX,	destY + sizeY);
 	
-	ScopedImageSampler samplerScope(image);
 	ImDrawList *drawList = ImGui::GetWindowDrawList();
-	drawList->AddImage(image->TexturePtr(), pMin, pMax, uv0, uv1,
-					   ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 1.0f, 1.0f, 1.0f)));
+	ScopedImageSampler samplerScope(image);
+	VID_ScopedGainMapDraw gainMapScope(image, drawList);
+	if (!gainMapScope.Suppressed())
+		drawList->AddImage(gainMapScope.Texture(), pMin, pMax, uv0, uv1,
+						   ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 1.0f, 1.0f, 1.0f)));
 
 }
 
@@ -661,10 +668,12 @@ void BlitAlpha(CSlrImage *image, float destX, float destY, float z, float size,
 	ImVec2 pMin(destX,			destY);
 	ImVec2 pMax(destX + sizeX,	destY + sizeY);
 	
-	ScopedImageSampler samplerScope(image);
 	ImDrawList *drawList = ImGui::GetWindowDrawList();
-	drawList->AddImage(image->TexturePtr(), pMin, pMax, uv0, uv1,
-					   ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 1.0f, 1.0f, alpha)));
+	ScopedImageSampler samplerScope(image);
+	VID_ScopedGainMapDraw gainMapScope(image, drawList);
+	if (!gainMapScope.Suppressed())
+		drawList->AddImage(gainMapScope.Texture(), pMin, pMax, uv0, uv1,
+						   ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 1.0f, 1.0f, alpha)));
 }
 
 void BlitAlpha_aaaa(CSlrImage *what, float destX, float destY, float z, float size,
@@ -728,10 +737,12 @@ void Blit(CSlrImage *image, float destX, float destY, float z, float sizeX, floa
 	ImVec2 pMin(destX,			destY);
 	ImVec2 pMax(destX + sizeX,	destY + sizeY);
 	
-	ScopedImageSampler samplerScope(image);
 	ImDrawList *drawList = ImGui::GetWindowDrawList();
-	drawList->AddImage(image->TexturePtr(), pMin, pMax, uv0, uv1,
-					   ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 1.0f, 1.0f, 1.0f)));
+	ScopedImageSampler samplerScope(image);
+	VID_ScopedGainMapDraw gainMapScope(image, drawList);
+	if (!gainMapScope.Suppressed())
+		drawList->AddImage(gainMapScope.Texture(), pMin, pMax, uv0, uv1,
+						   ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 1.0f, 1.0f, 1.0f)));
 }
 
 void BlitQuarterTurns(CSlrImage *image, float destX, float destY, float z,
@@ -766,10 +777,12 @@ void BlitQuarterTurns(CSlrImage *image, float destX, float destY, float z,
 	VID_RotateQuarterUVInRect(q, texEndX,   texEndY,   sx0, sy0, sx1, sy1, uv3.x, uv3.y);
 	VID_RotateQuarterUVInRect(q, texStartX, texEndY,   sx0, sy0, sx1, sy1, uv4.x, uv4.y);
 
-	ScopedImageSampler samplerScope(image);
 	ImDrawList *drawList = ImGui::GetWindowDrawList();
-	drawList->AddImageQuad(image->TexturePtr(), p1, p2, p3, p4, uv1, uv2, uv3, uv4,
-						   ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 1.0f, 1.0f, 1.0f)));
+	ScopedImageSampler samplerScope(image);
+	VID_ScopedGainMapDraw gainMapScope(image, drawList);
+	if (!gainMapScope.Suppressed())
+		drawList->AddImageQuad(gainMapScope.Texture(), p1, p2, p3, p4, uv1, uv2, uv3, uv4,
+							   ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 1.0f, 1.0f, 1.0f)));
 }
 
 void BlitFlipVertical(CSlrImage *image, float destX, float destY, float z, float sizeX, float sizeY,
@@ -787,10 +800,12 @@ void BlitFlipVertical(CSlrImage *image, float destX, float destY, float z, float
 	ImVec2 pMin(destX,			destY);
 	ImVec2 pMax(destX + sizeX,	destY + sizeY);
 	
-	ScopedImageSampler samplerScope(image);
 	ImDrawList *drawList = ImGui::GetWindowDrawList();
-	drawList->AddImage(image->TexturePtr(), pMin, pMax, uv0, uv1,
-					   ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 1.0f, 1.0f, 1.0f)));
+	ScopedImageSampler samplerScope(image);
+	VID_ScopedGainMapDraw gainMapScope(image, drawList);
+	if (!gainMapScope.Suppressed())
+		drawList->AddImage(gainMapScope.Texture(), pMin, pMax, uv0, uv1,
+						   ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 1.0f, 1.0f, 1.0f)));
 }
 
 
@@ -809,10 +824,12 @@ void BlitInImGuiWindow(CSlrImage *image, float destX, float destY, float z, floa
 //	ImVec2 pMin(destX,			destY);
 //	ImVec2 pMax(destX + sizeX,	destY + sizeY);
 	
-	ScopedImageSampler samplerScope(image);
 	ImDrawList *drawList = ImGui::GetWindowDrawList();
-	drawList->AddImage(image->TexturePtr(), pMin, pMax, uv0, uv1,
-					   ImGui::ColorConvertFloat4ToU32(ImVec4(colorR, colorG, colorB, alpha)));
+	ScopedImageSampler samplerScope(image);
+	VID_ScopedGainMapDraw gainMapScope(image, drawList);
+	if (!gainMapScope.Suppressed())
+		drawList->AddImage(gainMapScope.Texture(), pMin, pMax, uv0, uv1,
+						   ImGui::ColorConvertFloat4ToU32(ImVec4(colorR, colorG, colorB, alpha)));
 	
 }
 
@@ -831,10 +848,12 @@ void BlitInImGuiWindow(CSlrImage *image, float destX, float destY, float z, floa
 //	ImVec2 pMin(destX,			destY);
 //	ImVec2 pMax(destX + sizeX,	destY + sizeY);
 	
-	ScopedImageSampler samplerScope(image);
 	ImDrawList *drawList = ImGui::GetWindowDrawList();
-	drawList->AddImage(image->TexturePtr(), pMin, pMax, uv0, uv1,
-					   ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 1.0f, 1.0f, 1.0f)));
+	ScopedImageSampler samplerScope(image);
+	VID_ScopedGainMapDraw gainMapScope(image, drawList);
+	if (!gainMapScope.Suppressed())
+		drawList->AddImage(gainMapScope.Texture(), pMin, pMax, uv0, uv1,
+						   ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 1.0f, 1.0f, 1.0f)));
 	
 }
 
@@ -904,10 +923,12 @@ void BlitAlpha(CSlrImage *image, float destX, float destY, float z, float sizeX,
 		ImVec2 pMin(destX,			destY);
 		ImVec2 pMax(destX + sizeX,	destY + sizeY);
 		
-		ScopedImageSampler samplerScope(image);
 		ImDrawList *drawList = ImGui::GetWindowDrawList();
-		drawList->AddImage(image->TexturePtr(), pMin, pMax, uv0, uv1,
-						   ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 1.0f, 1.0f, alpha)));
+		ScopedImageSampler samplerScope(image);
+		VID_ScopedGainMapDraw gainMapScope(image, drawList);
+		if (!gainMapScope.Suppressed())
+			drawList->AddImage(gainMapScope.Texture(), pMin, pMax, uv0, uv1,
+							   ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 1.0f, 1.0f, alpha)));
 }
 
 void BlitAlpha_aaaa(CSlrImage *what, float destX, float destY, float z, float sizeX, float sizeY,

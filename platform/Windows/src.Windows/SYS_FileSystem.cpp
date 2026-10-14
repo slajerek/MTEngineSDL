@@ -1356,6 +1356,16 @@ char* SYS_GetPathToDocuments()
 	return gCPathToDocuments;
 }
 
+std::string SYS_GetCacheDir()
+{
+	// %LOCALAPPDATA% is the non-roaming per-user store -- the settings folder's
+	// own parent (:320) -- and Cache\ keeps rebuildable data apart from it.
+	const std::string localAppData = SYS_WinGetSpecialFolderUtf8(CSIDL_LOCAL_APPDATA);
+	if (localAppData.empty())
+		return std::string();
+	return localAppData + "\\" + MT_GetSettingsFolderName() + "\\Cache\\";
+}
+
 #ifndef WIN32
 #include <unistd.h>
 #endif

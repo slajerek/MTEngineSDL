@@ -18,8 +18,12 @@
 #include "GFX_Types.h"
 #include "zlib.h"
 #include "CIccProfileCodec.h"
+#include "ICC_SRGBProfile.h"   // the built-in sRGB profile: an ImageIO-decoded CMYK JPEG is sRGB
 #include "CExifReader.h"
 #include "JPEGWriter.h"
+extern "C" {
+#include "MT_jpeglib.h"     // the libjpeg-turbo decode in Load (MTLoadJpegTurbo)
+}
 #include "CSlrFileZlib.h"
 #include "CSlrFileMemory.h"
 #include "stb_image.h"
@@ -51,7 +55,12 @@ static_assert(BASISD_SUPPORT_KTX2_ZSTD == 1,
 #include "SYS_ApkManager.h"
 #endif
 
+#include <atomic>
+#include <cstdint>
+#include <csetjmp>    // MTLoadJpegTurbo's libjpeg error manager
 #include <map>
+#include <new>        // std::nothrow
+#include <vector>
 
 #define PEDANTIC
 
@@ -3125,6 +3134,329 @@ void CImageData::SaveScaled(const char *fileName, short int min, short int max)
 
 }
 
+static std::atomic<int>  gMTJpegTurboDecodes{0};
+static std::atomic<int>  gMTJpegTurboRefusedOversize{0};
+static std::atomic<bool> gMTJpegTurboForceCmyk{false};
+
+int MT_TestJpegTurboDecodes()
+{
+	return gMTJpegTurboDecodes.load(std::memory_order_relaxed);
+}
+
+int MT_TestJpegTurboRefusedOversize()
+{
+	return gMTJpegTurboRefusedOversize.load(std::memory_order_relaxed);
+}
+
+void MT_TestSetJpegTurboForceCmyk(bool force)
+{
+	gMTJpegTurboForceCmyk.store(force, std::memory_order_relaxed);
+}
+
+// ---- JPEG through libjpeg-turbo (libjpeg-turbo plan, Phase 2) ----------------
+//
+// CImageData::Load decodes a JPEG with libjpeg-turbo (SIMD) first and keeps the
+// result only when the decode is CLEAN: 8-bit samples and not one libjpeg
+// warning. Anything else -- a truncated or corrupt stream (libjpeg warns and
+// pads), 12-bit data, an unknown colour space, more than kMTJpegTurboMaxScans
+// scans, a libjpeg error -- returns kMTJpegTurboDeclined and Load runs the
+// stb_image / missing-EOI repair / platform decoder chain exactly as before,
+// so a damaged file is still decoded by the same code and still marked
+// decodeWasRepaired.
+//
+// CMYK / YCCK, which stb rejects outright, depend on the platform:
+//  - Apple: declined right after the header (kMTJpegTurboCmykForPlatform),
+//    before any allocation. Load hands the file to ImageIO, which converts it
+//    to sRGB COLOUR-MANAGED -- through the embedded profile, else the system's
+//    default CMYK space -- and Load tags the result with the built-in sRGB
+//    profile (and flags it repaired when the file has no EOI). A naive formula there would turn a print file's cyan
+//    (about 0,163,218 through ImageIO) into 0,255,255. Only if ImageIO fails
+//    does Load come back here for the naive conversion below.
+//  - Windows and Linux: decoded here with the naive conversion. WIC only
+//    converted the pixel format (no colour management) before, and Linux had
+//    no CMYK decode at all.
+// MT_TestSetJpegTurboForceCmyk(true) takes the naive path on Apple too, so its
+// formula is tested on every platform.
+
+enum EMTJpegTurboResult
+{
+	kMTJpegTurboDeclined = 0,       // not ours: run the stb chain
+	kMTJpegTurboDecoded,            // RGB / gray decoded
+	kMTJpegTurboDecodedCmyk,        // CMYK / YCCK decoded with the naive conversion
+	kMTJpegTurboCmykForPlatform,    // CMYK / YCCK on Apple: use the platform decoder
+};
+
+// More scans than any real encoder writes (a progressive JPEG from libjpeg has
+// 10; the most aggressive scan scripts stay well under 100). A crafted file
+// can carry thousands, each a full pass over the coefficient buffer.
+static const int kMTJpegTurboMaxScans = 500;
+
+namespace
+{
+struct MTJpegDecodeErrorMgr
+{
+	struct jpeg_error_mgr pub;
+	jmp_buf jump;
+	int warnings;
+};
+
+void MTJpegDecodeErrorExit(j_common_ptr cinfo)
+{
+	longjmp(((MTJpegDecodeErrorMgr *)cinfo->err)->jump, 1);
+}
+
+// Count warnings (msg_level < 0) and print nothing: a warning makes the decode
+// decline, and stb's chain logs what happens next.
+void MTJpegDecodeEmitMessage(j_common_ptr cinfo, int msgLevel)
+{
+	if (msgLevel < 0)
+		((MTJpegDecodeErrorMgr *)cinfo->err)->warnings++;
+}
+
+// libjpeg calls this while it absorbs a multi-scan file. Past the scan limit
+// it takes the error exit (the longjmp): a decline, and stb's chain runs.
+void MTJpegDecodeProgress(j_common_ptr cinfo)
+{
+	if (cinfo->is_decompressor && ((j_decompress_ptr)cinfo)->input_scan_number > kMTJpegTurboMaxScans)
+		(*cinfo->err->error_exit)(cinfo);
+}
+} // namespace
+
+static bool MTIsJpegSignature(const u8 *data, size_t size)
+{
+	return size >= 3 && data[0] == 0xFF && data[1] == 0xD8 && data[2] == 0xFF;
+}
+
+// The largest width or height this path accepts. The engine defines no decode
+// dimension limit of its own (grep MAX_IMAGE_DIMENSION: none), so this is
+// libultrahdr's UHDR_MAX_DIMENSION in our build. libjpeg's own limit is 65500,
+// which would let a 64 KB file with a patched SOF ask for 16 GB.
+static const JDIMENSION kMTJpegTurboMaxDimension = 32768;
+
+// Decode the JPEG `f` is positioned at (owned by the caller, who fcloses it on
+// every path -- the longjmp below returns into THIS frame, never past the
+// caller) to tightly packed RGBA8. On a decode sets out->resultData (new u8[],
+// matching DeallocImage's delete[]), out->width and out->height; on any other
+// result touches nothing in `out`. `cmykNaive`: decode CMYK here even on Apple.
+static EMTJpegTurboResult MTLoadJpegTurbo(FILE *f, CImageData *out, bool cmykNaive)
+{
+	// SETJMP OWNERSHIP RULES. libjpeg reports a fatal error by calling
+	// error_exit, which longjmps back to the setjmp below. A longjmp runs no
+	// destructors and leaves modified non-volatile locals indeterminate, so:
+	//  1. Nothing with a destructor is in scope across the setjmp -- no
+	//     std::vector, std::string or smart pointer in this frame. The FILE* is
+	//     the caller's: it opened it, and it closes it on every path, after this
+	//     function returns (normally or from the handler).
+	//  2. cinfo is zeroed before the setjmp, and `created` is set only after
+	//     jpeg_create_decompress returns: the handler destroys the object only if
+	//     it was created, never a half-built one (an allocation failure inside
+	//     jpeg_create_decompress).
+	//  3. The output buffer is `u8 *volatile pixels`, assigned after allocation:
+	//     a non-volatile local modified between setjmp and longjmp is
+	//     INDETERMINATE after the jump (C17 7.13.2.1p3). The handler delete[]s
+	//     it. out->resultData is assigned only on success, after
+	//     jpeg_finish_decompress.
+	//  4. Allocation never throws out of CImageData::Load: new (std::nothrow), and
+	//     before allocating, a zero dimension, one above
+	//     kMTJpegTurboMaxDimension, or a w*h*4 that overflows size_t refuses
+	//     (a decline -> stb's chain, with its own limits).
+	//  5. jpeg_destroy_decompress runs on every path out, success included.
+	struct jpeg_decompress_struct cinfo;
+	struct jpeg_progress_mgr progress;
+	MTJpegDecodeErrorMgr jerr;
+	memset(&cinfo, 0, sizeof cinfo);
+	memset(&progress, 0, sizeof progress);
+	memset(&jerr, 0, sizeof jerr);
+	volatile bool created = false;
+	u8 *volatile pixels = NULL;
+
+	cinfo.err = jpeg_std_error(&jerr.pub);
+	jerr.pub.error_exit   = MTJpegDecodeErrorExit;
+	jerr.pub.emit_message = MTJpegDecodeEmitMessage;
+	progress.progress_monitor = MTJpegDecodeProgress;
+
+	if (setjmp(jerr.jump))
+	{
+		delete [] pixels;
+		if (created)
+			jpeg_destroy_decompress(&cinfo);
+		return kMTJpegTurboDeclined;
+	}
+
+	jpeg_create_decompress(&cinfo);
+	created = true;
+	cinfo.progress = &progress;
+	jpeg_stdio_src(&cinfo, f);
+	jpeg_read_header(&cinfo, TRUE);         // require_image: a tables-only stream is an error
+
+	// 12-bit (and 16-bit lossless) JPEGs: jpeg_read_scanlines is the 8-bit API.
+	bool cmyk = false;
+	bool ok = jerr.warnings == 0 && cinfo.data_precision == 8;
+	if (ok)
+	{
+		switch (cinfo.jpeg_color_space)
+		{
+			case JCS_GRAYSCALE:
+			case JCS_YCbCr:
+			case JCS_RGB:
+				cinfo.out_color_space = JCS_EXT_RGBA;
+				break;
+			case JCS_CMYK:
+			case JCS_YCCK:                    // libjpeg converts YCCK to CMYK itself
+#if defined(__APPLE__)
+				if (!cmykNaive)
+				{
+					// The platform decoder colour-manages it (see above).
+					jpeg_destroy_decompress(&cinfo);
+					return kMTJpegTurboCmykForPlatform;
+				}
+#else
+				(void)cmykNaive;
+#endif
+				cinfo.out_color_space = JCS_CMYK;
+				cmyk = true;
+				break;
+			default:
+				ok = false;
+				break;
+		}
+	}
+	if (ok)
+	{
+		jpeg_calc_output_dimensions(&cinfo);
+		const JDIMENSION w = cinfo.output_width, h = cinfo.output_height;
+		const uint64_t bytes = (uint64_t)w * (uint64_t)h * 4u;
+		if (w == 0 || h == 0)
+			ok = false;
+		else if (w > kMTJpegTurboMaxDimension || h > kMTJpegTurboMaxDimension || bytes > (uint64_t)SIZE_MAX)
+		{
+			gMTJpegTurboRefusedOversize.fetch_add(1, std::memory_order_relaxed);
+			ok = false;
+		}
+		else
+		{
+			pixels = new (std::nothrow) u8[(size_t)bytes];
+			ok = (pixels != NULL);
+		}
+	}
+	if (!ok)
+	{
+		delete [] pixels;
+		jpeg_destroy_decompress(&cinfo);
+		return kMTJpegTurboDeclined;
+	}
+
+	jpeg_start_decompress(&cinfo);            // a multi-scan file is absorbed here, under the scan limit
+	const size_t stride = (size_t)cinfo.output_width * 4;
+	if (cinfo.output_components != 4)        // both RGBA and CMYK are 4 bytes a pixel
+		ok = false;
+	while (ok && cinfo.output_scanline < cinfo.output_height)
+	{
+		// Up to 16 rows a call (the tallest iMCU row) straight into the image.
+		JSAMPROW rows[16];
+		const JDIMENSION left = cinfo.output_height - cinfo.output_scanline;
+		const JDIMENSION n = left < 16 ? left : 16;
+		for (JDIMENSION i = 0; i < n; i++)
+			rows[i] = (JSAMPROW)(pixels + (size_t)(cinfo.output_scanline + i) * stride);
+		if (jpeg_read_scanlines(&cinfo, rows, n) == 0)
+			ok = false;
+		if (jerr.warnings != 0)
+			ok = false;
+	}
+	if (ok)
+		jpeg_finish_decompress(&cinfo);
+	if (!ok || jerr.warnings != 0)
+	{
+		delete [] pixels;
+		jpeg_destroy_decompress(&cinfo);
+		return kMTJpegTurboDeclined;
+	}
+
+	if (cmyk)
+	{
+		// CMYK -> RGB in place, NAIVE (no colour management), one rule per
+		// convention:
+		//  - with an Adobe APP14 marker (saw_Adobe_marker) the file stores the
+		//    values INVERTED (Photoshop's convention; 255 = no ink), so on the
+		//    stored values R = C*K/255, G = M*K/255, B = Y*K/255;
+		//  - without it the values are plain ink amounts, so
+		//    R = (255-C)*(255-K)/255, likewise G from M and B from Y.
+		const bool adobeInverted = cinfo.saw_Adobe_marker != 0;
+		u8 *p = pixels;
+		const size_t count = (size_t)cinfo.output_width * cinfo.output_height;
+		for (size_t i = 0; i < count; i++, p += 4)
+		{
+			unsigned c = p[0], m = p[1], y = p[2], k = p[3];
+			if (!adobeInverted)
+			{
+				c = 255 - c; m = 255 - m; y = 255 - y; k = 255 - k;
+			}
+			p[0] = (u8)((c * k + 127) / 255);
+			p[1] = (u8)((m * k + 127) / 255);
+			p[2] = (u8)((y * k + 127) / 255);
+			p[3] = 255;
+		}
+	}
+
+	out->width      = (int)cinfo.output_width;
+	out->height     = (int)cinfo.output_height;
+	out->resultData = pixels;
+	jpeg_destroy_decompress(&cinfo);
+	gMTJpegTurboDecodes.fetch_add(1, std::memory_order_relaxed);
+	return cmyk ? kMTJpegTurboDecodedCmyk : kMTJpegTurboDecoded;
+}
+
+// TRUE when the file does not end in an EOI marker (FF D9) once trailing NUL
+// padding is dropped -- the missing-EOI test LoadRepairedJpeg applies, read
+// from the last 4 KB only. Used to flag a damaged CMYK file that the platform
+// decoder opened anyway. (A healthy JPEG with a trailer after its EOI -- a
+// motion photo's video -- would read as damaged here; CMYK motion photos do
+// not occur in practice.)
+static bool MTJpegTailLacksEoi(const char *fileName)
+{
+	FILE *f = SYS_FopenUtf8(fileName, "rb");
+	if (f == NULL)
+		return false;
+	u8 tail[4096];
+	size_t got = 0;
+	long len = -1;
+	if (fseek(f, 0, SEEK_END) == 0)
+		len = ftell(f);
+	if (len > 0)
+	{
+		const long take = len < (long)sizeof(tail) ? len : (long)sizeof(tail);
+		if (fseek(f, len - take, SEEK_SET) == 0)
+			got = fread(tail, 1, (size_t)take, f);
+	}
+	fclose(f);
+	while (got > 2 && tail[got - 1] == 0x00)
+		got--;
+	return !(got >= 2 && tail[got - 2] == 0xFF && tail[got - 1] == 0xD9);
+}
+
+// Load's entry to MTLoadJpegTurbo. The decoder reads through stdio from the
+// FILE* this function owns -- only as far as the JPEG's own EOI, so a motion
+// photo's trailing video is never read -- and this function fcloses it on
+// every path, after MTLoadJpegTurbo has returned (its setjmp handler returns
+// into its own frame, so no path skips the fclose). Only files that start
+// FF D8 FF reach libjpeg; anything else costs three bytes.
+static EMTJpegTurboResult MTLoadJpegTurboFile(const char *fileName, CImageData *out, bool cmykNaive)
+{
+	FILE *f = SYS_FopenUtf8(fileName, "rb");
+	if (f == NULL)
+		return kMTJpegTurboDeclined;
+	u8 sig[3] = { 0, 0, 0 };
+	if (fread(sig, 1, 3, f) != 3 || !MTIsJpegSignature(sig, 3) || fseek(f, 0, SEEK_SET) != 0)
+	{
+		fclose(f);
+		return kMTJpegTurboDeclined;
+	}
+	const bool naive = cmykNaive || gMTJpegTurboForceCmyk.load(std::memory_order_relaxed);
+	const EMTJpegTurboResult r = MTLoadJpegTurbo(f, out, naive);
+	fclose(f);
+	return r;
+}
+
 const char *CImageData::GetLoadError()
 {
 	return stbi_failure_reason();
@@ -3373,8 +3705,46 @@ bool CImageData::Load(const char *fileName, bool dealloc)
 	}
 
 	this->type = IMG_TYPE_RGBA;
-	this->resultData = stbi_load(fileName, &this->width, &this->height, NULL, 4);
-	if (this->resultData == NULL)
+	// JPEG first through libjpeg-turbo (MTLoadJpegTurbo, above): a clean decode
+	// sets resultData, so the stb / repair / platform-decoder chain below is
+	// skipped -- but NOT the ICC block at the end, which every successful decode
+	// must reach (an early return here would strip every tagged JPEG's
+	// profile). A decline (not a JPEG, a warning, 12-bit, too large) leaves
+	// resultData NULL and the chain runs exactly as before.
+	//
+	// CMYK / YCCK take their own route (cmykRoute): on Apple the platform
+	// decoder (colour-managed), with turbo's naive conversion if it fails; on
+	// other platforms turbo's naive conversion. stb refuses 4 components and the
+	// missing-EOI repair is stb's, so neither runs for them, and a healthy CMYK
+	// file is no longer flagged decodeWasRepaired.
+	const EMTJpegTurboResult turbo = MTLoadJpegTurboFile(fileName, this, false);
+	const bool cmykRoute = (turbo == kMTJpegTurboDecodedCmyk || turbo == kMTJpegTurboCmykForPlatform);
+	if (turbo == kMTJpegTurboCmykForPlatform)
+	{
+		if (LoadWithPlatformDecoder(fileName))
+		{
+			// ImageIO drew the CMYK into sRGB and recorded no profile. Say so:
+			// an UNTAGGED image is open to reinterpretation further down the
+			// colour pipeline (an EXIF ColorSpace / InteropIndex hint, the
+			// user's assumed-profile setting), and these pixels are sRGB.
+			if (this->iccProfile == NULL)
+			{
+				const std::vector<uint8_t> srgb = ICC_BuildSRGBProfileV2();
+				if (!srgb.empty())
+					SetIccProfile(srgb.data(), (u32)srgb.size());
+			}
+			// ImageIO decodes a truncated file without complaint (it reports
+			// the source complete), so the damage is read from the file the
+			// way the repair path reads it: no EOI at the end.
+			if (MTJpegTailLacksEoi(fileName))
+				decodeWasRepaired = true;
+		}
+		else
+			(void)MTLoadJpegTurboFile(fileName, this, true);
+	}
+	else if (turbo == kMTJpegTurboDeclined)
+		this->resultData = stbi_load(fileName, &this->width, &this->height, NULL, 4);
+	if (this->resultData == NULL && !cmykRoute)
 	{
 		// SALVAGE PASS. stb_image is strict about the trailing EOI marker: it
 		// decodes the entire image, then throws the result away with
@@ -3396,7 +3766,7 @@ bool CImageData::Load(const char *fileName, bool dealloc)
 			     fileName, this->width, this->height);
 		}
 	}
-	if (this->resultData == NULL)
+	if (this->resultData == NULL && !cmykRoute)
 	{
 		// LAST RESORT: the operating system's own decoder. stb_image aborts on
 		// the first bad symbol; ImageIO and WIC decode up to the damage and
@@ -3415,10 +3785,14 @@ bool CImageData::Load(const char *fileName, bool dealloc)
 	{
 		LOGError("CImageData::Load: %s failed", fileName);
 	}
-	else
+	else if (!cmykRoute)
 	{
-		// stb_image discards every byte of metadata, so the profile needs its
-		// own pass over the file. ReadFileHeader, not ReadFile: this runs on
+		// stb_image and the turbo path both discard every byte of metadata, so
+		// the profile needs its own pass over the file. NOT for a CMYK file:
+		// its pixels are RGB now, so its embedded CMYK profile no longer
+		// describes them -- the CMYK route above tags ImageIO's output with
+		// the built-in sRGB profile (what it drew into), and the naive
+		// conversion's output stays untagged. ReadFileHeader, not ReadFile: this runs on
 		// the decode workers for every JPEG/PNG/BMP, and ReadFile would read up
 		// to 16 MB and build tag strings we immediately throw away. 128 KB is
 		// enough -- APP2 precedes SOS and iCCP precedes IDAT by spec.
@@ -4862,6 +5236,10 @@ CImageData *CImageData::GetFromByteBuffer(CByteBuffer *byteBuffer)
 	}
 	else if (compressionType == GFX_COMPRESSION_TYPE_JPEG)
 	{
+		// stb_image here, not libjpeg-turbo, deliberately: this and the
+		// JPEG_ZLIB arm below decode the engine's OWN serialised buffers in
+		// memory (CByteBuffer), not photographs from disk -- the turbo path is
+		// CImageData::Load's (MTLoadJpegTurboFile).
 		u32 compressedSize = byteBuffer->GetU32();
 		u8 *compressedData = (u8*)malloc( compressedSize );
 		byteBuffer->GetBytes(compressedData, compressedSize);

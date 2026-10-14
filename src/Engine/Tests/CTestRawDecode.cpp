@@ -21,6 +21,7 @@
 
 #ifdef __APPLE__
 #include <mach/mach.h>
+#include <malloc/malloc.h>   // malloc_zone_pressure_relief (CTestRawBudget)
 // CURRENT physical footprint (not lifetime peak): ru_maxrss is useless
 // in-suite because the app's cache tests push the lifetime peak past this
 // decode's whole demand long before this test runs (verified: the delta
@@ -1021,6 +1022,13 @@ void CTestRawBudget::Run(ITestCallback *callback)
 	long long peakDeltaMeasured = -1;
 #ifdef __APPLE__
 	{
+		// The footprint's DELTA is the measure, so the allocator must not be
+		// holding freed memory the decode can take back without growing it:
+		// an earlier test in the same process that developed a 24 Mpx RAW
+		// left hundreds of MB cached, and the decode measured a 0.8 MB delta
+		// against a 394 MB estimate (the sanity lower bound failed). Returned
+		// to the system first, the delta is the decode's own again.
+		malloc_zone_pressure_relief(nullptr, 0);
 		long long before = RawCurrentFootprintBytes();
 		std::atomic<bool> done(false);
 		std::atomic<long long> maxSeen(before);

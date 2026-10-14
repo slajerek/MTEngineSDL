@@ -85,6 +85,22 @@ void JPEGWriter::error_exit() {
     throw std::runtime_error("libjpeg error: " + warningMsg);
 }
 
+#define MT_JPEG_STR2(x) #x
+#define MT_JPEG_STR(x) MT_JPEG_STR2(x)
+
+const char* JPEGWriter::HeaderVersion() {
+    // LIBJPEG_TURBO_VERSION is a bare token in jconfig.h (3.2.0, not "3.2.0").
+    // MT_jpeglib.h #errors on any header that is not our turbo, so the macro exists.
+    return "libjpeg-turbo " MT_JPEG_STR(LIBJPEG_TURBO_VERSION);
+}
+
+std::string JPEGWriter::LinkedLibraryCopyright() {
+    struct jpeg_error_mgr err;
+    jpeg_std_error(&err);                 // the message table lives in the LINKED library
+    return (err.jpeg_message_table != NULL && JMSG_COPYRIGHT <= err.last_jpeg_message)
+         ? std::string(err.jpeg_message_table[JMSG_COPYRIGHT]) : std::string();
+}
+
 void JPEGWriter::output_message() {
     
     // Use the default routine to generate the message.

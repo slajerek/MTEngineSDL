@@ -7,6 +7,7 @@
 #include "VID_Main.h"
 #include "SYS_DefaultConfig.h"
 #include "CMTNativeMenuBarWin32.h"
+#include "CMTNativeMenuBarImGui.h"
 #include "CGuiMain.h"
 #include <timeapi.h>
 #include <Windows.h>
@@ -309,6 +310,18 @@ void PLATFORM_SetThreadName(const char *name)
 
 void PLATFORM_UpdateMenus()
 {
+	switch (MT_MenuBarKindFor(SYS_GetMenuBarMode(), gHeadlessMode))
+	{
+		case EMTMenuBarKind::None:
+			return;
+		case EMTMenuBarKind::ImGui:
+			// No CMTNativeMenuBarWin32 is constructed, so no HMENU is attached.
+			guiMain->SetNativeMenuBar(new CMTNativeMenuBarImGui());
+			return;
+		case EMTMenuBarKind::Native:
+			break;
+	}
+
 	SDL_Window *sdlWindow = VID_GetMainSDLWindow();
 	if (!sdlWindow) return;
 

@@ -1,6 +1,8 @@
 #include "ICC_SRGBProfile.h"
 
 #include <cstring>
+#include <algorithm>
+#include <cmath>
 
 // Minimal ICC v2 matrix/TRC sRGB profile builder. Portable by construction:
 // pure <cstdint>/<vector>/<cstring> byte assembly, no platform #ifdefs, no
@@ -123,6 +125,20 @@ namespace
         Pad4(t);
         return t;
     }
+
+    // curveType ("curv") with a TABLE: count u16 entries mapping [0,1] onto
+    // [0,1], interpolated linearly by every CMM. ICC v2-legal (a 'para' tag is
+    // a v4 type), so it sits in these v2.1 profiles without a version change.
+    std::vector<uint8_t> BuildCurveTableTag(const std::vector<uint16_t> &table)
+    {
+        std::vector<uint8_t> t;
+        PutSig(t, "curv");
+        PutU32(t, 0); // reserved
+        PutU32(t, (uint32_t)table.size());
+        for (uint16_t v : table) PutU16(t, v);
+        Pad4(t);
+        return t;
+    }
 }
 
 // Both built-in profiles are the same minimal matrix/TRC shape and differ only
@@ -130,11 +146,11 @@ namespace
 // sRGB caller passes exactly the values it used before this was factored out,
 // which keeps its bytes -- and therefore its content digest, which the export
 // path and the transform cache both depend on -- unchanged.
-static std::vector<uint8_t> BuildMatrixTrcProfile(const char *description,
-                                                  double rX, double rY, double rZ,
-                                                  double gX, double gY, double gZ,
-                                                  double bX, double bY, double bZ,
-                                                  uint16_t gammaU8Fixed8)
+static std::vector<uint8_t> BuildMatrixTrcProfileWithCurve(const char *description,
+                                                           double rX, double rY, double rZ,
+                                                           double gX, double gY, double gZ,
+                                                           double bX, double bY, double bZ,
+                                                           const std::vector<uint8_t> &curvTag)
 {
     // ---------------------------------------------------------------- tags
     // Built once; rTRC/gTRC/bTRC all reference the SAME curv blob (minimal
@@ -144,7 +160,6 @@ static std::vector<uint8_t> BuildMatrixTrcProfile(const char *description,
     const std::vector<uint8_t> rXYZTag = BuildXYZTag(rX, rY, rZ);
     const std::vector<uint8_t> gXYZTag = BuildXYZTag(gX, gY, gZ);
     const std::vector<uint8_t> bXYZTag = BuildXYZTag(bX, bY, bZ);
-    const std::vector<uint8_t> curvTag = BuildCurveTag(gammaU8Fixed8);
     const std::vector<uint8_t> cprtTag = BuildTextTag("No copyright, use freely");
 
     struct TagRef { const char *sig; const std::vector<uint8_t> *data; };
@@ -243,6 +258,16 @@ static std::vector<uint8_t> BuildMatrixTrcProfile(const char *description,
     return p;
 }
 
+static std::vector<uint8_t> BuildMatrixTrcProfile(const char *description,
+                                                  double rX, double rY, double rZ,
+                                                  double gX, double gY, double gZ,
+                                                  double bX, double bY, double bZ,
+                                                  uint16_t gammaU8Fixed8)
+{
+    return BuildMatrixTrcProfileWithCurve(description, rX, rY, rZ, gX, gY, gZ, bX, bY, bZ,
+                                          BuildCurveTag(gammaU8Fixed8));
+}
+
 
 std::vector<uint8_t> ICC_BuildSRGBProfileV2()
 {
@@ -306,6 +331,30 @@ std::vector<uint8_t> ICC_BuildDisplayP3ProfileV2()
                                  0.29198, 0.69225,  0.04189,
                                  0.15710, 0.06657,  0.78407,
                                  0x0233);
+}
+
+std::vector<uint8_t> ICC_BuildDisplayP3SrgbCurveProfileV2()
+{
+    // P3b: Display P3 with its REAL transfer function -- the IEC 61966-2-1 sRGB
+    // piecewise curve as a 1024-entry table -- for the BASE image of a gain-map
+    // JPEG. libultrahdr linearises the base with exactly this curve when it
+    // builds the map and again when it applies it ("We are assuming the SDR
+    // input is always sRGB transfer", jpegr.cpp), as does every ISO 21496-1
+    // reader that trusts the base's ICC; a base in the single-gamma 0x0233
+    // approximation above makes every shadow pixel need a gain of several
+    // stops. Colorants: exactly ICC_BuildDisplayP3ProfileV2's.
+    std::vector<uint16_t> table(1024);
+    for (size_t i = 0; i < table.size(); i++)
+    {
+        const double v = (double)i / (double)(table.size() - 1);
+        const double lin = (v <= 0.04045) ? v / 12.92 : std::pow((v + 0.055) / 1.055, 2.4);
+        table[i] = (uint16_t)std::lround(std::min(1.0, std::max(0.0, lin)) * 65535.0);
+    }
+    return BuildMatrixTrcProfileWithCurve("Display P3 (sRGB curve)",
+                                          0.51512, 0.24120, -0.00105,
+                                          0.29198, 0.69225,  0.04189,
+                                          0.15710, 0.06657,  0.78407,
+                                          BuildCurveTableTag(table));
 }
 
 std::vector<uint8_t> ICC_BuildRec709ProfileV2()

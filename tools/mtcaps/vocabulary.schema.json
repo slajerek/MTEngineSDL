@@ -33,6 +33,14 @@
           "pattern": "^MT_(ENABLE|CAMERA)_[A-Z0-9_]*$",
           "description": "Optional: the single MT_ENABLE_* flag that gates this dependency, for capabilities that enable several flags (the image-codec bundle). Must be in the owning capability's `enables`. Absent means the capability itself is the gate. The commercial_safe deny-list consults it so a flag forced 0 (libheif outside private builds) never errors."
         },
+        "notice": {
+          "type": "string",
+          "description": "Optional: a NOTICE the licence requires to be reproduced (Apache-2.0 #4(d)); emit_licenses prints it verbatim into LICENSES.txt. P3b: libultrahdr's Adobe gain-map notice."
+        },
+        "licence_text": {
+          "type": "string",
+          "description": "Optional: a path, relative to the engine root, to a committed text file emit_licenses reproduces VERBATIM in LICENSES.txt (FULL LICENCE TEXTS). For licences whose terms must travel with a binary distribution (libjpeg-turbo: BSD-3-Clause conditions and disclaimer, the IJG acknowledgement). A missing file fails the resolve."
+        },
         "size_mb": { "type": "number" },
         "system_package": { "type": "object" }
       },

@@ -95,16 +95,21 @@ bool CAudioConverterApple::Init(const AudioStreamBasicDescription &inASBD,
 		return false;
 	}
 
-	// BEST-EFFORT, AND SILENTLY SO. Empirically, on the OS version this was
-	// developed against, this call rejects even a textbook-correct AAC-LC
-	// cookie with kAudioCodecUnsupportedFormatError ('!dat') -- verified with
-	// a known-good reference cookie, not specific to this project's fixtures
-	// -- while decode via the explicit ASBD works fine regardless. So a
-	// failure here is non-fatal by design and is not logged as a warning.
+	// NON-FATAL, BUT NOT SILENT. For AAC the cookie is what carries SBR/PS
+	// (CAudioDecoderAACApple builds it as an ES_Descriptor via
+	// AacBuildEsdsCookie). It used to be passed as a bare ASC, which
+	// AudioToolbox rejects with kAudioCodecUnsupportedFormatError ('!dat');
+	// that rejection was mistaken for "the cookie never works" and silenced,
+	// and every HE-AAC stream decoded ~1 packet in 70 (2026-10-13). A
+	// rejection now is a real fault worth a log line; decode is still
+	// attempted from the ASBD alone.
 	if (cookie != NULL && cookieSize > 0)
 	{
-		AudioConverterSetProperty(converter, kAudioConverterDecompressionMagicCookie,
-								   (UInt32)cookieSize, cookie);
+		OSStatus cookieStatus = AudioConverterSetProperty(converter, kAudioConverterDecompressionMagicCookie,
+														   (UInt32)cookieSize, cookie);
+		if (cookieStatus != noErr)
+			LOGWarning("CAudioConverterApple::Init: magic cookie rejected (OSStatus %d) -- decoding from the ASBD alone",
+					   (int)cookieStatus);
 	}
 
 	AudioStreamBasicDescription actualOut;

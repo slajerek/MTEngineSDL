@@ -25,7 +25,8 @@ void CAudioDecoderAACApple::Teardown()
 }
 
 // ============================================================================
-// Init -- AudioSpecificConfig -> AudioConverter (input MPEG4AAC, output LPCM)
+// Init -- AudioSpecificConfig -> ES_Descriptor cookie -> AudioConverter (input
+// whatever AAC layer AudioToolbox reports for the cookie, output LPCM)
 // ============================================================================
 bool CAudioDecoderAACApple::Init(const u8 *asc, int ascSize)
 {
@@ -45,29 +46,80 @@ bool CAudioDecoderAACApple::Init(const u8 *asc, int ascSize)
 		return false;
 	}
 
-	// Declare the SBR-extended rate to AudioConverterNew() whenever the ASC
-	// explicitly signals SBR presence (every HE-AAC fixture this project
-	// ships uses the explicit "backward compatible" signaling form).
-	// mFramesPerPacket is always 1024 regardless -- that's the AAC frame's
-	// encoded samples-per-packet count; SBR's 2x sample doubling happens
-	// inside the converter's decode, not in this declared value (verified
-	// empirically: AudioConverterNew rejects mFramesPerPacket=2048 outright
-	// with kAudioConverterErr_UnspecifiedError, but accepts 1024 combined
-	// with the SBR-extended mSampleRate just fine).
+	// THE COOKIE IS WHAT TELLS AUDIOTOOLBOX ABOUT SBR/PS, so it must be in the
+	// form AudioToolbox accepts: an ES_Descriptor (AacBuildEsdsCookie), not
+	// the bare ASC. Until 2026-10-13 the bare ASC was passed, AudioToolbox
+	// rejected it ('!dat'), and the converter -- told only "AAC, 1024
+	// frames/packet" -- emitted output for ~1 packet in 70 on every HE-AAC
+	// stream: audibly scrambled, while a "PCM is non-empty" test stayed green.
+	// Measured on a real 44.1 kHz direct-signaled HE-AAC mp4: 3 of 216
+	// packets decoded; with this cookie, 216 of 216 at 2048 frames each,
+	// correlation 1.0000 against FFmpeg's decode.
+	std::vector<u8> cookie = AacBuildEsdsCookie(asc, ascSize);
+
+	// Let AudioToolbox describe the stream from the cookie. FormatList
+	// returns one entry per decodable layer, richest first (HE-AAC v2 'aacp'
+	// > HE-AAC 'aach' > the AAC-LC core 'aac '), each with ITS rate,
+	// channels and frames-per-packet -- e.g. 'aacp' 44100 Hz stereo 2048 for
+	// a mono-core 22050 Hz PS stream. This is the documented route (FormatInfo
+	// on the cookie, then FormatList with an AudioFormatInfo specifier).
 	AudioStreamBasicDescription inASBD;
 	memset(&inASBD, 0, sizeof(inASBD));
-	inASBD.mFormatID = kAudioFormatMPEG4AAC;
-	inASBD.mChannelsPerFrame = (UInt32)parsed.channels;
-	inASBD.mFramesPerPacket = 1024;
-	inASBD.mSampleRate = (parsed.sbrPresent && parsed.sbrSampleRate > 0) ? parsed.sbrSampleRate : parsed.coreSampleRate;
+	bool described = false;
+	if (!cookie.empty())
+	{
+		inASBD.mFormatID = kAudioFormatMPEG4AAC;
+		UInt32 size = sizeof(inASBD);
+		if (AudioFormatGetProperty(kAudioFormatProperty_FormatInfo, (UInt32)cookie.size(), cookie.data(),
+								   &size, &inASBD) == noErr)
+		{
+			AudioFormatInfo info;
+			memset(&info, 0, sizeof(info));
+			info.mASBD = inASBD;
+			info.mMagicCookie = cookie.data();
+			info.mMagicCookieSize = (UInt32)cookie.size();
 
-	inputChannels = parsed.channels;
+			AudioFormatListItem items[8];
+			UInt32 listSize = sizeof(items);
+			if (AudioFormatGetProperty(kAudioFormatProperty_FormatList, sizeof(info), &info,
+									   &listSize, items) == noErr &&
+				listSize >= sizeof(AudioFormatListItem) &&
+				items[0].mASBD.mSampleRate > 0.0 && items[0].mASBD.mChannelsPerFrame > 0)
+			{
+				inASBD = items[0].mASBD;
+				described = true;
+			}
+		}
+	}
 
-	// The converter, its LPCM output format, the best-effort magic cookie and
-	// the read-back of the ACTUAL negotiated output all live in
-	// CAudioConverterApple now -- see its .cpp for why the cookie is
-	// best-effort and why the output format is learned rather than assumed.
-	if (!converter.Init(inASBD, asc, ascSize))
+	// Fallback: describe it by hand from our own parse. The HE format IDs
+	// matter -- 'aac ' at the SBR rate with 1024 frames/packet is exactly the
+	// broken configuration above. HE-AAC (v1 and v2) is 2048 frames/packet at
+	// the SBR rate; PS decodes the mono core to stereo.
+	if (!described)
+	{
+		memset(&inASBD, 0, sizeof(inASBD));
+		if (parsed.sbrPresent && parsed.sbrSampleRate > 0)
+		{
+			inASBD.mFormatID = parsed.psPresent ? kAudioFormatMPEG4AAC_HE_V2 : kAudioFormatMPEG4AAC_HE;
+			inASBD.mChannelsPerFrame = parsed.psPresent ? 2 : (UInt32)parsed.channels;
+			inASBD.mFramesPerPacket = 2048;
+			inASBD.mSampleRate = parsed.sbrSampleRate;
+		}
+		else
+		{
+			inASBD.mFormatID = kAudioFormatMPEG4AAC;
+			inASBD.mChannelsPerFrame = (UInt32)parsed.channels;
+			inASBD.mFramesPerPacket = 1024;
+			inASBD.mSampleRate = parsed.coreSampleRate;
+		}
+	}
+
+	inputChannels = (int)inASBD.mChannelsPerFrame;
+
+	// The converter, its LPCM output format, the cookie and the read-back of
+	// the ACTUAL negotiated output all live in CAudioConverterApple.
+	if (!converter.Init(inASBD, cookie.empty() ? nullptr : cookie.data(), (int)cookie.size()))
 	{
 		errorReason = converter.GetErrorReason();
 		return false;

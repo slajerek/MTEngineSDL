@@ -10,6 +10,7 @@
 class CSlrImage;
 class CRenderTarget;
 class CMaskedTileShader;
+class CGainMapShader;
 class CVideoYUVConverter;
 class CRenderShader;
 class CRenderShaderCustomFragment;
@@ -237,6 +238,12 @@ public:
 
 	virtual CRenderTarget *CreateRenderTarget() { return NULL; }
 	virtual CMaskedTileShader *CreateMaskedTileShader(bool queued) { return NULL; }
+	// Option C (gain-map resident HDR): the per-draw gain-map shader. NULL = this
+	// backend has none (OpenGL, which never takes the arm; D3D11 until its port),
+	// and a gain-mapped photo then takes the float arm. A non-NULL shader has
+	// already compiled (synchronously); IsUsable() is the final answer. Main/render
+	// thread only; reached through VID_GainMapShaderUsable().
+	virtual CGainMapShader *CreateGainMapShader() { return NULL; }
 
 	// A shader that fills its quad with a constant colour, ignoring the texture.
 	//

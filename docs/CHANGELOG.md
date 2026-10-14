@@ -55,6 +55,98 @@ changes, so the copy phase recreates it with fresh inodes, keyed on
 `MT_CAPS_LIBS_DIR` -- the path that carries the caps hash. macOS only: Linux and
 Windows embed no signed dylibs this way.
 
+**Pinch gestures reach views again.** SDL 3.0 dropped SDL2's gesture
+recogniser and the engine said so in a comment, but SDL 3.4 brought pinch back
+as `SDL_EVENT_PINCH_BEGIN / UPDATE / END` -- on macOS the trackpad magnify
+gesture -- and `VID_ProcessEvents` was discarding them. They now go through
+`CGuiMain::DoPinchBegin / DoPinchUpdate / DoPinchEnd` into three new
+`CGuiView` virtuals, `DoPinchBegin / DoPinchZoom / DoPinchEnd`. The event has
+no position, so the anchor is the cursor. BEGIN picks the view exactly like the
+wheel; a view that returns `true` owns the gesture until END, wherever the
+cursor goes. `scale` is the multiplicative change since the previous update;
+non-finite or non-positive factors are dropped. Additive: the legacy
+`InitZoom / DoZoomBy` pair is unchanged. `CGuiMain::FindTopmostViewAt()` is
+the wheel's front-to-back view lookup, extracted so both share it.
+
+SDL 3.4.14 is inconsistent about `scale`: Cocoa, UIKit and Android send the
+change since the previous update, Wayland and X11 (XI 2.4) the total since
+BEGIN. `VID_PinchUpdateFactor()` normalises to the former (chosen per gesture
+from `SDL_GetCurrentVideoDriver()`), so a Linux pinch does not compound its own
+total into the zoom limit. The Linux path is unverified on hardware.
+
+`RemoveViewSkippingLayout()` drops a removed view's pinch latch under the GUI
+mutex, together with the view-list removal, rather than just before taking it.
+
+**Trackpad double-tap-and-drag reaches views.** The macOS gesture -- tap, then
+tap again and keep the finger down; moving drags, lifting ends -- is
+recognised from the pad's raw `SDL_EVENT_FINGER_*` stream by the pure
+`VID_TapDragOnFinger()` (VID_Main.h) and routed like a pinch:
+`CGuiMain::DoTapDragBegin / DoTapDragEnd` into two new `CGuiView` virtuals,
+`DoTapDragBegin / DoTapDragEnd`, latched to the view BEGIN found. There is no
+move callback: the pointer follows the finger, so the motion is the ordinary
+`DoNotTouchedMove` stream. A second finger ends it. It needs
+`SDL_HINT_TRACKPAD_IS_TOUCH_ONLY=1`, now set in `SYS_Startup` before
+`SDL_Init`: without it SDL 3 tags pad fingers `SDL_MOUSE_TOUCHID` and drops
+them. On Cocoa the hint changes only that touch id -- mouse events still come
+from the mouse handlers -- but it is set for every app, so a real-trackpad
+check is owed. Windows exposes no touchpad fingers through SDL.
+
+**A view can fill the application window without the OS window going
+fullscreen.** `SetFullScreenMode::ViewEnterWindowFill` runs the same path as
+`ViewEnterFullScreen` -- layout stored, every other view hidden, the view sized
+to the main viewport's work area, black background, `IsViewFullScreen()` true
+(so an app that skips its main menu bar in fullscreen skips it here too) --
+but leaves the OS window as it is. It is left with the ordinary
+`ViewLeaveFullScreen`, which does not touch the OS window either.
+`CGuiMain::IsViewFullScreenInWindow()` tells the two apart. Additive: no
+existing mode changed.
+
+**An app chooses its menu-bar backend.** `SYS_SetMenuBarMode(EMTMenuBarMode)`
+(`CMTNativeMenuBar.h`), called in `MT_PreInit()`, is read by
+`PLATFORM_UpdateMenus` when the bar is created. `Native` is the default and
+keeps today's behaviour: the native bar on macOS and Windows, the ImGui bar on
+Linux, no bar on headless macOS. `ImGui` puts `CMTNativeMenuBarImGui` on every
+platform, headless included, and attaches no `HMENU` on Windows, so the window
+has no empty menu strip. `None` creates no bar. `CTestMenuBarMode` checks the
+created bar against the mode; `docs/menu-bar.md` has the table.
+
+**Builds without the test engine compile again.** `MT_CAP_TEST_ENGINE=0` --
+and so every commercial build, which forces it off -- failed at
+`VID_Main.cpp`: the trackpad tap-drag code read `suppressInput`, which exists
+only when imgui_test_engine is compiled in. The check is now guarded like every
+other use of it.
+
+**libjpeg-turbo 3.2.0 is the engine's one libjpeg.** `build-jpeg.*` (an
+`mtcaps` unit) builds it from a SHA-256-pinned release archive before the
+codecs, on every configuration, and it is merged into both the full and the
+stub codec bundle. jpeg-9a leaves every compile and header search (it stays
+in `other/lib/jpeg-9a`); every `jpeglib.h` goes through `MT_jpeglib.h`, which
+stops the build on any other libjpeg. JPEG decoding goes through it, with stb
+as the fallback for warnings and 12-bit files: a browse decode went from
+173-202 ms to 135-145 ms p50. CMYK JPEGs now open, colour-managed by ImageIO on
+Apple.
+
+**Ultra HDR gain-map JPEGs.** libultrahdr 2.0.2 joins the image-codec bundle
+(`MT_ENABLE_LIBULTRAHDR`). `MT_UltraHdr` encodes and probes gain-map JPEGs,
+and `CImageData::LoadUltraHdrLinear` decodes one with its map applied, taking
+an optional output transform fused into its single copy pass.
+`LoadUltraHdrBaseAndMap` instead keeps the 8-bit base and the 8-bit map
+separate, and on Metal a per-draw gain-map shader applies the map at draw
+time. The main pane renders a one-time composite into a cached RGBA16F target,
+so later frames cost what a float texture costs. `MT_GainMapEvaluate` is the
+shader's exact CPU twin.
+
+**Smaller additions.** `BINDING_MODE_BIND_FREE_IMAGEDATA` binds an image and
+frees its CPU copy once the texture exists. `SYS_GetCacheDir()` and
+`CImageData::HasGainMap()` are new. `CDevelopChain::ExecuteOpRange` runs one
+pointwise op over a pixel sub-range. `SRawDecodeResult` reports the embedded
+preview's size. `MT_IMGUI_TEST_FILTER` narrows an imgui_test_engine run (see
+`docs/testing.md`). Every build driver ends with
+`=== Built binary: <abs path> (<Config>, <mtime>) ===`, so a stale binary run
+from another place shows as two different paths. HE-AAC on Apple decoded about
+one packet in seventy and played scrambled; it now decodes in full.
+`CDcpProfile::ReadFileTags` reads the head of a profile instead of all of it.
+
 ## 3.21.21 — development
 
 **The Windows x64 build with `MT_CAP_YOLO=1` had never completed, and five

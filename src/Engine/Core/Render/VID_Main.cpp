@@ -14,9 +14,12 @@
 #include "SYS_Main.h"
 #include "SYS_DefaultConfig.h"
 #include "SYS_CommandLine.h"   // sysCommandLineArguments (--render-backend, --hdr)
+#include <cmath>
+#include <algorithm>
 #include <cstring>
 #include "MT_VERSION.h"
 #include "VID_ImageBinding.h"
+#include "VID_GainMapDraw.h"   // VID_GainMapCompositeFrameTick (option C Task 3c)
 #include <SDL3/SDL_keyboard.h>
 #include "SYS_FileSystem.h"
 #include "SYS_Platform.h"
@@ -515,6 +518,10 @@ void VID_Render()
 	// ******************************RENDER
 	
 	VID_BindImages();
+	// Option C Task 3c: release the textures of gain-map composites whose image was
+	// deallocated or destroyed (above, or on another thread) -- before this frame
+	// records a single draw.
+	VID_GainMapCompositeFrameTick();
 	
 	gCurrentFrameTime = VID_GetTickCount();
 	gCurrentFrameNumber++;
@@ -697,6 +704,95 @@ volatile bool mtEventLoopRunning = false;
 // Workaround for a Bug in SDL2, SDL_CaptureMouse does not work since 2.0.22, let's do our own mouse move events
 static int prevGlobalMousePosX = 0;
 static int prevGlobalMousePosY = 0;
+
+float VID_PinchUpdateFactor(float sdlScale, bool cumulative, float *runningTotal)
+{
+	if (!cumulative)
+		return sdlScale;
+	if (!std::isfinite(sdlScale) || sdlScale <= 0.0f || !(*runningTotal > 0.0f))
+		return 0.0f;
+	const float factor = sdlScale / *runningTotal;
+	*runningTotal = sdlScale;
+	return factor;
+}
+
+// Per-gesture state for VID_PinchUpdateFactor; set on every BEGIN.
+static bool  vidPinchCumulative = false;
+static float vidPinchTotal      = 1.0f;
+
+VID_TapDragAction VID_TapDragOnFinger(VID_TapDragState *st, VID_TapDragPhase phase,
+                                      float x, float y, double tSec)
+{
+	switch (phase)
+	{
+		case VID_TapDragFingerDown:
+		{
+			st->fingers++;
+			if (st->fingers >= 2)
+			{
+				// Scroll, pinch, rotate: never part of a tap or a tap-drag.
+				// Dropping downT is what keeps the press from ending as a tap.
+				st->tapUpT = -1.0;
+				st->downT = -1.0;
+				if (st->dragging)
+				{
+					st->dragging = false;
+					return VID_TapDragEnd;
+				}
+				return VID_TapDragNone;
+			}
+			st->downT = tSec;
+			st->downX = x;
+			st->downY = y;
+			st->maxTravel = 0.0f;
+			if (st->tapUpT >= 0.0
+				&& tSec - st->tapUpT <= kVID_TapDragSecondPressMaxSec
+				&& std::hypot(x - st->tapX, y - st->tapY) <= kVID_TapDragSecondPressMaxDist)
+			{
+				st->tapUpT = -1.0;
+				st->dragging = true;
+				return VID_TapDragBegin;
+			}
+			st->tapUpT = -1.0;
+			return VID_TapDragNone;
+		}
+		case VID_TapDragFingerMotion:
+			if (st->fingers == 1 && st->downT >= 0.0)
+				st->maxTravel = std::max(st->maxTravel, std::hypot(x - st->downX, y - st->downY));
+			return VID_TapDragNone;
+		case VID_TapDragFingerUp:
+		case VID_TapDragFingerCanceled:
+		{
+			if (st->fingers > 0)
+				st->fingers--;
+			VID_TapDragAction action = VID_TapDragNone;
+			if (st->dragging)
+			{
+				st->dragging = false;
+				st->tapUpT = -1.0;
+				action = VID_TapDragEnd;
+			}
+			else if (st->fingers == 0)
+			{
+				const bool isTap = phase == VID_TapDragFingerUp
+					&& st->downT >= 0.0
+					&& tSec - st->downT <= kVID_TapDragTapMaxSec
+					&& std::max(st->maxTravel, std::hypot(x - st->downX, y - st->downY))
+					       <= kVID_TapDragTapMaxTravel;
+				st->tapUpT = isTap ? tSec : -1.0;
+				st->tapX = st->downX;
+				st->tapY = st->downY;
+			}
+			if (st->fingers == 0)
+				st->downT = -1.0;
+			return action;
+		}
+	}
+	return VID_TapDragNone;
+}
+
+// The pad's tap-drag recogniser; one per process, the pad is one device.
+static VID_TapDragState vidTapDrag;
 
 void VID_ProcessEvents()
 {
@@ -1066,37 +1162,75 @@ void VID_ProcessEvents()
 			free(droppedPath);
 		}
 		
-		// TODO: bug? for some reason these do not work on macOS. is this implemented at all?
-	// TODO: copy paste old MTEngine code with proper implementation of the events queue
-//	https://discourse.libsdl.org/t/events-dont-fire-sdl-multigesture-sdl-mousewheel-osx-10-14-6/27900
-		else if (event.type == SDL_EVENT_FINGER_DOWN)
+		// SDL 3.4 pinch (Cocoa magnifyWithEvent:, Wayland/X11 gestures, iOS/
+		// Android). The event has NO position and Cocoa sends windowID 0, so
+		// the anchor is the cursor -- what Preview and Photos do. Wayland and
+		// X11 send scale as a total since BEGIN, the rest as the change since
+		// the previous UPDATE: VID_PinchUpdateFactor makes it the latter.
+		else if (event.type == SDL_EVENT_PINCH_BEGIN)
 		{
-			LOGD("SDL_EVENT_FINGER_DOWN X=%g Y=%g ID=%lld dx=%g dy=%g",
-				 event.tfinger.x, event.tfinger.y,
-				 event.tfinger.fingerID,
-				 event.tfinger.dx, event.tfinger.dy);
+			const char *driver = SDL_GetCurrentVideoDriver();
+			vidPinchCumulative = driver != NULL
+				&& (strcmp(driver, "wayland") == 0 || strcmp(driver, "x11") == 0);
+			vidPinchTotal = 1.0f;   // reset even when suppressed: the next gesture starts clean
+			LOGI("SDL_EVENT_PINCH_BEGIN driver=%s cumulative=%d", driver ? driver : "?", (int)vidPinchCumulative);
+#if MT_ENABLE_IMGUI_TEST_ENGINE
+			if (!suppressInput)
+#endif
+			guiMain->DoPinchBegin(guiMain->mousePosX, guiMain->mousePosY);
 		}
-		else if (event.type == SDL_EVENT_FINGER_UP)
+		else if (event.type == SDL_EVENT_PINCH_UPDATE)
 		{
-			LOGD("SDL_EVENT_FINGER_UP X=%g Y=%g ID=%lld dx=%g dy=%g",
-				 event.tfinger.x, event.tfinger.y,
-				 event.tfinger.fingerID,
-				 event.tfinger.dx, event.tfinger.dy);
+#if MT_ENABLE_IMGUI_TEST_ENGINE
+			if (!suppressInput)
+#endif
+			guiMain->DoPinchUpdate(guiMain->mousePosX, guiMain->mousePosY,
+			                       VID_PinchUpdateFactor(event.pinch.scale, vidPinchCumulative, &vidPinchTotal));
 		}
-		else if (event.type == SDL_EVENT_FINGER_MOTION)
+		else if (event.type == SDL_EVENT_PINCH_END)
 		{
-			LOGD("SDL_EVENT_FINGER_MOTION X=%g Y=%g ID=%lld dx=%g dy=%g",
-				 event.tfinger.x, event.tfinger.y,
-				 event.tfinger.fingerID,
-				 event.tfinger.dx, event.tfinger.dy);
+			// Never gated: a latch must not outlive its gesture.
+			LOGI("SDL_EVENT_PINCH_END");
+			guiMain->DoPinchEnd(guiMain->mousePosX, guiMain->mousePosY);
 		}
-		// SDL3 REMOVED THE GESTURE RECOGNISER ENTIRELY -- there is no
-		// SDL_MULTIGESTURE and no replacement event. This handler only logged
-		// (its two lines of intent were already commented out), so the
-		// degradation is explicit and total: pinch/rotate is gone until
-		// somebody rebuilds it from raw SDL_EVENT_FINGER_* above, which is its
-		// own piece of work with its own decision, not something to improvise
-		// during a port. See the plan's "one genuine capability loss".
+		// Raw trackpad fingers (SDL 3 Cocoa sends them for a MacBook pad as an
+		// INDIRECT touch device, position in normalised PAD coordinates, no
+		// window). They feed the double-tap-and-drag recogniser; a touchSCREEN
+		// (DIRECT) is not a pad and is left alone. The pointer still moves by
+		// itself, so the drag's motion arrives as ordinary mouse motion.
+		else if (event.type == SDL_EVENT_FINGER_DOWN || event.type == SDL_EVENT_FINGER_UP
+				 || event.type == SDL_EVENT_FINGER_MOTION || event.type == SDL_EVENT_FINGER_CANCELED)
+		{
+			const SDL_TouchDeviceType devType = SDL_GetTouchDeviceType(event.tfinger.touchID);
+			if (devType == SDL_TOUCH_DEVICE_INDIRECT_ABSOLUTE || devType == SDL_TOUCH_DEVICE_INDIRECT_RELATIVE)
+			{
+				const VID_TapDragPhase phase =
+					event.type == SDL_EVENT_FINGER_DOWN   ? VID_TapDragFingerDown
+				  : event.type == SDL_EVENT_FINGER_MOTION ? VID_TapDragFingerMotion
+				  : event.type == SDL_EVENT_FINGER_UP     ? VID_TapDragFingerUp
+				  :                                         VID_TapDragFingerCanceled;
+				const VID_TapDragAction action = VID_TapDragOnFinger(&vidTapDrag, phase,
+					event.tfinger.x, event.tfinger.y, (double)event.tfinger.timestamp * 1e-9);
+				if (action == VID_TapDragBegin)
+				{
+					LOGI("trackpad double-tap drag: BEGIN");
+#if MT_ENABLE_IMGUI_TEST_ENGINE
+					if (!suppressInput)
+#endif
+						guiMain->DoTapDragBegin(guiMain->mousePosX, guiMain->mousePosY);
+				}
+				else if (action == VID_TapDragEnd)
+				{
+					// Never gated: a latch must not outlive its gesture.
+					LOGI("trackpad double-tap drag: END");
+					guiMain->DoTapDragEnd(guiMain->mousePosX, guiMain->mousePosY);
+				}
+			}
+		}
+		// SDL 3.0 removed SDL2's gesture recogniser (SDL_MULTIGESTURE); SDL 3.4
+		// brought pinch back as SDL_EVENT_PINCH_*, handled above. Rotate and
+		// multi-finger swipes have no SDL event yet -- building them from raw
+		// SDL_EVENT_FINGER_* is its own piece of work.
 		//
 		// SDL3 also removed SDL_SYSWMEVENT with the whole SDL_syswm.h header.
 		// The Windows WM_USER handling that lived here is not lost: SDL3's

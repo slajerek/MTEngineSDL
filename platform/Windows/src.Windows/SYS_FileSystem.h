@@ -129,6 +129,18 @@ std::vector<std::string> SYS_Win32GetAvailableDrivesPaths();
 
 char* SYS_GetPathToDocuments();
 
+// The per-user CACHES directory for this app (edits-while-browsing D1), UTF-8,
+// WITH a trailing separator:
+//   macOS    ~/Library/Caches/<bundle identifier>/  (MT_GetSettingsFolderName()
+//            when the process has no bundle identifier, e.g. a bare binary)
+//   Windows  %LOCALAPPDATA%\<MT_GetSettingsFolderName()>\Cache\
+//   Linux    ${XDG_CACHE_HOME:-$HOME/.cache}/<MT_GetSettingsFolderName()>/
+// The OS may purge it at any time: store only what can be rebuilt. This is a
+// PATH and nothing else -- it creates no directory. A caller creates what it
+// writes, which is also what lets a test ask for it without leaving a folder in
+// the user's real cache. "" when the platform cannot say.
+std::string SYS_GetCacheDir();
+
 std::string SYS_GetRelativePath(const char* pathToFolder, const char* pathToFile);
 std::string SYS_GetAbsolutePath(const char* pathToFolder, const char* relativePath);
 

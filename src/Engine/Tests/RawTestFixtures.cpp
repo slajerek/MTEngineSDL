@@ -7,11 +7,12 @@
 #include <fstream>
 #include <vector>
 
-// The engine's vendored jpeg-9a (compiled into the engine target on every
-// platform), for PC_BuildJpegWithIcc. jconfig.h/jmorecfg.h come with it.
+// The engine's one libjpeg (libjpeg-turbo, staged by build-jpeg into
+// $(MT_CAPS_LIBS_DIR)/jpeg/include and linked through the codec bundle on every
+// configuration), for PC_BuildJpegWithIcc -- through the guard header.
 #include <cstddef>
 extern "C" {
-#include "jpeglib.h"
+#include "MT_jpeglib.h"
 }
 
 #ifdef _WIN32

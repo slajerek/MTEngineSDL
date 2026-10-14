@@ -63,6 +63,12 @@ param(
 )
 
 if ($NoProd) { throw '-NoProd is gone. A build makes no package unless you pass -Prod (see docs\testing.md).' }
+# A final build tells the dependency scripts so: build-jpeg.ps1 then REFUSES a
+# build without SIMD instead of warning. Set before the deps and compile
+# stages; build-deps.ps1 and its children inherit the process env. The driver
+# OWNS the variable: it is cleared when -Prod is not given, so a final build
+# earlier in the same PowerShell session cannot leak into a development one.
+if ($Prod) { $env:MT_PROD_BUILD = '1' } else { Remove-Item Env:MT_PROD_BUILD -ErrorAction SilentlyContinue }
 $symbolsExplicit = [bool]$Symbols
 if (-not $Logs)    { $Logs    = if ($Prod) { 'off' } else { 'on' } }
 if (-not $Symbols) { $Symbols = if ($Prod) { 'off' } else { 'on' } }
@@ -637,3 +643,18 @@ the driver on first run) for Maxwell through Ampere.
     }
     Write-Host "Deployed: $prodDir\$prodExeName" -ForegroundColor Green
 }
+
+# THE BINARY, BY ABSOLUTE PATH, ONCE, AT THE END. Same shape as the macOS and
+# Linux drivers and as tests\run_test.ps1's "=== Using binary:" line, so a
+# stale exe run from another location shows up as two different paths.
+function Write-MtBinaryLine([string]$label, [string]$path) {
+    $item = Get-Item -LiteralPath $path -ErrorAction SilentlyContinue
+    if ($item) {
+        Write-Host ("=== {0}: {1} ({2}, {3}) ===" -f $label, $item.FullName, $Configuration, $item.LastWriteTime.ToString('yyyy-MM-dd HH:mm:ss')) -ForegroundColor Green
+    } else {
+        Write-Host ("=== {0}: {1} ({2}, missing) ===" -f $label, $path, $Configuration) -ForegroundColor Yellow
+    }
+}
+Write-Host ""
+Write-MtBinaryLine 'Built binary' $exe
+if ($Prod) { Write-MtBinaryLine 'Deployed binary' (Join-Path $prodDir $prodExeName) }

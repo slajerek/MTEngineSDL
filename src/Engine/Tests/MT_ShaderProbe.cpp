@@ -9,6 +9,7 @@
 #include "Core/Render/CRenderTarget.h"
 #include "Core/Render/CRenderBackend.h"
 #include "CVideoYUVConverter.h"
+#include "Core/Render/VID_GainMapDraw.h"
 
 #include <atomic>
 #include <vector>
@@ -581,9 +582,96 @@ static void ServiceHdrTransferRequest()
 	gHdrTransferState.store(SHADER_PROBE_READY, std::memory_order_release);
 }
 
+// --- Gain-map parity probe (option C, Task 3) ------------------------------
+//
+// Its own request/state pair (NEVER gRequestPending: ServicePendingRequest answers
+// that one by deleting and rebuilding gProbeShader and gProbeImage). The plain
+// statics are written before the release-store of the request flag and read after
+// the render thread's acq_rel exchange.
+
+static std::atomic<bool> gGainMapRequested(false);
+static std::atomic<int>  gGainMapState(SHADER_PROBE_CLOSED);
+static CSlrImage *gGainMapBase = NULL;
+static int   gGainMapW = 0, gGainMapH = 0;
+static float gGainMapRgba[4] = { 1, 1, 1, 1 };
+static bool  gGainMapThroughComposite = false;
+static std::vector<float> gGainMapResult;   // render thread writes, test reads after READY
+
+void MT_ShaderProbeRequestGainMapParity(CSlrImage *base, int w, int h, const float rgba[4],
+                                        bool throughComposite)
+{
+	gGainMapBase = base;
+	gGainMapThroughComposite = throughComposite;
+	gGainMapW = w;
+	gGainMapH = h;
+	for (int i = 0; i < 4; i++)
+		gGainMapRgba[i] = rgba[i];
+	gGainMapResult.clear();
+	gGainMapState.store(SHADER_PROBE_PENDING, std::memory_order_relaxed);
+	gGainMapRequested.store(true, std::memory_order_release);
+}
+
+EShaderProbeState MT_ShaderProbeGainMapParityState()
+{
+	return (EShaderProbeState)gGainMapState.load(std::memory_order_acquire);
+}
+
+const std::vector<float> &MT_ShaderProbeGainMapParityResult()
+{
+	return gGainMapResult;
+}
+
+// RENDER THREAD ONLY.
+static void ServiceGainMapParityRequest()
+{
+	if (!gGainMapRequested.exchange(false, std::memory_order_acq_rel))
+		return;
+
+	CRenderBackend *backend = VID_GetRenderBackend();
+	if (backend == NULL || gGainMapBase == NULL || gGainMapW <= 0 || gGainMapH <= 0)
+	{
+		gGainMapState.store(SHADER_PROBE_UNSUPPORTED, std::memory_order_release);
+		return;
+	}
+	if (!VID_GainMapShaderUsable())
+	{
+		gGainMapState.store(VID_GainMapShaderCompileFailed() ? SHADER_PROBE_COMPILE_FAILED
+															 : SHADER_PROBE_UNSUPPORTED,
+							std::memory_order_release);
+		return;
+	}
+
+	CRenderTarget *rt = backend->CreateRenderTarget();
+	if (rt == NULL || !rt->Create(gGainMapW, gGainMapH, RENDER_TEXTURE_RGBA16F))
+	{
+		if (rt) { rt->Destroy(); delete rt; }
+		gGainMapState.store(SHADER_PROBE_UNSUPPORTED, std::memory_order_release);
+		return;
+	}
+
+	std::vector<float> px((size_t)gGainMapW * gGainMapH * 4, 0.0f);
+	bool ok = gGainMapThroughComposite
+		? VID_GainMapCompositeRenderToTargetForTest(gGainMapBase, rt, gGainMapRgba)
+		: VID_GainMapRenderToTargetForTest(gGainMapBase, rt, gGainMapRgba);
+	if (ok)
+		ok = backend->ReadTexturePixelsFloat(rt->GetTexture(), gGainMapW, gGainMapH, px.data());
+	rt->Destroy();
+	delete rt;
+
+	if (!ok)
+	{
+		LOGError("MT_ShaderProbe: the gain-map parity draw or its read-back failed");
+		gGainMapState.store(SHADER_PROBE_UNSUPPORTED, std::memory_order_release);
+		return;
+	}
+	gGainMapResult.swap(px);
+	gGainMapState.store(SHADER_PROBE_READY, std::memory_order_release);
+}
+
 void MT_ShaderProbeRender()
 {
 	ServiceFloatTargetRequest();
+	ServiceGainMapParityRequest();
 	ServiceFloatImageReadbackRequest();
 	// NOT ServiceSwapchainReadbackRequest() -- see MT_ShaderProbeServiceSwapchainReadback()
 	// in the header. This function runs before ImGui::Render() and before the

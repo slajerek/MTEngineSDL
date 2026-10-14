@@ -256,7 +256,13 @@ bash "$SCRIPT_DIR/platform/Linux/build-mbedtls.sh"
 echo -e "\n\e[94mBuilding \e[31muSockets\e[0m"
 bash "$SCRIPT_DIR/platform/Linux/build-usockets.sh"
 
-# 3. Image codecs (TIFF, WebP, AVIF, LibRaw — static, built from source)
+# 3a. libjpeg-turbo -- the engine's one libjpeg (core: JPEGWriter needs it on
+#     every configuration). BEFORE the codecs, which build libultrahdr and
+#     LibRaw against its prefix and merge its archive into their bundle.
+echo -e "\n\e[94mBuilding \e[31mlibjpeg-turbo\e[0m"
+bash "$SCRIPT_DIR/platform/Linux/build-jpeg.sh"
+
+# 3b. Image codecs (TIFF, WebP, AVIF, LibRaw — static, built from source)
 echo -e "\n\e[94mBuilding \e[31mImage Codecs (TIFF, WebP, AVIF, LibRaw)\e[0m"
 bash "$SCRIPT_DIR/platform/Linux/build-image_codecs.sh"
 

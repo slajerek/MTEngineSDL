@@ -1,6 +1,7 @@
 #include "CRenderShaderMetal.h"
 #include "CRenderShaderCustomFragmentMetal.h"
 #include "CRenderShaderMaskedTileMetal.h"
+#include "CRenderShaderGainMapMetal.h"
 #include "CRenderBackendMetal.h"
 #include "SYS_Main.h"
 #include "VID_Main.h"
@@ -411,12 +412,28 @@ void CRenderBackendMetal::PresentFrameBuffer(ImVec4 clearColor)
 		if (!frameIsOffscreen)
 			[commandBuffer presentDrawable:drawable];
 
+		// PC_GPU_FRAME_LOG=1 (measurement aid, option C Task 8): one line per frame
+		// with the command buffer's GPU time (GPUEndTime - GPUStartTime) and the
+		// attachment size. Off by default; never a source edit to turn on.
+		static const bool gpuFrameLog = getenv("PC_GPU_FRAME_LOG") != NULL;
+		const unsigned long long frameNo = metalFrameCounter;
+		int logW = 0, logH = 0;
+		if (gpuFrameLog)
+		{
+			id<MTLTexture> att = frameIsOffscreen ? headlessColorTexture : drawable.texture;
+			logW = (int)att.width;
+			logH = (int)att.height;
+		}
+
 		// Fix 3 & 4: combined completion handler — logs GPU errors and signals the
 		// frame-pacing semaphore. Runs on a Metal-owned thread; both calls are safe.
 		[commandBuffer addCompletedHandler:^(id<MTLCommandBuffer> cb) {
 			if (cb.error)
 				LOGError("Metal command buffer error: %s",
 						 cb.error.localizedDescription.UTF8String);
+			if (gpuFrameLog)
+				LOGM("PC_GPU_FRAME frame=%llu gpu_ms=%.4f size=%dx%d", frameNo,
+					 (cb.GPUEndTime - cb.GPUStartTime) * 1000.0, logW, logH);
 			dispatch_semaphore_signal(kInFlightFrames);
 		}];
 
@@ -1257,7 +1274,23 @@ public:
 	virtual void EndPass() override
 	{
 		if (passEncoder != nil) { [passEncoder endEncoding]; passEncoder = nil; }
-		if (passCommandBuffer != nil) { [passCommandBuffer commit]; passCommandBuffer = nil; }
+		if (passCommandBuffer != nil)
+		{
+			// PC_GPU_FRAME_LOG=1 (measurement aid, option C Task 8): the pass's GPU
+			// time, one line per render-target pass. Off by default.
+			static const bool gpuPassLog = getenv("PC_GPU_FRAME_LOG") != NULL;
+			if (gpuPassLog)
+			{
+				const int logW = width, logH = height;
+				const int logFloat = (format == RENDER_TEXTURE_RGBA16F) ? 1 : 0;
+				[passCommandBuffer addCompletedHandler:^(id<MTLCommandBuffer> cb) {
+					LOGM("PC_GPU_FRAME pass gpu_ms=%.4f size=%dx%d float=%d",
+						 (cb.GPUEndTime - cb.GPUStartTime) * 1000.0, logW, logH, logFloat);
+				}];
+			}
+			[passCommandBuffer commit];
+			passCommandBuffer = nil;
+		}
 	}
 
 	virtual void *GetTexture() const override { return (__bridge void *)colorTexture; }
@@ -1395,6 +1428,16 @@ CMaskedTileShader *CRenderBackendMetal::CreateMaskedTileShader(bool queued)
 	return new CRenderShaderMaskedTileMetal(this, queued);
 }
 
+// Option C. Compiles synchronously in its constructor; VID_GainMapShaderUsable()
+// reads IsUsable() right after and latches a failure. NULL before the layer exists
+// (no colour pixel format to build against) is retried by that caller, never latched.
+CGainMapShader *CRenderBackendMetal::CreateGainMapShader()
+{
+	if (layer == nil)
+		return NULL;
+	return new CRenderShaderGainMapMetal(this);
+}
+
 CRenderShader *CRenderBackendMetal::CreateFlatColorShader(float r, float g, float b, float a)
 {
 	if (layer == nil)
@@ -1499,6 +1542,14 @@ void CRenderBackendMetal::QueueDefaultSampler()
 		return;
 	MetalEnsureSamplers(layer.device);
 	ImGui::GetWindowDrawList()->AddCallback(MetalDrawCallbackSamplerLinear, NULL);
+}
+
+void *CRenderBackendMetal::GetImageSamplerState(bool linearScaling)
+{
+	if (layer == nil)
+		return NULL;
+	MetalEnsureSamplers(layer.device);
+	return (__bridge void *)(linearScaling ? samplerLinear : samplerMagNearest);
 }
 
 unsigned int CRenderBackendMetal::GetColorPixelFormatRaw()

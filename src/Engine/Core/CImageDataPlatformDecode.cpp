@@ -51,4 +51,10 @@ bool CImageData::LoadWithImageIO_AppleHDR(const char *fileName)
 	(void)fileName;
 	return false;
 }
+
+bool CImageData::HasGainMap(const char *fileName)
+{
+	(void)fileName;
+	return false;   // no gain-map decode off macOS -- the stub above declines too
+}
 #endif

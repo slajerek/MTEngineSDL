@@ -119,6 +119,9 @@ static bool RawDecodeOpened(LibRaw &raw, const CRawDecoder::SOptions &opt,
 		out->cblackPre[i] = col.cblack[i];
 	}
 	out->blackLevelPre = col.black;
+	// Parse-time too: identify() fills imgdata.thumbnail at open_file.
+	out->thumbWidth  = raw.imgdata.thumbnail.twidth;
+	out->thumbHeight = raw.imgdata.thumbnail.theight;
 	out->whiteLevelPre = col.maximum;
 	out->baselineExposure = col.dng_levels.baseline_exposure;
 	out->hasBaselineExposure = (col.dng_levels.baseline_exposure > -998.f);
@@ -444,20 +447,47 @@ static bool RawRunWithBigStack(void (*fn)(void *), void *arg)
 }
 #else
 #include <pthread.h>
+#if defined(__APPLE__)
+#include <sys/resource.h>   // getiopolicy_np / setiopolicy_np
+#endif
 struct SRawThreadTrampoline
 {
 	void (*fn)(void *);
 	void *arg;
+	// The CALLER's thread-scope dataless-materialisation policy (-1 = none to
+	// carry). The policy is per THREAD: a worker that set
+	// IOPOL_MATERIALIZE_DATALESS_FILES_OFF -- so it fails fast on an iCloud
+	// stub instead of parking for the whole download -- lost it the moment
+	// its LibRaw call hopped onto this 8 MB-stack thread, and LibRaw's open
+	// then materialised the file after all. The browse develop lane, the
+	// editor's RAW source and the render cache of a photo app all decode
+	// here. Carried, never forced: a caller that WANTS the file downloaded
+	// (the viewer opening the current photo) has no policy set and keeps the
+	// default.
+	int datalessPolicy;
 };
 static void *RawThreadEntry(void *p)
 {
 	SRawThreadTrampoline *t = (SRawThreadTrampoline *)p;
+#if defined(__APPLE__)
+	if (t->datalessPolicy >= 0)
+		setiopolicy_np(IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES, IOPOL_SCOPE_THREAD,
+					   t->datalessPolicy);
+#endif
 	t->fn(t->arg);
 	return NULL;
 }
 static bool RawRunWithBigStack(void (*fn)(void *), void *arg)
 {
-	SRawThreadTrampoline t{ fn, arg };
+	SRawThreadTrampoline t{ fn, arg, -1 };
+#if defined(__APPLE__)
+	{
+		const int pol = getiopolicy_np(IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES,
+									   IOPOL_SCOPE_THREAD);
+		if (pol >= 0 && pol != IOPOL_MATERIALIZE_DATALESS_FILES_DEFAULT)
+			t.datalessPolicy = pol;
+	}
+#endif
 	pthread_attr_t attr;
 	if (pthread_attr_init(&attr) != 0)
 		return false;

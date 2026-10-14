@@ -290,6 +290,55 @@ class TestCommercialModeSemantics(Base):
         self.assertIn("Planted Font", text)
         self.assertIn("licence   : OFL-1.1", text)
 
+    def test_libultrahdr_notice_reaches_licenses(self):
+        """P3b: the Adobe gain-map NOTICE is a licence obligation, not prose --
+        it must be IN the shipped document whenever the codec is, and absent
+        when the photo codecs are off (the dependency is not shipped then)."""
+        on = self.resolve(self.manifest("MT_CAP_PHOTO_CODECS=1\n"))
+        self.assertEqual(on.returncode, 0, on.stderr)
+        with open(os.path.join(self.out_of(on), "LICENSES.txt"), encoding="utf-8") as f:
+            text = f.read()
+        self.assertIn("libultrahdr", text)
+        self.assertIn("Gain Map technology under license by Adobe", text)
+        off = self.resolve(self.manifest("MT_CAP_PHOTO_CODECS=0\n", name="off.caps"))
+        self.assertEqual(off.returncode, 0, off.stderr)
+        with open(os.path.join(self.out_of(off), "LICENSES.txt"), encoding="utf-8") as f:
+            self.assertNotIn("Gain Map technology under license by Adobe", f.read())
+
+    def test_core_licence_text_reaches_licenses(self):
+        """libjpeg-turbo is CORE (the stub bundle carries it on every
+        configuration), and BSD-3-Clause requires the copyright notice, the
+        conditions and the disclaimer in the documentation of a binary
+        distribution; the IJG licence requires its acknowledgement sentence.
+        So the core list carries a `licence_text` file whose content reaches
+        the generated document -- with every capability OFF."""
+        manifest = "".join("%s=0\n" % k for k in self.vocab.keys)
+        proc = self.resolve(self.manifest(manifest, name="alloff.caps"))
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        with open(os.path.join(self.out_of(proc), "LICENSES.txt"), encoding="utf-8") as f:
+            text = f.read()
+        self.assertIn("libjpeg-turbo", text)
+        self.assertIn("Redistribution and use in source and binary forms", text)
+        self.assertIn('THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"', text)
+        self.assertIn("This software is based in part on the work of the Independent JPEG Group", text)
+        self.assertIn("This software is provided 'as-is'", text)
+
+        # A licence document that silently drops a text is the failure being
+        # fixed: a core entry naming a missing file must FAIL the resolve.
+        import json
+        with open(V.default_vocabulary_path(), encoding="utf-8") as f:
+            data = json.load(f)
+        missing = "other/lib/licences/no-such-licence.txt"
+        data["core"]["dependencies"].append({
+            "name": "Planted", "licence": "MIT", "version": "1",
+            "provenance": "test", "commercial_safe": True, "licence_text": missing})
+        planted = os.path.join(self.tmp, "planted-licence.json")
+        with open(planted, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+        bad = self.resolve(self.manifest(manifest, name="alloff2.caps"), "--vocabulary", planted)
+        self.assertNotEqual(bad.returncode, 0, bad.stdout)
+        self.assertIn("no-such-licence.txt", bad.stderr)
+
     def test_app_licences_commercial_safe_false_aborts_store_build(self):
         """Gated exactly like a capability dependency: a store build aborts,
         naming the dep and the file it came from."""

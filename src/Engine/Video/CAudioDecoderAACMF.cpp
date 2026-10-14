@@ -82,9 +82,8 @@ bool CAudioDecoderAACMF::Init(const u8 *asc, int ascSize)
 
 	// Same hand-parse the Apple twin uses (AacAscParser.h, hoisted out of
 	// CAudioDecoderAACApple.cpp specifically so both decoders share it) --
-	// the MFT's input media type needs the channel count and the (possibly
-	// SBR-extended) sample rate declared explicitly, same as AudioConverter's
-	// input AudioStreamBasicDescription on the Apple side.
+	// the MFT's input media type needs the core channel count and core
+	// sample rate declared explicitly, and the ASC in the form it accepts.
 	SAacAscInfo parsed = AacParseAudioSpecificConfig(asc, ascSize);
 	if (!parsed.ok)
 	{
@@ -93,9 +92,26 @@ bool CAudioDecoderAACMF::Init(const u8 *asc, int ascSize)
 	}
 
 	inputChannels = parsed.channels;
-	u32 declaredRate = (parsed.sbrPresent && parsed.sbrSampleRate > 0)
-							? (u32)parsed.sbrSampleRate
-							: (u32)parsed.coreSampleRate;
+
+	// For MFAudioFormat_AAC "the media type gives the sample rate and number
+	// of channels PRIOR TO the application of spectral band replication (SBR)
+	// and parametric stereo (PS)" (Microsoft Learn, "AAC Decoder") -- the
+	// CORE rate and the CORE channel count. This used to declare the
+	// SBR-extended rate, the same doubling mistake the Apple twin made
+	// (2026-10-13); the MFT doubles the rate itself and reports it through
+	// the output type.
+	u32 declaredRate = (u32)parsed.coreSampleRate;
+
+	// The MFT also accepts only the backward-compatible ASC form
+	// (audioObjectType 2 + trailing SBR/PS extension). A directly-signaled
+	// ASC (top-level AOT 5/29 -- real web downloads use it) is re-emitted in
+	// that form; anything else passes through unchanged.
+	std::vector<u8> mfAsc = AacMakeBackwardCompatibleAsc(asc, ascSize);
+	if (mfAsc.empty())
+	{
+		errorReason = "AudioSpecificConfig has no form the Media Foundation AAC decoder accepts (direct SBR/PS signaling over a non-LC core)";
+		return false;
+	}
 
 	HRESULT hr = CoCreateInstance(CLSID_CMSAACDecMFT, nullptr, CLSCTX_INPROC_SERVER,
 								   IID_PPV_ARGS(&decoderMFT));
@@ -127,9 +143,9 @@ bool CAudioDecoderAACMF::Init(const u8 *asc, int ascSize)
 		//   wStructType(u16)=0
 		//   wReserved1(u16)=0
 		//   dwReserved2(u32)=0
-		// = 12 bytes, then the ASC verbatim.
+		// = 12 bytes, then the ASC (in backward-compatible form, above).
 		std::vector<u8> userData;
-		userData.reserve(12 + (size_t)ascSize);
+		userData.reserve(12 + mfAsc.size());
 		auto pushU16 = [&userData](unsigned short v) {
 			userData.push_back((u8)(v & 0xFF));
 			userData.push_back((u8)((v >> 8) & 0xFF));
@@ -145,7 +161,7 @@ bool CAudioDecoderAACMF::Init(const u8 *asc, int ascSize)
 		pushU16(0);      // wStructType
 		pushU16(0);      // wReserved1
 		pushU32(0);      // dwReserved2
-		userData.insert(userData.end(), asc, asc + ascSize);
+		userData.insert(userData.end(), mfAsc.begin(), mfAsc.end());
 
 		hr = inputType->SetBlob(MF_MT_USER_DATA, userData.data(), (UINT32)userData.size());
 		if (SUCCEEDED(hr))

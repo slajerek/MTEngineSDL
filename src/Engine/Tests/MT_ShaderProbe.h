@@ -1,6 +1,8 @@
 #ifndef _MT_ShaderProbe_h_
 #define _MT_ShaderProbe_h_
 
+#include <vector>
+
 class CSlrImage;
 
 // A tiny ImGui window that draws one rectangle through a backend-created
@@ -207,6 +209,34 @@ struct SHdrTransferProbeResult
 	float outB[kSteps] = {};
 };
 const SHdrTransferProbeResult &MT_ShaderProbeGetHdrTransferResult();
+
+// --- Gain-map parity probe (option C, Task 3) ------------------------------
+//
+// The test thread asks, the RENDER THREAD does the GPU work: it creates an
+// RGBA16F render target of w x h, draws `base` with its companion map through
+// the gain-map shader's own fragment function (VID_GainMapRenderToTargetForTest,
+// vertex colour `rgba`), reads it back into the probe's own buffer and destroys
+// the target. A target smaller than the base is a MINIFIED draw.
+//
+// Its OWN request/state pair, never the open/close probe's: that one answers a
+// request by deleting and rebuilding its shader and image.
+//
+// State: the file's convention -- CLOSED idle, PENDING asked, READY done (the
+// result holds w*h RGBA floats, top-down rows), COMPILE_FAILED when the backend's
+// gain-map shader failed to compile, UNSUPPORTED when the backend has none or the
+// draw could not run (no map, an unbound texture, no float target). `base` must
+// stay alive until the state leaves PENDING.
+//
+// `throughComposite` (Task 3c): instead of the shader's own draw, get (or build)
+// `base`'s one-time composite through the production cache and draw THAT through
+// a verbatim COPY of ImGui's fragment function (blending off) and the sampler
+// production binds for `base`
+// (VID_GainMapCompositeRenderToTargetForTest) -- the pixels a composite draw puts
+// on screen, as floats.
+void MT_ShaderProbeRequestGainMapParity(CSlrImage *base, int w, int h, const float rgba[4],
+                                        bool throughComposite = false);
+EShaderProbeState MT_ShaderProbeGainMapParityState();
+const std::vector<float> &MT_ShaderProbeGainMapParityResult();   // RGBA floats, top-down rows
 
 // The window's ImGui name, for CaptureAddWindow().
 const char *MT_ShaderProbeWindowName();

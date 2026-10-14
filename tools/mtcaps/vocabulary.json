@@ -10,6 +10,7 @@
       { "name": "Dear ImGui", "licence": "MIT", "version": "1.93.0 WIP", "provenance": "vendored source, src/Engine/Libs/imgui", "commercial_safe": true },
       { "name": "ImPlot", "licence": "MIT", "version": "vendored", "provenance": "vendored source; core because VID_Main.cpp:198 creates its context and ImPlotColorsExtensionGetterCallback is in the MT_API.h contract", "commercial_safe": true },
       { "name": "zlib", "licence": "Zlib", "version": "vendored", "provenance": "compiled straight into the engine, CMakeLists.txt:899-913", "commercial_safe": true },
+      { "name": "libjpeg-turbo", "licence": "IJG AND BSD-3-Clause AND Zlib", "version": "3.2.0", "provenance": "built by platform/*/build-jpeg.* from the release archive (SHA-256 pinned); core: JPEGWriter and lossless JPEG rotation (jpegtran's transupp) need it on every configuration; merged into the codec bundle (stub included). This software is based in part on the work of the Independent JPEG Group.", "source_url": "https://github.com/libjpeg-turbo/libjpeg-turbo/releases/download/3.2.0/libjpeg-turbo-3.2.0.tar.gz", "licence_url": "https://github.com/libjpeg-turbo/libjpeg-turbo/blob/3.2.0/LICENSE.md", "licence_text": "other/lib/licences/libjpeg-turbo.txt", "commercial_safe": true },
       { "name": "ALSA", "licence": "LGPL-2.1", "version": "system", "provenance": "system package, find_package(ALSA REQUIRED) at CMakeLists.txt:147 (Linux)", "commercial_safe": true },
       { "name": "GTK3", "licence": "LGPL-2.1", "version": "system", "provenance": "system package, pkg_check_modules(GTK3 REQUIRED) (Linux)", "commercial_safe": true },
       { "name": "freetype", "licence": "FTL or GPL-2.0", "version": "2.10.4 (vendored)", "provenance": "vendored source (other/lib/freetype-2.10.4), built by build-freetype.ps1 on Windows; tracked prebuilt as fallback", "commercial_safe": true },
@@ -99,11 +100,11 @@
 
     "MT_CAP_PHOTO_CODECS": {
       "short": "PHOTO_CODECS",
-      "description": "Still-image codecs beyond the core set: TIFF, WebP, AVIF and HEIF.",
+      "description": "Still-image codecs beyond the core set: TIFF, WebP, AVIF, HEIF and the ISO 21496-1 gain-map JPEG (libultrahdr).",
       "default": 1,
       "kind": "engine-compiled",
       "implies": [],
-      "enables": ["MT_ENABLE_LIBTIFF", "MT_ENABLE_LIBWEBP", "MT_ENABLE_LIBAVIF", "MT_ENABLE_LIBHEIF"],
+      "enables": ["MT_ENABLE_LIBTIFF", "MT_ENABLE_LIBWEBP", "MT_ENABLE_LIBAVIF", "MT_ENABLE_LIBHEIF", "MT_ENABLE_LIBULTRAHDR"],
       "app_visible": true,
       "app_visible_note": "one host app guards on MT_ENABLE_LIBTIFF, MT_ENABLE_LIBWEBP (x2), MT_ENABLE_LIBAVIF and MT_ENABLE_LIBHEIF in its own format-support test. Decision E was reversed on this measurement.",
       "dependencies": [
@@ -112,7 +113,8 @@
         { "name": "libavif", "licence": "BSD-2-Clause", "version": "see build-image_codecs", "provenance": "downloaded tarball", "commercial_safe": true },
         { "name": "libgav1", "licence": "Apache-2.0", "version": "see build-image_codecs", "provenance": "git clone (call sites Linux:293, MacOS:396, Windows:258)", "commercial_safe": true },
         { "name": "libjxl", "licence": "BSD-3-Clause", "version": "see build-image_codecs", "provenance": "git clone + its own submodules highway/brotli/skcms (Linux:296, MacOS:398, Windows:399/:401)", "commercial_safe": true },
-        { "name": "libheif", "licence": "LGPL-3.0 (container); its HEVC decoder is the licence question", "version": "system package on Linux today; vendored in #5.5a", "provenance": "pkg_check_modules on Linux, ImageIO on macOS, absent on Windows", "commercial_safe": false, "flag": "MT_ENABLE_LIBHEIF" }
+        { "name": "libheif", "licence": "LGPL-3.0 (container); its HEVC decoder is the licence question", "version": "system package on Linux today; vendored in #5.5a", "provenance": "pkg_check_modules on Linux, ImageIO on macOS, absent on Windows", "commercial_safe": false, "flag": "MT_ENABLE_LIBHEIF" },
+        { "name": "libultrahdr", "licence": "Apache-2.0 AND MIT (bundled image_io: Apache-2.0; its modp_b64: BSD-3-Clause)", "version": "2.0.2 (e5f5a022)", "provenance": "downloaded tarball, SHA-256 pinned; built against the engine's libjpeg-turbo (build-jpeg) by platform/*/build-image_codecs.*; MODIFIED: other/lib/image-codecs/patches/apply_libultrahdr_jpeg9_raw.py turns libjpeg 9's raw-mode DCT scaling off in lib/src/jpegdecoderhelper.cpp and lib/src/jpegencoderhelper.cpp (a no-op against libjpeg-turbo, kept so a jpeg-9 build stays safe), and each modified file carries a notice (Apache-2.0 4(b))", "source_url": "https://github.com/google/libultrahdr/archive/refs/tags/v2.0.2.tar.gz", "licence_url": "https://github.com/google/libultrahdr/blob/v2.0.2/LICENSE", "notice": "This product includes Gain Map technology under license by Adobe.", "commercial_safe": true, "flag": "MT_ENABLE_LIBULTRAHDR" }
       ],
       "acquisition": {
         "linux": "platform/Linux/build-image_codecs.sh",
@@ -125,7 +127,7 @@
         "note": "HEIF has no key of its own -- it lives under this capability -- so 'commercial mode turns HEIF off' CANNOT be capability-off, which would take TIFF, WebP, AVIF and RAW with it. It is the FFmpeg shape: the capability stays on and a decoder is withheld. Pending the #5.5a licence spike.",
         "forbidden_decoders_commercial": ["heif"]
       },
-      "symbols": { "forbidden_when_off": "TIFF|WebP|avif|heif", "required_when_on": "TIFF" }
+      "symbols": { "forbidden_when_off": "TIFF|WebP|avif|heif|uhdr_", "required_when_on": "TIFF" }
     },
 
     "MT_CAP_RAW": {
