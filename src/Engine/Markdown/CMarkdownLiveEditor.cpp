@@ -629,6 +629,64 @@ void CMarkdownLiveEditor::InsertLink()
 	Changed();
 }
 
+bool CMarkdownLiveEditor::EditTable(EMarkdownTableEdit edit)
+{
+	if (readOnly) return false;
+	int32_t cell = -1;
+	if (!CaretInCell(&cell)) return false;
+	BeginCompound();
+	uint32_t c = caret;
+	const bool done = doc.EditTable(cell, edit, &c);
+	if (done) caret = anchor = c;
+	EndCompound();
+	if (!done) return false;
+	preferredX = -1;
+	scrollToCaret = true;
+	Changed();
+	return true;
+}
+
+bool CMarkdownLiveEditor::SelectFirstCellOfRow()
+{
+	int32_t cell = -1;
+	if (!CaretInCell(&cell)) return false;
+	const std::vector<int32_t> cells = doc.CellsOf(doc.RowOf(cell));
+	if (cells.empty()) return false;
+	const CMarkdownBlock &first = doc.GetBlocks()[cells[0]];
+	SetSelection(first.beg, first.end);
+	return true;
+}
+
+void CMarkdownLiveEditor::RenderTableMenu()
+{
+	if (!ImGui::BeginPopup("##md_table_menu")) return;
+	struct Item { const char *id; const char *key; const char *fallback; EMarkdownTableEdit edit; bool separatorBefore; };
+	static const Item items[] = {
+		{"md_table_row_above", "markdown.editor.table.insert_row_above", "Insert row above", EMarkdownTableEdit::InsertRowAbove, false},
+		{"md_table_row_below", "markdown.editor.table.insert_row_below", "Insert row below", EMarkdownTableEdit::InsertRowBelow, false},
+		{"md_table_row_up", "markdown.editor.table.move_row_up", "Move row up", EMarkdownTableEdit::MoveRowUp, false},
+		{"md_table_row_down", "markdown.editor.table.move_row_down", "Move row down", EMarkdownTableEdit::MoveRowDown, false},
+		{"md_table_row_delete", "markdown.editor.table.delete_row", "Delete row", EMarkdownTableEdit::DeleteRow, false},
+		{"md_table_col_left", "markdown.editor.table.insert_column_left", "Insert column left", EMarkdownTableEdit::InsertColumnLeft, true},
+		{"md_table_col_right", "markdown.editor.table.insert_column_right", "Insert column right", EMarkdownTableEdit::InsertColumnRight, false},
+		{"md_table_col_move_left", "markdown.editor.table.move_column_left", "Move column left", EMarkdownTableEdit::MoveColumnLeft, false},
+		{"md_table_col_move_right", "markdown.editor.table.move_column_right", "Move column right", EMarkdownTableEdit::MoveColumnRight, false},
+		{"md_table_col_delete", "markdown.editor.table.delete_column", "Delete column", EMarkdownTableEdit::DeleteColumn, false},
+		{"md_table_align_left", "markdown.editor.table.align_left", "Align left", EMarkdownTableEdit::AlignLeft, true},
+		{"md_table_align_center", "markdown.editor.table.align_center", "Align center", EMarkdownTableEdit::AlignCenter, false},
+		{"md_table_align_right", "markdown.editor.table.align_right", "Align right", EMarkdownTableEdit::AlignRight, false},
+		{"md_table_align_default", "markdown.editor.table.align_default", "Default alignment", EMarkdownTableEdit::AlignDefault, false},
+	};
+	for (const Item &it : items)
+	{
+		if (it.separatorBefore) ImGui::Separator();
+		// `###id`: the item's identity does not depend on the translation.
+		const std::string label = std::string(L(it.key, it.fallback)) + "###" + it.id;
+		if (ImGui::MenuItem(label.c_str(), nullptr, false, !readOnly)) EditTable(it.edit);
+	}
+	ImGui::EndPopup();
+}
+
 bool CMarkdownLiveEditor::MoveToNextCell(bool backwards)
 {
 	int32_t cell = -1;
@@ -1715,6 +1773,12 @@ void CMarkdownLiveEditor::HandleMouse(ImVec2)
 		ClickAt(io.MousePos, io.KeyShift);
 		dragging = true;
 	}
+	if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+	{
+		// Right-click in a table: caret into the cell, then the table menu.
+		if (!(HasSelection() && GlyphAtScreen(io.MousePos) != nullptr)) ClickAt(io.MousePos, false);
+		if (CaretInCell(nullptr)) ImGui::OpenPopup("##md_table_menu");
+	}
 	if (overLink && !dragging)
 	{
 		if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal | ImGuiHoveredFlags_NoSharedDelay) && ImGui::BeginTooltip())
@@ -1822,9 +1886,17 @@ void CMarkdownLiveEditor::ProcessKeyboard()
 	const bool shift = io.KeyShift;
 	const ImGuiInputFlags rep = ImGuiInputFlags_Repeat;
 
-	// Table navigation first: Tab is otherwise a character.
-	if (ImGui::Shortcut(ImGuiKey_Tab, rep) && MoveToNextCell(false)) {}
-	else if (ImGui::Shortcut(ImGuiMod_Shift | ImGuiKey_Tab, rep) && MoveToNextCell(true)) {}
+	// Table navigation first: Tab is otherwise a character. Tab in the last
+	// cell appends a row and goes to its first cell.
+	if (ImGui::Shortcut(ImGuiKey_Tab, rep))
+	{
+		if (!MoveToNextCell(false) && CaretInCell(nullptr) && EditTable(EMarkdownTableEdit::InsertRowBelow)) SelectFirstCellOfRow();
+	}
+	else if (ImGui::Shortcut(ImGuiMod_Shift | ImGuiKey_Tab, rep)) MoveToNextCell(true);
+	else if (ImGui::Shortcut(ImGuiMod_Alt | ImGuiMod_Shift | ImGuiKey_UpArrow, rep) && CaretInCell(nullptr)) EditTable(EMarkdownTableEdit::MoveRowUp);
+	else if (ImGui::Shortcut(ImGuiMod_Alt | ImGuiMod_Shift | ImGuiKey_DownArrow, rep) && CaretInCell(nullptr)) EditTable(EMarkdownTableEdit::MoveRowDown);
+	else if (ImGui::Shortcut(ImGuiMod_Alt | ImGuiMod_Shift | ImGuiKey_LeftArrow, rep) && CaretInCell(nullptr)) EditTable(EMarkdownTableEdit::MoveColumnLeft);
+	else if (ImGui::Shortcut(ImGuiMod_Alt | ImGuiMod_Shift | ImGuiKey_RightArrow, rep) && CaretInCell(nullptr)) EditTable(EMarkdownTableEdit::MoveColumnRight);
 	else if (ImGui::Shortcut(ImGuiKey_LeftArrow, rep)) MoveHorizontal(-1, false);
 	else if (ImGui::Shortcut(ImGuiMod_Shift | ImGuiKey_LeftArrow, rep)) MoveHorizontal(-1, true);
 	else if (ImGui::Shortcut(ImGuiKey_RightArrow, rep)) MoveHorizontal(1, false);
@@ -1849,7 +1921,11 @@ void CMarkdownLiveEditor::ProcessKeyboard()
 	else if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_B)) ToggleStrong();
 	else if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_I)) ToggleEmphasis();
 	else if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_K)) InsertLink();
-	else if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Enter)) ToggleTask();
+	else if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Enter))
+	{
+		if (CaretInCell(nullptr)) EditTable(EMarkdownTableEdit::InsertRowBelow);
+		else ToggleTask();
+	}
 	else if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_1)) SetHeadingLevel(1);
 	else if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_2)) SetHeadingLevel(2);
 	else if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_3)) SetHeadingLevel(3);
@@ -2050,6 +2126,7 @@ void CMarkdownLiveEditor::Render(const char *id, ImVec2 size)
 	itemMax = ImGui::GetItemRectMax();
 
 	HandleMouse(contentOrigin);
+	RenderTableMenu();
 
 	const bool windowFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows);
 	if (windowFocused && (ImGui::IsItemActive() || ImGui::IsItemHovered() || focused)) focused = true;

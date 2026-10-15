@@ -223,5 +223,24 @@ void CTestMarkdownLiveEditor::Run(ITestCallback *callback)
 		MDE_ASSERT(!ed.ActivateLinkAt(0), "plain text opens nothing");
 	}
 
+	// ---- Table commands ------------------------------------------------------------
+	{
+		CMarkdownLiveEditor ed;
+		const std::string tsrc = "| A | B |\n|---|---|\n| 1 | 2 |\n";
+		ed.SetSource(tsrc);
+		ed.SetCaret(2);
+		MDE_ASSERT(!ed.EditTable(EMarkdownTableEdit::DeleteRow) && ed.GetSource() == tsrc, "a refused table command changes nothing");
+		ed.SetCaret((uint32_t)tsrc.find("2 |"));
+		MDE_ASSERT(ed.EditTable(EMarkdownTableEdit::InsertColumnRight) && ed.GetSource() == "| A | B |   |\n|---|---|---|\n| 1 | 2 |   |\n",
+			"a column to the right of the caret's cell");
+		MDE_ASSERT(ed.GetDocument().GetBlocks()[ed.GetDocument().FindBlockAt(ed.GetCaret())].IsCell()
+			&& ed.GetDocument().ColumnOf(ed.GetDocument().FindBlockAt(ed.GetCaret())) == 2, "the caret is in the new column");
+#if MT_ENABLE_UNDO
+		MDE_ASSERT(ed.Undo() && ed.GetSource() == tsrc, "one undo step restores the table");
+#endif
+		ed.SetCaret(2);
+		MDE_ASSERT(!ed.MoveToNextCell(true), "Shift+Tab from the first cell goes nowhere");
+	}
+
 	TestCompleted(true, "Markdown live editor: commands and undo");
 }

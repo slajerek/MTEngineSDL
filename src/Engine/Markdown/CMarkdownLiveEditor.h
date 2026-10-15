@@ -147,7 +147,14 @@ public:
 	// (default: the platform shell). False when there is none.
 	bool ActivateLinkAt(uint32_t offset);
 
-	// Table navigation; false when the caret is not in a cell.
+	// Table structure at the caret's cell (CMarkdownDocument::EditTable): one
+	// undo step; the caret lands in the new, moved or neighbouring cell. Also
+	// on a right-click menu in a table, Alt+Shift+arrows (move row / column)
+	// and Ctrl/Cmd+Enter (row below). False when not in a cell or refused.
+	bool EditTable(EMarkdownTableEdit edit);
+
+	// Table navigation; false when the caret is not in a cell. Tab in the last
+	// cell appends a row.
 	bool MoveToNextCell(bool backwards);
 	bool MoveToCellBelow();
 
@@ -317,6 +324,8 @@ private:
 	void RestoreEdit(uint32_t pos, uint32_t removeLength, const std::string &text, uint32_t newCaret, uint32_t newAnchor);
 	void Changed();
 	void ComputeRevealed();
+	void RenderTableMenu();
+	bool SelectFirstCellOfRow();
 	struct RevealUnit { int32_t block; uint32_t beg; uint32_t end; };
 	void RebuildUnits();
 	int32_t FindUnitAt(uint32_t offset) const;

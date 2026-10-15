@@ -140,6 +140,25 @@ struct CMarkdownSpan
 
 enum class EMarkdownCellAlign : uint8_t { Default, Left, Center, Right };
 
+// Structural table edits (CMarkdownDocument::EditTable).
+enum class EMarkdownTableEdit : uint8_t
+{
+	InsertRowAbove,     // not above the header row
+	InsertRowBelow,     // below the header: the first body row
+	DeleteRow,          // body rows only
+	MoveRowUp,          // body rows, within the body
+	MoveRowDown,
+	InsertColumnLeft,
+	InsertColumnRight,
+	DeleteColumn,       // never the last column
+	MoveColumnLeft,
+	MoveColumnRight,
+	AlignDefault,       // the delimiter row: `---`
+	AlignLeft,          // `:---`
+	AlignCenter,        // `:---:`
+	AlignRight          // `---:`
+};
+
 struct CMarkdownBlock
 {
 	EMarkdownBlockType type = EMarkdownBlockType::Paragraph;
@@ -291,6 +310,17 @@ public:
 	// box when the item is a task). Empty string when it is not a list line.
 	std::string ListContinuationPrefix(uint32_t offset) const;
 
+	// Edit the table that `cell` belongs to, as one Replace() of the table's
+	// lines. Lines are split on unescaped pipes, so the delimiter row is
+	// edited like any row and leading/trailing pipes, container prefixes
+	// (`> `, indentation) and the padding of untouched cells are kept. A new
+	// row's cells are as wide as the delimiter row's. Returns false, changing
+	// nothing, when the edit does not apply (no cell, the header row for a
+	// row deletion, the last column, a move off the end). `caretOut`, when
+	// given, receives the content start of the cell the caret belongs in
+	// afterwards: the new, moved or neighbouring cell.
+	bool EditTable(int32_t cell, EMarkdownTableEdit edit, uint32_t *caretOut);
+
 	// The task list item (`- [ ] ...`) whose own line holds `offset`, or whose
 	// subtree does when nothing nearer is a task; -1 none.
 	int32_t FindTaskItemAt(uint32_t offset) const;
@@ -317,6 +347,8 @@ private:
 	void ResolveCellRange(int32_t index, uint32_t rowLineBeg, uint32_t &cursor);
 	void ResolveSpans();
 	uint32_t MatchLinkTail(uint32_t from, uint32_t limit) const;
+	struct TableLine { std::string prefix; bool lead = false, trail = false; std::vector<std::string> cells; };
+	TableLine SplitTableLine(uint32_t lineBeg, uint32_t lineEnd) const;
 	bool LineIsSetextUnderline(uint32_t lineBeg, uint32_t lineEnd) const;
 	bool LineIsFence(uint32_t lineBeg, uint32_t lineEnd, char fenceChar) const;
 	bool LineIsTableDelimiter(uint32_t lineBeg, uint32_t lineEnd) const;

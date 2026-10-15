@@ -1117,3 +1117,197 @@ bool CMarkdownDocument::ToggleTask(int32_t item)
 	Replace(b.taskMarkOffset, b.taskMarkOffset + 1, checked ? " " : "x");
 	return true;
 }
+
+// ---- Table edits ------------------------------------------------------------------
+
+CMarkdownDocument::TableLine CMarkdownDocument::SplitTableLine(uint32_t lineBeg, uint32_t lineEnd) const
+{
+	TableLine t;
+	uint32_t i = SkipContainerMarkers(lineBeg, lineEnd);
+	t.prefix = source.substr(lineBeg, i - lineBeg);
+	if (i < lineEnd && source[i] == '|') { t.lead = true; i++; }
+	uint32_t segBeg = i;
+	while (i <= lineEnd)
+	{
+		if (i < lineEnd && source[i] == '\\') { i += 2; continue; }
+		if (i == lineEnd || source[i] == '|')
+		{
+			const uint32_t segEnd = std::min(i, lineEnd);
+			const std::string seg = source.substr(segBeg, segEnd - segBeg);
+			if (i == lineEnd)
+			{
+				// After a trailing pipe only blanks may remain; then there is no
+				// last cell, the line simply ends with `|`.
+				bool blank = true;
+				for (char c : seg) if (!IsBlank(c)) { blank = false; break; }
+				if (blank && !t.cells.empty() && segBeg > lineBeg && source[segBeg - 1] == '|') { t.trail = true; break; }
+				t.cells.push_back(seg);
+				break;
+			}
+			t.cells.push_back(seg);
+			i++;
+			segBeg = i;
+			continue;
+		}
+		i++;
+	}
+	return t;
+}
+
+bool CMarkdownDocument::EditTable(int32_t cell, EMarkdownTableEdit edit, uint32_t *caretOut)
+{
+	if (cell <= 0 || cell >= (int32_t)blocks.size() || !blocks[cell].IsCell()) return false;
+	const int32_t table = TableOf(cell);
+	if (table < 0) return false;
+	const std::vector<int32_t> rows = RowsOf(table);
+	const int32_t rowBlock = RowOf(cell);
+	int row = -1;
+	for (size_t r = 0; r < rows.size(); r++) if (rows[r] == rowBlock) row = (int)r;
+	int col = ColumnOf(cell);
+	if (row < 0 || col < 0) return false;
+	const int headRows = std::max<int>(1, blocks[table].headRowCount);
+	const int rowCount = (int)rows.size();
+	const int colCount = std::max<int>(1, blocks[table].columnCount);
+
+	// The table's physical lines: head rows, the delimiter row, body rows.
+	const uint32_t tableBeg = blocks[table].beg, tableEnd = blocks[table].end;
+	std::vector<TableLine> lines;
+	int delimLine = -1;
+	for (uint32_t lb = tableBeg; lb <= tableEnd; )
+	{
+		const uint32_t le = LineEnd(lb);
+		if (delimLine < 0 && LineIsTableDelimiter(lb, le)) delimLine = (int)lines.size();
+		lines.push_back(SplitTableLine(lb, le));
+		if (le >= tableEnd || le >= Size()) break;
+		lb = le + 1;
+	}
+	if (delimLine < 0) return false;
+	auto lineOfRow = [&](int r) { return r < headRows ? r : r + 1; };   // the delimiter sits after the head rows
+
+	int targetRow = row, targetCol = col;
+	const std::string blanks = "   ";
+	switch (edit)
+	{
+		case EMarkdownTableEdit::InsertRowAbove:
+		case EMarkdownTableEdit::InsertRowBelow:
+		{
+			const bool below = edit == EMarkdownTableEdit::InsertRowBelow;
+			if (!below && row < headRows) return false;
+			TableLine fresh;
+			const TableLine &ref = lines[delimLine];
+			fresh.prefix = lines[lineOfRow(row)].prefix;
+			fresh.lead = ref.lead;
+			fresh.trail = ref.trail;
+			for (int c = 0; c < (int)ref.cells.size(); c++)
+				fresh.cells.push_back(std::string(std::max<size_t>(3, ref.cells[c].size()), ' '));
+			const int at = below ? (row < headRows ? delimLine + 1 : lineOfRow(row) + 1) : lineOfRow(row);
+			lines.insert(lines.begin() + at, fresh);
+			targetRow = below ? (row < headRows ? headRows : row + 1) : row;
+			break;
+		}
+		case EMarkdownTableEdit::DeleteRow:
+			if (row < headRows) return false;
+			lines.erase(lines.begin() + lineOfRow(row));
+			targetRow = row + 1 < rowCount ? row : row - 1;
+			break;
+		case EMarkdownTableEdit::MoveRowUp:
+		case EMarkdownTableEdit::MoveRowDown:
+		{
+			const int other = edit == EMarkdownTableEdit::MoveRowUp ? row - 1 : row + 1;
+			if (row < headRows || other < headRows || other >= rowCount) return false;
+			std::swap(lines[lineOfRow(row)], lines[lineOfRow(other)]);
+			targetRow = other;
+			break;
+		}
+		case EMarkdownTableEdit::InsertColumnLeft:
+		case EMarkdownTableEdit::InsertColumnRight:
+		{
+			const int at = edit == EMarkdownTableEdit::InsertColumnRight ? col + 1 : col;
+			for (int l = 0; l < (int)lines.size(); l++)
+			{
+				TableLine &tl = lines[l];
+				const std::string seg = l == delimLine ? std::string("---") : blanks;
+				const bool padded = !tl.cells.empty() && !tl.cells[0].empty() && tl.cells[0][0] == ' ';
+				const std::string cellText = l == delimLine && padded ? " " + seg + " " : seg;
+				if (at <= (int)tl.cells.size()) tl.cells.insert(tl.cells.begin() + at, cellText);
+				else tl.cells.push_back(cellText);
+			}
+			targetCol = at;
+			break;
+		}
+		case EMarkdownTableEdit::DeleteColumn:
+			if (colCount <= 1) return false;
+			for (TableLine &tl : lines)
+				if (col < (int)tl.cells.size()) tl.cells.erase(tl.cells.begin() + col);
+			targetCol = col + 1 < colCount ? col : col - 1;
+			break;
+		case EMarkdownTableEdit::MoveColumnLeft:
+		case EMarkdownTableEdit::MoveColumnRight:
+		{
+			const int other = edit == EMarkdownTableEdit::MoveColumnLeft ? col - 1 : col + 1;
+			if (other < 0 || other >= colCount) return false;
+			for (TableLine &tl : lines)
+				if (col < (int)tl.cells.size() && other < (int)tl.cells.size()) std::swap(tl.cells[col], tl.cells[other]);
+			targetCol = other;
+			break;
+		}
+		case EMarkdownTableEdit::AlignDefault:
+		case EMarkdownTableEdit::AlignLeft:
+		case EMarkdownTableEdit::AlignCenter:
+		case EMarkdownTableEdit::AlignRight:
+		{
+			TableLine &dl = lines[delimLine];
+			if (col >= (int)dl.cells.size()) return false;
+			std::string &seg = dl.cells[col];
+			size_t a = 0, b = seg.size();
+			while (a < b && IsBlank(seg[a])) a++;
+			while (b > a && IsBlank(seg[b - 1])) b--;
+			size_t dashes = 0;
+			for (size_t k = a; k < b; k++) if (seg[k] == '-') dashes++;
+			dashes = std::max<size_t>(dashes, 3);
+			const bool left = edit == EMarkdownTableEdit::AlignLeft || edit == EMarkdownTableEdit::AlignCenter;
+			const bool right = edit == EMarkdownTableEdit::AlignRight || edit == EMarkdownTableEdit::AlignCenter;
+			// Keep the segment's width when the colons fit into its dashes.
+			const size_t colons = (left ? 1 : 0) + (right ? 1 : 0);
+			size_t oldColons = 0;
+			for (size_t k = a; k < b; k++) if (seg[k] == ':') oldColons++;
+			if (dashes + oldColons >= colons + 3) dashes = dashes + oldColons - colons;
+			const std::string core = std::string(left ? ":" : "") + std::string(dashes, '-') + std::string(right ? ":" : "");
+			seg = seg.substr(0, a) + core + seg.substr(b);
+			break;
+		}
+	}
+
+	std::string text;
+	for (size_t l = 0; l < lines.size(); l++)
+	{
+		const TableLine &tl = lines[l];
+		if (l > 0) text += '\n';
+		text += tl.prefix;
+		if (tl.lead) text += '|';
+		for (size_t c = 0; c < tl.cells.size(); c++)
+		{
+			if (c > 0) text += '|';
+			text += tl.cells[c];
+		}
+		if (tl.trail) text += '|';
+	}
+	if (text == source.substr(tableBeg, tableEnd - tableBeg)) return false;
+	Replace(tableBeg, tableEnd, text);
+
+	if (caretOut)
+	{
+		*caretOut = tableBeg;
+		const int32_t t = TableOf(FindBlockAt(tableBeg + (uint32_t)lines[0].prefix.size() + 1));
+		if (t > 0)
+		{
+			const std::vector<int32_t> newRows = RowsOf(t);
+			if (targetRow >= 0 && targetRow < (int)newRows.size())
+			{
+				const std::vector<int32_t> cells = CellsOf(newRows[targetRow]);
+				if (targetCol >= 0 && targetCol < (int)cells.size()) *caretOut = blocks[cells[targetCol]].beg;
+			}
+		}
+	}
+	return true;
+}

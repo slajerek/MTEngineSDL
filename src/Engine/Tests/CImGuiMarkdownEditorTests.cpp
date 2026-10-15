@@ -448,4 +448,54 @@ void RegisterMarkdownEditorTests(ImGuiTestEngine *engine)
 		ed.onLinkActivated = nullptr;
 		ed.imageResolver = nullptr;
 	};
+
+	t = IM_REGISTER_TEST(engine, "markdown", "table_menu_tab_and_row_moves");
+	t->TestFunc = [](ImGuiTestContext *ctx)
+	{
+		CGuiViewMarkdownEditor *view = EnsureView(ctx);
+		CMarkdownLiveEditor &ed = view->GetEditor();
+		const std::string src = "Top\n\n| Item | Who |\n|------|-----|\n| Plan | Ann |\n| Ship | Bob |\n";
+		ed.SetSource(src);
+		ctx->Yield(2);
+		auto rowsNow = [&ed]() {
+			const CMarkdownDocument &d = ed.GetDocument();
+			for (int32_t i = 0; i < (int32_t)d.GetBlocks().size(); i++)
+				if (d.GetBlocks()[i].type == EMarkdownBlockType::Table) return (int)d.RowsOf(i).size();
+			return 0;
+		};
+		IM_CHECK_EQ(rowsNow(), 3);
+
+		// Right-click a cell, then "Insert row below" from the table menu.
+		const uint32_t plan = (uint32_t)src.find("Plan");
+		ImVec2 pos;
+		float h = 0;
+		IM_CHECK(ed.GetOffsetScreenPos(plan + 1, &pos, &h));
+		ctx->MouseMoveToPos(ImVec2(pos.x + 1.0f, pos.y + h * 0.5f));
+		ctx->MouseClick(ImGuiMouseButton_Right);
+		ctx->Yield(2);
+		ctx->ItemClick("//$FOCUSED/###md_table_row_below");
+		ctx->Yield(2);
+		IM_CHECK_EQ(rowsNow(), 4);
+		IM_CHECK(ed.GetSource().find("| Plan | Ann |\n|      |     |\n| Ship | Bob |") != std::string::npos);
+		IM_CHECK(ed.GetDocument().GetBlocks()[ed.GetRevealedBlock()].IsCell());   // the caret is in the new row
+
+		// Tab from the very last cell appends a row and selects its first cell.
+		const uint32_t bob = (uint32_t)ed.GetSource().find("Bob");
+		IM_CHECK(ClickOffset(ctx, ed, bob + 1));
+		ctx->KeyPress(ImGuiKey_Tab);
+		ctx->Yield(2);
+		IM_CHECK_EQ(rowsNow(), 5);
+		const CMarkdownDocument &d = ed.GetDocument();
+		const int32_t cell = d.FindBlockAt(ed.GetCaret());
+		IM_CHECK(d.GetBlocks()[cell].IsCell() && d.ColumnOf(cell) == 0);
+		ctx->KeyChars("Test");
+		ctx->Yield(2);
+		IM_CHECK(ed.GetSource().find("| Ship | Bob |\n| Test") != std::string::npos);
+
+		// Alt+Shift+Up moves that row above "Ship".
+		ctx->KeyPress(ImGuiMod_Alt | ImGuiMod_Shift | ImGuiKey_UpArrow);
+		ctx->Yield(2);
+		IM_CHECK(ed.GetSource().find("| Test") < ed.GetSource().find("| Ship"));
+		IM_CHECK_EQ(rowsNow(), 5);
+	};
 }

@@ -234,6 +234,53 @@ void CTestMarkdownDocument::Run(ITestCallback *callback)
 		MD_ASSERT(SpanText(hard, EMarkdownSpanType::Link, 2) == "[**k**](v)", "a link around strong text spans the whole link");
 	}
 
+	// Table edits: whole-line rewrites that keep pipes, padding and escapes.
+	{
+		const std::string tsrc = "Intro\n\n| Name | Age |\n|:-----|----:|\n| Ann  | 31  |\n| Bob  |     |\n| a\\|b | 2 |\n\nAfter\n";
+		auto cellAt = [](const CMarkdownDocument &d, int row, int col) -> int32_t {
+			const int32_t t = FirstOfType(d, EMarkdownBlockType::Table);
+			return d.CellsOf(d.RowsOf(t)[row])[col];
+		};
+		auto tableText = [](const CMarkdownDocument &d) {
+			const int32_t t = FirstOfType(d, EMarkdownBlockType::Table);
+			return d.GetSource().substr(d.GetBlocks()[t].beg, d.GetBlocks()[t].end - d.GetBlocks()[t].beg);
+		};
+		CMarkdownDocument t1(tsrc);
+		uint32_t c = 0;
+		MD_ASSERT(t1.EditTable(cellAt(t1, 1, 0), EMarkdownTableEdit::InsertRowBelow, &c)
+			&& tableText(t1) == "| Name | Age |\n|:-----|----:|\n| Ann  | 31  |\n|      |     |\n| Bob  |     |\n| a\\|b | 2 |",
+			"a new row is as wide as the delimiter row");
+		MD_ASSERT(t1.CellsOf(t1.RowOf(t1.FindBlockAt(c))).size() == 2 && t1.RowsOf(FirstOfType(t1, EMarkdownBlockType::Table)).size() == 5
+			&& t1.GetBlocks()[t1.FindBlockAt(c)].IsCell(), "the caret lands in the new row's cell");
+		MD_ASSERT(t1.GetSource().find("\n\nAfter\n") != std::string::npos && t1.GetSource().rfind("Intro\n\n", 0) == 0, "only the table's lines change");
+		CMarkdownDocument t2(tsrc);
+		MD_ASSERT(!t2.EditTable(cellAt(t2, 0, 0), EMarkdownTableEdit::DeleteRow, nullptr) && !t2.EditTable(cellAt(t2, 0, 0), EMarkdownTableEdit::InsertRowAbove, nullptr)
+			&& !t2.EditTable(cellAt(t2, 1, 0), EMarkdownTableEdit::MoveRowUp, nullptr) && t2.GetSource() == tsrc,
+			"the header row cannot be deleted, preceded or swapped with");
+		MD_ASSERT(t2.EditTable(cellAt(t2, 1, 0), EMarkdownTableEdit::MoveRowDown, nullptr)
+			&& tableText(t2) == "| Name | Age |\n|:-----|----:|\n| Bob  |     |\n| Ann  | 31  |\n| a\\|b | 2 |", "a body row moves down");
+		CMarkdownDocument t3(tsrc);
+		MD_ASSERT(t3.EditTable(cellAt(t3, 1, 0), EMarkdownTableEdit::InsertColumnRight, nullptr)
+			&& tableText(t3) == "| Name |   | Age |\n|:-----|---|----:|\n| Ann  |   | 31  |\n| Bob  |   |     |\n| a\\|b |   | 2 |",
+			"a column is inserted on every line, the delimiter row included; an escaped pipe is not a column");
+		CMarkdownDocument t4(tsrc);
+		MD_ASSERT(t4.EditTable(cellAt(t4, 1, 1), EMarkdownTableEdit::DeleteColumn, nullptr)
+			&& tableText(t4) == "| Name |\n|:-----|\n| Ann  |\n| Bob  |\n| a\\|b |", "a column is deleted from every line");
+		MD_ASSERT(!t4.EditTable(cellAt(t4, 1, 0), EMarkdownTableEdit::DeleteColumn, nullptr), "the last column cannot be deleted");
+		CMarkdownDocument t5(tsrc);
+		MD_ASSERT(t5.EditTable(cellAt(t5, 1, 1), EMarkdownTableEdit::AlignCenter, nullptr)
+			&& tableText(t5).find("|:-----|:---:|") != std::string::npos, "alignment rewrites the delimiter cell and keeps its width");
+		MD_ASSERT(t5.GetBlocks()[cellAt(t5, 1, 1)].align == EMarkdownCellAlign::Center, "and md4c reads it back");
+		CMarkdownDocument t6(tsrc);
+		MD_ASSERT(t6.EditTable(cellAt(t6, 2, 0), EMarkdownTableEdit::MoveColumnRight, &c)
+			&& tableText(t6).rfind("| Age | Name |\n|----:|:-----|", 0) == 0 && t6.GetSource().compare(c, 3, "Bob") == 0,
+			"a column moves with its alignment and the caret follows the cell");
+		CMarkdownDocument quoted("> | a | b |\n> |---|---|\n> | 1 | 2 |\n");
+		const int32_t qt = FirstOfType(quoted, EMarkdownBlockType::Table);
+		MD_ASSERT(qt > 0 && quoted.EditTable(quoted.CellsOf(quoted.RowsOf(qt)[1])[0], EMarkdownTableEdit::InsertRowBelow, nullptr)
+			&& quoted.GetSource() == "> | a | b |\n> |---|---|\n> | 1 | 2 |\n> |   |   |\n", "a table in a quote keeps the quote prefix on a new row");
+	}
+
 	// Degenerate inputs.
 	CMarkdownDocument empty("");
 	MD_ASSERT(empty.GetBlocks().size() == 1 && empty.FindBlockAt(0) == 0, "an empty source is a Document with nothing in it");
