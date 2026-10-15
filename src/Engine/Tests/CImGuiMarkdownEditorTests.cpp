@@ -573,4 +573,50 @@ void RegisterMarkdownEditorTests(ImGuiTestEngine *engine)
 		IM_CHECK(!GImGui->PlatformImeDataPrev.WantTextInput);
 		ed.SetReadOnly(false);
 	};
+
+	t = IM_REGISTER_TEST(engine, "markdown", "find_bar_steps_through_matches");
+	t->TestFunc = [](ImGuiTestContext *ctx)
+	{
+		CGuiViewMarkdownEditor *view = EnsureView(ctx);
+		CMarkdownLiveEditor &ed = view->GetEditor();
+		ed.SetFindQuery("");
+		ed.SetSource("alpha beta\n\nBeta gamma beta\n");
+		ctx->Yield(2);
+		IM_CHECK(ClickOffset(ctx, ed, 0));
+		ctx->KeyPress(ImGuiMod_Ctrl | ImGuiKey_F);
+		ctx->Yield(3);
+		IM_CHECK(ed.IsFindOpen());
+		ctx->KeyChars("beta");          // into the bar, which took the focus
+		ctx->Yield(2);
+		IM_CHECK_EQ(ed.GetFindQuery(), std::string("beta"));
+		IM_CHECK_EQ((int)ed.GetFindMatches().size(), 3);
+		IM_CHECK_EQ(ed.GetCurrentFindMatch(), 0);
+		IM_CHECK_EQ(ed.GetSelectedText(), std::string("beta"));
+		ctx->KeyPress(ImGuiKey_Enter);
+		ctx->Yield(2);
+		IM_CHECK_EQ(ed.GetCurrentFindMatch(), 1);
+		IM_CHECK_EQ(ed.GetSelectedText(), std::string("Beta"));
+		ctx->KeyPress(ImGuiKey_Enter);
+		ctx->Yield(2);
+		ctx->KeyPress(ImGuiKey_Enter);
+		ctx->Yield(2);
+		IM_CHECK_EQ(ed.GetCurrentFindMatch(), 0);   // wrapped
+		ctx->KeyPress(ImGuiMod_Shift | ImGuiKey_Enter);
+		ctx->Yield(2);
+		IM_CHECK_EQ(ed.GetCurrentFindMatch(), 2);
+		IM_CHECK_EQ(ed.GetDocument().FindBlockAt(ed.GetCaret()), ed.GetRevealedBlock());
+
+		// Esc closes the bar and gives the text the keyboard back.
+		ctx->KeyPress(ImGuiKey_Escape);
+		ctx->Yield(3);
+		IM_CHECK(!ed.IsFindOpen());
+		IM_CHECK(ed.IsFocused());
+		// F3 in the text keeps stepping with the last query.
+		ctx->KeyPress(ImGuiKey_F3);
+		ctx->Yield(2);
+		IM_CHECK_EQ(ed.GetCurrentFindMatch(), 0);
+		ctx->KeyChars("Z");             // typing replaces the selected match: the text has the keyboard
+		ctx->Yield(2);
+		IM_CHECK_EQ(ed.GetSource(), std::string("alpha Z\n\nBeta gamma beta\n"));
+	};
 }

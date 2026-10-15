@@ -687,6 +687,163 @@ void CMarkdownLiveEditor::RenderTableMenu()
 	ImGui::EndPopup();
 }
 
+// ---- Find ----------------------------------------------------------------------------
+
+void CMarkdownLiveEditor::UpdateFindMatches() const
+{
+	if (findMatchesParse == doc.GetParseCount() && findMatchesQuery == findQuery && findMatchesCase == findCaseSensitive) return;
+	findMatchesParse = doc.GetParseCount();
+	findMatchesQuery = findQuery;
+	findMatchesCase = findCaseSensitive;
+	findMatches.clear();
+	if (findQuery.empty()) return;
+	const std::string &src = doc.GetSource();
+	auto fold = [this](char c) { return (!findCaseSensitive && c >= 'A' && c <= 'Z') ? (char)(c - 'A' + 'a') : c; };
+	const size_t n = findQuery.size();
+	for (size_t i = 0; i + n <= src.size(); )
+	{
+		size_t k = 0;
+		while (k < n && fold(src[i + k]) == fold(findQuery[k])) k++;
+		if (k == n) { findMatches.push_back({(uint32_t)i, (uint32_t)(i + n)}); i += n; }
+		else i++;
+	}
+}
+
+const std::vector<std::pair<uint32_t, uint32_t>> &CMarkdownLiveEditor::GetFindMatches() const
+{
+	UpdateFindMatches();
+	return findMatches;
+}
+
+int CMarkdownLiveEditor::GetCurrentFindMatch() const
+{
+	const auto &m = GetFindMatches();
+	const uint32_t a = std::min(anchor, caret), b = std::max(anchor, caret);
+	for (size_t i = 0; i < m.size(); i++)
+		if (m[i].first == a && m[i].second == b) return (int)i;
+	return -1;
+}
+
+void CMarkdownLiveEditor::OpenFind()
+{
+	findOpen = true;
+	findFocusRequest = true;
+	// A selection on one line seeds the query, as in every editor.
+	if (HasSelection())
+	{
+		const std::string sel = GetSelectedText();
+		if (sel.find('\n') == std::string::npos && sel.size() < sizeof(findBuffer)) SetFindQuery(sel);
+	}
+}
+
+void CMarkdownLiveEditor::CloseFind()
+{
+	if (!findOpen) return;
+	findOpen = false;
+	findReturnFocus = true;
+}
+
+void CMarkdownLiveEditor::SetFindQuery(std::string_view query)
+{
+	findQuery.assign(query.data(), std::min(query.size(), sizeof(findBuffer) - 1));
+	memcpy(findBuffer, findQuery.data(), findQuery.size());
+	findBuffer[findQuery.size()] = 0;
+}
+
+void CMarkdownLiveEditor::SetFindCaseSensitive(bool value)
+{
+	findCaseSensitive = value;
+}
+
+bool CMarkdownLiveEditor::FindNext()
+{
+	const auto &m = GetFindMatches();
+	if (m.empty()) return false;
+	const uint32_t from = std::max(anchor, caret);
+	size_t i = 0;
+	while (i < m.size() && m[i].first < from) i++;
+	// The match already selected is not "next".
+	if (i < m.size() && GetCurrentFindMatch() == (int)i) i++;
+	if (i >= m.size()) i = 0;
+	SetSelection(m[i].first, m[i].second);
+	preferredX = -1;
+	scrollToCaret = true;
+	return true;
+}
+
+bool CMarkdownLiveEditor::FindPrevious()
+{
+	const auto &m = GetFindMatches();
+	if (m.empty()) return false;
+	const uint32_t from = std::min(anchor, caret);
+	int i = (int)m.size() - 1;
+	while (i >= 0 && m[i].first >= from) i--;
+	if (i < 0) i = (int)m.size() - 1;
+	SetSelection(m[i].first, m[i].second);
+	preferredX = -1;
+	scrollToCaret = true;
+	return true;
+}
+
+void CMarkdownLiveEditor::RenderFindBar()
+{
+	ImGui::PushID("##md_find");
+	const float h = ImGui::GetFrameHeight();
+	const float buttonW = h * 1.2f;
+	const float countW = ImGui::CalcTextSize("0000 / 0000").x + ImGui::GetStyle().ItemSpacing.x;
+	const float inputW = std::max(h * 4.0f, ImGui::GetContentRegionAvail().x - countW - 4 * (buttonW + ImGui::GetStyle().ItemSpacing.x));
+
+	if (findFocusRequest) { ImGui::SetKeyboardFocusHere(); findFocusRequest = false; }
+	ImGui::SetNextItemWidth(inputW);
+	const bool enter = ImGui::InputTextWithHint("###md_find_query", L("markdown.editor.find.hint", "Find"), findBuffer, sizeof(findBuffer),
+		ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
+	const bool inputActive = ImGui::IsItemActive() || ImGui::IsItemDeactivated();   // Esc deactivates it in the same frame
+	if (std::string_view(findBuffer) != findQuery)
+	{
+		// Typing searches as it goes: the first match from where the caret is.
+		findQuery = findBuffer;
+		const uint32_t from = std::min(anchor, caret);
+		const auto &m = GetFindMatches();
+		size_t i = 0;
+		while (i < m.size() && m[i].first < from) i++;
+		if (i >= m.size()) i = 0;
+		if (!m.empty()) { SetSelection(m[i].first, m[i].second); scrollToCaret = true; }
+	}
+	if (enter)
+	{
+		if (ImGui::GetIO().KeyShift) FindPrevious(); else FindNext();
+		ImGui::SetKeyboardFocusHere(-1);   // keep typing in the bar
+	}
+	if (inputActive && ImGui::IsKeyPressed(ImGuiKey_Escape, false)) CloseFind();
+	if (inputActive && ImGui::IsKeyPressed(ImGuiKey_F3)) { if (ImGui::GetIO().KeyShift) FindPrevious(); else FindNext(); }
+
+	ImGui::SameLine();
+	const auto &m = GetFindMatches();
+	const int cur = GetCurrentFindMatch();
+	char count[64];
+	if (findQuery.empty()) count[0] = 0;
+	else if (m.empty()) snprintf(count, sizeof(count), "%s", L("markdown.editor.find.none", "No results"));
+	else snprintf(count, sizeof(count), "%d / %d", cur >= 0 ? cur + 1 : 0, (int)m.size());
+	ImGui::AlignTextToFramePadding();
+	ImGui::TextUnformatted(count);
+	ImGui::SameLine(ImGui::GetContentRegionMax().x - 4 * buttonW - 3 * ImGui::GetStyle().ItemSpacing.x);
+	if (ImGui::Button("<###md_find_prev", ImVec2(buttonW, h))) FindPrevious();
+	ImGui::SetItemTooltip("%s", L("markdown.editor.find.previous", "Previous match (Shift+Enter)"));
+	ImGui::SameLine();
+	if (ImGui::Button(">###md_find_next", ImVec2(buttonW, h))) FindNext();
+	ImGui::SetItemTooltip("%s", L("markdown.editor.find.next", "Next match (Enter)"));
+	ImGui::SameLine();
+	if (findCaseSensitive) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetColorU32(ImGuiCol_ButtonActive));
+	const bool caseClicked = ImGui::Button("Aa###md_find_case", ImVec2(buttonW, h));
+	if (findCaseSensitive) ImGui::PopStyleColor();
+	if (caseClicked) findCaseSensitive = !findCaseSensitive;
+	ImGui::SetItemTooltip("%s", L("markdown.editor.find.match_case", "Match case"));
+	ImGui::SameLine();
+	if (ImGui::Button("x###md_find_close", ImVec2(buttonW, h))) CloseFind();
+	ImGui::SetItemTooltip("%s", L("markdown.editor.find.close", "Close (Esc)"));
+	ImGui::PopID();
+}
+
 bool CMarkdownLiveEditor::MoveToNextCell(bool backwards)
 {
 	int32_t cell = -1;
@@ -1911,6 +2068,10 @@ void CMarkdownLiveEditor::ProcessKeyboard()
 	else if (pressed(EMarkdownEditorCommand::Paragraph, false)) SetHeadingLevel(0);
 	else if (pressed(EMarkdownEditorCommand::Undo, true)) Undo();
 	else if (pressed(EMarkdownEditorCommand::Redo, true) || pressed(EMarkdownEditorCommand::RedoAlternate, true)) Redo();
+	else if (pressed(EMarkdownEditorCommand::Find, false)) OpenFind();
+	else if (pressed(EMarkdownEditorCommand::FindNext, true)) { if (findQuery.empty()) OpenFind(); else FindNext(); }
+	else if (pressed(EMarkdownEditorCommand::FindPrevious, true)) { if (findQuery.empty()) OpenFind(); else FindPrevious(); }
+	else if (findOpen && ImGui::Shortcut(ImGuiKey_Escape)) CloseFind();
 	else if (pressed(EMarkdownEditorCommand::ToggleTaskOrInsertRow, false))
 	{
 		if (inCell) EditTable(EMarkdownTableEdit::InsertRowBelow);
@@ -2007,6 +2168,7 @@ void CMarkdownLiveEditor::Draw(ImDrawList *dl, ImVec2 origin)
 	}
 
 	caretRectValid = false;
+	if (findOpen) UpdateFindMatches();
 	const int caretLine = FindLineOfOffset(caret);
 	const bool showCaret = focused;
 
@@ -2015,6 +2177,22 @@ void CMarkdownLiveEditor::Draw(ImDrawList *dl, ImVec2 origin)
 	{
 		const Line &line = layout.lines[li];
 		const float baseY = origin.y + line.y + line.ascent;
+
+		// Find matches (the selected one is drawn as the selection).
+		if (findOpen && !findMatches.empty())
+		{
+			const ImU32 matchCol = WithAlpha(ImGui::GetColorU32(ImGuiCol_PlotHistogram), 0.35f);
+			for (const Glyph &g : line.glyphs)
+			{
+				if (g.synthetic) continue;
+				auto it = std::upper_bound(findMatches.begin(), findMatches.end(), g.offset,
+					[](uint32_t o, const std::pair<uint32_t, uint32_t> &m) { return o < m.first; });
+				if (it == findMatches.begin()) continue;
+				--it;
+				if (g.offset >= it->first && g.offset < it->second)
+					dl->AddRectFilled(ImVec2(origin.x + g.x0, origin.y + line.y), ImVec2(origin.x + g.x1, origin.y + line.y + line.height), matchCol);
+			}
+		}
 
 		// Selection.
 		if (selA != selB)
@@ -2121,8 +2299,20 @@ void CMarkdownLiveEditor::Draw(ImDrawList *dl, ImVec2 origin)
 void CMarkdownLiveEditor::Render(const char *id, ImVec2 size)
 {
 	ImGui::PushID(id);
+	if (findOpen)
+	{
+		// The bar sits above the text, outside the scrolling area.
+		RenderFindBar();
+		if (size.y > 0) size.y = std::max(1.0f, size.y - ImGui::GetFrameHeightWithSpacing());
+	}
 	const ImGuiWindowFlags flags = ImGuiWindowFlags_NoMove;
 	ImGui::BeginChild("##md_live_editor", size, ImGuiChildFlags_None, flags);
+	if (findReturnFocus)
+	{
+		ImGui::SetWindowFocus();
+		focused = true;
+		findReturnFocus = false;
+	}
 
 	const float pad = ImGui::GetStyle().FramePadding.x;
 	const float width = std::max(10.0f, ImGui::GetContentRegionAvail().x - 2 * pad);

@@ -279,5 +279,33 @@ void CTestMarkdownLiveEditor::Run(ITestCallback *callback)
 			"engine key codes map to ImGui keys");
 	}
 
+	// ---- Find -------------------------------------------------------------------------
+	{
+		CMarkdownLiveEditor ed;
+		ed.SetSource("Plan **beta** now\n\nBeta test, then beta.\n");
+		ed.SetFindQuery("beta");
+		MDE_ASSERT(ed.GetFindMatches().size() == 3, "matching is case-insensitive by default and runs over the source");
+		ed.SetFindCaseSensitive(true);
+		MDE_ASSERT(ed.GetFindMatches().size() == 2, "Match case drops 'Beta'");
+		ed.SetFindCaseSensitive(false);
+		ed.SetCaret(0);
+		MDE_ASSERT(ed.FindNext() && ed.GetSelectedText() == "beta" && ed.GetCurrentFindMatch() == 0, "FindNext selects the first match after the caret");
+		MDE_ASSERT(ed.FindNext() && ed.GetSelectedText() == "Beta" && ed.GetCurrentFindMatch() == 1, "then the next");
+		ed.FindNext();
+		MDE_ASSERT(ed.FindNext() && ed.GetCurrentFindMatch() == 0, "and wraps around");
+		MDE_ASSERT(ed.FindPrevious() && ed.GetCurrentFindMatch() == 2, "FindPrevious wraps backwards");
+		MDE_ASSERT(ed.GetDocument().GetBlocks()[ed.GetRevealedBlock()].type == EMarkdownBlockType::Paragraph
+			&& ed.GetRevealedBlock() == ed.GetDocument().FindBlockAt(ed.GetCaret()), "the selected match's unit is revealed");
+		ed.SetFindQuery("**be");
+		MDE_ASSERT(ed.GetFindMatches().size() == 1, "a query with markers finds the markers");
+		ed.SetFindQuery("beta");
+		const uint32_t firstBefore = ed.GetFindMatches()[0].first;
+		ed.SetCaret(0);
+		ed.InsertText("X ");
+		MDE_ASSERT(ed.GetFindMatches().size() == 3 && ed.GetFindMatches()[0].first == firstBefore + 2, "matches follow edits");
+		ed.SetFindQuery("");
+		MDE_ASSERT(ed.GetFindMatches().empty() && !ed.FindNext(), "an empty query finds nothing");
+	}
+
 	TestCompleted(true, "Markdown live editor: commands and undo");
 }

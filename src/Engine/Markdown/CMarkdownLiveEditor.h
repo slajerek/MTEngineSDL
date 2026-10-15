@@ -161,6 +161,28 @@ public:
 	// and Ctrl/Cmd+Enter (row below). False when not in a cell or refused.
 	bool EditTable(EMarkdownTableEdit edit);
 
+	// ---- Find (Ctrl/Cmd+F). A bar above the text: matches of the query in the
+	// SOURCE (so `bold` finds `**bold**`; a query with markers finds them),
+	// all highlighted, the current one selected -- which reveals its unit.
+	// Enter / Shift+Enter in the bar, F3 / Shift+F3 in the text step through
+	// them, wrapping; Esc closes and returns to the text. Case-insensitive
+	// matching folds ASCII only.
+	void OpenFind();
+	void CloseFind();
+	bool IsFindOpen() const { return findOpen; }
+	void SetFindQuery(std::string_view query);
+	const std::string &GetFindQuery() const { return findQuery; }
+	void SetFindCaseSensitive(bool value);
+	bool IsFindCaseSensitive() const { return findCaseSensitive; }
+	// Matches as [beg, end) source ranges, in order.
+	const std::vector<std::pair<uint32_t, uint32_t>> &GetFindMatches() const;
+	// Index of the selected match, -1 when the selection is not a match.
+	int GetCurrentFindMatch() const;
+	// Select the next / previous match from the caret, wrapping. False when
+	// there is none.
+	bool FindNext();
+	bool FindPrevious();
+
 	// Table navigation; false when the caret is not in a cell. Tab in the last
 	// cell appends a row.
 	bool MoveToNextCell(bool backwards);
@@ -333,6 +355,8 @@ private:
 	void Changed();
 	void ComputeRevealed();
 	void RenderTableMenu();
+	void RenderFindBar();
+	void UpdateFindMatches() const;
 	bool SelectFirstCellOfRow();
 	struct RevealUnit { int32_t block; uint32_t beg; uint32_t end; };
 	void RebuildUnits();
@@ -367,7 +391,18 @@ private:
 	std::vector<uint8_t> hiddenSyntax;          // per byte of [revealBeg, revealEnd): an inline marker not shown
 	float revealLeftOverride = -1;
 	std::vector<int32_t> revealImages;          // image spans in the revealed range the caret does not touch
-	static const char *(*translateFunc)(const char *key);              // the revealed unit starts on a list marker line: lay it out from the list's left edge
+	static const char *(*translateFunc)(const char *key);
+
+	bool findOpen = false;
+	bool findFocusRequest = false;
+	bool findReturnFocus = false;
+	bool findCaseSensitive = false;
+	std::string findQuery;
+	char findBuffer[256] = {0};
+	mutable std::vector<std::pair<uint32_t, uint32_t>> findMatches;
+	mutable uint32_t findMatchesParse = UINT32_MAX;
+	mutable std::string findMatchesQuery;
+	mutable bool findMatchesCase = false;              // the revealed unit starts on a list marker line: lay it out from the list's left edge
 	uint32_t layoutCount = 0;
 	ImVec2 itemMin, itemMax, contentOrigin;
 	float scrollY = 0;
