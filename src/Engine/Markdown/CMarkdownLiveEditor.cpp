@@ -2155,6 +2155,29 @@ void CMarkdownLiveEditor::Render(const char *id, ImVec2 size)
 
 	Draw(ImGui::GetWindowDrawList(), contentOrigin);
 
+	// IME and text input. The SDL3 backend starts SDL text input -- without
+	// which no characters arrive at all -- only for a frame whose platform
+	// IME data asks for it (ImGui's InputText does the same), and it places
+	// the OS composition and candidate windows at InputPos. So: every focused
+	// frame, at the caret.
+	if (focused && !readOnly)
+	{
+		ImGuiPlatformImeData &ime = GImGui->PlatformImeData;
+		ime.WantVisible = true;
+		ime.WantTextInput = true;
+		if (caretRectValid)
+		{
+			ime.InputPos = ImVec2(caretMin.x - 1.0f, caretMin.y);
+			ime.InputLineHeight = caretMax.y - caretMin.y;
+		}
+		else
+		{
+			ime.InputPos = itemMin;
+			ime.InputLineHeight = ImGui::GetFontSize();
+		}
+		ime.ViewportId = ImGui::GetWindowViewport()->ID;
+	}
+
 	ImGui::EndChild();
 	ImGui::PopID();
 }

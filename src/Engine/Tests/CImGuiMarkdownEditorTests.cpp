@@ -1,5 +1,6 @@
 #include "CImGuiMarkdownEditorTests.h"
 #include "imgui.h"
+#include "imgui_internal.h"
 #include "imgui_te_engine.h"
 #include "imgui_te_context.h"
 #include "CGuiMain.h"
@@ -7,6 +8,7 @@
 #include "CMarkdownEditorBindings.h"
 #include "CSlrKeyboardShortcuts.h"
 
+#include <cmath>
 #include <string>
 
 namespace
@@ -537,5 +539,38 @@ void RegisterMarkdownEditorTests(ImGuiTestEngine *engine)
 		ctx->KeyPress(ImGuiMod_Ctrl | ImGuiKey_B);
 		ctx->Yield(2);
 		IM_CHECK_EQ(ed.GetSource(), std::string("**make** **me** bold\n"));
+	};
+
+	t = IM_REGISTER_TEST(engine, "markdown", "ime_data_follows_the_caret");
+	t->TestFunc = [](ImGuiTestContext *ctx)
+	{
+		CGuiViewMarkdownEditor *view = EnsureView(ctx);
+		CMarkdownLiveEditor &ed = view->GetEditor();
+		ed.SetSource("First line\n\nSecond paragraph\n");
+		ctx->Yield(2);
+		IM_CHECK(ClickOffset(ctx, ed, 3));
+		ctx->Yield(2);
+		// What the editor published last frame (ImGui keeps it as Prev).
+		ImVec2 cmin, cmax;
+		IM_CHECK(ed.GetCaretScreenRect(&cmin, &cmax));
+		const ImGuiPlatformImeData &ime = GImGui->PlatformImeDataPrev;
+		IM_CHECK(ime.WantTextInput);      // what makes SDL3 deliver characters
+		IM_CHECK(ime.WantVisible);
+		IM_CHECK(std::fabs(ime.InputPos.x - (cmin.x - 1.0f)) < 0.5f);
+		IM_CHECK(std::fabs(ime.InputPos.y - cmin.y) < 0.5f);
+		IM_CHECK(std::fabs(ime.InputLineHeight - (cmax.y - cmin.y)) < 0.5f);
+
+		// The caret moves to the next paragraph: so does the IME position.
+		const float firstY = ime.InputPos.y;
+		IM_CHECK(ClickOffset(ctx, ed, (uint32_t)ed.GetSource().find("paragraph")));
+		ctx->Yield(2);
+		IM_CHECK_GT(GImGui->PlatformImeDataPrev.InputPos.y, firstY + 1.0f);
+
+		// Read-only: the editor asks for no text input (nothing else in the
+		// test window does either).
+		ed.SetReadOnly(true);
+		ctx->Yield(2);
+		IM_CHECK(!GImGui->PlatformImeDataPrev.WantTextInput);
+		ed.SetReadOnly(false);
 	};
 }
