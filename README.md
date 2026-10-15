@@ -37,7 +37,10 @@ parameter file (`mtengine-app.conf`) and a build stub per platform that hands
 over to `tools/appbuild/app-build-<platform>`. The build flow itself lives
 here, so an app repo holds parameters rather than a copy of the machinery.
 
-`MTEngineSDLDummyApp` is the template to copy:
+`MTEngineSDLTemplateApp` is a template to create new apps:
+https://github.com/slajerek/MTEngineSDLTemplateApp
+
+`MTEngineSDLDemoApp` is a demo app:
 https://github.com/slajerek/MTEngineSDLDemoApp
 
 ## Capabilities
