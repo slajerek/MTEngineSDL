@@ -68,6 +68,18 @@ public:
 	std::string GetDescription() override { return "Markdown edit"; }
 };
 
+const char *(*CMarkdownLiveEditor::translateFunc)(const char *key) = nullptr;
+
+const char *CMarkdownLiveEditor::L(const char *key, const char *fallback)
+{
+	if (translateFunc != nullptr)
+	{
+		const char *t = translateFunc(key);
+		if (t != nullptr && strcmp(t, key) != 0) return t;
+	}
+	return fallback;
+}
+
 CMarkdownLiveEditor::CMarkdownLiveEditor()
 {
 	undoTarget = std::make_shared<UndoTarget>(UndoTarget{this});
@@ -571,6 +583,52 @@ void CMarkdownLiveEditor::ToggleEmphasis()
 	Changed();
 }
 
+bool CMarkdownLiveEditor::ToggleTask()
+{
+	const int32_t item = doc.FindTaskItemAt(caret);
+	if (item < 0) return false;
+	return ToggleTaskAt(doc.GetBlocks()[item].taskMarkOffset);
+}
+
+bool CMarkdownLiveEditor::ToggleTaskAt(uint32_t markOffset)
+{
+	if (readOnly) return false;
+	const int32_t item = doc.FindTaskItemByMark(markOffset);
+	if (item < 0) return false;
+	BeginCompound();
+	const bool done = doc.ToggleTask(item);
+	EndCompound();
+	if (done) Changed();
+	return done;
+}
+
+void CMarkdownLiveEditor::InsertLink()
+{
+	if (readOnly) return;
+	const uint32_t a = std::min(anchor, caret), b = std::max(anchor, caret);
+	const std::string sel = doc.GetSource().substr(a, b - a);
+	const bool isUrl = sel.rfind("http://", 0) == 0 || sel.rfind("https://", 0) == 0 || sel.rfind("mailto:", 0) == 0;
+	BeginCompound();
+	if (sel.empty() || sel.find('\n') != std::string::npos)
+	{
+		doc.Replace(b, b, "[]()");
+		caret = anchor = b + 1;
+	}
+	else if (isUrl)
+	{
+		doc.Replace(a, b, "[](" + sel + ")");
+		caret = anchor = a + 1;
+	}
+	else
+	{
+		doc.Replace(a, b, "[" + sel + "]()");
+		caret = anchor = a + (uint32_t)sel.size() + 3;
+	}
+	EndCompound();
+	scrollToCaret = true;
+	Changed();
+}
+
 bool CMarkdownLiveEditor::MoveToNextCell(bool backwards)
 {
 	int32_t cell = -1;
@@ -711,6 +769,38 @@ void CMarkdownLiveEditor::EndLine(Emit &e)
 
 void CMarkdownLiveEditor::PutGlyph(Emit &e, ImWchar cp, uint32_t offset, const Style &st, bool synthetic, bool syntax, bool breakable)
 {
+	Glyph g{};
+	g.offset = offset;
+	g.cp = cp;
+	g.synthetic = synthetic;
+	g.syntax = syntax;
+	g.isNewline = false;
+	g.height = LineHeightFor(st);
+	g.ascent = st.font->GetFontBaked(st.size)->Ascent + (g.height - st.size) * 0.5f;
+	g.next = synthetic ? offset : offset + (uint32_t)Utf8Length((unsigned char)doc.GetSource()[offset]);
+	g.image = -1;
+	g.deco = kDecoNone;
+	PutGlyphG(e, g, st, breakable, Advance(st, cp));
+}
+
+void CMarkdownLiveEditor::PutDeco(Emit &e, uint8_t deco, uint32_t anchorOffset, const Style &st, float advance)
+{
+	Glyph g{};
+	g.offset = anchorOffset;
+	g.cp = ' ';
+	g.synthetic = true;
+	g.syntax = false;
+	g.isNewline = false;
+	g.height = LineHeightFor(st);
+	g.ascent = st.font->GetFontBaked(st.size)->Ascent + (g.height - st.size) * 0.5f;
+	g.next = anchorOffset;
+	g.image = -1;
+	g.deco = deco;
+	PutGlyphG(e, g, st, false, advance);
+}
+
+void CMarkdownLiveEditor::PutGlyphG(Emit &e, Glyph g, const Style &st, bool breakable, float adv)
+{
 	if (!e.pendingLine) StartLine(e, 0);
 	if (e.line == nullptr)
 	{
@@ -722,7 +812,7 @@ void CMarkdownLiveEditor::PutGlyph(Emit &e, ImWchar cp, uint32_t offset, const S
 		line.width = e.lineRight - e.lineLeft;
 		line.block = e.block;
 		line.begOffset = UINT32_MAX;
-		line.endOffset = offset;
+		line.endOffset = g.offset;
 		line.quoteDepth = e.quoteDepth;
 		line.codeBackground = e.codeBg;
 		line.bgColor = e.bgColor;
@@ -731,11 +821,10 @@ void CMarkdownLiveEditor::PutGlyph(Emit &e, ImWchar cp, uint32_t offset, const S
 		e.x = e.lineLeft;
 	}
 
-	const float adv = Advance(st, cp);
 	Line *line = e.line;
 
 	// Wrap: move the tail after the last breakable glyph to a fresh line.
-	if (e.x + adv > e.lineRight && !line->glyphs.empty() && !synthetic)
+	if (e.x + adv > e.lineRight && !line->glyphs.empty() && !g.synthetic)
 	{
 		std::vector<Glyph> tail;
 		if (e.lastBreakGlyph >= 0 && e.lastBreakGlyph + 1 < (int)line->glyphs.size())
@@ -743,19 +832,15 @@ void CMarkdownLiveEditor::PutGlyph(Emit &e, ImWchar cp, uint32_t offset, const S
 			tail.assign(line->glyphs.begin() + e.lastBreakGlyph + 1, line->glyphs.end());
 			line->glyphs.erase(line->glyphs.begin() + e.lastBreakGlyph + 1, line->glyphs.end());
 		}
-		else if (e.lastBreakGlyph < 0)
-		{
-			// No break opportunity: break right here (a very long word).
-		}
-		else
-		{
-			// The break glyph is the last one: nothing to move.
-		}
-		// Recompute the end offset of the shortened line.
+		// (No break opportunity -- a very long word -- breaks right here; a
+		// break glyph that is the last one leaves nothing to move.)
 		if (!line->glyphs.empty())
 		{
 			const Glyph &last = line->glyphs.back();
-			line->endOffset = last.synthetic ? last.offset : last.offset + (uint32_t)Utf8Length((unsigned char)doc.GetSource()[last.offset]);
+			line->endOffset = last.synthetic ? last.offset : last.next;
+			line->height = 0;
+			line->ascent = 0;
+			for (const Glyph &k : line->glyphs) { line->height = std::max(line->height, k.height); line->ascent = std::max(line->ascent, k.ascent); }
 		}
 		else line->endOffset = line->begOffset;
 
@@ -763,14 +848,13 @@ void CMarkdownLiveEditor::PutGlyph(Emit &e, ImWchar cp, uint32_t offset, const S
 		EndLine(e);
 		StartLine(e, 0);
 		e.curOffset = savedOffset;
-		for (const Glyph &g : tail)
+		for (const Glyph &t : tail)
 		{
-			// Re-emit the tail with its own style: look it up through the
-			// layout's style table.
-			const Style &gs = e.layout->styles[g.style];
-			PutGlyph(e, g.cp, g.offset, gs, g.synthetic, g.syntax, g.cp == ' ');
+			// Re-emit the tail with its own style and width.
+			const Style &ts = e.layout->styles[t.style];
+			PutGlyphG(e, t, ts, t.cp == ' ' && t.deco == kDecoNone, t.x1 - t.x0);
 		}
-		PutGlyph(e, cp, offset, st, synthetic, syntax, breakable);
+		PutGlyphG(e, g, st, breakable, adv);
 		return;
 	}
 
@@ -789,34 +873,61 @@ void CMarkdownLiveEditor::PutGlyph(Emit &e, ImWchar cp, uint32_t offset, const S
 		styleIndex = (uint16_t)i;
 	}
 
-	Glyph g;
-	g.offset = offset;
 	g.x0 = e.x;
 	g.x1 = e.x + adv;
-	g.cp = cp;
 	g.style = styleIndex;
-	g.synthetic = synthetic;
-	g.syntax = syntax;
-	g.isNewline = false;
 	line->glyphs.push_back(g);
 	if (breakable) e.lastBreakGlyph = (int)line->glyphs.size() - 1;
 	e.x += adv;
 
-	const float h = LineHeightFor(st);
-	const float ascent = st.font->GetFontBaked(st.size)->Ascent + (h - st.size) * 0.5f;
-	line->height = std::max(line->height, h);
-	line->ascent = std::max(line->ascent, ascent);
-	if (line->begOffset == UINT32_MAX || offset < line->begOffset) line->begOffset = offset;
-	if (!synthetic)
+	line->height = std::max(line->height, g.height);
+	line->ascent = std::max(line->ascent, g.ascent);
+	if (line->begOffset == UINT32_MAX || g.offset < line->begOffset) line->begOffset = g.offset;
+	if (!g.synthetic)
 	{
-		const uint32_t next = offset + (uint32_t)Utf8Length((unsigned char)doc.GetSource()[offset]);
-		line->endOffset = std::max(line->endOffset, next);
-		e.curOffset = next;
+		line->endOffset = std::max(line->endOffset, g.next);
+		e.curOffset = g.next;
 	}
 	else
 	{
-		line->endOffset = std::max(line->endOffset, offset);
+		line->endOffset = std::max(line->endOffset, g.offset);
 	}
+}
+
+int32_t CMarkdownLiveEditor::ImageSpanOfRun(uint32_t r) const
+{
+	const auto &runs = doc.GetRuns();
+	const auto &spans = doc.GetSpans();
+	if (r >= runs.size()) return -1;
+	for (int32_t sp = runs[r].span; sp >= 0; sp = spans[sp].parent)
+		if (spans[sp].type == EMarkdownSpanType::Image) return sp;
+	return -1;
+}
+
+// An image span as one inline box, when the host resolves it.
+bool CMarkdownLiveEditor::EmitImage(Emit &e, int32_t span, const Style &st)
+{
+	if (!imageResolver || span < 0) return false;
+	const CMarkdownSpan &sp = doc.GetSpans()[span];
+	ImTextureRef tex;
+	ImVec2 size(0, 0);
+	if (!imageResolver(sp.href, &tex, &size) || size.x <= 0 || size.y <= 0) return false;
+	const float maxW = std::max(1.0f, e.lineRight - e.lineLeft);
+	if (size.x > maxW) { size.y *= maxW / size.x; size.x = maxW; }
+	e.layout->images.push_back(tex);
+	Glyph g{};
+	g.offset = sp.beg;
+	g.cp = 0xFFFC;
+	g.synthetic = false;
+	g.syntax = false;
+	g.isNewline = false;
+	g.height = size.y + st.size * 0.35f;
+	g.ascent = size.y + st.size * 0.1f;
+	g.next = sp.end;
+	g.image = (int16_t)(e.layout->images.size() - 1);
+	g.deco = kDecoNone;
+	PutGlyphG(e, g, st, true, size.x);
+	return true;
 }
 
 void CMarkdownLiveEditor::PutNewline(Emit &e, uint32_t offset)
@@ -862,11 +973,30 @@ void CMarkdownLiveEditor::LayoutRuns(Emit &e, int32_t block, bool, uint32_t, uin
 	const bool header = b.type == EMarkdownBlockType::TableHeaderCell;
 	const std::string &src = doc.GetSource();
 
+	// Images with no alt text have no run; they sit before the run they precede.
+	const auto &spans = doc.GetSpans();
+	std::vector<int32_t> bare;
+	if (imageResolver)
+		for (int32_t sp = 0; sp < (int32_t)spans.size(); sp++)
+			if (spans[sp].type == EMarkdownSpanType::Image && spans[sp].runCount == 0 && spans[sp].block == block) bare.push_back(sp);
+	size_t nextBare = 0;
+	int32_t shownImage = -1;
+	const Style plain = StyleFor(0, headingLevel, false, asCode, header);
+
 	for (uint32_t r = b.firstRun; r < b.firstRun + b.runCount; r++)
 	{
+		while (nextBare < bare.size() && spans[bare[nextBare]].firstRun <= r) EmitImage(e, bare[nextBare++], plain);
 		const CMarkdownRun &run = runs[r];
 		if (run.block != block) continue;
 		const Style st = StyleFor(run.styles, headingLevel, false, asCode, header);
+
+		// A resolved image replaces its alt text with the picture.
+		if (run.styles & MD_STYLE_IMAGE)
+		{
+			const int32_t isp = ImageSpanOfRun(r);
+			if (isp >= 0 && isp == shownImage) continue;
+			if (isp >= 0 && EmitImage(e, isp, st)) { shownImage = isp; continue; }
+		}
 
 		if (run.IsSynthesized() || run.beg == run.end)
 		{
@@ -902,6 +1032,7 @@ void CMarkdownLiveEditor::LayoutRuns(Emit &e, int32_t block, bool, uint32_t, uin
 			off += n > 0 ? (uint32_t)n : 1;
 		}
 	}
+	while (nextBare < bare.size()) EmitImage(e, bare[nextBare++], plain);
 }
 
 // Revealed source: every byte of [beg, end) as a glyph, syntax dimmed.
@@ -919,6 +1050,20 @@ void CMarkdownLiveEditor::LayoutSourceRange(Emit &e, int32_t block, uint32_t beg
 	{
 		while (r < runs.size() && (runs[r].IsSynthesized() || runs[r].end <= off)) r++;
 		const bool content = r < runs.size() && off >= runs[r].beg && off < runs[r].end;
+		// An image the caret does not touch stays a picture inside the revealed unit.
+		bool pictured = false;
+		for (int32_t sp : revealImages)
+		{
+			const CMarkdownSpan &span = doc.GetSpans()[sp];
+			if (span.beg == off && span.end > off && EmitImage(e, sp, StyleFor(0, headingLevel, false, false, header)))
+			{
+				off = span.end;
+				e.curOffset = off;
+				pictured = true;
+				break;
+			}
+		}
+		if (pictured) continue;
 		if (!content && off >= revealBeg && off - revealBeg < hiddenSyntax.size() && hiddenSyntax[off - revealBeg])
 		{
 			// An inline marker of a span the caret does not touch: not drawn.
@@ -1163,6 +1308,7 @@ void CMarkdownLiveEditor::LayoutBlock(Emit &e, int32_t block, bool)
 				StartLine(e, first ? base * kParagraphSpacing : (b.listIsTight ? 0.0f : base * kParagraphSpacing * 0.5f));
 				first = false;
 				e.curOffset = item.beg;
+				const uint32_t itemNumber = number++;
 
 				// The revealed unit starts on this item's marker line (the item's
 				// own text, or its first child): the line shows as source from
@@ -1190,23 +1336,30 @@ void CMarkdownLiveEditor::LayoutBlock(Emit &e, int32_t block, bool)
 					e.lineLeft = savedLeft;
 					continue;
 				}
-				// Marker glyphs, right-aligned in the indent column.
-				char marker[32];
-				if (ordered) snprintf(marker, sizeof(marker), "%u%c", number++, b.listMark ? b.listMark : '.');
-				else snprintf(marker, sizeof(marker), "%s", "\xE2\x80\xA2");   // U+2022 bullet
-				float mw = 0;
-				{
-					const char *p = marker;
-					while (*p) { unsigned int cp = 0; const int n = ImTextCharFromUtf8(&cp, p, nullptr); mw += Advance(st, (ImWchar)cp); p += n > 0 ? n : 1; }
-				}
+				// Marker, right-aligned in the indent column: the number as text,
+				// a bullet and a task box as drawn shapes (fonts do not reliably
+				// carry U+2022 / U+2610, and ImGui's default font does not).
 				e.lineLeft = savedLeft + indent;
-				e.x = std::max(savedLeft, savedLeft + indent - mw - Advance(st, ' '));
-				PutSynthetic(e, marker, item.beg, st);
+				if (ordered)
+				{
+					char marker[32];
+					snprintf(marker, sizeof(marker), "%u%c", itemNumber, b.listMark ? b.listMark : '.');
+					float mw = 0;
+					for (const char *p = marker; *p; p++) mw += Advance(st, (ImWchar)(unsigned char)*p);
+					e.x = std::max(savedLeft, savedLeft + indent - mw - Advance(st, ' '));
+					PutSynthetic(e, marker, item.beg, st);
+				}
+				else
+				{
+					const float bw = st.size * 0.5f;
+					e.x = std::max(savedLeft, savedLeft + indent - bw - Advance(st, ' '));
+					PutDeco(e, kDecoBullet, item.beg, st, bw);
+				}
 				e.x = savedLeft + indent;
 				if (item.isTask)
 				{
 					const bool checked = item.taskMark == 'x' || item.taskMark == 'X';
-					PutSynthetic(e, checked ? "\xE2\x98\x91 " : "\xE2\x98\x90 ", item.taskMarkOffset, st);   // U+2611 / U+2610
+					PutDeco(e, checked ? kDecoBoxChecked : kDecoBox, item.taskMarkOffset, st, st.size * 1.35f);
 				}
 
 				// The item's own text (tight list) continues on the marker line.
@@ -1281,6 +1434,15 @@ void CMarkdownLiveEditor::EnsureLayout(float width)
 		for (const CMarkdownSpan &sp : spans)
 			if (sp.beg >= revealBeg && sp.end <= revealEnd) mark(sp, 1);
 		for (int32_t t : touchedSpans) mark(spans[t], 0);
+	}
+	revealImages.clear();
+	if (!revealAllInlineSyntax && imageResolver)
+	{
+		const auto &spans = doc.GetSpans();
+		for (int32_t i = 0; i < (int32_t)spans.size(); i++)
+			if (spans[i].type == EMarkdownSpanType::Image && spans[i].beg >= revealBeg && spans[i].end <= revealEnd
+				&& std::find(touchedSpans.begin(), touchedSpans.end(), i) == touchedSpans.end())
+				revealImages.push_back(i);
 	}
 
 	Emit e;
@@ -1531,10 +1693,40 @@ void CMarkdownLiveEditor::HandleMouse(ImVec2)
 {
 	const ImGuiIO &io = ImGui::GetIO();
 	const bool hovered = ImGui::IsItemHovered();
+	const Glyph *under = hovered ? GlyphAtScreen(io.MousePos) : nullptr;
+	const bool overBox = under != nullptr && (under->deco == kDecoBox || under->deco == kDecoBoxChecked);
+	std::string href;
+	const bool overLink = under != nullptr && LinkOfGlyph(*under, &href);
 	if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
 	{
+		if (overBox)
+		{
+			// The task box toggles in place; the caret does not move into it.
+			ToggleTaskAt(under->offset);
+			focused = true;
+			return;
+		}
+		if (overLink && io.KeyCtrl)
+		{
+			OpenLink(href);
+			focused = true;
+			return;
+		}
 		ClickAt(io.MousePos, io.KeyShift);
 		dragging = true;
+	}
+	if (overLink && !dragging)
+	{
+		if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal | ImGuiHoveredFlags_NoSharedDelay) && ImGui::BeginTooltip())
+		{
+			ImGui::TextUnformatted(href.c_str());
+#if defined(__APPLE__)
+			ImGui::TextDisabled("%s", L("markdown.editor.link_hint", "Cmd+click to open"));
+#else
+			ImGui::TextDisabled("%s", L("markdown.editor.link_hint", "Ctrl+click to open"));
+#endif
+			ImGui::EndTooltip();
+		}
 	}
 	if (dragging)
 	{
@@ -1556,7 +1748,70 @@ void CMarkdownLiveEditor::HandleMouse(ImVec2)
 		}
 		else dragging = false;
 	}
-	if (hovered) ImGui::SetMouseCursor(ImGuiMouseCursor_TextInput);
+	if (hovered)
+		ImGui::SetMouseCursor(overBox || (overLink && io.KeyCtrl) ? ImGuiMouseCursor_Hand : ImGuiMouseCursor_TextInput);
+}
+
+const CMarkdownLiveEditor::Glyph *CMarkdownLiveEditor::GlyphAtScreen(ImVec2 screenPos) const
+{
+	const ImVec2 p(screenPos.x - contentOrigin.x, screenPos.y - contentOrigin.y);
+	for (const Line &line : layout.lines)
+	{
+		if (p.y < line.y || p.y >= line.y + line.height) continue;
+		for (const Glyph &g : line.glyphs)
+			if (p.x >= g.x0 && p.x < g.x1) return &g;
+	}
+	return nullptr;
+}
+
+bool CMarkdownLiveEditor::LinkOfGlyph(const Glyph &g, std::string *href) const
+{
+	if (g.deco != kDecoNone || (g.synthetic && g.image < 0)) return false;
+	const auto &spans = doc.GetSpans();
+	// The innermost link around the glyph wins; an image outside any link
+	// opens its own source.
+	const uint32_t at = g.offset;
+	int32_t best = -1;
+	for (int32_t i = 0; i < (int32_t)spans.size(); i++)
+	{
+		const CMarkdownSpan &sp = spans[i];
+		if (sp.type != EMarkdownSpanType::Link && sp.type != EMarkdownSpanType::WikiLink) continue;
+		if (at >= sp.beg && at < sp.end) best = i;
+	}
+	if (best < 0 && g.image >= 0)
+		best = doc.FindSpanAt(g.offset, EMarkdownSpanType::Image);
+	if (best < 0) return false;
+	// A revealed link's markers are being edited, not followed: only its text
+	// and pictures are live.
+	const CMarkdownSpan &sp = spans[best];
+	if (g.image < 0 && !(at >= sp.contentBeg && at < sp.contentEnd)) return false;
+	if (sp.href.empty()) return false;
+	*href = sp.href;
+	return true;
+}
+
+void CMarkdownLiveEditor::OpenLink(const std::string &href)
+{
+	if (onLinkActivated) { onLinkActivated(href); return; }
+	ImGuiPlatformIO &pio = ImGui::GetPlatformIO();
+	if (pio.Platform_OpenInShellFn) pio.Platform_OpenInShellFn(ImGui::GetCurrentContext(), href.c_str());
+}
+
+bool CMarkdownLiveEditor::ActivateLinkAt(uint32_t offset)
+{
+	const auto &spans = doc.GetSpans();
+	int32_t best = -1;
+	for (int32_t i = 0; i < (int32_t)spans.size(); i++)
+	{
+		const CMarkdownSpan &sp = spans[i];
+		if (sp.type != EMarkdownSpanType::Link && sp.type != EMarkdownSpanType::WikiLink && sp.type != EMarkdownSpanType::Image) continue;
+		if (sp.href.empty() || offset < sp.beg || offset >= sp.end) continue;
+		// A link wins over an image inside it; the inner of two links wins.
+		if (best < 0 || sp.type != EMarkdownSpanType::Image) best = i;
+	}
+	if (best < 0) return false;
+	OpenLink(spans[best].href);
+	return true;
 }
 
 void CMarkdownLiveEditor::ProcessKeyboard()
@@ -1593,6 +1848,8 @@ void CMarkdownLiveEditor::ProcessKeyboard()
 	else if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Y, rep)) Redo();
 	else if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_B)) ToggleStrong();
 	else if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_I)) ToggleEmphasis();
+	else if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_K)) InsertLink();
+	else if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Enter)) ToggleTask();
 	else if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_1)) SetHeadingLevel(1);
 	else if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_2)) SetHeadingLevel(2);
 	else if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_3)) SetHeadingLevel(3);
@@ -1698,16 +1955,48 @@ void CMarkdownLiveEditor::Draw(ImDrawList *dl, ImVec2 origin)
 				dl->AddRectFilled(ImVec2(origin.x + sx0, origin.y + line.y), ImVec2(origin.x + sx1, origin.y + line.y + line.height), selCol);
 		}
 
-		// Text, in segments of equal style.
+		// Text, in segments of equal style; pictures and shapes on their own.
 		size_t i = 0;
 		while (i < line.glyphs.size())
 		{
+			const Glyph &first = line.glyphs[i];
+			if (first.image >= 0 || first.deco != kDecoNone)
+			{
+				const Style &st = layout.styles[first.style];
+				const float gx0 = origin.x + first.x0, gx1 = origin.x + first.x1;
+				if (first.image >= 0 && first.image < (int)layout.images.size())
+				{
+					const float h = first.ascent - st.size * 0.1f;
+					dl->AddImage(layout.images[first.image], ImVec2(gx0, baseY - h), ImVec2(gx1, baseY));
+				}
+				else if (first.deco == kDecoBullet)
+				{
+					dl->AddCircleFilled(ImVec2((gx0 + gx1) * 0.5f, baseY - st.size * 0.32f), st.size * 0.16f, st.color);
+				}
+				else
+				{
+					const float side = st.size * 0.8f;
+					const ImVec2 bmin(gx0, baseY - side * 0.95f), bmax(gx0 + side, baseY + side * 0.05f);
+					if (first.deco == kDecoBoxChecked)
+					{
+						dl->AddRectFilled(bmin, bmax, ImGui::GetColorU32(ImGuiCol_CheckMark), side * 0.18f);
+						const ImU32 tick = ImGui::GetColorU32(ImGuiCol_WindowBg);
+						dl->AddLine(ImVec2(bmin.x + side * 0.22f, bmin.y + side * 0.52f), ImVec2(bmin.x + side * 0.42f, bmin.y + side * 0.74f), tick, 2.0f);
+						dl->AddLine(ImVec2(bmin.x + side * 0.42f, bmin.y + side * 0.74f), ImVec2(bmin.x + side * 0.80f, bmin.y + side * 0.28f), tick, 2.0f);
+					}
+					else
+						dl->AddRect(bmin, bmax, st.color, side * 0.18f, 0, 1.5f);
+				}
+				i++;
+				continue;
+			}
 			const uint16_t style = line.glyphs[i].style;
 			const float x0 = line.glyphs[i].x0;
 			segment.clear();
 			size_t j = i;
 			float x1 = x0;
-			while (j < line.glyphs.size() && line.glyphs[j].style == style && line.glyphs[j].x0 >= x1 - 0.01f)
+			while (j < line.glyphs.size() && line.glyphs[j].style == style && line.glyphs[j].x0 >= x1 - 0.01f
+				&& line.glyphs[j].image < 0 && line.glyphs[j].deco == kDecoNone)
 			{
 				const Glyph &g = line.glyphs[j];
 				char buf[5];

@@ -181,5 +181,47 @@ void CTestMarkdownLiveEditor::Run(ITestCallback *callback)
 		MDE_ASSERT(ed.GetDocument().GetBlocks()[ed.GetRevealedBlock()].IsCell(), "a caret in a cell reveals the cell");
 	}
 
+	// ---- Tasks and links -------------------------------------------------------
+	{
+		CMarkdownLiveEditor ed;
+		ed.SetSource("- [ ] buy milk\n- [x] done\n- plain\n");
+		ed.SetCaret(8);
+		MDE_ASSERT(ed.ToggleTask() && ed.GetSource() == "- [x] buy milk\n- [x] done\n- plain\n" && ed.GetCaret() == 8,
+			"ToggleTask checks the box at the caret, one byte, caret in place");
+		MDE_ASSERT(ed.ToggleTaskAt((uint32_t)ed.GetSource().find("x] done")) && ed.GetSource() == "- [x] buy milk\n- [ ] done\n- plain\n",
+			"ToggleTaskAt flips the box whose mark is at the offset");
+		ed.SetCaret((uint32_t)ed.GetSource().find("plain"));
+		MDE_ASSERT(!ed.ToggleTask() && ed.GetSource() == "- [x] buy milk\n- [ ] done\n- plain\n", "a plain item has no box to toggle");
+#if MT_ENABLE_UNDO
+		MDE_ASSERT(ed.Undo() && ed.GetSource() == "- [x] buy milk\n- [x] done\n- plain\n", "a toggle is one undo step");
+#endif
+
+		ed.SetSource("see docs here\n");
+		ed.SetSelection(4, 8);
+		ed.InsertLink();
+		MDE_ASSERT(ed.GetSource() == "see [docs]() here\n" && ed.GetCaret() == 11, "Ctrl+K wraps the selection and puts the caret in the destination");
+		ed.InsertText("http://d");
+		MDE_ASSERT(ed.GetSource() == "see [docs](http://d) here\n", "typing fills the destination");
+#if MT_ENABLE_UNDO
+		ed.Undo();
+		MDE_ASSERT(ed.Undo() && ed.GetSource() == "see docs here\n", "the link insertion is one undo step");
+#endif
+		ed.SetSource("go https://x.y now\n");
+		ed.SetSelection(3, 14);
+		ed.InsertLink();
+		MDE_ASSERT(ed.GetSource() == "go [](https://x.y) now\n" && ed.GetCaret() == 4, "a selected URL becomes the destination, the caret goes to the text");
+		ed.SetSource("x\n");
+		ed.SetCaret(1);
+		ed.InsertLink();
+		MDE_ASSERT(ed.GetSource() == "x[]()\n" && ed.GetCaret() == 2, "with no selection the caret goes between the brackets");
+
+		std::string opened;
+		ed.onLinkActivated = [&opened](const std::string &href) { opened = href; };
+		ed.SetSource("a [t](http://t.t) b ![i](p.png)\n");
+		MDE_ASSERT(ed.ActivateLinkAt(3) && opened == "http://t.t", "ActivateLinkAt opens the link under the offset");
+		MDE_ASSERT(ed.ActivateLinkAt((uint32_t)ed.GetSource().find("i]")) && opened == "p.png", "an image opens its source");
+		MDE_ASSERT(!ed.ActivateLinkAt(0), "plain text opens nothing");
+	}
+
 	TestCompleted(true, "Markdown live editor: commands and undo");
 }

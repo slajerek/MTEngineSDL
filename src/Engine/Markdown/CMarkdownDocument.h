@@ -221,6 +221,8 @@ public:
 	// Spans whose range [beg, end] contains `offset` (the end inclusive: a
 	// caret just after `**bold**` touches it), outermost first.
 	std::vector<int32_t> SpansTouching(uint32_t offset) const;
+	// The innermost span of `type` touching `offset`, -1 none.
+	int32_t FindSpanAt(uint32_t offset, EMarkdownSpanType type) const;
 
 	// Children of a block, in document order (indices into GetBlocks()).
 	std::vector<int32_t> GetChildren(int32_t block) const;
@@ -288,6 +290,16 @@ public:
 	// it should carry (same indent, same mark, number + 1, an unchecked task
 	// box when the item is a task). Empty string when it is not a list line.
 	std::string ListContinuationPrefix(uint32_t offset) const;
+
+	// The task list item (`- [ ] ...`) whose own line holds `offset`, or whose
+	// subtree does when nothing nearer is a task; -1 none.
+	int32_t FindTaskItemAt(uint32_t offset) const;
+	// The task item whose box mark is at `markOffset`; -1 none.
+	int32_t FindTaskItemByMark(uint32_t markOffset) const;
+	// Flip a task item's box: the one byte between `[` and `]` becomes `x` or
+	// ` `. Nothing else changes, so every offset stays valid. False when the
+	// block is not a task item.
+	bool ToggleTask(int32_t item);
 
 	// The number of parse passes so far; a test uses it to assert that an edit
 	// reparsed exactly once.

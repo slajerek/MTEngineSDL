@@ -135,6 +135,18 @@ public:
 	bool SetHeadingLevel(int level);                     // 0 = paragraph
 	void ToggleStrong();                                 // `**`
 	void ToggleEmphasis();                               // `*`
+	// Task items: flip the box of the task at the caret (Ctrl/Cmd+Enter), or
+	// of the one whose mark byte is `markOffset` (a click on the box). One
+	// byte changes; the caret stays.
+	bool ToggleTask();
+	bool ToggleTaskAt(uint32_t markOffset);
+	// Ctrl/Cmd+K: `[selection]()` with the caret in the destination, `[](url)`
+	// when the selection is a URL, `[]()` with the caret in the text otherwise.
+	void InsertLink();
+	// Open the link, wikilink or image under `offset` through onLinkActivated
+	// (default: the platform shell). False when there is none.
+	bool ActivateLinkAt(uint32_t offset);
+
 	// Table navigation; false when the caret is not in a cell.
 	bool MoveToNextCell(bool backwards);
 	bool MoveToCellBelow();
@@ -168,6 +180,19 @@ public:
 
 	// Called after every change to the source (for the host's dirty tracking).
 	std::function<void()> onChanged;
+	// Ctrl/Cmd+click on a link. Unset: ImGui's Platform_OpenInShellFn.
+	std::function<void(const std::string &href)> onLinkActivated;
+	// Images: given the destination as written (`![alt](src)`), the host
+	// returns a texture and its size in pixels, or false to keep the alt text.
+	// Called during layout, so the host caches.
+	std::function<bool(const std::string &src, ImTextureRef *texture, ImVec2 *size)> imageResolver;
+
+	// Labels the editor draws itself (tooltips, the find bar, the table
+	// menu) are English unless the host installs a translation function:
+	// `key` in, the translated text out, or `key` / nullptr when it has none.
+	// The same pattern as the engine's media views.
+	static void SetTranslateFunction(const char *(*fn)(const char *key)) { translateFunc = fn; }
+	static const char *L(const char *key, const char *fallback);
 
 public:
 	// ---- Layout (public so tests can inspect; not an API)
@@ -180,7 +205,13 @@ public:
 		bool synthetic;       // not a source byte (bullet, rendered soft break space, checkbox)
 		bool syntax;          // a revealed syntax byte (dimmed)
 		bool isNewline;       // a revealed '\n': zero width, ends the line
+		float height;         // the line height this glyph needs
+		float ascent;         // its ascent from the line top
+		uint32_t next;        // source offset after it (an image covers its whole span)
+		int16_t image;        // index into Layout::images, -1 for text
+		uint8_t deco;         // drawn shape instead of text: kDecoNone / Box / BoxChecked / Bullet
 	};
+	enum : uint8_t { kDecoNone = 0, kDecoBox = 1, kDecoBoxChecked = 2, kDecoBullet = 3 };
 	struct Line
 	{
 		float y;              // content-space top
@@ -206,6 +237,7 @@ public:
 		std::vector<Style> styles;
 		std::vector<TableLayout> tables;
 		std::vector<std::pair<float, float>> rules;   // y, height for horizontal rules
+		std::vector<ImTextureRef> images;
 		float height = 0;
 	};
 
@@ -242,6 +274,10 @@ private:
 	void StartLine(Emit &e, float spacingBefore);
 	void EndLine(Emit &e);
 	void PutGlyph(Emit &e, ImWchar cp, uint32_t offset, const Style &st, bool synthetic, bool syntax, bool breakable);
+	void PutGlyphG(Emit &e, Glyph g, const Style &st, bool breakable, float advance);
+	void PutDeco(Emit &e, uint8_t deco, uint32_t anchor, const Style &st, float advance);
+	bool EmitImage(Emit &e, int32_t span, const Style &st);
+	int32_t ImageSpanOfRun(uint32_t run) const;
 	void PutNewline(Emit &e, uint32_t offset);
 	void PutSynthetic(Emit &e, const char *text, uint32_t anchor, const Style &st);
 	Style StyleFor(uint32_t styles, int headingLevel, bool syntax, bool code, bool tableHeader) const;
@@ -254,6 +290,9 @@ private:
 	void Draw(ImDrawList *dl, ImVec2 origin);
 	void HandleMouse(ImVec2 origin);
 	bool HitTestContent(ImVec2 contentPos, uint32_t *offset, bool *hit) const;
+	const Glyph *GlyphAtScreen(ImVec2 screenPos) const;
+	bool LinkOfGlyph(const Glyph &g, std::string *href) const;
+	void OpenLink(const std::string &href);
 	int FindLineOfOffset(uint32_t offset) const;      // in current layout; -1 none
 	float XOfOffset(const Line &line, uint32_t offset) const;
 	uint32_t OffsetAtX(const Line &line, float x) const;
@@ -308,7 +347,9 @@ private:
 	bool revealAllInlineSyntax = false;
 	std::vector<int32_t> touchedSpans, layoutTouchedSpans;
 	std::vector<uint8_t> hiddenSyntax;          // per byte of [revealBeg, revealEnd): an inline marker not shown
-	float revealLeftOverride = -1;              // the revealed unit starts on a list marker line: lay it out from the list's left edge
+	float revealLeftOverride = -1;
+	std::vector<int32_t> revealImages;          // image spans in the revealed range the caret does not touch
+	static const char *(*translateFunc)(const char *key);              // the revealed unit starts on a list marker line: lay it out from the list's left edge
 	uint32_t layoutCount = 0;
 	ImVec2 itemMin, itemMax, contentOrigin;
 	float scrollY = 0;

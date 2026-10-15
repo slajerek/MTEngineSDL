@@ -366,4 +366,86 @@ void RegisterMarkdownEditorTests(ImGuiTestEngine *engine)
 		IM_CHECK(OffsetHasGlyph(ed, stars));
 		ed.SetRevealAllInlineSyntax(false);
 	};
+
+	t = IM_REGISTER_TEST(engine, "markdown", "task_box_link_and_image_interactions");
+	t->TestFunc = [](ImGuiTestContext *ctx)
+	{
+		CGuiViewMarkdownEditor *view = EnsureView(ctx);
+		CMarkdownLiveEditor &ed = view->GetEditor();
+		const std::string src = "Intro [site](http://s.t) end\n\n- [ ] task one\n- next\n\nPic ![alt](a.png) after\n";
+		std::string opened;
+		ed.onLinkActivated = [&opened](const std::string &href) { opened = href; };
+		ed.imageResolver = [](const std::string &srcPath, ImTextureRef *tex, ImVec2 *size) {
+			if (srcPath != "a.png") return false;
+			*tex = ImGui::GetIO().Fonts->TexRef;
+			*size = ImVec2(48, 24);
+			return true;
+		};
+		ed.SetSource(src);
+		ctx->Yield(2);
+		const uint32_t next = (uint32_t)src.find("next");
+		IM_CHECK(ClickOffset(ctx, ed, next));      // caret away from the box and the link
+
+		// The task box is a drawn shape; a click toggles it and leaves the caret.
+		const CMarkdownLiveEditor::Glyph *box = nullptr;
+		float boxY = 0, boxH = 0;
+		for (const auto &line : ed.GetLayoutLines())
+			for (const auto &g : line.glyphs)
+				if (g.deco == CMarkdownLiveEditor::kDecoBox) { box = &g; boxY = line.y; boxH = line.height; }
+		IM_CHECK(box != nullptr);
+		const ImVec2 origin(ed.GetItemMin().x + ImGui::GetStyle().FramePadding.x, ed.GetItemMin().y + ImGui::GetStyle().FramePadding.x);
+		ctx->MouseMoveToPos(ImVec2(origin.x + (box->x0 + box->x1) * 0.5f, origin.y + boxY + boxH * 0.5f));
+		ctx->MouseClick(ImGuiMouseButton_Left);
+		ctx->Yield(2);
+		IM_CHECK(ed.GetSource().find("- [x] task one") != std::string::npos);
+		IM_CHECK_EQ(ed.GetCaret(), next);
+		bool checkedShown = false;
+		for (const auto &line : ed.GetLayoutLines())
+			for (const auto &g : line.glyphs)
+				if (g.deco == CMarkdownLiveEditor::kDecoBoxChecked) checkedShown = true;
+		IM_CHECK(checkedShown);
+		// The unordered marker is a drawn bullet, not a font glyph.
+		bool bullet = false;
+		for (const auto &line : ed.GetLayoutLines())
+			for (const auto &g : line.glyphs)
+				if (g.deco == CMarkdownLiveEditor::kDecoBullet) bullet = true;
+		IM_CHECK(bullet);
+
+		// A resolved image is one picture box; its alt text is not drawn.
+		const uint32_t pic = (uint32_t)ed.GetSource().find("![alt]");
+		const CMarkdownLiveEditor::Glyph *img = nullptr;
+		for (const auto &line : ed.GetLayoutLines())
+			for (const auto &g : line.glyphs)
+				if (g.image >= 0) img = &g;
+		IM_CHECK(img != nullptr);
+		IM_CHECK_EQ(img->offset, pic);
+		IM_CHECK(img->x1 - img->x0 > 47.0f && img->x1 - img->x0 < 49.0f);
+		IM_CHECK(!OffsetHasGlyph(ed, pic + 2));    // 'a' of alt
+
+		// Ctrl+click on the rendered link opens it; the caret stays put.
+		const uint32_t site = (uint32_t)ed.GetSource().find("site");
+		ImVec2 lp;
+		float lh = 0;
+		IM_CHECK(ed.GetOffsetScreenPos(site + 1, &lp, &lh));
+		ctx->MouseMoveToPos(ImVec2(lp.x + 1.0f, lp.y + lh * 0.5f));
+		ctx->KeyDown(ImGuiMod_Ctrl);
+		ctx->MouseClick(ImGuiMouseButton_Left);
+		ctx->KeyUp(ImGuiMod_Ctrl);
+		ctx->Yield(2);
+		IM_CHECK_EQ(opened, std::string("http://s.t"));
+		IM_CHECK_EQ(ed.GetCaret(), next);
+		// A plain click edits: the caret lands in the link text.
+		IM_CHECK(ClickOffset(ctx, ed, site + 1));
+		IM_CHECK_EQ(ed.GetCaret(), site + 1);
+		IM_CHECK(OffsetHasGlyph(ed, site - 1));    // the touched link shows its '['
+
+		// Clicking the picture puts the caret on it, which reveals its source.
+		IM_CHECK(ClickOffset(ctx, ed, pic));
+		IM_CHECK_EQ(ed.GetCaret(), pic);
+		IM_CHECK(OffsetHasGlyph(ed, pic));         // '!' drawn as source now
+		IM_CHECK(OffsetHasGlyph(ed, pic + 2));
+
+		ed.onLinkActivated = nullptr;
+		ed.imageResolver = nullptr;
+	};
 }

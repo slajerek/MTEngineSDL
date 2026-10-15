@@ -834,6 +834,14 @@ void CMarkdownDocument::ResolveSpans()
 	}
 }
 
+int32_t CMarkdownDocument::FindSpanAt(uint32_t offset, EMarkdownSpanType type) const
+{
+	int32_t best = -1;
+	for (int32_t i = 0; i < (int32_t)spans.size(); i++)
+		if (spans[i].type == type && spans[i].Touches(offset)) best = i;   // later = inner
+	return best;
+}
+
 std::vector<int32_t> CMarkdownDocument::SpansTouching(uint32_t offset) const
 {
 	std::vector<int32_t> out;
@@ -1077,4 +1085,35 @@ std::string CMarkdownDocument::ListContinuationPrefix(uint32_t offset) const
 		&& source[i + 2] == ']' && (i + 3 == lineEnd || IsBlank(source[i + 3])))
 		prefix += "[ ] ";
 	return prefix;
+}
+
+// ---- Task items ----------------------------------------------------------------
+
+int32_t CMarkdownDocument::FindTaskItemAt(uint32_t offset) const
+{
+	int32_t block = FindBlockAt(offset);
+	while (block > 0)
+	{
+		const CMarkdownBlock &b = blocks[block];
+		if (b.type == EMarkdownBlockType::ListItem && b.isTask) return block;
+		block = b.parent;
+	}
+	return -1;
+}
+
+int32_t CMarkdownDocument::FindTaskItemByMark(uint32_t markOffset) const
+{
+	for (int32_t i = 1; i < (int32_t)blocks.size(); i++)
+		if (blocks[i].type == EMarkdownBlockType::ListItem && blocks[i].isTask && blocks[i].taskMarkOffset == markOffset) return i;
+	return -1;
+}
+
+bool CMarkdownDocument::ToggleTask(int32_t item)
+{
+	if (item <= 0 || item >= (int32_t)blocks.size()) return false;
+	const CMarkdownBlock &b = blocks[item];
+	if (b.type != EMarkdownBlockType::ListItem || !b.isTask || b.taskMarkOffset >= Size()) return false;
+	const bool checked = b.taskMark == 'x' || b.taskMark == 'X';
+	Replace(b.taskMarkOffset, b.taskMarkOffset + 1, checked ? " " : "x");
+	return true;
 }
