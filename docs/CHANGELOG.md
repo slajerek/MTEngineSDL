@@ -35,37 +35,46 @@ however it likes.
 
 ## 3.21.22 — development
 
-**A live Markdown editor, as a spike (M0 of the Agenda Scene programme).**
-`src/Engine/Markdown/` is new: `CMarkdownDocument` is a Markdown source string
-plus the block and inline structure md4c finds in it, with every block, cell
-and text run mapped back to a BYTE RANGE of the source; `CMarkdownLiveEditor`
-is a Dear ImGui widget that draws that source RENDERED -- headings large,
-emphasis in the bold and italic fonts, lists with bullets, tables as a grid --
-except for the block the caret is in, which shows its syntax dimmed. The
-source is the single truth and an edit is a byte replacement followed by a
-reparse, so untouched formatting survives by construction; there is no
-serializer to get wrong. `CGuiViewMarkdownEditor` (GUI/Controls) is the thin
-window over it, in the shape of `CGuiViewCodeEditor`.
+**A live Markdown editor (M0 and M2 of the Agenda Scene programme).**
+`src/Engine/Markdown/` is new. `CMarkdownDocument` is a Markdown source string
+plus the block, span and text-run structure md4c finds in it, every element
+mapped back to a BYTE RANGE of the source. `CMarkdownLiveEditor` is a Dear
+ImGui widget that draws that source RENDERED -- headings, emphasis, numbers,
+drawn bullets and task boxes, tables as an aligned grid, quotes, code,
+pictures -- except the unit the caret is in (a paragraph, a heading, one list
+item's line, a table cell), which shows its source with block markers dimmed
+and inline markers only for the span the caret touches. The source is the
+single truth: an edit is a byte replacement, so untouched formatting survives
+by construction and there is no serializer to get wrong.
+`CGuiViewMarkdownEditor` (GUI/Controls) is the window over it.
 
-md4c reports no source offsets (mity/md4c#91, open since 2019), so the ranges
-are derived: text() hands back pointers into the input buffer, which gives the
-content bytes exactly; a block is its content widened to full lines, plus the
-lines md4c swallows and never names (fences, a setext underline, a table's
-delimiter row); an empty block (a lone `#`, a `---`, an empty cell) is placed
-on the first non-blank line after the previous block. Every byte in a block
-that no text run named is, by definition, syntax -- which is the whole hiding
-rule. `CTestMarkdownDocument` pins the derivation on a document that has every
-such construct; `RegisterMarkdownEditorTests()` drives the widget with real
-mouse and keyboard events (caret by click, typing, Backspace/Delete, undo and
-redo, Ctrl+1/2/3 headings, Ctrl+B, list continuation on Enter, Tab between
-table cells, arrows across wrapped lines and blocks). A host registers both
-next to its own tests; AgendaScene does.
+What it does: caret and selection by mouse and keyboard; typing, deletion,
+clipboard; list continuation; task boxes that toggle on click; links that
+open on Ctrl/Cmd+click; images through a host resolver; table commands (rows,
+columns, alignment) on a right-click menu and keys; a find bar; undo through
+Tools/Undo (`CUndoManager`, shareable with the host, `CUndoManager::PeekUndo()`
+added for grouping); remappable commands as `CSlrKeyboardShortcut` objects
+(`CMarkdownEditorBindings`, own zone, registered with `guiMain`); IME data at
+the caret, which is also what makes SDL3 deliver text to it; translatable
+labels through `SetTranslateFunction()`.
+
+md4c reports no source offsets (mity/md4c#91), so the ranges are derived:
+content runs are pointers into the input buffer, and blocks and spans are
+widened from them by rules `docs/markdown-editor.md` lists. Edits reparse
+INCREMENTALLY (the touched top-level blocks and their neighbours) when that
+is provably equal to a full parse; a randomized test compares 3000 edits with
+full parses field by field. Typing in a 57 KB document: 0.13 ms per keystroke
+instead of 8.2 ms.
+
+Tests: `CTestMarkdownDocument` (model) and `CTestMarkdownLiveEditor`
+(commands, undo, bindings, find) for a host's `CTestSuite`;
+`RegisterMarkdownEditorTests()` for its imgui_test_engine tests, twelve of
+them driving the widget with real input and one checking captured pixels.
+AgendaScene registers all three.
 
 Also declared, because they were shipped undeclared: `md4c` (MIT), `imgui_md`
 (MIT) and `imgui_markdown` (Zlib) now have rows in the caps vocabulary's core
-list, so LICENSES.txt names them. `docs/markdown-editor.md` describes the
-component and what the spike deliberately left out (incremental reparse,
-images, link activation, IME display, find).
+list, so LICENSES.txt names them.
 
 **The app could die at exec with no crash report, after switching licence
 tiers.** Xcode's copy-files phase overwrites the dylib already in
