@@ -142,5 +142,44 @@ void CTestMarkdownLiveEditor::Run(ITestCallback *callback)
 	}
 #endif
 
+	// ---- Reveal units partition the source ---------------------------------------
+	{
+		CMarkdownLiveEditor ed;
+		const std::string src = "\n# H\n\npara one\nline two\n\n- a\n- b\n  - c\n\n> q1\n>\n> q2\n\n| x | y |\n|---|---|\n| 1 |   |\n\n```\ncode\n```\n\n---\n";
+		ed.SetSource(src);
+		bool covered = true, monotonic = true, cells = true;
+		uint32_t prevBeg = 0;
+		int32_t prevBlock = -1;
+		for (uint32_t o = 0; o <= ed.GetDocument().Size(); o++)
+		{
+			ed.SetCaret(o);
+			uint32_t b = 0, e = 0;
+			ed.GetRevealedRange(&b, &e);
+			const int32_t blk = ed.GetRevealedBlock();
+			if (blk < 0 || o < b || (o > e) || (o == e && o != ed.GetDocument().Size() && !ed.GetDocument().GetBlocks()[blk].IsCell())) covered = false;
+			if (!ed.GetDocument().GetBlocks()[blk].IsCell())
+			{
+				if (b < prevBeg) monotonic = false;
+				prevBeg = b;
+			}
+			else if (ed.GetDocument().TableOf(blk) < 0) cells = false;
+			prevBlock = blk;
+		}
+		(void)prevBlock;
+		MDE_ASSERT(covered, "every byte, blank lines and container syntax included, is inside the revealed range for a caret on it");
+		MDE_ASSERT(monotonic, "reveal ranges follow document order");
+		MDE_ASSERT(cells, "a cell is revealed only inside its table");
+		ed.SetCaret((uint32_t)src.find("q2"));
+		MDE_ASSERT(ed.GetDocument().GetBlocks()[ed.GetRevealedBlock()].type == EMarkdownBlockType::Paragraph, "inside a quote the unit is the paragraph");
+		ed.SetCaret((uint32_t)src.find("c\n"));
+		uint32_t b = 0, e = 0;
+		ed.GetRevealedRange(&b, &e);
+		MDE_ASSERT(src.substr(b, e - b) == "  - c\n\n", "a nested item is its own unit and owns the blank line after it");
+		ed.SetCaret((uint32_t)src.find("| 1"));
+		MDE_ASSERT(ed.GetDocument().GetBlocks()[ed.GetRevealedBlock()].type == EMarkdownBlockType::Table, "a caret on a table's pipe reveals the table");
+		ed.SetCaret((uint32_t)src.find("| 1") + 2);
+		MDE_ASSERT(ed.GetDocument().GetBlocks()[ed.GetRevealedBlock()].IsCell(), "a caret in a cell reveals the cell");
+	}
+
 	TestCompleted(true, "Markdown live editor: commands and undo");
 }

@@ -91,7 +91,51 @@ struct CMarkdownRun
 	// written in the source (not resolved, not escaped).
 	std::string href;
 
+	// The innermost inline span this run is inside (index into
+	// CMarkdownDocument::GetSpans()), -1 when none.
+	int32_t span = -1;
+
 	bool IsSynthesized() const { return beg == end && kind != EMarkdownRunKind::Normal; }
+};
+
+enum class EMarkdownSpanType : uint8_t
+{
+	Emphasis,
+	Strong,
+	Code,
+	Link,
+	Image,
+	Strikethrough,
+	Underline,
+	Math,
+	WikiLink
+};
+
+// An inline span (`**strong**`, `*em*`, `` `code` ``, `~~del~~`, `[link](url)`,
+// `![image](src)`, `<autolink>`) with its source range. md4c reports spans
+// without offsets, like blocks; the derivation is in the .cpp:
+//
+//   content = the runs inside the span;
+//   opening = the syntax bytes right before the first content byte, back to
+//             the previous content of the block or a blank;
+//   closing = the syntax bytes right after the last content byte; for a link
+//             or image, through the destination: `](url "title")`, `][ref]`.
+//
+// Nested spans share marker bytes where their delimiters touch (`***x***`):
+// each claims the whole run of delimiter characters. The editor only uses
+// the ranges to decide which markers to show, and over-claiming there
+// reveals a little more, never less.
+struct CMarkdownSpan
+{
+	EMarkdownSpanType type = EMarkdownSpanType::Emphasis;
+	uint32_t beg = 0, end = 0;               // markers included
+	uint32_t contentBeg = 0, contentEnd = 0; // inner content; empty for `![](x)`
+	int32_t block = -1;                      // the block whose text holds the span
+	int32_t parent = -1;                     // enclosing span, -1 none
+	uint32_t firstRun = 0, runCount = 0;     // runs inside, contiguous
+	std::string href;                        // link / image / wikilink destination
+
+	bool Touches(uint32_t offset) const { return offset >= beg && offset <= end; }
 };
 
 enum class EMarkdownCellAlign : uint8_t { Default, Left, Center, Right };
@@ -172,6 +216,11 @@ public:
 
 	const std::vector<CMarkdownBlock> &GetBlocks() const { return blocks; }
 	const std::vector<CMarkdownRun> &GetRuns() const { return runs; }
+	const std::vector<CMarkdownSpan> &GetSpans() const { return spans; }
+
+	// Spans whose range [beg, end] contains `offset` (the end inclusive: a
+	// caret just after `**bold**` touches it), outermost first.
+	std::vector<int32_t> SpansTouching(uint32_t offset) const;
 
 	// Children of a block, in document order (indices into GetBlocks()).
 	std::vector<int32_t> GetChildren(int32_t block) const;
@@ -254,6 +303,8 @@ private:
 	bool OwnsContent(int32_t index) const;
 	void ResolveLeafRange(int32_t index, uint32_t &cursor);
 	void ResolveCellRange(int32_t index, uint32_t rowLineBeg, uint32_t &cursor);
+	void ResolveSpans();
+	uint32_t MatchLinkTail(uint32_t from, uint32_t limit) const;
 	bool LineIsSetextUnderline(uint32_t lineBeg, uint32_t lineEnd) const;
 	bool LineIsFence(uint32_t lineBeg, uint32_t lineEnd, char fenceChar) const;
 	bool LineIsTableDelimiter(uint32_t lineBeg, uint32_t lineEnd) const;
@@ -270,6 +321,7 @@ private:
 	std::string source;
 	std::vector<CMarkdownBlock> blocks;
 	std::vector<CMarkdownRun> runs;
+	std::vector<CMarkdownSpan> spans;
 	unsigned parserFlags;
 	uint32_t parseCount = 0;
 
@@ -277,6 +329,7 @@ private:
 	std::vector<int32_t> blockStack;
 	struct SpanState { uint32_t style; std::string href; };
 	std::vector<SpanState> spanStack;
+	std::vector<int32_t> openSpans;
 	uint32_t currentStyles = 0;
 	std::string currentHref;
 	int32_t currentLeaf = -1;

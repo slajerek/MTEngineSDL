@@ -80,9 +80,16 @@ void RegisterMarkdownEditorTests(ImGuiTestEngine *engine)
 		IM_CHECK(ClickOffset(ctx, ed, world));
 		IM_CHECK_EQ(ed.GetCaret(), world);
 		IM_CHECK_EQ(ed.GetRevealedBlock(), 1);
-		IM_CHECK(OffsetHasGlyph(ed, 6));           // '*' now drawn (dimmed)
+		// Inline markers show only for the span the caret touches: not yet.
+		IM_CHECK(!OffsetHasGlyph(ed, 6));
 		// ...and the second paragraph is still drawn as content.
 		IM_CHECK(OffsetHasGlyph(ed, second));
+		// Into "bold": its '**' are drawn (dimmed).
+		IM_CHECK(ClickOffset(ctx, ed, 9));
+		IM_CHECK_EQ(ed.GetCaret(), 9u);
+		IM_CHECK(OffsetHasGlyph(ed, 6));
+		IM_CHECK(OffsetHasGlyph(ed, 12));
+		IM_CHECK(ClickOffset(ctx, ed, world));
 
 		// The caret rectangle sits where the glyph is.
 		ImVec2 cmin, cmax, gpos;
@@ -305,7 +312,9 @@ void RegisterMarkdownEditorTests(ImGuiTestEngine *engine)
 		IM_CHECK_EQ(ed.GetRevealedBlock(), 2);
 		for (int i = 0; i < paraLines + 3 && ed.GetCaret() < longPara.find("> quoted"); i++) { ctx->KeyPress(ImGuiKey_DownArrow); ctx->Yield(); }
 		IM_CHECK(ed.GetCaret() >= longPara.find("> quoted"));
-		IM_CHECK_EQ(ed.GetDocument().GetBlocks()[ed.GetRevealedBlock()].type, EMarkdownBlockType::Quote);
+		// The quote's paragraph is the unit, not the whole quote.
+		IM_CHECK_EQ(ed.GetDocument().GetBlocks()[ed.GetRevealedBlock()].type, EMarkdownBlockType::Paragraph);
+		IM_CHECK_EQ(ed.GetDocument().GetBlocks()[ed.GetDocument().GetBlocks()[ed.GetRevealedBlock()].parent].type, EMarkdownBlockType::Quote);
 		// Up goes back into the paragraph (across the gap line).
 		for (int i = 0; i < 3 && ed.GetRevealedBlock() != 2; i++) { ctx->KeyPress(ImGuiKey_UpArrow); ctx->Yield(); }
 		IM_CHECK_EQ(ed.GetRevealedBlock(), 2);
@@ -317,5 +326,44 @@ void RegisterMarkdownEditorTests(ImGuiTestEngine *engine)
 		ctx->KeyPress(ImGuiKey_End);
 		ctx->Yield();
 		IM_CHECK(ed.GetCaret() >= before);
+	};
+
+	t = IM_REGISTER_TEST(engine, "markdown", "reveal_unit_is_one_list_item_and_inline_span");
+	t->TestFunc = [](ImGuiTestContext *ctx)
+	{
+		CGuiViewMarkdownEditor *view = EnsureView(ctx);
+		CMarkdownLiveEditor &ed = view->GetEditor();
+		const std::string src = "- one\n- two **b** x\n- three\n";
+		ed.SetSource(src);
+		ctx->Yield(2);
+
+		const uint32_t two = (uint32_t)src.find("two");
+		IM_CHECK(ClickOffset(ctx, ed, two));
+		IM_CHECK_EQ(ed.GetCaret(), two);
+		const CMarkdownDocument &doc = ed.GetDocument();
+		IM_CHECK_EQ(doc.GetBlocks()[ed.GetRevealedBlock()].type, EMarkdownBlockType::ListItem);
+		uint32_t rb = 0, re = 0;
+		ed.GetRevealedRange(&rb, &re);
+		IM_CHECK_EQ(rb, (uint32_t)src.find("- two"));
+		IM_CHECK_EQ(re, (uint32_t)src.find("- three"));
+		IM_CHECK(OffsetHasGlyph(ed, rb));                       // this item's '-' shows as source
+		IM_CHECK(!OffsetHasGlyph(ed, 0));                       // the first item keeps its rendered bullet
+		IM_CHECK(OffsetHasGlyph(ed, 2));                        // ...and its text
+		IM_CHECK(!OffsetHasGlyph(ed, (uint32_t)src.find("- three")));
+		const uint32_t stars = (uint32_t)src.find("**b**");
+		IM_CHECK(!OffsetHasGlyph(ed, stars));                   // untouched span: markers hidden
+		IM_CHECK(OffsetHasGlyph(ed, stars + 2));                // its text drawn
+
+		// Touch the span: its markers appear; the caret stays on the same byte.
+		IM_CHECK(ClickOffset(ctx, ed, stars + 2));
+		IM_CHECK_EQ(ed.GetCaret(), stars + 2);
+		IM_CHECK(OffsetHasGlyph(ed, stars));
+		IM_CHECK(OffsetHasGlyph(ed, stars + 3));
+
+		// The whole-unit option shows every marker wherever the caret is.
+		ed.SetRevealAllInlineSyntax(true);
+		IM_CHECK(ClickOffset(ctx, ed, two));
+		IM_CHECK(OffsetHasGlyph(ed, stars));
+		ed.SetRevealAllInlineSyntax(false);
 	};
 }

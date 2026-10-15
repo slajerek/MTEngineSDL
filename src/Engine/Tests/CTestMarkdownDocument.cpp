@@ -36,6 +36,14 @@ namespace
 		return -1;
 	}
 
+	// The source text of the nth span of a type, "" when there is none.
+	std::string SpanText(const CMarkdownDocument &d, EMarkdownSpanType t, int skip = 0)
+	{
+		for (const CMarkdownSpan &sp : d.GetSpans())
+			if (sp.type == t) { if (skip == 0) return d.GetSource().substr(sp.beg, sp.end - sp.beg); skip--; }
+		return "";
+	}
+
 	// '_' where a byte is syntax, '~' for newline, the byte itself when content.
 	std::string ContentMask(const CMarkdownDocument &d)
 	{
@@ -196,6 +204,35 @@ void CTestMarkdownDocument::Run(ITestCallback *callback)
 	MD_ASSERT(d.ListContinuationPrefix((uint32_t)d.GetSource().find("Zadanie")) == "   - [ ] ", "a task item continues with an unchecked box at the same indent");
 	MD_ASSERT(d.ListContinuationPrefix((uint32_t)d.GetSource().find("Opis")) == "", "a paragraph inside an item is not a list line");
 	MD_ASSERT(d.ListContinuationPrefix((uint32_t)d.GetSource().find("---")) == "", "a rule is not a list line");
+
+	// Inline spans: ranges with their markers, content inside.
+	{
+		CMarkdownDocument sp(src);
+		MD_ASSERT(SpanText(sp, EMarkdownSpanType::Strong) == "**bold**", "a strong span's range includes both `**`");
+		MD_ASSERT(SpanText(sp, EMarkdownSpanType::Emphasis) == "*em*", "an emphasis span's range includes both `*`");
+		MD_ASSERT(SpanText(sp, EMarkdownSpanType::Code) == "`code`", "a code span's range includes its backticks");
+		MD_ASSERT(SpanText(sp, EMarkdownSpanType::Link) == "[link](http://x.y)", "a link's range runs through its destination");
+		const CMarkdownSpan *link = nullptr;
+		for (const CMarkdownSpan &x : sp.GetSpans()) if (x.type == EMarkdownSpanType::Link) link = &x;
+		MD_ASSERT(link && link->href == "http://x.y" && sp.GetSource().substr(link->contentBeg, link->contentEnd - link->contentBeg) == "link",
+			"a link carries its destination and its text range");
+		const uint32_t boldAt = (uint32_t)sp.GetSource().find("**bold**");
+		MD_ASSERT(sp.SpansTouching(boldAt).size() == 1 && sp.SpansTouching(boldAt + 8).size() == 1 && sp.SpansTouching(boldAt - 1).empty(),
+			"a span is touched from its first marker through just after its last");
+		const int32_t r = sp.FindRunAt(boldAt + 2);
+		MD_ASSERT(r >= 0 && sp.GetRuns()[r].span >= 0 && sp.GetSpans()[sp.GetRuns()[r].span].type == EMarkdownSpanType::Strong,
+			"a run knows its innermost span");
+
+		CMarkdownDocument hard("a ***x*** b [t](u \"q r\") c ![](i.png) d <http://a.b> e ` x ` f ~~s~~ g [**k**](v)\n");
+		MD_ASSERT(SpanText(hard, EMarkdownSpanType::Emphasis) == "***x***" && SpanText(hard, EMarkdownSpanType::Strong) == "***x***",
+			"nested spans sharing a delimiter run both claim it");
+		MD_ASSERT(SpanText(hard, EMarkdownSpanType::Link) == "[t](u \"q r\")", "a link title with blanks stays inside the link");
+		MD_ASSERT(SpanText(hard, EMarkdownSpanType::Image) == "![](i.png)", "an image with no alt text is placed between its neighbours");
+		MD_ASSERT(SpanText(hard, EMarkdownSpanType::Link, 1) == "<http://a.b>", "an autolink's range includes its angle brackets");
+		MD_ASSERT(SpanText(hard, EMarkdownSpanType::Code) == "` x `", "a padded code span keeps its padding inside");
+		MD_ASSERT(SpanText(hard, EMarkdownSpanType::Strikethrough) == "~~s~~", "strikethrough");
+		MD_ASSERT(SpanText(hard, EMarkdownSpanType::Link, 2) == "[**k**](v)", "a link around strong text spans the whole link");
+	}
 
 	// Degenerate inputs.
 	CMarkdownDocument empty("");

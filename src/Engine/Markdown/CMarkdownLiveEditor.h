@@ -6,10 +6,15 @@
 // THE MODEL. The Markdown source is the single truth (CMarkdownDocument). Every
 // frame the widget lays the source out as RENDERED text -- headings large,
 // emphasis in the bold/italic fonts, lists with bullets, tables as a grid --
-// except for the block the caret is in, which is shown as SOURCE with its
-// syntax visible but dimmed. Moving the caret into a block reveals its
-// syntax; moving out renders it again. Inside a table the reveal unit is the
-// cell, not the table, so the grid stays a grid while a cell is edited.
+// except for the REVEAL UNIT the caret is in, which is shown as SOURCE with
+// its block syntax (`# `, `- `, `> `, fences) visible but dimmed. A unit is the
+// innermost leaf: a paragraph, a heading, a code block, a rule, one list
+// item's own line, a table cell (a table outside its cells reveals whole).
+// The source is partitioned into unit ranges -- each unit owns the bytes from
+// its start to the next unit's start -- so blank lines and container syntax
+// always have a caret position. Inside the revealed unit, inline markers
+// (`**`, `*`, `` ` ``, `~~`, `[`, `](url)`) are shown only for the spans the
+// caret touches (Obsidian's rule); SetRevealAllInlineSyntax(true) shows all.
 //
 // This is the "source is truth, decorations near the caret" class of editor
 // (Obsidian Live Preview, Zettlr, iA Writer), chosen over block widgets
@@ -74,6 +79,9 @@ public:
 	void SetBaseFontSize(float size) { baseFontSize = size; layoutDirty = true; }
 	// Size multipliers for heading levels 1..6.
 	void SetHeadingScale(int level, float scale);
+	// Show every inline marker of the revealed unit, not only those of the
+	// spans the caret touches.
+	void SetRevealAllInlineSyntax(bool value) { revealAllInlineSyntax = value; layoutDirty = true; }
 
 	// ---- Rendering. Draws into the current window as one item of `size`
 	// (0 = available). Handles mouse and keyboard when the window is focused.
@@ -135,6 +143,8 @@ public:
 	// The block whose syntax is currently revealed (top-level block of the
 	// caret, or the caret's cell inside a table). -1 when nothing is revealed.
 	int32_t GetRevealedBlock() const { return revealedBlock; }
+	// The source range the revealed unit shows as source: [beg, end).
+	void GetRevealedRange(uint32_t *beg, uint32_t *end) const { *beg = revealBeg; *end = revealEnd; }
 	bool IsFocused() const { return focused; }
 	// The screen rectangle of the caret as drawn in the last Render(); false
 	// when it was not visible.
@@ -268,6 +278,11 @@ private:
 	void RestoreEdit(uint32_t pos, uint32_t removeLength, const std::string &text, uint32_t newCaret, uint32_t newAnchor);
 	void Changed();
 	void ComputeRevealed();
+	struct RevealUnit { int32_t block; uint32_t beg; uint32_t end; };
+	void RebuildUnits();
+	int32_t FindUnitAt(uint32_t offset) const;
+	void LayoutRevealed(Emit &e, int32_t block);
+	bool IsDescendant(int32_t block, int32_t ancestor) const;
 	bool CaretInCell(int32_t *cellOut) const;
 
 	CMarkdownDocument doc;
@@ -287,6 +302,13 @@ private:
 	float layoutFontSize = -1;
 	int32_t revealedBlock = -1;
 	int32_t layoutRevealedBlock = -2;
+	uint32_t revealBeg = 0, revealEnd = 0;
+	std::vector<RevealUnit> units;
+	uint32_t unitsParseCount = UINT32_MAX;
+	bool revealAllInlineSyntax = false;
+	std::vector<int32_t> touchedSpans, layoutTouchedSpans;
+	std::vector<uint8_t> hiddenSyntax;          // per byte of [revealBeg, revealEnd): an inline marker not shown
+	float revealLeftOverride = -1;              // the revealed unit starts on a list marker line: lay it out from the list's left edge
 	uint32_t layoutCount = 0;
 	ImVec2 itemMin, itemMax, contentOrigin;
 	float scrollY = 0;

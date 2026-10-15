@@ -150,12 +150,81 @@ bool CMarkdownLiveEditor::CaretInCell(int32_t *cellOut) const
 	return false;
 }
 
+// The reveal units in document order: leaves (outside tables), list items
+// with text of their own (or none at all), and whole tables. Each owns the
+// bytes up to the next unit's start; the first also owns everything before it.
+void CMarkdownLiveEditor::RebuildUnits()
+{
+	if (unitsParseCount == doc.GetParseCount()) return;
+	unitsParseCount = doc.GetParseCount();
+	units.clear();
+	const auto &blocks = doc.GetBlocks();
+	for (int32_t i = 1; i < (int32_t)blocks.size(); i++)
+	{
+		const CMarkdownBlock &b = blocks[i];
+		if (b.type != EMarkdownBlockType::Table && doc.TableOf(i) > 0) continue;
+		const bool unit = b.type == EMarkdownBlockType::Table
+			|| (b.IsLeaf() && !b.IsCell())
+			|| (b.type == EMarkdownBlockType::ListItem && (doc.OwnsContentPublic(i) || doc.GetChildren(i).empty()));
+		if (unit) units.push_back({i, b.beg, b.end});
+	}
+	std::stable_sort(units.begin(), units.end(), [](const RevealUnit &a, const RevealUnit &b) { return a.beg < b.beg; });
+	// Two units cannot start on the same byte; keep the outer (earlier) one.
+	units.erase(std::unique(units.begin(), units.end(), [](const RevealUnit &a, const RevealUnit &b) { return a.beg == b.beg; }), units.end());
+	for (size_t i = 0; i < units.size(); i++)
+	{
+		units[i].end = i + 1 < units.size() ? units[i + 1].beg : doc.Size();
+		if (i == 0) units[i].beg = 0;
+	}
+}
+
+int32_t CMarkdownLiveEditor::FindUnitAt(uint32_t offset) const
+{
+	if (units.empty()) return -1;
+	// The last unit starting at or before offset.
+	size_t lo = 0, hi = units.size();
+	while (hi - lo > 1)
+	{
+		const size_t mid = (lo + hi) / 2;
+		if (units[mid].beg <= offset) lo = mid; else hi = mid;
+	}
+	return (int32_t)lo;
+}
+
+bool CMarkdownLiveEditor::IsDescendant(int32_t block, int32_t ancestor) const
+{
+	const auto &blocks = doc.GetBlocks();
+	while (block > 0 && block < (int32_t)blocks.size())
+	{
+		if (block == ancestor) return true;
+		block = blocks[block].parent;
+	}
+	return false;
+}
+
 void CMarkdownLiveEditor::ComputeRevealed()
 {
-	if (doc.Size() == 0 || doc.GetBlocks().size() <= 1) { revealedBlock = -1; return; }
+	touchedSpans.clear();
+	if (doc.Size() == 0 || doc.GetBlocks().size() <= 1) { revealedBlock = -1; revealBeg = revealEnd = 0; return; }
+	RebuildUnits();
+	const int32_t u = FindUnitAt(caret);
+	if (u < 0) { revealedBlock = -1; revealBeg = revealEnd = 0; return; }
+	revealedBlock = units[u].block;
+	revealBeg = units[u].beg;
+	revealEnd = units[u].end;
 	int32_t cell = -1;
-	if (CaretInCell(&cell)) { revealedBlock = cell; return; }
-	revealedBlock = doc.FindBlockAt(caret, true);
+	if (doc.GetBlocks()[revealedBlock].type == EMarkdownBlockType::Table && CaretInCell(&cell))
+	{
+		revealedBlock = cell;
+		revealBeg = doc.GetBlocks()[cell].beg;
+		revealEnd = doc.GetBlocks()[cell].end;
+	}
+	if (!revealAllInlineSyntax)
+		for (int32_t sp : doc.SpansTouching(caret))
+		{
+			const CMarkdownSpan &span = doc.GetSpans()[sp];
+			if (span.beg >= revealBeg && span.end <= std::max(revealEnd, revealBeg)) touchedSpans.push_back(sp);
+		}
 }
 
 // ---- Editing -----------------------------------------------------------------------
@@ -850,6 +919,13 @@ void CMarkdownLiveEditor::LayoutSourceRange(Emit &e, int32_t block, uint32_t beg
 	{
 		while (r < runs.size() && (runs[r].IsSynthesized() || runs[r].end <= off)) r++;
 		const bool content = r < runs.size() && off >= runs[r].beg && off < runs[r].end;
+		if (!content && off >= revealBeg && off - revealBeg < hiddenSyntax.size() && hiddenSyntax[off - revealBeg])
+		{
+			// An inline marker of a span the caret does not touch: not drawn.
+			off = doc.NextCodepoint(off);
+			e.curOffset = off;
+			continue;
+		}
 		const uint32_t styles = content ? runs[r].styles : 0;
 		const bool runCode = content && runs[r].kind == EMarkdownRunKind::Code;
 		const Style st = StyleFor(styles, headingLevel, !content, asCode || runCode, header);
@@ -979,37 +1055,41 @@ void CMarkdownLiveEditor::LayoutTable(Emit &e, int32_t table)
 	e.layout->tables.push_back(tl);
 }
 
-void CMarkdownLiveEditor::LayoutBlock(Emit &e, int32_t block, bool sourceMode)
+// The revealed unit: every byte of its range as a glyph, block syntax dimmed,
+// inline markers of untouched spans hidden.
+void CMarkdownLiveEditor::LayoutRevealed(Emit &e, int32_t block)
+{
+	const CMarkdownBlock &b = doc.GetBlocks()[block];
+	const float base = FontSizeFor(0);
+	const float savedLeft = e.lineLeft;
+	if (revealLeftOverride >= 0) { e.lineLeft = revealLeftOverride; revealLeftOverride = -1; }
+	e.block = block;
+	const int headingLevel = b.type == EMarkdownBlockType::Heading ? b.level : 0;
+	StartLine(e, b.type == EMarkdownBlockType::Heading ? base * kHeadingSpacingBefore : base * kParagraphSpacing);
+	e.x = e.lineLeft;
+	e.curOffset = revealBeg;
+	const bool asCode = b.type == EMarkdownBlockType::Code || b.type == EMarkdownBlockType::Html;
+	if (b.type == EMarkdownBlockType::Code) e.codeBg = true;
+	LayoutSourceRange(e, block, revealBeg, revealEnd, headingLevel, asCode);
+	e.codeBg = false;
+	// The caret may sit at the range's end (just before the next unit): the
+	// trailing line's endOffset already covers it when the range ended with '\n'.
+	if (e.pendingLine && e.line == nullptr) e.curOffset = revealEnd;
+	EndLine(e);
+	e.lineLeft = savedLeft;
+	e.spacingBefore = base * kParagraphSpacing;
+}
+
+void CMarkdownLiveEditor::LayoutBlock(Emit &e, int32_t block, bool)
 {
 	const auto &blocks = doc.GetBlocks();
 	const CMarkdownBlock &b = blocks[block];
 	const float base = FontSizeFor(0);
 	e.block = block;
 
-	if (sourceMode)
+	if (block == revealedBlock && !b.IsCell() && b.type != EMarkdownBlockType::ListItem)
 	{
-		// The revealed top-level block: its bytes, plus the blank lines up to
-		// the next top-level block (and from the previous one), so every byte
-		// of the source has a place for the caret.
-		uint32_t beg = b.beg, end = b.end;
-		const int32_t prev = doc.PrevTopLevel(block);
-		const int32_t next = doc.NextTopLevel(block);
-		beg = prev >= 0 ? blocks[prev].end : 0;
-		end = next >= 0 ? blocks[next].beg : doc.Size();
-		// Skip the single '\n' that ends the previous block's last line so the
-		// previous block does not lose its line end.
-		if (prev >= 0 && beg < end && doc.GetSource()[beg] == '\n') beg++;
-		const int headingLevel = b.type == EMarkdownBlockType::Heading ? b.level : 0;
-		StartLine(e, b.type == EMarkdownBlockType::Heading ? base * kHeadingSpacingBefore : base * kParagraphSpacing);
-		e.curOffset = beg;
-		if (b.type == EMarkdownBlockType::Code) { e.codeBg = true; }
-		LayoutSourceRange(e, block, beg, end, headingLevel, b.type == EMarkdownBlockType::Code || b.type == EMarkdownBlockType::Html);
-		e.codeBg = false;
-		// The caret may sit at `end` (just before the next block): the trailing
-		// line's endOffset already covers it when the range ended with '\n'.
-		if (e.pendingLine && e.line == nullptr) { e.curOffset = end; }
-		EndLine(e);
-		e.spacingBefore = base * kParagraphSpacing;
+		LayoutRevealed(e, block);
 		return;
 	}
 
@@ -1083,6 +1163,33 @@ void CMarkdownLiveEditor::LayoutBlock(Emit &e, int32_t block, bool sourceMode)
 				StartLine(e, first ? base * kParagraphSpacing : (b.listIsTight ? 0.0f : base * kParagraphSpacing * 0.5f));
 				first = false;
 				e.curOffset = item.beg;
+
+				// The revealed unit starts on this item's marker line (the item's
+				// own text, or its first child): the line shows as source from
+				// the list's left edge -- no rendered marker -- and the rest of
+				// the item renders as usual.
+				const bool ownRevealed = li == revealedBlock;
+				const bool lineRevealed = ownRevealed || (revealedBlock > 0 && IsDescendant(revealedBlock, li)
+					&& doc.LineStart(blocks[revealedBlock].beg) == doc.LineStart(item.beg));
+				if (lineRevealed)
+				{
+					e.lineLeft = savedLeft + indent;
+					if (ownRevealed)
+					{
+						revealLeftOverride = savedLeft;
+						LayoutRevealed(e, li);
+					}
+					for (int32_t c : doc.GetChildren(li))
+					{
+						EndLine(e);
+						if (!ownRevealed && IsDescendant(revealedBlock, c)) revealLeftOverride = savedLeft;
+						LayoutBlock(e, c, false);
+					}
+					revealLeftOverride = -1;
+					EndLine(e);
+					e.lineLeft = savedLeft;
+					continue;
+				}
 				// Marker glyphs, right-aligned in the indent column.
 				char marker[32];
 				if (ordered) snprintf(marker, sizeof(marker), "%u%c", number++, b.listMark ? b.listMark : '.');
@@ -1147,7 +1254,8 @@ void CMarkdownLiveEditor::LayoutBlock(Emit &e, int32_t block, bool sourceMode)
 void CMarkdownLiveEditor::EnsureLayout(float width)
 {
 	const float fontSize = FontSizeFor(0);
-	if (!layoutDirty && width == layoutWidth && fontSize == layoutFontSize && revealedBlock == layoutRevealedBlock) return;
+	if (!layoutDirty && width == layoutWidth && fontSize == layoutFontSize && revealedBlock == layoutRevealedBlock
+		&& touchedSpans == layoutTouchedSpans) return;
 
 	layout = Layout();
 	layoutCount++;
@@ -1155,6 +1263,25 @@ void CMarkdownLiveEditor::EnsureLayout(float width)
 	layoutWidth = width;
 	layoutFontSize = fontSize;
 	layoutRevealedBlock = revealedBlock;
+	layoutTouchedSpans = touchedSpans;
+
+	// Which bytes of the revealed range are inline markers to hide: those of
+	// every span in the range, minus those of the spans the caret touches.
+	hiddenSyntax.assign(revealEnd > revealBeg ? revealEnd - revealBeg : 0, 0);
+	if (!revealAllInlineSyntax && !hiddenSyntax.empty())
+	{
+		const auto &spans = doc.GetSpans();
+		auto mark = [&](const CMarkdownSpan &sp, uint8_t v) {
+			for (uint32_t o = sp.beg; o < sp.end; o++)
+			{
+				if (o >= sp.contentBeg && o < sp.contentEnd) continue;
+				if (o >= revealBeg && o < revealEnd) hiddenSyntax[o - revealBeg] = v;
+			}
+		};
+		for (const CMarkdownSpan &sp : spans)
+			if (sp.beg >= revealBeg && sp.end <= revealEnd) mark(sp, 1);
+		for (int32_t t : touchedSpans) mark(spans[t], 0);
+	}
 
 	Emit e;
 	e.layout = &layout;
@@ -1192,21 +1319,10 @@ void CMarkdownLiveEditor::EnsureLayout(float width)
 		return;
 	}
 
-	const int32_t revealedTop = revealedBlock > 0 ? doc.TopLevelOf(revealedBlock) : -1;
+	// Every block lays itself out rendered unless it is the revealed unit; a
+	// table with a revealed cell stays a grid and LayoutTable reveals the cell.
 	for (int32_t top : doc.GetChildren(0))
-	{
-		const bool isTable = blocks[top].type == EMarkdownBlockType::Table;
-		const bool sourceMode = top == revealedTop && (!isTable || revealedBlock == top);
-		if (isTable && !sourceMode && top == revealedTop)
-		{
-			// A cell is revealed: the table stays a grid; LayoutTable reveals the cell.
-			LayoutBlock(e, top, false);
-		}
-		else
-		{
-			LayoutBlock(e, top, sourceMode);
-		}
-	}
+		LayoutBlock(e, top, false);
 	// Trailing blank lines after the last block belong to the last block's
 	// source view; when it is not revealed the caret can still be at Size():
 	// give it an (invisible) empty line.

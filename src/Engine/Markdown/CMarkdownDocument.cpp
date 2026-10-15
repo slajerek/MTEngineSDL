@@ -78,8 +78,10 @@ void CMarkdownDocument::Parse()
 {
 	blocks.clear();
 	runs.clear();
+	spans.clear();
 	blockStack.clear();
 	spanStack.clear();
+	openSpans.clear();
 	currentStyles = 0;
 	currentHref.clear();
 	currentLeaf = -1;
@@ -107,6 +109,7 @@ void CMarkdownDocument::Parse()
 	}
 
 	ResolveRanges();
+	ResolveSpans();
 }
 
 static EMarkdownBlockType BlockTypeFromMd(int type)
@@ -259,29 +262,39 @@ int CMarkdownDocument::EnterSpan(int type, void *detail, void *userdata)
 
 	auto attr = [](const MD_ATTRIBUTE &a) { return std::string(a.text ? a.text : "", a.text ? a.size : 0); };
 
+	CMarkdownSpan span;
+	span.block = doc->blockStack.empty() ? -1 : doc->blockStack.back();
+	span.parent = doc->openSpans.empty() ? -1 : doc->openSpans.back();
+	span.firstRun = (uint32_t)doc->runs.size();
 	switch ((MD_SPANTYPE)type)
 	{
-		case MD_SPAN_EM: doc->currentStyles |= MD_STYLE_EMPHASIS; break;
-		case MD_SPAN_STRONG: doc->currentStyles |= MD_STYLE_STRONG; break;
-		case MD_SPAN_CODE: doc->currentStyles |= MD_STYLE_CODE; break;
-		case MD_SPAN_DEL: doc->currentStyles |= MD_STYLE_STRIKETHROUGH; break;
-		case MD_SPAN_U: doc->currentStyles |= MD_STYLE_UNDERLINE; break;
+		case MD_SPAN_EM: doc->currentStyles |= MD_STYLE_EMPHASIS; span.type = EMarkdownSpanType::Emphasis; break;
+		case MD_SPAN_STRONG: doc->currentStyles |= MD_STYLE_STRONG; span.type = EMarkdownSpanType::Strong; break;
+		case MD_SPAN_CODE: doc->currentStyles |= MD_STYLE_CODE; span.type = EMarkdownSpanType::Code; break;
+		case MD_SPAN_DEL: doc->currentStyles |= MD_STYLE_STRIKETHROUGH; span.type = EMarkdownSpanType::Strikethrough; break;
+		case MD_SPAN_U: doc->currentStyles |= MD_STYLE_UNDERLINE; span.type = EMarkdownSpanType::Underline; break;
 		case MD_SPAN_LATEXMATH:
-		case MD_SPAN_LATEXMATH_DISPLAY: doc->currentStyles |= MD_STYLE_MATH; break;
+		case MD_SPAN_LATEXMATH_DISPLAY: doc->currentStyles |= MD_STYLE_MATH; span.type = EMarkdownSpanType::Math; break;
 		case MD_SPAN_A:
 			doc->currentStyles |= MD_STYLE_LINK;
 			doc->currentHref = attr(((const MD_SPAN_A_DETAIL *)detail)->href);
+			span.type = EMarkdownSpanType::Link;
 			break;
 		case MD_SPAN_IMG:
 			doc->currentStyles |= MD_STYLE_IMAGE;
 			doc->currentHref = attr(((const MD_SPAN_IMG_DETAIL *)detail)->src);
+			span.type = EMarkdownSpanType::Image;
 			break;
 		case MD_SPAN_WIKILINK:
 			doc->currentStyles |= MD_STYLE_WIKILINK;
 			doc->currentHref = attr(((const MD_SPAN_WIKILINK_DETAIL *)detail)->target);
+			span.type = EMarkdownSpanType::WikiLink;
 			break;
 		default: break;
 	}
+	span.href = doc->currentHref;
+	doc->openSpans.push_back((int32_t)doc->spans.size());
+	doc->spans.push_back(std::move(span));
 	return 0;
 }
 
@@ -293,6 +306,12 @@ int CMarkdownDocument::LeaveSpan(int, void *, void *userdata)
 	doc->currentStyles = doc->spanStack.back().style;
 	doc->currentHref = doc->spanStack.back().href;
 	doc->spanStack.pop_back();
+	if (!doc->openSpans.empty())
+	{
+		CMarkdownSpan &span = doc->spans[doc->openSpans.back()];
+		span.runCount = (uint32_t)doc->runs.size() - span.firstRun;
+		doc->openSpans.pop_back();
+	}
 	return 0;
 }
 
@@ -308,6 +327,7 @@ int CMarkdownDocument::Text(int type, const char *text, unsigned size, void *use
 	run.block = doc->blockStack.empty() ? -1 : doc->blockStack.back();
 	run.styles = doc->currentStyles;
 	run.href = doc->currentHref;
+	run.span = doc->openSpans.empty() ? -1 : doc->openSpans.back();
 
 	const char *base = doc->source.data();
 	const bool inSource = text >= base && text + size <= base + doc->source.size();
@@ -682,6 +702,144 @@ void CMarkdownDocument::ResolveRanges()
 		if (block.end > parent.end) block.end = parent.end;
 		if (block.end < block.beg) block.end = block.beg;
 	}
+}
+
+// ---- Inline spans --------------------------------------------------------------
+
+// From just after a link's text (`from`, at or before its `]`), the end of the
+// link's tail: `](dest "title")`, `][ref]`, `[]`, or just `]`. Returns `from`
+// when there is no `]` before `limit` (an autolink).
+uint32_t CMarkdownDocument::MatchLinkTail(uint32_t from, uint32_t limit) const
+{
+	uint32_t k = from;
+	while (k < limit && source[k] != ']') k++;
+	if (k >= limit) return from;
+	uint32_t j = k + 1;
+	if (j < limit && source[j] == '(')
+	{
+		int depth = 0;
+		char quote = 0;
+		bool angle = false;
+		for (; j < limit; j++)
+		{
+			const char c = source[j];
+			if (c == '\\' && j + 1 < limit) { j++; continue; }
+			if (quote) { if (c == quote) quote = 0; continue; }
+			if (angle) { if (c == '>') angle = false; continue; }
+			if (c == '<') angle = true;
+			else if (c == '"' || c == '\'') quote = c;
+			else if (c == '(') depth++;
+			else if (c == ')') { if (--depth == 0) return j + 1; }
+		}
+		return limit;
+	}
+	if (j < limit && source[j] == '[')
+	{
+		while (j < limit && source[j] != ']') j++;
+		return j < limit ? j + 1 : limit;
+	}
+	return j;
+}
+
+void CMarkdownDocument::ResolveSpans()
+{
+	auto isWs = [](char c) { return c == ' ' || c == '\t' || c == '\r' || c == '\n'; };
+	for (CMarkdownSpan &span : spans)
+	{
+		// Content: the in-buffer runs inside.
+		uint32_t cBeg = UINT32_MAX, cEnd = 0;
+		for (uint32_t r = span.firstRun; r < span.firstRun + span.runCount && r < runs.size(); r++)
+		{
+			const CMarkdownRun &run = runs[r];
+			if (run.IsSynthesized() || run.beg == UINT32_MAX) continue;
+			cBeg = std::min(cBeg, run.beg);
+			cEnd = std::max(cEnd, run.end);
+		}
+
+		// Neighbouring content of the same block bounds the markers.
+		uint32_t prevEnd = UINT32_MAX, nextBeg = UINT32_MAX;
+		for (uint32_t r = span.firstRun; r > 0; r--)
+		{
+			const CMarkdownRun &run = runs[r - 1];
+			if (run.block != span.block) break;
+			if (!run.IsSynthesized() && run.beg != UINT32_MAX) { prevEnd = run.end; break; }
+		}
+		for (uint32_t r = span.firstRun + span.runCount; r < runs.size(); r++)
+		{
+			const CMarkdownRun &run = runs[r];
+			if (run.block != span.block) break;
+			if (!run.IsSynthesized() && run.beg != UINT32_MAX) { nextBeg = run.beg; break; }
+		}
+
+		if (cBeg == UINT32_MAX)
+		{
+			// No content (`![](x)`, `[](x)`): the span is the syntax between its
+			// neighbours, blanks trimmed. Without neighbours it cannot be placed.
+			uint32_t a = prevEnd != UINT32_MAX ? prevEnd : (nextBeg != UINT32_MAX ? LineStart(nextBeg) : 0);
+			uint32_t b = nextBeg != UINT32_MAX ? nextBeg : LineEnd(a);
+			if (prevEnd == UINT32_MAX && span.block >= 0 && span.block < (int32_t)blocks.size() && nextBeg == UINT32_MAX)
+			{
+				a = blocks[span.block].beg;
+				b = LineEnd(a);
+			}
+			if (prevEnd == UINT32_MAX) a = SkipContainerMarkers(LineStart(a), LineEnd(a));
+			while (a < b && isWs(source[a])) a++;
+			while (b > a && isWs(source[b - 1])) b--;
+			// Within that, the image/link syntax starts at its `!` or `[`.
+			uint32_t open = a;
+			while (open < b && source[open] != '[' && source[open] != '!') open++;
+			if (open < b) a = open;
+			span.beg = a;
+			span.contentBeg = span.contentEnd = std::min(b, a + (source[a] == '!' ? 2u : 1u));
+			span.end = (span.type == EMarkdownSpanType::Link || span.type == EMarkdownSpanType::Image)
+				? std::max(span.contentEnd, MatchLinkTail(span.contentEnd, std::max(b, span.contentEnd))) : b;
+			continue;
+		}
+
+		span.contentBeg = cBeg;
+		span.contentEnd = cEnd;
+
+		// Opening: back over syntax bytes to the previous content or a blank.
+		const uint32_t lower = prevEnd != UINT32_MAX ? prevEnd : LineStart(cBeg);
+		uint32_t a = cBeg;
+		if (span.type == EMarkdownSpanType::Code && a > lower && source[a - 1] == ' ') a--;   // `` ` x ` ``
+		while (a > lower && !isWs(source[a - 1])) a--;
+		span.beg = a;
+
+		// Closing: forward over syntax bytes to the next content or a blank;
+		// a link or image through its destination.
+		const uint32_t upper = nextBeg != UINT32_MAX ? nextBeg : LineEnd(cEnd > 0 ? cEnd - 1 : cEnd);
+		uint32_t b = cEnd;
+		if (span.type == EMarkdownSpanType::Link || span.type == EMarkdownSpanType::Image)
+		{
+			const uint32_t tail = MatchLinkTail(b, std::max(upper, b));
+			if (tail != b) b = tail;
+			else while (b < upper && !isWs(source[b])) b++;   // autolink `<url>`
+		}
+		else
+		{
+			if (span.type == EMarkdownSpanType::Code && b < upper && source[b] == ' ') b++;
+			while (b < upper && !isWs(source[b])) b++;
+		}
+		span.end = std::max(b, cEnd);
+	}
+
+	// An enclosing span covers its children.
+	for (int32_t i = (int32_t)spans.size() - 1; i >= 0; i--)
+	{
+		const int32_t p = spans[i].parent;
+		if (p < 0) continue;
+		spans[p].beg = std::min(spans[p].beg, spans[i].beg);
+		spans[p].end = std::max(spans[p].end, spans[i].end);
+	}
+}
+
+std::vector<int32_t> CMarkdownDocument::SpansTouching(uint32_t offset) const
+{
+	std::vector<int32_t> out;
+	for (int32_t i = 0; i < (int32_t)spans.size(); i++)
+		if (spans[i].Touches(offset)) out.push_back(i);
+	return out;
 }
 
 // ---- Queries -----------------------------------------------------------------
