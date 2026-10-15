@@ -387,7 +387,13 @@ Write-Host "Output: $outDir"
 # is canonical_form and structurally cannot carry an MT_ENABLE_*, so the old
 # test could not see an FFmpeg-less build and would demand a build-mode marker
 # from a build that deliberately has none. UNVERIFIED: written on macOS.
-$ffmpegOn = if ($null -ne $env:MT_ENABLE_FFMPEG) { $env:MT_ENABLE_FFMPEG } else { '1' }
+# Use this resolve's generated flag, not an environment value that the
+# dependency stage may never have populated (-SkipDeps), or left stale.
+$ffmpegFlags = @($mtResolvedFlags | Where-Object { $_ -match '^\s*MT_ENABLE_FFMPEG\b' })
+if ($ffmpegFlags.Count -ne 1 -or $ffmpegFlags[0] -notmatch '^MT_ENABLE_FFMPEG = ([01])$') {
+    throw 'Expected exactly one MT_ENABLE_FFMPEG = 0 or 1 in MTEngineCaps.xcconfig'
+}
+$ffmpegOn = $Matches[1]
 if ($ffmpegOn -eq '1') {
     $marker = "$mtLibsDir\ffmpeg\.ffmpeg-build-mode"
     $markerMode = if (Test-Path $marker) { (Get-Content $marker -Raw).Trim() } else { 'missing' }

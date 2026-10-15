@@ -1,0 +1,40 @@
+name: Windows FFmpeg gate
+
+on:
+  pull_request:
+    paths:
+      - 'tools/appbuild/app-build-windows.ps1'
+      - 'tools/appbuild/scan-no-ffmpeg.ps1'
+      - 'tools/appbuild/scan-forbidden-symbols.ps1'
+      - 'tools/mtcaps/vocabulary.json'
+      - 'tests/test-windows-ffmpeg-gate.ps1'
+      - '.github/workflows/test-windows-ffmpeg-gate.yml'
+  push:
+    paths:
+      - 'tools/appbuild/app-build-windows.ps1'
+      - 'tools/appbuild/scan-no-ffmpeg.ps1'
+      - 'tools/appbuild/scan-forbidden-symbols.ps1'
+      - 'tools/mtcaps/vocabulary.json'
+      - 'tests/test-windows-ffmpeg-gate.ps1'
+      - '.github/workflows/test-windows-ffmpeg-gate.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ffmpeg-gate:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test Windows FFmpeg gate (Windows PowerShell 5.1)
+        shell: powershell
+        run: .\tests\test-windows-ffmpeg-gate.ps1 -ResultsDir "$env:RUNNER_TEMP\ffmpeg-gate-results"
+      - name: Retain case results and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-ffmpeg-gate-results
+          path: ${{ runner.temp }}/ffmpeg-gate-results
+          if-no-files-found: warn
