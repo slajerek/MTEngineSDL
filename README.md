@@ -70,9 +70,7 @@ the log goes to the system temp folder, or to `./log/` when that directory
 exists. On Windows, LogConsole.exe displays it live:
 https://sourceforge.net/projects/fastlogconsole/
 
-# Name
-
-Project History
+# Name and Project History
 
 The name MTEngine originates from Mobi Tracker Engine, originally developed for Mobi Tracker, one of the first working XM module trackers for Symbian phones, dating back to 2003.
 
