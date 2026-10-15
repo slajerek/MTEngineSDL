@@ -38,7 +38,7 @@ over to `tools/appbuild/app-build-<platform>`. The build flow itself lives
 here, so an app repo holds parameters rather than a copy of the machinery.
 
 `MTEngineSDLDummyApp` is the template to copy:
-https://github.com/slajerek/MTEngineSDLDummyApp
+https://github.com/slajerek/MTEngineSDLDemoApp
 
 ## Capabilities
 
