@@ -70,6 +70,16 @@ the log goes to the system temp folder, or to `./log/` when that directory
 exists. On Windows, LogConsole.exe displays it live:
 https://sourceforge.net/projects/fastlogconsole/
 
+# Name
+
+Project History
+
+The name MTEngine originates from Mobi Tracker Engine, originally developed for Mobi Tracker, one of the first working XM module trackers for Symbian phones, dating back to 2003.
+
+The engine has a long history of development and evolution across multiple platforms and graphics technologies. It started as a simple bitmap-based rendering engine running natively on Symbian OS. Over time, it was ported to desktop platforms, first using DirectX, then transitioning to OpenGL for cross-platform rendering.
+
+Further development led to the adoption of SDL2, followed by Dear ImGui integration for user interface rendering. The latest iteration is built around SDL3, incorporating numerous architectural improvements, modernized APIs, and enhancements accumulated over more than two decades of development.
+
 # Thanks
 
 This product would not have been created without the help of alpha testers:
