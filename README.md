@@ -72,7 +72,7 @@ https://sourceforge.net/projects/fastlogconsole/
 
 # Name and Project History
 
-The name MTEngine originates from Mobi Tracker Engine, originally developed for Mobi Tracker, one of the first working XM module trackers for Symbian phones, dating back to 2003.
+The name MTEngine originates from Mobi Tracker Engine, originally developed for Mobi Tracker, the first working XM module trackers for Symbian phones, dating back to 2003.
 
 The engine has a long history of development and evolution across multiple platforms and graphics technologies. It started as a simple bitmap-based rendering engine running natively on Symbian OS. Over time, it was ported to desktop platforms, first using DirectX, then transitioning to OpenGL for cross-platform rendering.
 
