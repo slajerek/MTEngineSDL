@@ -67,9 +67,183 @@ uint32_t CMarkdownDocument::Replace(uint32_t beg, uint32_t end, std::string_view
 	if (beg > size) beg = size;
 	if (end > size) end = size;
 	if (end < beg) std::swap(beg, end);
-	source.replace(beg, end - beg, text.data(), text.size());
-	Parse();
+	if (!(incrementalParse && TryIncrementalReplace(beg, end, text)))
+	{
+		source.replace(beg, end - beg, text.data(), text.size());
+		Parse();
+	}
 	return beg + (uint32_t)text.size();
+}
+
+// A line that could be a link reference definition (`[label]: dest`), after
+// container markers. Conservative: a false positive only costs a full parse.
+bool CMarkdownDocument::MayHaveLinkReferenceDefinitions(std::string_view text)
+{
+	size_t i = 0;
+	const size_t n = text.size();
+	while (i < n)
+	{
+		size_t j = i;
+		while (j < n && (text[j] == ' ' || text[j] == '\t' || text[j] == '>')) j++;
+		if (j < n && text[j] == '[')
+		{
+			const size_t lineEnd = text.find('\n', j);
+			const std::string_view line = text.substr(j, (lineEnd == std::string_view::npos ? n : lineEnd) - j);
+			if (line.find("]:") != std::string_view::npos) return true;
+		}
+		const size_t nl = text.find('\n', i);
+		if (nl == std::string_view::npos) break;
+		i = nl + 1;
+	}
+	return false;
+}
+
+bool CMarkdownDocument::TryIncrementalReplace(uint32_t beg, uint32_t end, std::string_view text)
+{
+	lastParseIncremental = false;
+	if (hasRefDefs || blocks.size() <= 1) return false;
+	const std::vector<int32_t> tops = GetChildren(0);
+	const int n = (int)tops.size();
+	if (n < 3) return false;
+
+	// The top-level blocks the edit touches: the last starting at or before
+	// each end of the edit (a gap belongs to the block before it).
+	auto topAt = [&](uint32_t offset) {
+		int k = 0;
+		for (int i = 0; i < n; i++) if (blocks[tops[i]].beg <= offset) k = i;
+		return k;
+	};
+	const int iA = topAt(beg), iZ = topAt(end);
+	const int ia = std::max(0, iA - 1), iz = std::min(n - 1, iZ + 1);
+	if (ia == 0 && iz == n - 1) return false;   // no smaller than the whole document
+
+	// The old region: from the previous neighbour (or the document start) to
+	// the next neighbour's end (or the document end).
+	// The gaps to the blocks outside belong to the region too: they hold no
+	// block's content, but they may hold syntax a block range does not name.
+	const uint32_t r0 = ia < iA ? (ia > 0 ? std::min(blocks[tops[ia]].beg, LineEnd(blocks[tops[ia - 1]].end) + 1) : 0) : 0;
+	const uint32_t r1 = iz > iZ ? (iz + 1 < n ? std::max(blocks[tops[iz]].end, LineStart(blocks[tops[iz + 1]].beg) - 1) : Size()) : Size();
+	if (beg < r0 || end > r1) return false;
+	const int64_t delta = (int64_t)text.size() - (int64_t)(end - beg);
+
+	std::string newSource = source;
+	newSource.replace(beg, end - beg, text.data(), text.size());
+	const uint32_t nr1 = (uint32_t)((int64_t)r1 + delta);
+	const std::string_view region(newSource.data() + r0, nr1 - r0);
+	if (MayHaveLinkReferenceDefinitions(region)) return false;
+
+	CMarkdownDocument sub;
+	sub.incrementalParse = false;
+	sub.parserFlags = parserFlags;
+	sub.SetSource(region);
+	const std::vector<int32_t> subTops = sub.GetChildren(0);
+	if (subTops.empty()) return false;
+
+	// The neighbours must parse exactly as before: same type, same range.
+	if (ia < iA)
+	{
+		const CMarkdownBlock &o = blocks[tops[ia]];
+		const CMarkdownBlock &f = sub.blocks[subTops.front()];
+		if (f.type != o.type || f.beg + r0 != o.beg || f.end + r0 != o.end) return false;
+		if (subTops.size() < 2) return false;
+	}
+	if (iz > iZ)
+	{
+		const CMarkdownBlock &o = blocks[tops[iz]];
+		const CMarkdownBlock &l = sub.blocks[subTops.back()];
+		if (l.type != o.type || (int64_t)l.beg + r0 != (int64_t)o.beg + delta || (int64_t)l.end + r0 != (int64_t)o.end + delta) return false;
+	}
+
+	// Splice. The old region is a contiguous run of blocks (whole top-level
+	// subtrees in pre-order), of runs and of spans.
+	const int32_t blockA = tops[ia];
+	const int32_t blockZ = iz + 1 < n ? tops[iz + 1] : (int32_t)blocks.size();   // one past
+	const uint32_t runA = blocks[blockA].firstRun;
+	const uint32_t runZ = blockZ < (int32_t)blocks.size() ? blocks[blockZ].firstRun : (uint32_t)runs.size();
+	uint32_t spanA = (uint32_t)spans.size(), spanZ = (uint32_t)spans.size();
+	for (uint32_t i = 0; i < spans.size(); i++)
+		if (spans[i].block >= blockA) { spanA = i; break; }
+	for (uint32_t i = spanA; i < spans.size(); i++)
+		if (spans[i].block >= blockZ) { spanZ = i; break; }
+
+	const int32_t newBlocks = (int32_t)sub.blocks.size() - 1;
+	const int32_t dBlocks = newBlocks - (blockZ - blockA);
+	const int32_t dRuns = (int32_t)sub.runs.size() - (int32_t)(runZ - runA);
+	const int32_t dSpans = (int32_t)sub.spans.size() - (int32_t)(spanZ - spanA);
+	auto shift = [](uint32_t &v, int64_t d) { if (v != UINT32_MAX) v = (uint32_t)((int64_t)v + d); };
+	auto shiftBlock = [&](CMarkdownBlock &b, int64_t d) {
+		shift(b.beg, d);
+		shift(b.end, d);
+		if (b.isTask) shift(b.taskMarkOffset, d);
+		if (b.infoEnd > b.infoBeg) { shift(b.infoBeg, d); shift(b.infoEnd, d); }
+		if (b.langEnd > b.langBeg) { shift(b.langBeg, d); shift(b.langEnd, d); }
+	};
+
+	// The region's replacements, mapped into this document.
+	std::vector<CMarkdownBlock> inBlocks(sub.blocks.begin() + 1, sub.blocks.end());
+	for (CMarkdownBlock &b : inBlocks)
+	{
+		shiftBlock(b, r0);
+		b.parent = b.parent <= 0 ? 0 : b.parent - 1 + blockA;
+		b.firstRun += runA;
+	}
+	std::vector<CMarkdownRun> inRuns = sub.runs;
+	for (CMarkdownRun &r : inRuns)
+	{
+		shift(r.beg, r0);
+		shift(r.end, r0);
+		if (r.block > 0) r.block = r.block - 1 + blockA;
+		if (r.span >= 0) r.span += (int32_t)spanA;
+	}
+	std::vector<CMarkdownSpan> inSpans = sub.spans;
+	for (CMarkdownSpan &sp : inSpans)
+	{
+		shift(sp.beg, r0); shift(sp.end, r0); shift(sp.contentBeg, r0); shift(sp.contentEnd, r0);
+		if (sp.block > 0) sp.block = sp.block - 1 + blockA;
+		if (sp.parent >= 0) sp.parent += (int32_t)spanA;
+		sp.firstRun += runA;
+	}
+
+	// Everything after the region moves by the edit and by the count changes.
+	for (int32_t i = blockZ; i < (int32_t)blocks.size(); i++)
+	{
+		CMarkdownBlock &b = blocks[i];
+		shiftBlock(b, delta);
+		if (b.parent >= blockZ) b.parent += dBlocks;
+		b.firstRun = (uint32_t)((int32_t)b.firstRun + dRuns);
+	}
+	for (uint32_t i = runZ; i < runs.size(); i++)
+	{
+		CMarkdownRun &r = runs[i];
+		shift(r.beg, delta);
+		shift(r.end, delta);
+		if (r.block >= blockZ) r.block += dBlocks;
+		if (r.span >= (int32_t)spanZ) r.span += dSpans;
+	}
+	for (uint32_t i = spanZ; i < spans.size(); i++)
+	{
+		CMarkdownSpan &sp = spans[i];
+		shift(sp.beg, delta); shift(sp.end, delta); shift(sp.contentBeg, delta); shift(sp.contentEnd, delta);
+		if (sp.block >= blockZ) sp.block += dBlocks;
+		if (sp.parent >= (int32_t)spanZ) sp.parent += dSpans;
+		sp.firstRun = (uint32_t)((int32_t)sp.firstRun + dRuns);
+	}
+
+	blocks.erase(blocks.begin() + blockA, blocks.begin() + blockZ);
+	blocks.insert(blocks.begin() + blockA, inBlocks.begin(), inBlocks.end());
+	runs.erase(runs.begin() + runA, runs.begin() + runZ);
+	runs.insert(runs.begin() + runA, inRuns.begin(), inRuns.end());
+	spans.erase(spans.begin() + spanA, spans.begin() + spanZ);
+	spans.insert(spans.begin() + spanA, inSpans.begin(), inSpans.end());
+
+	source.swap(newSource);
+	blocks[0].beg = 0;
+	blocks[0].end = Size();
+	blocks[0].runCount = (uint32_t)runs.size();
+	parseCount++;
+	incrementalParseCount++;
+	lastParseIncremental = true;
+	return true;
 }
 
 // ---- Parsing -----------------------------------------------------------------
@@ -82,6 +256,7 @@ void CMarkdownDocument::Parse()
 	blockStack.clear();
 	spanStack.clear();
 	openSpans.clear();
+	strayLeaves = 0;
 	currentStyles = 0;
 	currentHref.clear();
 	currentLeaf = -1;
@@ -98,6 +273,8 @@ void CMarkdownDocument::Parse()
 	parser.text = [](MD_TEXTTYPE t, const MD_CHAR *text, MD_SIZE size, void *u) { return Text((int)t, text, size, u); };
 
 	md_parse(source.data(), (MD_SIZE)source.size(), &parser, this);
+	lastParseIncremental = false;
+	hasRefDefs = MayHaveLinkReferenceDefinitions(source);
 
 	// md4c always brackets the document in MD_BLOCK_DOC, so blocks[0] is the
 	// Document. Guard anyway: a failed parse must still leave a usable model.
@@ -247,6 +424,24 @@ int CMarkdownDocument::LeaveBlock(int, void *, void *userdata)
 	if (doc->blockStack.empty())
 		return 0;
 	const int32_t index = doc->blockStack.back();
+
+	// Spans end with their block. md4c can resolve a delimiter against one it
+	// later consumes elsewhere (`~a [x](~b)` pairs the two tildes) and then
+	// emits that span's leave_span in a LATER block. Closing it here keeps a
+	// span inside its block -- and keeps the model a function of the block's
+	// own text, which incremental reparse depends on. The late leave_span is
+	// recognised and dropped in LeaveSpan().
+	while (!doc->openSpans.empty() && doc->spans[doc->openSpans.back()].block == index && !doc->spanStack.empty())
+	{
+		CMarkdownSpan &span = doc->spans[doc->openSpans.back()];
+		span.runCount = (uint32_t)doc->runs.size() - span.firstRun;
+		doc->currentStyles = doc->spanStack.back().style;
+		doc->currentHref = doc->spanStack.back().href;
+		doc->spanStack.pop_back();
+		doc->openSpans.pop_back();
+		doc->strayLeaves++;
+	}
+
 	doc->blockStack.pop_back();
 	CMarkdownBlock &block = doc->blocks[index];
 	block.runCount = (uint32_t)doc->runs.size() - block.firstRun;
@@ -298,11 +493,44 @@ int CMarkdownDocument::EnterSpan(int type, void *detail, void *userdata)
 	return 0;
 }
 
-int CMarkdownDocument::LeaveSpan(int, void *, void *userdata)
+static EMarkdownSpanType SpanTypeFromMd(int type)
+{
+	switch ((MD_SPANTYPE)type)
+	{
+		case MD_SPAN_EM: return EMarkdownSpanType::Emphasis;
+		case MD_SPAN_STRONG: return EMarkdownSpanType::Strong;
+		case MD_SPAN_CODE: return EMarkdownSpanType::Code;
+		case MD_SPAN_A: return EMarkdownSpanType::Link;
+		case MD_SPAN_IMG: return EMarkdownSpanType::Image;
+		case MD_SPAN_DEL: return EMarkdownSpanType::Strikethrough;
+		case MD_SPAN_U: return EMarkdownSpanType::Underline;
+		case MD_SPAN_LATEXMATH:
+		case MD_SPAN_LATEXMATH_DISPLAY: return EMarkdownSpanType::Math;
+		case MD_SPAN_WIKILINK: return EMarkdownSpanType::WikiLink;
+	}
+	return EMarkdownSpanType::Emphasis;
+}
+
+int CMarkdownDocument::LeaveSpan(int type, void *, void *userdata)
 {
 	CMarkdownDocument *doc = (CMarkdownDocument *)userdata;
 	if (doc->spanStack.empty())
+	{
+		if (doc->strayLeaves > 0) doc->strayLeaves--;
 		return 0;
+	}
+	// A leave_span for a span already closed with its block (see LeaveBlock):
+	// the innermost open span is of another type or from another block.
+	if (doc->strayLeaves > 0 && !doc->openSpans.empty())
+	{
+		const CMarkdownSpan &top = doc->spans[doc->openSpans.back()];
+		const int32_t current = doc->blockStack.empty() ? -1 : doc->blockStack.back();
+		if (top.type != SpanTypeFromMd(type) || top.block != current)
+		{
+			doc->strayLeaves--;
+			return 0;
+		}
+	}
 	doc->currentStyles = doc->spanStack.back().style;
 	doc->currentHref = doc->spanStack.back().href;
 	doc->spanStack.pop_back();
@@ -470,6 +698,97 @@ bool CMarkdownDocument::OwnsContent(int32_t index) const
 	return false;
 }
 
+// The end of the line before the next blank line after `from` (or the
+// source end): as far as a paragraph's text can run.
+uint32_t CMarkdownDocument::NextBlankLine(uint32_t from) const
+{
+	const uint32_t size = Size();
+	uint32_t lb = LineEnd(std::min(from, size));
+	while (lb < size)
+	{
+		const uint32_t next = lb + 1, ne = LineEnd(next);
+		bool blank = true;
+		for (uint32_t k = next; k < ne; k++) if (!IsBlank(source[k])) { blank = false; break; }
+		if (blank) return lb;
+		lb = ne;
+	}
+	return size;
+}
+
+// Where a code span's closing backticks, or a link's / image's `](dest)`,
+// end -- from the runs alone, before any block range is known. 0 when the
+// span is of another kind or the closing cannot be found. These are the two
+// spans whose closing syntax can sit on a line with no content at all
+// ("`code\n`", "[a](\ndest)"), a line the content-based leaf range misses.
+uint32_t CMarkdownDocument::SpanCloseEnd(const CMarkdownSpan &span) const
+{
+	const uint32_t size = Size();
+	if (span.type != EMarkdownSpanType::Code && span.type != EMarkdownSpanType::Link && span.type != EMarkdownSpanType::Image)
+	{
+		// Any other span whose last run is a line break closes on a later
+		// line: its delimiter is the first non-blank text after the break.
+		if (span.runCount == 0) return 0;
+		const CMarkdownRun &last = runs[span.firstRun + span.runCount - 1];
+		if (!(last.IsSynthesized() && (last.kind == EMarkdownRunKind::SoftBreak || last.kind == EMarkdownRunKind::HardBreak))) return 0;
+		uint32_t j = last.beg;
+		const uint32_t limit = NextBlankLine(j);
+		while (j < limit && (IsBlank(source[j]) || source[j] == '\n' || source[j] == '>')) j++;
+		uint32_t k = j;
+		while (k < limit && (source[k] == '*' || source[k] == '_' || source[k] == '~')) k++;
+		return k > j ? k : 0;
+	}
+	uint32_t prevEnd = 0, cBeg = UINT32_MAX, cEnd = 0;
+	for (uint32_t r = span.firstRun; r > 0; r--)
+	{
+		const CMarkdownRun &run = runs[r - 1];
+		if (run.block != span.block) break;
+		if (!run.IsSynthesized() && run.beg != UINT32_MAX) { prevEnd = run.end; break; }
+	}
+	for (uint32_t r = span.firstRun; r < span.firstRun + span.runCount && r < runs.size(); r++)
+	{
+		const CMarkdownRun &run = runs[r];
+		if (run.IsSynthesized() || run.beg == UINT32_MAX) continue;
+		cBeg = std::min(cBeg, run.beg);
+		cEnd = std::max(cEnd, run.end);
+	}
+	const uint32_t limit = NextBlankLine(cBeg != UINT32_MAX ? cBeg : prevEnd);
+	if (span.type == EMarkdownSpanType::Code)
+	{
+		// The opener: the backticks before the content (blanks between), or
+		// the first backticks after the previous content.
+		uint32_t open = UINT32_MAX;
+		if (cBeg != UINT32_MAX)
+		{
+			uint32_t k = cBeg;
+			while (k > prevEnd && (IsBlank(source[k - 1]) || source[k - 1] == '\n')) k--;
+			while (k > prevEnd && source[k - 1] == '`') k--;
+			if (k < cBeg && source[k] == '`') open = k;
+		}
+		else
+		{
+			uint32_t k = prevEnd;
+			while (k < limit && source[k] != '`') k++;
+			if (k < limit) open = k;
+		}
+		if (open == UINT32_MAX) return 0;
+		uint32_t n = 0;
+		while (open + n < size && source[open + n] == '`') n++;
+		uint32_t j = std::max(open + n, cEnd);
+		while (j < limit)
+		{
+			if (source[j] != '`') { j++; continue; }
+			uint32_t m = 0;
+			while (j + m < size && source[j + m] == '`') m++;
+			if (m == n) return j + m;
+			j += m;
+		}
+		return 0;
+	}
+	if (cEnd == 0) return 0;
+	const uint32_t tail = MatchLinkTail(cEnd, limit);
+	return tail != cEnd ? tail : 0;
+}
+
 void CMarkdownDocument::ResolveLeafRange(int32_t index, uint32_t &cursor)
 {
 	CMarkdownBlock &block = blocks[index];
@@ -494,6 +813,38 @@ void CMarkdownDocument::ResolveLeafRange(int32_t index, uint32_t &cursor)
 		block.beg = LineStart(minBeg);
 		block.end = LineEnd(maxEnd > 0 ? maxEnd - 1 : maxEnd);
 		if (maxEnd > block.end) block.end = maxEnd;   // a run that ends exactly at a '\n' (verbatim lines)
+
+		// Lines with no content at all -- a lone closing "`", "~", "](dest)",
+		// a lazy line of markers -- are still lines of the leaf, and md4c says
+		// how many: one line break per line boundary. Breaks before the first
+		// content move the start up, breaks after the last content move the
+		// end down. (Not for code, whose blank lines are content.)
+		if (block.type != EMarkdownBlockType::Code)
+		{
+			uint32_t before = 0, after = 0;
+			bool seen = false;
+			for (uint32_t r = block.firstRun; r < block.firstRun + block.runCount; r++)
+			{
+				const CMarkdownRun &run = runs[r];
+				if (run.block != index) continue;
+				const bool lineBreak = (run.kind == EMarkdownRunKind::SoftBreak || run.kind == EMarkdownRunKind::HardBreak)
+					&& run.synthesized == "\n";
+				if (lineBreak) { if (seen) after++; else before++; }
+				else if (!run.IsSynthesized() && run.beg != UINT32_MAX) { seen = true; after = 0; }
+			}
+			for (uint32_t k = 0; k < before && block.beg > 0; k++) block.beg = LineStart(block.beg - 1);
+			for (uint32_t k = 0; k < after && block.end < Size(); k++) block.end = LineEnd(block.end + 1);
+		}
+
+		// A code span or link closing on a line of its own: the leaf runs to
+		// that line. Known here, before the next empty block is placed after
+		// this one's end.
+		for (const CMarkdownSpan &sp : spans)
+		{
+			if (sp.block != index) continue;
+			const uint32_t closeEnd = SpanCloseEnd(sp);
+			if (closeEnd > block.end) block.end = LineEnd(closeEnd - 1);
+		}
 	}
 
 	// Lines md4c swallows and never names.
@@ -507,12 +858,17 @@ void CMarkdownDocument::ResolveLeafRange(int32_t index, uint32_t &cursor)
 			const uint32_t prevBeg = LineStart(prevEnd);
 			if (LineIsFence(prevBeg, prevEnd, block.fenceChar)) block.beg = prevBeg;
 		}
-		// Closing fence: the line after the last content line, if it is one.
-		if (block.end < Size())
+		// Closing fence: the next fence line after the last content line.
+		// Blank lines inside the block come as synthesized line breaks, not as
+		// content, so they are skipped on the way.
+		uint32_t probe = block.end;
+		while (probe < Size())
 		{
-			const uint32_t nextBeg = block.end + 1;
+			const uint32_t nextBeg = probe + 1;
 			const uint32_t nextEnd = LineEnd(nextBeg);
-			if (nextBeg <= Size() && LineIsFence(nextBeg, nextEnd, block.fenceChar)) block.end = nextEnd;
+			if (LineIsFence(nextBeg, nextEnd, block.fenceChar)) { block.end = nextEnd; break; }
+			if (SkipContainerMarkers(nextBeg, nextEnd) < nextEnd) break;   // not blank: no closing fence here
+			probe = nextEnd;
 		}
 	}
 	else if (block.type == EMarkdownBlockType::Heading && block.end < Size())
@@ -520,8 +876,11 @@ void CMarkdownDocument::ResolveLeafRange(int32_t index, uint32_t &cursor)
 		// Setext underline: a `===` / `---` line right after the text.
 		const uint32_t nextBeg = block.end + 1;
 		const uint32_t nextEnd = LineEnd(nextBeg);
-		const uint32_t firstContent = SkipContainerMarkers(block.beg, LineEnd(block.beg));
-		const bool isAtx = firstContent < Size() && source[firstContent] == '#';
+		// ATX is 1-6 '#' then a blank or the line end; "#b" is setext text.
+		const uint32_t firstLineEnd = LineEnd(block.beg);
+		uint32_t h = SkipContainerMarkers(block.beg, firstLineEnd), hashes = 0;
+		while (h < firstLineEnd && source[h] == '#') { h++; hashes++; }
+		const bool isAtx = hashes >= 1 && hashes <= 6 && (h == firstLineEnd || IsBlank(source[h]));
 		if (!isAtx && LineIsSetextUnderline(nextBeg, nextEnd)) block.end = nextEnd;
 	}
 
@@ -584,7 +943,30 @@ void CMarkdownDocument::ResolveRanges()
 	// Pass 1, document order: leaves, cells, and any container that owns text
 	// itself (a tight list item).
 	std::vector<bool> placed(blocks.size(), false);
+	std::vector<uint32_t> quoteTail(blocks.size(), 0);
 	uint32_t cursor = 0;
+	// Lines that hold nothing but quote markers (`>`) after a leaf inside a
+	// quote belong to that quote; there is no content on them to say so.
+	auto takeQuoteTail = [&](int32_t leaf) {
+		int32_t q = blocks[leaf].parent;
+		while (q > 0 && blocks[q].type != EMarkdownBlockType::Quote) q = blocks[q].parent;
+		if (q <= 0) return;
+		// The quote's own marker column: a `>` further left is another quote
+		// (one inside a list item cannot be continued from column 0).
+		const uint32_t qLine = LineStart(blocks[leaf].beg);
+		uint32_t qcol = 0;
+		while (qLine + qcol < Size() && source[qLine + qcol] != '>' && source[qLine + qcol] != '\n') qcol++;
+		uint32_t probe = cursor;
+		while (probe < Size())
+		{
+			const uint32_t nb = probe + 1, ne = LineEnd(nb);
+			uint32_t k = nb;
+			while (k < ne && IsBlank(source[k])) k++;
+			if (k >= ne || source[k] != '>' || k - nb < qcol || SkipContainerMarkers(nb, ne) < ne) break;
+			probe = ne;
+		}
+		if (probe > cursor) { cursor = probe; quoteTail[q] = std::max(quoteTail[q], probe); }
+	};
 	uint32_t rowLineBeg = 0;
 	uint32_t cellCursor = 0;
 	for (int32_t i = 0; i < (int32_t)blocks.size(); i++)
@@ -616,6 +998,19 @@ void CMarkdownDocument::ResolveRanges()
 		else if (block.IsLeaf() || OwnsContent(i))
 		{
 			ResolveLeafRange(i, cursor);
+			placed[i] = true;
+			takeQuoteTail(i);
+		}
+		else if ((block.type == EMarkdownBlockType::ListItem || block.type == EMarkdownBlockType::Quote)
+			&& !(i + 1 < (int32_t)blocks.size() && blocks[i + 1].parent == i))
+		{
+			// An empty list item (`-` alone) or quote (`>` alone): on the first
+			// non-blank line after the previous block. Placed here, in document
+			// order, so a run of empty ones lands on consecutive lines.
+			const uint32_t lineBeg = FirstNonBlankLineStart(cursor);
+			block.beg = lineBeg;
+			block.end = LineEnd(lineBeg);
+			cursor = std::max(cursor, block.end);
 			placed[i] = true;
 		}
 	}
@@ -654,14 +1049,14 @@ void CMarkdownDocument::ResolveRanges()
 		if (minBeg == UINT32_MAX)
 		{
 			// A container with no placed child: an empty list item (`-` alone).
-			// Place it on the first non-blank line after the previous sibling
-			// (or the parent's start).
+			// Place it on the first non-blank line after the block placed just
+			// before it in document order -- a previous sibling's content, or
+			// the text of an enclosing item. (Not "after the previous sibling":
+			// the first item of a list has none, and its parent is not placed
+			// yet in this pass; that used to put it on the document's first line.)
 			uint32_t from = 0;
-			for (int32_t p = i - 1; p >= 0; p--)
-			{
-				if (placed[p] && blocks[p].depth >= block.depth) { from = blocks[p].end; break; }
-				if (blocks[p].depth < block.depth) break;
-			}
+			for (int32_t p = i - 1; p >= 1; p--)
+				if (placed[p]) { from = blocks[p].end; break; }
 			const uint32_t lineBeg = FirstNonBlankLineStart(from);
 			block.beg = lineBeg;
 			block.end = LineEnd(lineBeg);
@@ -670,7 +1065,7 @@ void CMarkdownDocument::ResolveRanges()
 		}
 
 		block.beg = minBeg;
-		block.end = maxEnd;
+		block.end = std::max(maxEnd, quoteTail[i]);
 
 		// A list item / quote begins at its marker, which is on the first
 		// child's first line: widen to the line start. (A cell is intra-line
@@ -744,8 +1139,47 @@ uint32_t CMarkdownDocument::MatchLinkTail(uint32_t from, uint32_t limit) const
 void CMarkdownDocument::ResolveSpans()
 {
 	auto isWs = [](char c) { return c == ' ' || c == '\t' || c == '\r' || c == '\n'; };
+	const uint32_t size = Size();
+	// Where a paragraph's text can still run: up to the next blank line.
+	auto paragraphLimit = [&](uint32_t from) {
+		uint32_t lb = LineEnd(from);
+		while (lb < size)
+		{
+			const uint32_t next = lb + 1, ne = LineEnd(next);
+			bool blank = true;
+			for (uint32_t k = next; k < ne; k++) if (!IsBlank(source[k])) { blank = false; break; }
+			if (blank) return lb;
+			lb = ne;
+		}
+		return size;
+	};
+	// A code span: the run of N backticks at or before `from`, and the next
+	// run of exactly N after it (CommonMark: a code span may cross lines).
+	auto matchCode = [&](uint32_t open, uint32_t searchFrom, uint32_t limit, uint32_t *end) {
+		uint32_t n = 0;
+		while (open + n < size && source[open + n] == '`') n++;
+		if (n == 0) return false;
+		uint32_t j = std::max(searchFrom, open + n);
+		while (j < limit)
+		{
+			if (source[j] != '`') { j++; continue; }
+			uint32_t m = 0;
+			while (j + m < size && source[j + m] == '`') m++;
+			if (m == n) { *end = j + m; return true; }
+			j += m;
+		}
+		return false;
+	};
 	for (CMarkdownSpan &span : spans)
 	{
+		// A span never runs into the next block: the block after its own in
+		// document order (a leaf has no children) starts where it must stop.
+		uint32_t blockLimit = size;
+		if (span.block >= 0)
+			for (int32_t j = span.block + 1; j < (int32_t)blocks.size(); j++)
+				if (blocks[j].beg > 0 || blocks[j].end > 0) { blockLimit = std::max(blocks[j].beg, LineStart(blocks[j].beg)); break; }
+		auto limitFrom = [&](uint32_t from) { return std::min(paragraphLimit(from), std::max(blockLimit, from)); };
+
 		// Content: the in-buffer runs inside.
 		uint32_t cBeg = UINT32_MAX, cEnd = 0;
 		for (uint32_t r = span.firstRun; r < span.firstRun + span.runCount && r < runs.size(); r++)
@@ -789,6 +1223,21 @@ void CMarkdownDocument::ResolveSpans()
 			uint32_t open = a;
 			while (open < b && source[open] != '[' && source[open] != '!') open++;
 			if (open < b) a = open;
+			if (span.type == EMarkdownSpanType::Code)
+			{
+				// Only synthesized content (a line break): match the backticks.
+				uint32_t open = prevEnd != UINT32_MAX ? prevEnd : a;
+				while (open < size && source[open] != '`' && source[open] != '\n') open++;
+				uint32_t close = 0;
+				const uint32_t limit = nextBeg != UINT32_MAX ? nextBeg : limitFrom(open);
+				if (open < size && source[open] == '`' && matchCode(open, open, limit, &close))
+				{
+					span.beg = open;
+					span.contentBeg = span.contentEnd = open + 1;
+					span.end = close;
+					continue;
+				}
+			}
 			span.beg = a;
 			span.contentBeg = span.contentEnd = std::min(b, a + (source[a] == '!' ? 2u : 1u));
 			span.end = (span.type == EMarkdownSpanType::Link || span.type == EMarkdownSpanType::Image)
@@ -802,17 +1251,38 @@ void CMarkdownDocument::ResolveSpans()
 		// Opening: back over syntax bytes to the previous content or a blank.
 		const uint32_t lower = prevEnd != UINT32_MAX ? prevEnd : LineStart(cBeg);
 		uint32_t a = cBeg;
-		if (span.type == EMarkdownSpanType::Code && a > lower && source[a - 1] == ' ') a--;   // `` ` x ` ``
-		while (a > lower && !isWs(source[a - 1])) a--;
+		if (span.type == EMarkdownSpanType::Code)
+		{
+			// The opening backticks, possibly with blanks or a line break
+			// before the content (`` ` x ` ``, "`\ncode`").
+			const uint32_t floor = prevEnd != UINT32_MAX ? prevEnd : 0;
+			uint32_t k = cBeg;
+			while (k > floor && isWs(source[k - 1])) k--;
+			if (k > floor && source[k - 1] == '`')
+			{
+				while (k > floor && source[k - 1] == '`') k--;
+				a = k;
+			}
+			else while (a > lower && !isWs(source[a - 1])) a--;
+		}
+		else while (a > lower && !isWs(source[a - 1])) a--;
 		span.beg = a;
 
 		// Closing: forward over syntax bytes to the next content or a blank;
-		// a link or image through its destination.
+		// a link or image through its destination, a code span through its
+		// matching backticks -- the only two that may close past a blank.
 		const uint32_t upper = nextBeg != UINT32_MAX ? nextBeg : LineEnd(cEnd > 0 ? cEnd - 1 : cEnd);
 		uint32_t b = cEnd;
-		if (span.type == EMarkdownSpanType::Link || span.type == EMarkdownSpanType::Image)
+		uint32_t codeEnd = 0;
+		if (span.type == EMarkdownSpanType::Code && a < cBeg && source[a] == '`'
+			&& matchCode(a, cEnd, nextBeg != UINT32_MAX ? nextBeg : limitFrom(cEnd), &codeEnd))
 		{
-			const uint32_t tail = MatchLinkTail(b, std::max(upper, b));
+			b = codeEnd;
+		}
+		else if (span.type == EMarkdownSpanType::Link || span.type == EMarkdownSpanType::Image)
+		{
+			const uint32_t linkUpper = nextBeg != UINT32_MAX ? nextBeg : limitFrom(cEnd > 0 ? cEnd - 1 : cEnd);
+			const uint32_t tail = MatchLinkTail(b, std::max(linkUpper, b));
 			if (tail != b) b = tail;
 			else while (b < upper && !isWs(source[b])) b++;   // autolink `<url>`
 		}
@@ -831,6 +1301,24 @@ void CMarkdownDocument::ResolveSpans()
 		if (p < 0) continue;
 		spans[p].beg = std::min(spans[p].beg, spans[i].beg);
 		spans[p].end = std::max(spans[p].end, spans[i].end);
+	}
+
+	// A block covers its spans. Content alone can miss a line: a code span
+	// whose closing backtick sits alone on a lazy continuation line ("`a\n`")
+	// has no in-buffer content there, so the leaf (and its containers) would
+	// end a line early -- and a reparse of the block's range would lose the span.
+	for (const CMarkdownSpan &sp : spans)
+	{
+		if (sp.block <= 0 || sp.block >= (int32_t)blocks.size() || sp.end == 0) continue;
+		CMarkdownBlock &b = blocks[sp.block];
+		if (b.IsCell() || (sp.end <= b.end && sp.beg >= b.beg)) continue;
+		const uint32_t newEnd = sp.end > b.end ? LineEnd(sp.end - 1) : b.end;
+		const uint32_t newBeg = sp.beg < b.beg ? LineStart(sp.beg) : b.beg;
+		for (int32_t k = sp.block; k > 0; k = blocks[k].parent)
+		{
+			blocks[k].end = std::max(blocks[k].end, newEnd);
+			blocks[k].beg = std::min(blocks[k].beg, newBeg);
+		}
 	}
 }
 

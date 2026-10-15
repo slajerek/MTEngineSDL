@@ -2,6 +2,7 @@
 #include "CMarkdownDocument.h"
 #include "DBG_Log.h"
 
+#include <chrono>
 #include <cstdio>
 #include <string>
 
@@ -42,6 +43,46 @@ namespace
 		for (const CMarkdownSpan &sp : d.GetSpans())
 			if (sp.type == t) { if (skip == 0) return d.GetSource().substr(sp.beg, sp.end - sp.beg); skip--; }
 		return "";
+	}
+
+	// Field-by-field equality of two parses; the first difference in `why`.
+	bool SameModel(const CMarkdownDocument &a, const CMarkdownDocument &b, std::string *why)
+	{
+		char buf[256];
+		if (a.GetSource() != b.GetSource()) { *why = "source"; return false; }
+		const auto &ba = a.GetBlocks(), &bb = b.GetBlocks();
+		if (ba.size() != bb.size()) { snprintf(buf, sizeof(buf), "block count %zu vs %zu", ba.size(), bb.size()); *why = buf; return false; }
+		for (size_t i = 0; i < ba.size(); i++)
+		{
+			const CMarkdownBlock &x = ba[i], &y = bb[i];
+			const bool same = x.type == y.type && x.beg == y.beg && x.end == y.end && x.parent == y.parent && x.depth == y.depth
+				&& x.level == y.level && x.listStart == y.listStart && x.listMark == y.listMark && x.listIsTight == y.listIsTight
+				&& x.isTask == y.isTask && x.taskMark == y.taskMark && (!x.isTask || x.taskMarkOffset == y.taskMarkOffset)
+				&& x.isFenced == y.isFenced && x.fenceChar == y.fenceChar && x.infoBeg == y.infoBeg && x.infoEnd == y.infoEnd
+				&& x.langBeg == y.langBeg && x.langEnd == y.langEnd && x.columnCount == y.columnCount
+				&& x.headRowCount == y.headRowCount && x.bodyRowCount == y.bodyRowCount && x.align == y.align
+				&& x.firstRun == y.firstRun && x.runCount == y.runCount;
+			if (!same) { snprintf(buf, sizeof(buf), "block %zu (type %d [%u,%u) vs type %d [%u,%u))", i, (int)x.type, x.beg, x.end, (int)y.type, y.beg, y.end); *why = buf; return false; }
+		}
+		const auto &ra = a.GetRuns(), &rb = b.GetRuns();
+		if (ra.size() != rb.size()) { snprintf(buf, sizeof(buf), "run count %zu vs %zu", ra.size(), rb.size()); *why = buf; return false; }
+		for (size_t i = 0; i < ra.size(); i++)
+		{
+			const CMarkdownRun &x = ra[i], &y = rb[i];
+			if (!(x.beg == y.beg && x.end == y.end && x.styles == y.styles && x.block == y.block && x.kind == y.kind
+				&& x.synthesized == y.synthesized && x.href == y.href && x.span == y.span))
+			{ snprintf(buf, sizeof(buf), "run %zu ([%u,%u) blk %d vs [%u,%u) blk %d)", i, x.beg, x.end, x.block, y.beg, y.end, y.block); *why = buf; return false; }
+		}
+		const auto &sa = a.GetSpans(), &sb = b.GetSpans();
+		if (sa.size() != sb.size()) { snprintf(buf, sizeof(buf), "span count %zu vs %zu", sa.size(), sb.size()); *why = buf; return false; }
+		for (size_t i = 0; i < sa.size(); i++)
+		{
+			const CMarkdownSpan &x = sa[i], &y = sb[i];
+			if (!(x.type == y.type && x.beg == y.beg && x.end == y.end && x.contentBeg == y.contentBeg && x.contentEnd == y.contentEnd
+				&& x.block == y.block && x.parent == y.parent && x.firstRun == y.firstRun && x.runCount == y.runCount && x.href == y.href))
+			{ snprintf(buf, sizeof(buf), "span %zu", i); *why = buf; return false; }
+		}
+		return true;
 	}
 
 	// '_' where a byte is syntax, '~' for newline, the byte itself when content.
@@ -279,6 +320,67 @@ void CTestMarkdownDocument::Run(ITestCallback *callback)
 		const int32_t qt = FirstOfType(quoted, EMarkdownBlockType::Table);
 		MD_ASSERT(qt > 0 && quoted.EditTable(quoted.CellsOf(quoted.RowsOf(qt)[1])[0], EMarkdownTableEdit::InsertRowBelow, nullptr)
 			&& quoted.GetSource() == "> | a | b |\n> |---|---|\n> | 1 | 2 |\n> |   |   |\n", "a table in a quote keeps the quote prefix on a new row");
+	}
+
+	// Incremental reparse: every random edit must give exactly what a full
+	// parse of the same source gives. The alphabet is Markdown syntax, so
+	// edits open fences, make setext underlines, start and end lists, tables,
+	// quotes and spans -- the cases where a local reparse would be wrong.
+	{
+		CMarkdownDocument inc(src + "\n## Second\n\nMore text *here* and `code`.\n\n- x\n- y\n\n> q\n\nEnd.\n");
+		const char alphabet[] = " \n\n\n#-*_`|>[]():x1.=~ab";
+		uint32_t seed = 20261015u;
+		auto rnd = [&seed](uint32_t n) { seed = seed * 1664525u + 1013904223u; return n ? (seed >> 8) % n : 0; };
+		const int kEdits = 3000;
+		int incremental = 0;
+		std::string why;
+		bool ok = true;
+		int failedAt = -1;
+		for (int i = 0; i < kEdits && ok; i++)
+		{
+			const uint32_t size = inc.Size();
+			const uint32_t pos = rnd(size + 1);
+			if (rnd(3) == 0 || size > 2400)
+			{
+				const uint32_t len = 1 + rnd(3);
+				inc.Replace(pos, std::min(size, pos + len), "");
+			}
+			else
+			{
+				std::string ins;
+				const uint32_t len = 1 + rnd(3);
+				for (uint32_t k = 0; k < len; k++) ins += alphabet[rnd(sizeof(alphabet) - 1)];
+				inc.Replace(pos, pos, ins);
+			}
+			if (inc.WasLastParseIncremental()) incremental++;
+			CMarkdownDocument full(inc.GetSource());
+			if (!SameModel(inc, full, &why)) { ok = false; failedAt = i; }
+		}
+		char msg[512];
+		snprintf(msg, sizeof(msg), "%d random edits: incremental reparse equals a full parse (%d took the incremental path)%s%s%s",
+			kEdits, incremental, ok ? "" : "; FIRST DIFFERENCE at edit ", ok ? "" : std::to_string(failedAt).c_str(), ok ? "" : (": " + why).c_str());
+		MD_ASSERT(ok, msg);
+		MD_ASSERT(incremental > kEdits / 4, "the incremental path is taken for most local edits");
+
+		// A long agenda: typing stays local.
+		std::string big;
+		for (int k = 0; k < 600; k++)
+			big += "## Topic " + std::to_string(k) + "\n\nSome **notes** for the topic, with a [link](http://x).\n\n- point one\n- point two\n\n";
+		CMarkdownDocument bigInc(big), bigFull(big);
+		bigFull.SetIncrementalParse(false);
+		const uint32_t at = (uint32_t)big.find("Some", big.size() / 2);
+		auto t0 = std::chrono::steady_clock::now();
+		for (int k = 0; k < 100; k++) bigInc.Replace(at + (uint32_t)k, at + (uint32_t)k, "z");
+		auto t1 = std::chrono::steady_clock::now();
+		for (int k = 0; k < 100; k++) bigFull.Replace(at + (uint32_t)k, at + (uint32_t)k, "z");
+		auto t2 = std::chrono::steady_clock::now();
+		const double incMs = std::chrono::duration<double, std::milli>(t1 - t0).count();
+		const double fullMs = std::chrono::duration<double, std::milli>(t2 - t1).count();
+		std::string why2;
+		MD_ASSERT(SameModel(bigInc, bigFull, &why2), "100 keystrokes in a 600-topic agenda: incremental and full parses agree");
+		snprintf(msg, sizeof(msg), "typing in a %zu-byte document: %.3f ms per keystroke incremental, %.3f ms full",
+			big.size(), incMs / 100.0, fullMs / 100.0);
+		MD_ASSERT(bigInc.GetIncrementalParseCount() == 100, msg);
 	}
 
 	// Degenerate inputs.

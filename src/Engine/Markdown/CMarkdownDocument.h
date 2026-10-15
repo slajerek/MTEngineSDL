@@ -225,7 +225,19 @@ public:
 	// primitive: every edit the editor makes is one of these, which is what
 	// keeps unrelated bytes untouched. Returns the offset just after the
 	// inserted text. Out-of-range arguments are clamped.
+	//
+	// The reparse is INCREMENTAL when that is provably equivalent: only the
+	// top-level blocks the edit touches plus one neighbour on each side are
+	// parsed, and the result is spliced in. It falls back to a full parse when
+	// the neighbours do not come back with the same type and range (the edit
+	// changed how they parse: an opened fence, a setext underline, a lazy
+	// continuation) or when the document has link reference definitions
+	// (document-global in CommonMark). CTestMarkdownDocument compares
+	// thousands of random incremental edits with full parses.
 	uint32_t Replace(uint32_t beg, uint32_t end, std::string_view text);
+	void SetIncrementalParse(bool value) { incrementalParse = value; }
+	bool WasLastParseIncremental() const { return lastParseIncremental; }
+	uint32_t GetIncrementalParseCount() const { return incrementalParseCount; }
 
 	// md4c parser flags. Default: MD_DIALECT_GITHUB (tables, strikethrough,
 	// task lists, permissive autolinks). Set before SetSource(); changing it
@@ -341,11 +353,15 @@ public:
 
 private:
 	void Parse();
+	bool TryIncrementalReplace(uint32_t beg, uint32_t end, std::string_view text);
+	static bool MayHaveLinkReferenceDefinitions(std::string_view text);
 	void ResolveRanges();
 	bool OwnsContent(int32_t index) const;
 	void ResolveLeafRange(int32_t index, uint32_t &cursor);
 	void ResolveCellRange(int32_t index, uint32_t rowLineBeg, uint32_t &cursor);
 	void ResolveSpans();
+	uint32_t NextBlankLine(uint32_t from) const;
+	uint32_t SpanCloseEnd(const CMarkdownSpan &span) const;
 	uint32_t MatchLinkTail(uint32_t from, uint32_t limit) const;
 	struct TableLine { std::string prefix; bool lead = false, trail = false; std::vector<std::string> cells; };
 	TableLine SplitTableLine(uint32_t lineBeg, uint32_t lineEnd) const;
@@ -368,12 +384,17 @@ private:
 	std::vector<CMarkdownSpan> spans;
 	unsigned parserFlags;
 	uint32_t parseCount = 0;
+	bool incrementalParse = true;
+	bool lastParseIncremental = false;
+	uint32_t incrementalParseCount = 0;
+	bool hasRefDefs = false;
 
 	// Parse-time state
 	std::vector<int32_t> blockStack;
 	struct SpanState { uint32_t style; std::string href; };
 	std::vector<SpanState> spanStack;
 	std::vector<int32_t> openSpans;
+	uint32_t strayLeaves = 0;
 	uint32_t currentStyles = 0;
 	std::string currentHref;
 	int32_t currentLeaf = -1;
