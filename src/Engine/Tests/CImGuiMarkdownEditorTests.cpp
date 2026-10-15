@@ -7,8 +7,10 @@
 #include "CGuiViewMarkdownEditor.h"
 #include "CMarkdownEditorBindings.h"
 #include "CSlrKeyboardShortcuts.h"
+#include "MT_CaptureHelpers.h"
 
 #include <cmath>
+#include <cstdlib>
 #include <string>
 
 namespace
@@ -19,7 +21,8 @@ namespace
 	{
 		if (s_view == nullptr)
 		{
-			s_view = new CGuiViewMarkdownEditor("MarkdownEditorTest", 40, 40, -1, 640, 480);
+			// Inside the headless app window, so captures see all of it.
+			s_view = new CGuiViewMarkdownEditor("MarkdownEditorTest", 20, 30, -1, 600, 420);
 			guiMain->AddView(s_view);
 		}
 		s_view->SetVisible(true);
@@ -618,5 +621,67 @@ void RegisterMarkdownEditorTests(ImGuiTestEngine *engine)
 		ctx->KeyChars("Z");             // typing replaces the selected match: the text has the keyboard
 		ctx->Yield(2);
 		IM_CHECK_EQ(ed.GetSource(), std::string("alpha Z\n\nBeta gamma beta\n"));
+	};
+
+	// Pixels, not geometry: the editor's window is captured in four states and
+	// each must have drawn real text. With MT_MD_CAPTURE_DIR set, the captures
+	// are also written there (raw RGBA artifacts) for a human to look at.
+	t = IM_REGISTER_TEST(engine, "markdown", "captures_show_rendered_text");
+	t->TestFunc = [](ImGuiTestContext *ctx)
+	{
+		CGuiViewMarkdownEditor *view = EnsureView(ctx);
+		CMarkdownLiveEditor &ed = view->GetEditor();
+		const std::string src =
+			"# Internal AI meeting\n\n"
+			"Agenda for **24 October**, see [the notes](http://example.com) and `build.sh`.\n\n"
+			"1. Introduction (Anna)\n"
+			"2. Project split\n"
+			"   - Authorisation\n"
+			"   - [x] Data model\n"
+			"   - [ ] Release plan\n\n"
+			"> Decisions are recorded in the minutes.\n\n"
+			"| Topic | Owner | Minutes |\n"
+			"|:------|-------|--------:|\n"
+			"| Intro | Anna  | 5 |\n"
+			"| Split | Bob   | 20 |\n\n"
+			"```\nmake release\n```\n\n"
+			"Closing remarks with ~~old~~ *new* items.\n";
+		ed.SetFindQuery("");
+		ed.SetSource(src);
+		ctx->Yield(3);
+		const char *dir = getenv("MT_MD_CAPTURE_DIR");
+		auto shot = [&](const char *name) {
+			ctx->Yield(3);
+			std::vector<unsigned int> px;
+			int w = 0, h = 0;
+			IM_CHECK(MT_CaptureWindowRGBA(ctx, "//MarkdownEditorTest", &px, &w, &h));
+			const unsigned int bg = px.empty() ? 0 : px[(size_t)(h / 2) * (size_t)w + (size_t)(w - 3)];
+			int distinct = 0;
+			const float ink = MT_NonBackgroundFraction(px, bg, 24, &distinct);
+			ctx->LogInfo("capture %s: %dx%d, %.3f non-background, %d colours", name, w, h, ink, distinct);
+			IM_CHECK_GT(ink, 0.02f);
+			IM_CHECK_GT(distinct, 8);
+			if (dir != nullptr)
+			{
+				const std::string path = std::string(dir) + "/" + name + ".rgba";
+				MT_WriteCaptureArtifact(path.c_str(), px, w, h);
+			}
+		};
+		// 1. Everything rendered (caret at the end, in the last paragraph).
+		IM_CHECK(ClickOffset(ctx, ed, (uint32_t)src.find("items")));
+		shot("1_rendered");
+		// 2. A list item revealed, its strong span untouched.
+		IM_CHECK(ClickOffset(ctx, ed, (uint32_t)src.find("Data model")));
+		shot("2_list_item_revealed");
+		// 3. A table cell revealed: the grid stays a grid.
+		IM_CHECK(ClickOffset(ctx, ed, (uint32_t)src.find("Bob") + 1));
+		shot("3_table_cell");
+		// 4. The find bar with three matches.
+		ctx->KeyPress(ImGuiMod_Ctrl | ImGuiKey_F);
+		ctx->Yield(2);
+		ctx->KeyChars("an");
+		shot("4_find");
+		ctx->KeyPress(ImGuiKey_Escape);
+		ctx->Yield(2);
 	};
 }

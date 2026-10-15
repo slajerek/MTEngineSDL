@@ -788,6 +788,7 @@ bool CMarkdownLiveEditor::FindPrevious()
 void CMarkdownLiveEditor::RenderFindBar()
 {
 	ImGui::PushID("##md_find");
+	const float lineRight = ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x;
 	const float h = ImGui::GetFrameHeight();
 	const float buttonW = h * 1.2f;
 	const float countW = ImGui::CalcTextSize("0000 / 0000").x + ImGui::GetStyle().ItemSpacing.x;
@@ -826,7 +827,7 @@ void CMarkdownLiveEditor::RenderFindBar()
 	else snprintf(count, sizeof(count), "%d / %d", cur >= 0 ? cur + 1 : 0, (int)m.size());
 	ImGui::AlignTextToFramePadding();
 	ImGui::TextUnformatted(count);
-	ImGui::SameLine(ImGui::GetContentRegionMax().x - 4 * buttonW - 3 * ImGui::GetStyle().ItemSpacing.x);
+	ImGui::SameLine(lineRight - 4 * buttonW - 3 * ImGui::GetStyle().ItemSpacing.x);
 	if (ImGui::Button("<###md_find_prev", ImVec2(buttonW, h))) FindPrevious();
 	ImGui::SetItemTooltip("%s", L("markdown.editor.find.previous", "Previous match (Shift+Enter)"));
 	ImGui::SameLine();
@@ -1033,7 +1034,8 @@ void CMarkdownLiveEditor::PutGlyphG(Emit &e, Glyph g, const Style &st, bool brea
 		line.bgColor = e.bgColor;
 		e.layout->lines.push_back(line);
 		e.line = &e.layout->lines.back();
-		e.x = e.lineLeft;
+		// The pen stays where the caller put it: StartLine() already moved it to
+		// the left edge, and a list marker is placed left of that on purpose.
 	}
 
 	Line *line = e.line;
@@ -1196,6 +1198,12 @@ void CMarkdownLiveEditor::LayoutRuns(Emit &e, int32_t block, bool, uint32_t, uin
 			if (spans[sp].type == EMarkdownSpanType::Image && spans[sp].runCount == 0 && spans[sp].block == block) bare.push_back(sp);
 	size_t nextBare = 0;
 	int32_t shownImage = -1;
+	// A code block's text ends with the newline of its last line: that one
+	// ends the block, it does not open an empty line inside it.
+	uint32_t lastContentEnd = 0;
+	if (asCode)
+		for (uint32_t r = b.firstRun; r < b.firstRun + b.runCount; r++)
+			if (runs[r].block == block && !runs[r].IsSynthesized()) lastContentEnd = std::max(lastContentEnd, runs[r].end);
 	const Style plain = StyleFor(0, headingLevel, false, asCode, header);
 
 	for (uint32_t r = b.firstRun; r < b.firstRun + b.runCount; r++)
@@ -1215,6 +1223,15 @@ void CMarkdownLiveEditor::LayoutRuns(Emit &e, int32_t block, bool, uint32_t, uin
 
 		if (run.IsSynthesized() || run.beg == run.end)
 		{
+			// A code block's closing newline (md4c may pass it as a literal):
+			// the block ends there, no empty line inside it.
+			if (asCode && run.synthesized == "\n")
+			{
+				bool laterContent = false;
+				for (uint32_t k = r + 1; k < b.firstRun + b.runCount; k++)
+					if (runs[k].block == block && (!runs[k].IsSynthesized() || runs[k].synthesized == "\n")) { laterContent = true; break; }
+				if (!laterContent) continue;
+			}
 			if (run.kind == EMarkdownRunKind::HardBreak || run.synthesized == "\n")
 			{
 				// A rendered line break: the caret before the break maps to run.beg.
@@ -1242,7 +1259,19 @@ void CMarkdownLiveEditor::LayoutRuns(Emit &e, int32_t block, bool, uint32_t, uin
 		{
 			unsigned int cp = 0;
 			const int n = ImTextCharFromUtf8(&cp, src.data() + off, src.data() + run.end);
-			if (cp == '\n') { PutNewline(e, off); off += 1; continue; }
+			if (cp == '\n')
+			{
+				if (asCode && off + 1 == lastContentEnd)
+				{
+					if (e.line) e.line->endOffset = std::max(e.line->endOffset, off);
+					e.curOffset = off;
+					off += 1;
+					continue;
+				}
+				PutNewline(e, off);
+				off += 1;
+				continue;
+			}
 			PutGlyph(e, (ImWchar)cp, off, st, false, false, cp == ' ');
 			off += n > 0 ? (uint32_t)n : 1;
 		}
@@ -1292,7 +1321,23 @@ void CMarkdownLiveEditor::LayoutSourceRange(Emit &e, int32_t block, uint32_t beg
 
 		unsigned int cp = 0;
 		const int n = ImTextCharFromUtf8(&cp, src.data() + off, src.data() + end);
-		if (cp == '\n') { PutNewline(e, off); off += 1; continue; }
+		if (cp == '\n')
+		{
+			// The range's final newline: the caret goes before it; after it is
+			// the next unit's first byte, laid out by that unit.
+			if (off + 1 == end && end < doc.Size())
+			{
+				if (!e.pendingLine) StartLine(e, 0);
+				if (e.line == nullptr) { e.curOffset = off; EndLine(e); }
+				if (e.line) e.line->endOffset = std::max(e.line->endOffset, off);
+				e.curOffset = off;
+				off += 1;
+				continue;
+			}
+			PutNewline(e, off);
+			off += 1;
+			continue;
+		}
 		PutGlyph(e, (ImWchar)cp, off, st, false, !content, cp == ' ');
 		off += n > 0 ? (uint32_t)n : 1;
 	}
@@ -1399,6 +1444,17 @@ void CMarkdownLiveEditor::LayoutTable(Emit &e, int32_t table)
 				LayoutRuns(e, cells[c], false, 0, 0, 0);
 			EndLine(e);
 			cl.lineCount = e.layout->lines.size() - cl.firstLine;
+			// Column alignment from the delimiter row: shift each line of the cell.
+			if (cell.align == EMarkdownCellAlign::Right || cell.align == EMarkdownCellAlign::Center)
+				for (size_t li = cl.firstLine; li < cl.firstLine + cl.lineCount; li++)
+				{
+					Line &ln = e.layout->lines[li];
+					if (ln.glyphs.empty()) continue;
+					const float free = (tl.colX[c + 1] - pad) - ln.glyphs.back().x1;
+					const float dx = cell.align == EMarkdownCellAlign::Right ? free : free * 0.5f;
+					if (dx <= 0) continue;
+					for (Glyph &g : ln.glyphs) { g.x0 += dx; g.x1 += dx; }
+				}
 			rowBottom = std::max(rowBottom, e.y + pad * 0.6f);
 			tl.cells.push_back(cl);
 		}
@@ -1425,7 +1481,12 @@ void CMarkdownLiveEditor::LayoutRevealed(Emit &e, int32_t block)
 	if (revealLeftOverride >= 0) { e.lineLeft = revealLeftOverride; revealLeftOverride = -1; }
 	e.block = block;
 	const int headingLevel = b.type == EMarkdownBlockType::Heading ? b.level : 0;
-	StartLine(e, b.type == EMarkdownBlockType::Heading ? base * kHeadingSpacingBefore : base * kParagraphSpacing);
+	// A list item's line was already started by the list (with the list's
+	// spacing); starting another would leave an empty line above it.
+	const float spacing = b.type == EMarkdownBlockType::Heading ? base * kHeadingSpacingBefore
+		: (b.type == EMarkdownBlockType::ListItem ? 0.0f : base * kParagraphSpacing);
+	if (e.pendingLine && e.line == nullptr) e.spacingBefore = std::max(e.spacingBefore, spacing);
+	else StartLine(e, spacing);
 	e.x = e.lineLeft;
 	e.curOffset = revealBeg;
 	const bool asCode = b.type == EMarkdownBlockType::Code || b.type == EMarkdownBlockType::Html;
@@ -1437,7 +1498,9 @@ void CMarkdownLiveEditor::LayoutRevealed(Emit &e, int32_t block)
 	if (e.pendingLine && e.line == nullptr) e.curOffset = revealEnd;
 	EndLine(e);
 	e.lineLeft = savedLeft;
-	e.spacingBefore = base * kParagraphSpacing;
+	// A list item is followed by its siblings at the list's spacing, which the
+	// list sets; other units by a paragraph gap.
+	if (b.type != EMarkdownBlockType::ListItem) e.spacingBefore = base * kParagraphSpacing;
 }
 
 void CMarkdownLiveEditor::LayoutBlock(Emit &e, int32_t block, bool)
@@ -2275,10 +2338,12 @@ void CMarkdownLiveEditor::Draw(ImDrawList *dl, ImVec2 origin)
 			if (st.codeBg && !line.codeBackground)
 				dl->AddRectFilled(ImVec2(origin.x + x0, pos.y), ImVec2(origin.x + x1, pos.y + st.size * 1.15f), codeBg, 2.0f);
 			dl->AddText(st.font, st.size, pos, st.color, segment.c_str(), segment.c_str() + segment.size());
+			// The glyphs' own baseline: baseY sits half the line gap lower.
+			const float glyphBaseline = pos.y + (LineHeightFor(st) - st.size) * 0.5f + glyphAscent;
 			if (st.strike)
-				dl->AddLine(ImVec2(origin.x + x0, baseY - st.size * 0.3f), ImVec2(origin.x + x1, baseY - st.size * 0.3f), st.color, 1.0f);
+				dl->AddLine(ImVec2(origin.x + x0, glyphBaseline - st.size * 0.3f), ImVec2(origin.x + x1, glyphBaseline - st.size * 0.3f), st.color, 1.0f);
 			if (st.underline)
-				dl->AddLine(ImVec2(origin.x + x0, baseY + 1.0f), ImVec2(origin.x + x1, baseY + 1.0f), st.color, 1.0f);
+				dl->AddLine(ImVec2(origin.x + x0, glyphBaseline + 1.5f), ImVec2(origin.x + x1, glyphBaseline + 1.5f), st.color, 1.0f);
 			i = j;
 		}
 
