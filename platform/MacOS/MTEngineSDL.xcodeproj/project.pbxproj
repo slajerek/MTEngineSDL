@@ -677,6 +677,11 @@
 		41E1CFDC2DDF8434006B32FB /* imgui_stdlib.h in Headers */ = {isa = PBXBuildFile; fileRef = 41E1CFDA2DDF8434006B32FB /* imgui_stdlib.h */; };
 		41E1CFDD2DDF8434006B32FB /* imgui_stdlib.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 41E1CFDB2DDF8434006B32FB /* imgui_stdlib.cpp */; };
 		41E4CA97285343B6007509C3 /* CRenderBackend.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 41E4CA93285343B6007509C3 /* CRenderBackend.cpp */; };
+		CC453B3B192C31AC7C1022DD /* CImGuiMarkdownEditorTests.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4D1545A7CF47E642324DD5D2 /* CImGuiMarkdownEditorTests.cpp */; };
+		05DC2F68A11C81BC63A6B386 /* CTestMarkdownDocument.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CDB277FF1D00B50A8BF50FF0 /* CTestMarkdownDocument.cpp */; };
+		C55E563BAF989E52A5E99294 /* CGuiViewMarkdownEditor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CBE957D66CE0AE3DC7C6F2B4 /* CGuiViewMarkdownEditor.cpp */; };
+		9A89AE552B5FA6052A9B8B98 /* CMarkdownLiveEditor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3FC7B79525618F68DD616853 /* CMarkdownLiveEditor.cpp */; };
+		7DDA85CA5353FB62749F023D /* CMarkdownDocument.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9169E433D669A2E17AA20B22 /* CMarkdownDocument.cpp */; };
 		05A9E27AB82C3067AC34C854 /* CTestMenuBarMode.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E89FC040C492F4976E513F9E /* CTestMenuBarMode.cpp */; };
 		FC6CE2AEBA960A7E21FDE489 /* VID_GainMapDraw.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AB4D7F732186FB08243F4CA1 /* VID_GainMapDraw.cpp */; };
 		797B340C6DB65C1947DDE5DF /* MT_UltraHdr.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36582C7C27E445A11AF2CB0C /* MT_UltraHdr.cpp */; };
@@ -1709,6 +1714,16 @@
 		41E1CFDA2DDF8434006B32FB /* imgui_stdlib.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = imgui_stdlib.h; path = imguiext/imgui_stdlib.h; sourceTree = "<group>"; };
 		41E1CFDB2DDF8434006B32FB /* imgui_stdlib.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = imgui_stdlib.cpp; path = imguiext/imgui_stdlib.cpp; sourceTree = "<group>"; };
 		41E4CA93285343B6007509C3 /* CRenderBackend.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CRenderBackend.cpp; sourceTree = "<group>"; };
+		4D1545A7CF47E642324DD5D2 /* CImGuiMarkdownEditorTests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CImGuiMarkdownEditorTests.cpp; path = ../../src/Engine/Tests/CImGuiMarkdownEditorTests.cpp; sourceTree = SOURCE_ROOT; };
+		A7B76E33FE5B32EBEC008456 /* CImGuiMarkdownEditorTests.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CImGuiMarkdownEditorTests.h; path = ../../src/Engine/Tests/CImGuiMarkdownEditorTests.h; sourceTree = SOURCE_ROOT; };
+		CDB277FF1D00B50A8BF50FF0 /* CTestMarkdownDocument.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CTestMarkdownDocument.cpp; path = ../../src/Engine/Tests/CTestMarkdownDocument.cpp; sourceTree = SOURCE_ROOT; };
+		1F2F306BD8B6FF33FB0C2294 /* CTestMarkdownDocument.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CTestMarkdownDocument.h; path = ../../src/Engine/Tests/CTestMarkdownDocument.h; sourceTree = SOURCE_ROOT; };
+		CBE957D66CE0AE3DC7C6F2B4 /* CGuiViewMarkdownEditor.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CGuiViewMarkdownEditor.cpp; path = ../../src/Engine/GUI/Controls/CGuiViewMarkdownEditor.cpp; sourceTree = SOURCE_ROOT; };
+		2BBD5A4218F70C2DCF41AC67 /* CGuiViewMarkdownEditor.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CGuiViewMarkdownEditor.h; path = ../../src/Engine/GUI/Controls/CGuiViewMarkdownEditor.h; sourceTree = SOURCE_ROOT; };
+		3FC7B79525618F68DD616853 /* CMarkdownLiveEditor.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CMarkdownLiveEditor.cpp; path = ../../src/Engine/Markdown/CMarkdownLiveEditor.cpp; sourceTree = SOURCE_ROOT; };
+		F52A809ADC1E06E13AFDF134 /* CMarkdownLiveEditor.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CMarkdownLiveEditor.h; path = ../../src/Engine/Markdown/CMarkdownLiveEditor.h; sourceTree = SOURCE_ROOT; };
+		9169E433D669A2E17AA20B22 /* CMarkdownDocument.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CMarkdownDocument.cpp; path = ../../src/Engine/Markdown/CMarkdownDocument.cpp; sourceTree = SOURCE_ROOT; };
+		426F1012228BDABE18681BC8 /* CMarkdownDocument.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CMarkdownDocument.h; path = ../../src/Engine/Markdown/CMarkdownDocument.h; sourceTree = SOURCE_ROOT; };
 		29A53BCCC417C22ECC9CA20E /* CTestMenuBarMode.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CTestMenuBarMode.h; path = ../../src/Engine/Tests/CTestMenuBarMode.h; sourceTree = SOURCE_ROOT; };
 		E89FC040C492F4976E513F9E /* CTestMenuBarMode.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CTestMenuBarMode.cpp; path = ../../src/Engine/Tests/CTestMenuBarMode.cpp; sourceTree = SOURCE_ROOT; };
 		AB4D7F732186FB08243F4CA1 /* VID_GainMapDraw.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = VID_GainMapDraw.cpp; path = ../../src/Engine/Core/Render/VID_GainMapDraw.cpp; sourceTree = SOURCE_ROOT; };
@@ -3503,6 +3518,16 @@
 				41D5E267239D891200143F1C /* VID_ImageBinding.cpp */,
 				41D5E268239D891200143F1C /* VID_ImageBinding.h */,
 				41E4CA93285343B6007509C3 /* CRenderBackend.cpp */,
+				4D1545A7CF47E642324DD5D2 /* CImGuiMarkdownEditorTests.cpp */,
+				A7B76E33FE5B32EBEC008456 /* CImGuiMarkdownEditorTests.h */,
+				CDB277FF1D00B50A8BF50FF0 /* CTestMarkdownDocument.cpp */,
+				1F2F306BD8B6FF33FB0C2294 /* CTestMarkdownDocument.h */,
+				CBE957D66CE0AE3DC7C6F2B4 /* CGuiViewMarkdownEditor.cpp */,
+				2BBD5A4218F70C2DCF41AC67 /* CGuiViewMarkdownEditor.h */,
+				3FC7B79525618F68DD616853 /* CMarkdownLiveEditor.cpp */,
+				F52A809ADC1E06E13AFDF134 /* CMarkdownLiveEditor.h */,
+				9169E433D669A2E17AA20B22 /* CMarkdownDocument.cpp */,
+				426F1012228BDABE18681BC8 /* CMarkdownDocument.h */,
 				29A53BCCC417C22ECC9CA20E /* CTestMenuBarMode.h */,
 				E89FC040C492F4976E513F9E /* CTestMenuBarMode.cpp */,
 				AB4D7F732186FB08243F4CA1 /* VID_GainMapDraw.cpp */,
@@ -4913,6 +4938,11 @@
 				4143A3D829DE45F9006F2318 /* implot_items.cpp in Sources */,
 				41DAE4BB23BA18C90011FEA9 /* nfd_cocoa.m in Sources */,
 				41E4CA97285343B6007509C3 /* CRenderBackend.cpp in Sources */,
+				CC453B3B192C31AC7C1022DD /* CImGuiMarkdownEditorTests.cpp in Sources */,
+				05DC2F68A11C81BC63A6B386 /* CTestMarkdownDocument.cpp in Sources */,
+				C55E563BAF989E52A5E99294 /* CGuiViewMarkdownEditor.cpp in Sources */,
+				9A89AE552B5FA6052A9B8B98 /* CMarkdownLiveEditor.cpp in Sources */,
+				7DDA85CA5353FB62749F023D /* CMarkdownDocument.cpp in Sources */,
 				05A9E27AB82C3067AC34C854 /* CTestMenuBarMode.cpp in Sources */,
 				FC6CE2AEBA960A7E21FDE489 /* VID_GainMapDraw.cpp in Sources */,
 				797B340C6DB65C1947DDE5DF /* MT_UltraHdr.cpp in Sources */,

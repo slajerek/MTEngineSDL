@@ -35,6 +35,38 @@ however it likes.
 
 ## 3.21.22 — development
 
+**A live Markdown editor, as a spike (M0 of the Agenda Scene programme).**
+`src/Engine/Markdown/` is new: `CMarkdownDocument` is a Markdown source string
+plus the block and inline structure md4c finds in it, with every block, cell
+and text run mapped back to a BYTE RANGE of the source; `CMarkdownLiveEditor`
+is a Dear ImGui widget that draws that source RENDERED -- headings large,
+emphasis in the bold and italic fonts, lists with bullets, tables as a grid --
+except for the block the caret is in, which shows its syntax dimmed. The
+source is the single truth and an edit is a byte replacement followed by a
+reparse, so untouched formatting survives by construction; there is no
+serializer to get wrong. `CGuiViewMarkdownEditor` (GUI/Controls) is the thin
+window over it, in the shape of `CGuiViewCodeEditor`.
+
+md4c reports no source offsets (mity/md4c#91, open since 2019), so the ranges
+are derived: text() hands back pointers into the input buffer, which gives the
+content bytes exactly; a block is its content widened to full lines, plus the
+lines md4c swallows and never names (fences, a setext underline, a table's
+delimiter row); an empty block (a lone `#`, a `---`, an empty cell) is placed
+on the first non-blank line after the previous block. Every byte in a block
+that no text run named is, by definition, syntax -- which is the whole hiding
+rule. `CTestMarkdownDocument` pins the derivation on a document that has every
+such construct; `RegisterMarkdownEditorTests()` drives the widget with real
+mouse and keyboard events (caret by click, typing, Backspace/Delete, undo and
+redo, Ctrl+1/2/3 headings, Ctrl+B, list continuation on Enter, Tab between
+table cells, arrows across wrapped lines and blocks). A host registers both
+next to its own tests; AgendaScene does.
+
+Also declared, because they were shipped undeclared: `md4c` (MIT), `imgui_md`
+(MIT) and `imgui_markdown` (Zlib) now have rows in the caps vocabulary's core
+list, so LICENSES.txt names them. `docs/markdown-editor.md` describes the
+component and what the spike deliberately left out (incremental reparse,
+images, link activation, IME display, find).
+
 **The app could die at exec with no crash report, after switching licence
 tiers.** Xcode's copy-files phase overwrites the dylib already in
 `Contents/Frameworks`, reusing its **inode**. macOS caches a code signature
