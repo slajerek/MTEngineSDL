@@ -22,7 +22,7 @@
 // WHAT WORKS (the spike's brief): caret placement by click, caret movement
 // by keyboard across visual lines, typing, Backspace/Delete, Enter with list
 // continuation, selection (Shift+arrows, mouse drag), Cut/Copy/Paste,
-// grouped Undo/Redo, Ctrl/Cmd+1/2/3 heading level, Ctrl/Cmd+0 paragraph,
+// grouped Undo/Redo through Tools/Undo, Ctrl/Cmd+1/2/3 heading level, Ctrl/Cmd+0 paragraph,
 // Ctrl/Cmd+B / Ctrl/Cmd+I emphasis toggles, Tab/Shift+Tab between table
 // cells, Enter to the cell below. Fonts come from the host (SetFonts); any
 // null font falls back to the ImGui default font at the requested size.
@@ -34,9 +34,13 @@
 #include "imgui.h"
 
 #include <functional>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <vector>
+
+class CUndoManager;
+class CUndoAction;
 
 struct CMarkdownEditorFonts
 {
@@ -51,6 +55,9 @@ class CMarkdownLiveEditor
 {
 public:
 	CMarkdownLiveEditor();
+	~CMarkdownLiveEditor();
+	CMarkdownLiveEditor(const CMarkdownLiveEditor &) = delete;
+	CMarkdownLiveEditor &operator=(const CMarkdownLiveEditor &) = delete;
 
 	// ---- Document
 	void SetSource(std::string_view source);
@@ -81,8 +88,29 @@ public:
 	void SelectAll();
 	std::string GetSelectedText() const;
 
+	// ---- Undo. Edits are recorded as Tools/Undo actions (CUndoAction) in a
+	// CUndoManager: the editor's own by default, or the host's, so document
+	// edits and the host's other undoable operations share one history.
+	// Passing nullptr goes back to the editor's own manager. The manager must
+	// outlive the editor or be handed back first; actions left in a shared
+	// manager after the editor is destroyed, or after SetSource(), do nothing.
+	// Requires MT_CAP_UNDO: without it no edit is recorded and Undo() /
+	// Redo() return false.
+	// Inline on purpose: MT_CAP_UNDO's symbol gate rejects any engine symbol
+	// whose mangled name mentions CUndoManager in an app built without it, and
+	// a parameter type is part of the mangled name. Inline, the symbol exists
+	// only in a host that calls it -- one that has the capability.
+	void SetUndoManager(CUndoManager *manager)
+	{
+		undoManager = manager ? manager : ownedUndoManager;
+		lastAction = nullptr;
+		groupOpen = false;
+	}
+	CUndoManager *GetUndoManager() const { return undoManager; }
+
 	// ---- Editing. Each call is one undo step unless grouped with the
-	// previous one (typing within 500 ms, adjacent).
+	// previous one (the same kind of edit -- typing, Backspace, forward
+	// Delete -- at the caret, within 500 ms).
 	void InsertText(std::string_view text);              // replaces the selection
 	void Backspace();
 	void DeleteForward();
@@ -92,8 +120,8 @@ public:
 	void Paste();
 	bool Undo();
 	bool Redo();
-	bool CanUndo() const { return !undoStack.empty(); }
-	bool CanRedo() const { return !redoStack.empty(); }
+	bool CanUndo() const;
+	bool CanRedo() const;
 
 	// Structural commands on the block at the caret.
 	bool SetHeadingLevel(int level);                     // 0 = paragraph
@@ -227,7 +255,17 @@ private:
 	// ---- Editing internals
 	enum class EEditKind : uint8_t { Insert, Backspace, DeleteForward, Structural };
 	void ApplyReplace(uint32_t beg, uint32_t end, std::string_view text, EEditKind kind);
-	void PushUndo(EEditKind kind);
+	// Records the replacement of [pos, pos + removed.size()) by `inserted` on
+	// the CURRENT source (call before applying it), merging into the previous
+	// action when it continues the same burst.
+	void RecordEdit(uint32_t pos, std::string_view removed, std::string_view inserted,
+		uint32_t caretBefore, uint32_t anchorBefore, uint32_t caretAfter, uint32_t anchorAfter, EEditKind kind);
+	// A command made of several replacements is recorded as one: the source
+	// before and after are diffed into a single replacement.
+	void BeginCompound();
+	void EndCompound();
+	// Applied by an undo action: no recording.
+	void RestoreEdit(uint32_t pos, uint32_t removeLength, const std::string &text, uint32_t newCaret, uint32_t newAnchor);
 	void Changed();
 	void ComputeRevealed();
 	bool CaretInCell(int32_t *cellOut) const;
@@ -258,10 +296,18 @@ private:
 	float preferredX = -1;     // for vertical movement
 	bool dragging = false;
 
-	struct UndoState { std::string source; uint32_t caret, anchor; };
-	std::vector<UndoState> undoStack, redoStack;
+	// Undo. The actions hold the target weakly: a destroyed editor, or one
+	// that loaded a new source, leaves no-op actions behind in a shared manager.
+	class EditAction;
+	struct UndoTarget { CMarkdownLiveEditor *editor; };
+	std::shared_ptr<UndoTarget> undoTarget;
+	CUndoManager *undoManager = nullptr;       // the one in use: owned or the host's
+	CUndoManager *ownedUndoManager = nullptr;  // created only with MT_ENABLE_UNDO
+	EditAction *lastAction = nullptr;          // the action a burst merges into
 	double lastEditTime = -1;
-	uint32_t lastEditEnd = UINT32_MAX;
 	EEditKind lastEditKind = EEditKind::Insert;
 	bool groupOpen = false;
+	int compoundDepth = 0;
+	std::string compoundBefore;
+	uint32_t compoundCaret = 0, compoundAnchor = 0;
 };

@@ -4,6 +4,11 @@
 #include "imgui.h"
 #include "imgui_internal.h"   // ImTextCharFromUtf8 / ImTextCharToUtf8
 
+#include "CUndoAction.h"
+#if MT_ENABLE_UNDO
+#include "CUndoManager.h"
+#endif
+
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -17,7 +22,6 @@ namespace
 	constexpr float kQuoteIndent = 1.2f;
 	constexpr float kCellPadding = 0.35f;
 	constexpr double kUndoGroupSeconds = 0.5;
-	constexpr size_t kUndoDepth = 200;
 
 	ImU32 WithAlpha(ImU32 col, float alpha)
 	{
@@ -36,8 +40,49 @@ namespace
 	}
 }
 
+// ---- Undo action --------------------------------------------------------------------
+//
+// One replacement: at `pos`, `removed` became `inserted`. Undo puts `removed`
+// back and restores the caret from before; Redo re-applies. The editor is
+// reached through a weak handle, so an action that outlives its editor (in a
+// host's shared manager) or its document (after SetSource) does nothing.
+
+class CMarkdownLiveEditor::EditAction : public CUndoAction
+{
+public:
+	std::weak_ptr<UndoTarget> target;
+	uint32_t pos = 0;
+	std::string removed, inserted;
+	uint32_t caretBefore = 0, anchorBefore = 0, caretAfter = 0, anchorAfter = 0;
+
+	void Undo() override
+	{
+		if (auto t = target.lock())
+			t->editor->RestoreEdit(pos, (uint32_t)inserted.size(), removed, caretBefore, anchorBefore);
+	}
+	void Redo() override
+	{
+		if (auto t = target.lock())
+			t->editor->RestoreEdit(pos, (uint32_t)removed.size(), inserted, caretAfter, anchorAfter);
+	}
+	std::string GetDescription() override { return "Markdown edit"; }
+};
+
 CMarkdownLiveEditor::CMarkdownLiveEditor()
 {
+	undoTarget = std::make_shared<UndoTarget>(UndoTarget{this});
+#if MT_ENABLE_UNDO
+	ownedUndoManager = new CUndoManager();
+	undoManager = ownedUndoManager;
+#endif
+}
+
+CMarkdownLiveEditor::~CMarkdownLiveEditor()
+{
+	undoTarget.reset();   // actions left in a shared manager become no-ops
+#if MT_ENABLE_UNDO
+	delete ownedUndoManager;
+#endif
 }
 
 // ---- Document -----------------------------------------------------------------
@@ -46,8 +91,13 @@ void CMarkdownLiveEditor::SetSource(std::string_view source)
 {
 	doc.SetSource(source);
 	caret = anchor = 0;
-	undoStack.clear();
-	redoStack.clear();
+	// A new document starts a new history. The old actions cannot be removed
+	// from a host's manager, so they are detached instead.
+	undoTarget = std::make_shared<UndoTarget>(UndoTarget{this});
+#if MT_ENABLE_UNDO
+	if (ownedUndoManager) ownedUndoManager->Clear();
+#endif
+	lastAction = nullptr;
 	groupOpen = false;
 	dirty = false;
 	layoutDirty = true;
@@ -118,34 +168,154 @@ void CMarkdownLiveEditor::Changed()
 	if (onChanged) onChanged();
 }
 
-void CMarkdownLiveEditor::PushUndo(EEditKind kind)
+void CMarkdownLiveEditor::RecordEdit(uint32_t pos, std::string_view removed, std::string_view inserted,
+	uint32_t caretBefore, uint32_t anchorBefore, uint32_t caretAfter, uint32_t anchorAfter, EEditKind kind)
 {
+#if MT_ENABLE_UNDO
+	if (undoManager == nullptr || compoundDepth > 0) return;
+	if (removed.empty() && inserted.empty()) return;
+
 	// One undo step per burst of the SAME kind of edit at the caret: typing
 	// groups with typing, Backspace with Backspace, forward Delete with forward
-	// Delete. Mixing kinds, moving the caret, a selection, or a pause longer
-	// than kUndoGroupSeconds starts a new step -- the CodeMirror / ProseMirror
-	// defaults, which is what users have under their fingers already.
+	// Delete. Mixing kinds, moving the caret, a selection, a structural command
+	// or a pause longer than kUndoGroupSeconds starts a new step -- the
+	// CodeMirror / ProseMirror defaults, which users have under their fingers.
+	// The burst grows the action on top of the manager in place, which is only
+	// valid while nothing else was pushed or undone since.
 	const double now = ImGui::GetCurrentContext() ? ImGui::GetTime() : 0.0;
-	const bool adjacent = groupOpen && kind == lastEditKind && caret == lastEditEnd
-		&& !HasSelection() && (now - lastEditTime) < kUndoGroupSeconds;
-	if (!adjacent)
+	EditAction *last = lastAction;
+	const bool merge = last != nullptr && groupOpen && kind == lastEditKind && kind != EEditKind::Structural
+		&& (now - lastEditTime) < kUndoGroupSeconds && caretBefore == anchorBefore && caretBefore == last->caretAfter
+		&& undoManager->PeekUndo() == last && !undoManager->CanRedo();
+	const std::string &s1 = doc.GetSource();
+	const uint32_t b = pos, e = pos + (uint32_t)removed.size();
+	const uint32_t p = last ? last->pos : 0;
+	const uint32_t pEnd = last ? p + (uint32_t)last->inserted.size() : 0;
+	if (merge && b <= pEnd && e >= p)
 	{
-		undoStack.push_back({doc.GetSource(), caret, anchor});
-		if (undoStack.size() > kUndoDepth) undoStack.erase(undoStack.begin());
+		// Compose two replacements over the union of their ranges, in the
+		// coordinates of the source between them (s1).
+		const uint32_t u0 = std::min(p, b), u1 = std::max(pEnd, e);
+		std::string oldText = s1.substr(u0, p - u0) + last->removed + s1.substr(pEnd, u1 - pEnd);
+		std::string newText = s1.substr(u0, b - u0) + std::string(inserted) + s1.substr(e, u1 - e);
+		last->pos = u0;
+		last->removed = std::move(oldText);
+		last->inserted = std::move(newText);
+		last->caretAfter = caretAfter;
+		last->anchorAfter = anchorAfter;
 	}
-	redoStack.clear();
+	else
+	{
+		auto action = std::make_unique<EditAction>();
+		action->target = undoTarget;
+		action->pos = pos;
+		action->removed = std::string(removed);
+		action->inserted = std::string(inserted);
+		action->caretBefore = caretBefore;
+		action->anchorBefore = anchorBefore;
+		action->caretAfter = caretAfter;
+		action->anchorAfter = anchorAfter;
+		lastAction = action.get();
+		undoManager->Push(std::move(action));
+	}
 	lastEditTime = now;
 	lastEditKind = kind;
-	groupOpen = true;
+	groupOpen = kind != EEditKind::Structural;
+#else
+	(void)pos; (void)removed; (void)inserted; (void)caretBefore; (void)anchorBefore;
+	(void)caretAfter; (void)anchorAfter; (void)kind;
+#endif
+}
+
+void CMarkdownLiveEditor::BeginCompound()
+{
+	if (compoundDepth++ == 0)
+	{
+		compoundBefore = doc.GetSource();
+		compoundCaret = caret;
+		compoundAnchor = anchor;
+	}
+}
+
+void CMarkdownLiveEditor::EndCompound()
+{
+	if (compoundDepth <= 0 || --compoundDepth > 0) return;
+	const std::string &before = compoundBefore;
+	const std::string &after = doc.GetSource();
+	size_t prefix = 0;
+	const size_t minLen = std::min(before.size(), after.size());
+	while (prefix < minLen && before[prefix] == after[prefix]) prefix++;
+	size_t suffix = 0;
+	while (suffix < minLen - prefix && before[before.size() - 1 - suffix] == after[after.size() - 1 - suffix]) suffix++;
+	const std::string removed = before.substr(prefix, before.size() - prefix - suffix);
+	const std::string inserted = after.substr(prefix, after.size() - prefix - suffix);
+	// RecordEdit works on the source BEFORE the edit; the compound is already
+	// applied, so record against a fresh action (structural, never merged).
+	if (!removed.empty() || !inserted.empty())
+	{
+		groupOpen = false;
+		lastAction = nullptr;
+#if MT_ENABLE_UNDO
+		if (undoManager)
+		{
+			auto action = std::make_unique<EditAction>();
+			action->target = undoTarget;
+			action->pos = (uint32_t)prefix;
+			action->removed = removed;
+			action->inserted = inserted;
+			action->caretBefore = compoundCaret;
+			action->anchorBefore = compoundAnchor;
+			action->caretAfter = caret;
+			action->anchorAfter = anchor;
+			undoManager->Push(std::move(action));
+		}
+#endif
+	}
+	compoundBefore.clear();
+	compoundBefore.shrink_to_fit();
+}
+
+void CMarkdownLiveEditor::RestoreEdit(uint32_t pos, uint32_t removeLength, const std::string &text, uint32_t newCaret, uint32_t newAnchor)
+{
+	doc.Replace(pos, pos + removeLength, text);
+	const uint32_t size = doc.Size();
+	caret = std::min(newCaret, size);
+	anchor = std::min(newAnchor, size);
+	groupOpen = false;
+	lastAction = nullptr;
+	preferredX = -1;
+	scrollToCaret = true;
+	Changed();
+}
+
+bool CMarkdownLiveEditor::CanUndo() const
+{
+#if MT_ENABLE_UNDO
+	return undoManager != nullptr && undoManager->CanUndo();
+#else
+	return false;
+#endif
+}
+
+bool CMarkdownLiveEditor::CanRedo() const
+{
+#if MT_ENABLE_UNDO
+	return undoManager != nullptr && undoManager->CanRedo();
+#else
+	return false;
+#endif
 }
 
 void CMarkdownLiveEditor::ApplyReplace(uint32_t beg, uint32_t end, std::string_view text, EEditKind kind)
 {
 	if (readOnly) return;
-	PushUndo(kind);
+	const uint32_t size = doc.Size();
+	beg = std::min(beg, size);
+	end = std::min(std::max(beg, end), size);
+	const uint32_t caretAfter = beg + (uint32_t)text.size();
+	RecordEdit(beg, std::string_view(doc.GetSource()).substr(beg, end - beg), text, caret, anchor, caretAfter, caretAfter, kind);
 	const uint32_t after = doc.Replace(beg, end, text);
 	caret = anchor = after;
-	lastEditEnd = after;
 	preferredX = -1;
 	scrollToCaret = true;
 	Changed();
@@ -169,13 +339,16 @@ void CMarkdownLiveEditor::DeleteForward()
 {
 	if (HasSelection()) { InsertText(""); return; }
 	if (caret >= doc.Size()) return;
+	if (readOnly) return;
 	const uint32_t next = doc.NextCodepoint(caret);
-	// A forward delete keeps the caret in place, so adjacency for grouping is
-	// "caret unchanged": record that by pretending the edit ended at caret.
-	PushUndo(EEditKind::DeleteForward);
+	// A forward delete keeps the caret in place: the burst continues while the
+	// caret stays where the previous delete left it.
+	RecordEdit(caret, std::string_view(doc.GetSource()).substr(caret, next - caret), "", caret, anchor, caret, caret,
+		EEditKind::DeleteForward);
 	doc.Replace(caret, next, "");
 	anchor = caret;
-	lastEditEnd = caret;
+	preferredX = -1;
+	scrollToCaret = true;
 	Changed();
 }
 
@@ -231,46 +404,39 @@ void CMarkdownLiveEditor::Paste()
 
 bool CMarkdownLiveEditor::Undo()
 {
-	if (undoStack.empty()) return false;
-	redoStack.push_back({doc.GetSource(), caret, anchor});
-	const UndoState s = undoStack.back();
-	undoStack.pop_back();
-	doc.SetSource(s.source);
-	caret = s.caret;
-	anchor = s.anchor;
+	if (readOnly || !CanUndo()) return false;
+#if MT_ENABLE_UNDO
 	groupOpen = false;
-	scrollToCaret = true;
-	Changed();
+	lastAction = nullptr;
+	undoManager->PerformUndo();
 	return true;
+#else
+	return false;
+#endif
 }
 
 bool CMarkdownLiveEditor::Redo()
 {
-	if (redoStack.empty()) return false;
-	undoStack.push_back({doc.GetSource(), caret, anchor});
-	const UndoState s = redoStack.back();
-	redoStack.pop_back();
-	doc.SetSource(s.source);
-	caret = s.caret;
-	anchor = s.anchor;
+	if (readOnly || !CanRedo()) return false;
+#if MT_ENABLE_UNDO
 	groupOpen = false;
-	scrollToCaret = true;
-	Changed();
+	lastAction = nullptr;
+	undoManager->PerformRedo();
 	return true;
+#else
+	return false;
+#endif
 }
 
 bool CMarkdownLiveEditor::SetHeadingLevel(int level)
 {
 	if (readOnly) return false;
-	// Probe first so a no-op does not push an undo state.
-	const int32_t block = doc.FindBlockAt(caret);
-	uint32_t mb = 0, me = 0;
-	if (!doc.GetAtxMarkerRange(block, &mb, &me)) return false;
-	PushUndo(EEditKind::Structural);
-	groupOpen = false;
+	BeginCompound();
 	uint32_t c = caret;
-	if (!doc.SetHeadingLevel(caret, level, &c)) { undoStack.pop_back(); return false; }
-	caret = anchor = c;
+	const bool changed = doc.SetHeadingLevel(caret, level, &c);
+	if (changed) caret = anchor = c;
+	EndCompound();
+	if (!changed) return false;
 	scrollToCaret = true;
 	Changed();
 	return true;
@@ -317,20 +483,22 @@ static void ToggleDelimiter(CMarkdownLiveEditor &ed, CMarkdownDocument &doc, uin
 void CMarkdownLiveEditor::ToggleStrong()
 {
 	if (readOnly) return;
-	PushUndo(EEditKind::Structural);
-	groupOpen = false;
+	BeginCompound();
 	auto apply = [this](uint32_t beg, uint32_t end, std::string_view text, bool) { doc.Replace(beg, end, text); };
 	ToggleDelimiter(*this, doc, caret, anchor, "**", apply);
+	EndCompound();
+	scrollToCaret = true;
 	Changed();
 }
 
 void CMarkdownLiveEditor::ToggleEmphasis()
 {
 	if (readOnly) return;
-	PushUndo(EEditKind::Structural);
-	groupOpen = false;
+	BeginCompound();
 	auto apply = [this](uint32_t beg, uint32_t end, std::string_view text, bool) { doc.Replace(beg, end, text); };
 	ToggleDelimiter(*this, doc, caret, anchor, "*", apply);
+	EndCompound();
+	scrollToCaret = true;
 	Changed();
 }
 

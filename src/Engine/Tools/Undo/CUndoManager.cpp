@@ -52,6 +52,11 @@ bool CUndoManager::CanRedo() const
 	return currentIndex + 1 < (int)history.size();
 }
 
+CUndoAction *CUndoManager::PeekUndo() const
+{
+	return CanUndo() ? history[currentIndex].get() : nullptr;
+}
+
 void CUndoManager::Clear()
 {
 	history.clear();

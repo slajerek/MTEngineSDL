@@ -1107,6 +1107,12 @@
     <ClCompile Include="..\..\..\src\Engine\Core\Render\CRenderBackend.cpp">
       <Filter>Source Files\src\Engine\Core\Render</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestMarkdownLiveEditor.cpp">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClCompile>
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestMarkdownLiveEditor.h">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClInclude>
     <ClCompile Include="..\..\..\src\Engine\Tests\CImGuiMarkdownEditorTests.cpp">
       <Filter>Source Files\src\Engine\Tests</Filter>
     </ClCompile>
