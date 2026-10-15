@@ -4,6 +4,8 @@
 #include "imgui_te_context.h"
 #include "CGuiMain.h"
 #include "CGuiViewMarkdownEditor.h"
+#include "CMarkdownEditorBindings.h"
+#include "CSlrKeyboardShortcuts.h"
 
 #include <string>
 
@@ -497,5 +499,43 @@ void RegisterMarkdownEditorTests(ImGuiTestEngine *engine)
 		ctx->Yield(2);
 		IM_CHECK(ed.GetSource().find("| Test") < ed.GetSource().find("| Ship"));
 		IM_CHECK_EQ(rowsNow(), 5);
+	};
+
+	t = IM_REGISTER_TEST(engine, "markdown", "remapped_binding_replaces_default_chord");
+	t->TestFunc = [](ImGuiTestContext *ctx)
+	{
+		CGuiViewMarkdownEditor *view = EnsureView(ctx);
+		CMarkdownLiveEditor &ed = view->GetEditor();
+		ed.SetSource("make me bold\n");
+		ctx->Yield(2);
+		CMarkdownEditorBindings *kb = ed.GetBindings();
+		IM_CHECK(kb->IsRegistered());
+		// The host's shortcut registry sees the editor's shortcuts in their zone.
+		std::list<u32> zones;
+		zones.push_back(CMarkdownEditorBindings::kZone);
+		IM_CHECK(guiMain->keyboardShortcuts->FindShortcut(zones, 'b', false, false, true, false) == kb->GetShortcut(EMarkdownEditorCommand::Bold));
+
+		CSlrKeyboardShortcut *bold = kb->GetShortcut(EMarkdownEditorCommand::Bold);
+		guiMain->RemoveKeyboardShortcut(bold);
+		bold->SetKeyCode('b', true, false, true, false);    // Ctrl/Cmd+Shift+B
+		guiMain->AddKeyboardShortcut(bold);
+
+		IM_CHECK(ClickOffset(ctx, ed, 0));
+		ed.SetSelection(0, 4);
+		ctx->KeyPress(ImGuiMod_Ctrl | ImGuiKey_B);
+		ctx->Yield(2);
+		IM_CHECK_EQ(ed.GetSource(), std::string("make me bold\n"));   // the old chord does nothing now
+		ctx->KeyPress(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_B);
+		ctx->Yield(2);
+		IM_CHECK_EQ(ed.GetSource(), std::string("**make** me bold\n"));
+
+		// A binding takes effect from the next frame: ImGui routes a chord for
+		// the frame after the one that asked for it.
+		kb->ResetToDefaults();
+		ctx->Yield(2);
+		ed.SetSelection(9, 11);
+		ctx->KeyPress(ImGuiMod_Ctrl | ImGuiKey_B);
+		ctx->Yield(2);
+		IM_CHECK_EQ(ed.GetSource(), std::string("**make** **me** bold\n"));
 	};
 }

@@ -1886,17 +1886,45 @@ void CMarkdownLiveEditor::ProcessKeyboard()
 	const bool shift = io.KeyShift;
 	const ImGuiInputFlags rep = ImGuiInputFlags_Repeat;
 
-	// Table navigation first: Tab is otherwise a character. Tab in the last
-	// cell appends a row and goes to its first cell.
-	if (ImGui::Shortcut(ImGuiKey_Tab, rep))
+	// Remappable commands first (CMarkdownEditorBindings), so a binding the
+	// user chose wins over a fixed key with the same chord.
+	CMarkdownEditorBindings *kb = GetBindings();
+	auto pressed = [&](EMarkdownEditorCommand c, bool repeat) {
+		const ImGuiKeyChord chord = kb->GetChord(c);
+		return chord != 0 && ImGui::Shortcut(chord, repeat ? rep : ImGuiInputFlags_None);
+	};
+	const bool inCell = CaretInCell(nullptr);
+	bool handled = true;
+	if (inCell && pressed(EMarkdownEditorCommand::TableMoveRowUp, true)) EditTable(EMarkdownTableEdit::MoveRowUp);
+	else if (inCell && pressed(EMarkdownEditorCommand::TableMoveRowDown, true)) EditTable(EMarkdownTableEdit::MoveRowDown);
+	else if (inCell && pressed(EMarkdownEditorCommand::TableMoveColumnLeft, true)) EditTable(EMarkdownTableEdit::MoveColumnLeft);
+	else if (inCell && pressed(EMarkdownEditorCommand::TableMoveColumnRight, true)) EditTable(EMarkdownTableEdit::MoveColumnRight);
+	else if (pressed(EMarkdownEditorCommand::Bold, false)) ToggleStrong();
+	else if (pressed(EMarkdownEditorCommand::Italic, false)) ToggleEmphasis();
+	else if (pressed(EMarkdownEditorCommand::InsertLink, false)) InsertLink();
+	else if (pressed(EMarkdownEditorCommand::Heading1, false)) SetHeadingLevel(1);
+	else if (pressed(EMarkdownEditorCommand::Heading2, false)) SetHeadingLevel(2);
+	else if (pressed(EMarkdownEditorCommand::Heading3, false)) SetHeadingLevel(3);
+	else if (pressed(EMarkdownEditorCommand::Heading4, false)) SetHeadingLevel(4);
+	else if (pressed(EMarkdownEditorCommand::Heading5, false)) SetHeadingLevel(5);
+	else if (pressed(EMarkdownEditorCommand::Heading6, false)) SetHeadingLevel(6);
+	else if (pressed(EMarkdownEditorCommand::Paragraph, false)) SetHeadingLevel(0);
+	else if (pressed(EMarkdownEditorCommand::Undo, true)) Undo();
+	else if (pressed(EMarkdownEditorCommand::Redo, true) || pressed(EMarkdownEditorCommand::RedoAlternate, true)) Redo();
+	else if (pressed(EMarkdownEditorCommand::ToggleTaskOrInsertRow, false))
 	{
-		if (!MoveToNextCell(false) && CaretInCell(nullptr) && EditTable(EMarkdownTableEdit::InsertRowBelow)) SelectFirstCellOfRow();
+		if (inCell) EditTable(EMarkdownTableEdit::InsertRowBelow);
+		else ToggleTask();
+	}
+	else handled = false;
+	if (handled) {}
+	// Table navigation: Tab is otherwise a character. Tab in the last cell
+	// appends a row and goes to its first cell.
+	else if (ImGui::Shortcut(ImGuiKey_Tab, rep))
+	{
+		if (!MoveToNextCell(false) && inCell && EditTable(EMarkdownTableEdit::InsertRowBelow)) SelectFirstCellOfRow();
 	}
 	else if (ImGui::Shortcut(ImGuiMod_Shift | ImGuiKey_Tab, rep)) MoveToNextCell(true);
-	else if (ImGui::Shortcut(ImGuiMod_Alt | ImGuiMod_Shift | ImGuiKey_UpArrow, rep) && CaretInCell(nullptr)) EditTable(EMarkdownTableEdit::MoveRowUp);
-	else if (ImGui::Shortcut(ImGuiMod_Alt | ImGuiMod_Shift | ImGuiKey_DownArrow, rep) && CaretInCell(nullptr)) EditTable(EMarkdownTableEdit::MoveRowDown);
-	else if (ImGui::Shortcut(ImGuiMod_Alt | ImGuiMod_Shift | ImGuiKey_LeftArrow, rep) && CaretInCell(nullptr)) EditTable(EMarkdownTableEdit::MoveColumnLeft);
-	else if (ImGui::Shortcut(ImGuiMod_Alt | ImGuiMod_Shift | ImGuiKey_RightArrow, rep) && CaretInCell(nullptr)) EditTable(EMarkdownTableEdit::MoveColumnRight);
 	else if (ImGui::Shortcut(ImGuiKey_LeftArrow, rep)) MoveHorizontal(-1, false);
 	else if (ImGui::Shortcut(ImGuiMod_Shift | ImGuiKey_LeftArrow, rep)) MoveHorizontal(-1, true);
 	else if (ImGui::Shortcut(ImGuiKey_RightArrow, rep)) MoveHorizontal(1, false);
@@ -1915,24 +1943,6 @@ void CMarkdownLiveEditor::ProcessKeyboard()
 	else if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_C)) Copy();
 	else if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_X)) Cut();
 	else if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_V, rep)) Paste();
-	else if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Z, rep)) Undo();
-	else if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_Z, rep)) Redo();
-	else if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Y, rep)) Redo();
-	else if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_B)) ToggleStrong();
-	else if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_I)) ToggleEmphasis();
-	else if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_K)) InsertLink();
-	else if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Enter))
-	{
-		if (CaretInCell(nullptr)) EditTable(EMarkdownTableEdit::InsertRowBelow);
-		else ToggleTask();
-	}
-	else if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_1)) SetHeadingLevel(1);
-	else if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_2)) SetHeadingLevel(2);
-	else if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_3)) SetHeadingLevel(3);
-	else if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_4)) SetHeadingLevel(4);
-	else if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_5)) SetHeadingLevel(5);
-	else if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_6)) SetHeadingLevel(6);
-	else if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_0)) SetHeadingLevel(0);
 	else if (ImGui::Shortcut(ImGuiKey_Backspace, rep)) Backspace();
 	else if (ImGui::Shortcut(ImGuiKey_Delete, rep)) DeleteForward();
 	else if (ImGui::Shortcut(ImGuiKey_Enter, rep) || ImGui::Shortcut(ImGuiKey_KeypadEnter, rep))
@@ -2125,6 +2135,7 @@ void CMarkdownLiveEditor::Render(const char *id, ImVec2 size)
 	itemMin = ImGui::GetItemRectMin();
 	itemMax = ImGui::GetItemRectMax();
 
+	GetBindings()->RegisterWithGuiMain();
 	HandleMouse(contentOrigin);
 	RenderTableMenu();
 

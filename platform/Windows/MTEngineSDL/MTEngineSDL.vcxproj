@@ -103,6 +103,8 @@
     <ClCompile Include="..\..\..\src\Engine\Core\Net\NET_Main.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Core\Pool\CPool.cpp" />
     <ClCompile Include="..\..\..\src\Engine\Core\Render\CRenderBackend.cpp" />
+    <ClCompile Include="..\..\..\src\Engine\Markdown\CMarkdownEditorBindings.cpp" />
+    <ClInclude Include="..\..\..\src\Engine\Markdown\CMarkdownEditorBindings.h" />
     <ClCompile Include="..\..\..\src\Engine\Tests\CTestMarkdownLiveEditor.cpp" />
     <ClInclude Include="..\..\..\src\Engine\Tests\CTestMarkdownLiveEditor.h" />
     <ClCompile Include="..\..\..\src\Engine\Tests\CImGuiMarkdownEditorTests.cpp" />

@@ -36,6 +36,7 @@
 // link activation, IME composition display, word-level caret jumps, find.
 
 #include "CMarkdownDocument.h"
+#include "CMarkdownEditorBindings.h"
 #include "imgui.h"
 
 #include <functional>
@@ -82,6 +83,13 @@ public:
 	// Show every inline marker of the revealed unit, not only those of the
 	// spans the caret touches.
 	void SetRevealAllInlineSyntax(bool value) { revealAllInlineSyntax = value; layoutDirty = true; }
+
+	// ---- Key bindings. The formatting, heading, undo, link, task, table and
+	// find commands go through CSlrKeyboardShortcut objects
+	// (CMarkdownEditorBindings): the shared default set unless the host gives
+	// another. Movement, deletion, Enter, Tab and the clipboard keys are fixed.
+	void SetBindings(CMarkdownEditorBindings *b) { bindings = b; }
+	CMarkdownEditorBindings *GetBindings() const { return bindings ? bindings : CMarkdownEditorBindings::GetDefault(); }
 
 	// ---- Rendering. Draws into the current window as one item of `size`
 	// (0 = available). Handles mouse and keyboard when the window is focused.
@@ -340,6 +348,7 @@ private:
 	bool readOnly = false;
 	bool focused = false;
 
+	CMarkdownEditorBindings *bindings = nullptr;
 	CMarkdownEditorFonts fonts;
 	float baseFontSize = 0;
 	float headingScale[7] = {1.0f, 2.0f, 1.6f, 1.3f, 1.15f, 1.05f, 1.0f};

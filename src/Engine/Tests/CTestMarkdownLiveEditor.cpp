@@ -1,5 +1,8 @@
 #include "CTestMarkdownLiveEditor.h"
 #include "CMarkdownLiveEditor.h"
+#include "CMarkdownEditorBindings.h"
+#include "CSlrKeyboardShortcuts.h"
+#include "SYS_KeyCodes.h"
 #include "DBG_Log.h"
 
 #if MT_ENABLE_UNDO
@@ -8,6 +11,7 @@
 #endif
 
 #include <cstdio>
+#include <cstring>
 #include <memory>
 #include <string>
 
@@ -240,6 +244,39 @@ void CTestMarkdownLiveEditor::Run(ITestCallback *callback)
 #endif
 		ed.SetCaret(2);
 		MDE_ASSERT(!ed.MoveToNextCell(true), "Shift+Tab from the first cell goes nowhere");
+	}
+
+	// ---- Bindings: CSlrKeyboardShortcut objects -> ImGui chords -------------------
+	{
+		CMarkdownEditorBindings kb;   // a private set: the default one is shared with the UI
+		MDE_ASSERT(kb.GetChord(EMarkdownEditorCommand::Bold) == (ImGuiMod_Ctrl | ImGuiKey_B)
+			&& kb.GetChord(EMarkdownEditorCommand::Heading2) == (ImGuiMod_Ctrl | ImGuiKey_2)
+			&& kb.GetChord(EMarkdownEditorCommand::Paragraph) == (ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_0)
+			&& kb.GetChord(EMarkdownEditorCommand::Redo) == (ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_Z)
+			&& kb.GetChord(EMarkdownEditorCommand::ToggleTaskOrInsertRow) == (ImGuiMod_Ctrl | ImGuiKey_Enter)
+			&& kb.GetChord(EMarkdownEditorCommand::FindPrevious) == (ImGuiMod_Shift | ImGuiKey_F3)
+			&& kb.GetChord(EMarkdownEditorCommand::TableMoveRowUp) == (ImGuiMod_Alt | ImGuiMod_Shift | ImGuiKey_UpArrow),
+			"the default bindings are the product spec's, as ImGui chords (Ctrl is Cmd on macOS on both sides)");
+		bool distinct = true, named = true;
+		for (int i = 0; i < (int)EMarkdownEditorCommand::Count; i++)
+		{
+			const EMarkdownEditorCommand c = (EMarkdownEditorCommand)i;
+			const CSlrKeyboardShortcut *sc = kb.GetShortcut(c);
+			if (sc == nullptr || sc->zone != CMarkdownEditorBindings::kZone || strlen(CMarkdownEditorBindings::GetCommandKey(c)) == 0) named = false;
+			for (int j = 0; j < i; j++)
+				if (kb.GetChord((EMarkdownEditorCommand)j) == kb.GetChord(c) || kb.GetShortcut((EMarkdownEditorCommand)j)->hashCode == sc->hashCode) distinct = false;
+		}
+		MDE_ASSERT(named && distinct, "every command has its own shortcut in the editor's zone, a translation key, and a chord no other command has");
+		kb.GetShortcut(EMarkdownEditorCommand::Bold)->SetKeyCode('b', true, false, true, false);
+		MDE_ASSERT(kb.GetChord(EMarkdownEditorCommand::Bold) == (ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_B), "a rebinding shows in the chord at once");
+		kb.GetShortcut(EMarkdownEditorCommand::Italic)->SetKeyCode(0, false, false, false, false);
+		MDE_ASSERT(kb.GetChord(EMarkdownEditorCommand::Italic) == 0, "key code 0 unbinds");
+		kb.ResetToDefaults();
+		MDE_ASSERT(kb.GetChord(EMarkdownEditorCommand::Bold) == (ImGuiMod_Ctrl | ImGuiKey_B) && kb.GetChord(EMarkdownEditorCommand::Italic) == (ImGuiMod_Ctrl | ImGuiKey_I),
+			"ResetToDefaults restores them");
+		MDE_ASSERT(CMarkdownEditorBindings::KeyCodeToImGuiKey('q') == ImGuiKey_Q && CMarkdownEditorBindings::KeyCodeToImGuiKey(MTKEY_F12) == ImGuiKey_F12
+			&& CMarkdownEditorBindings::KeyCodeToImGuiKey(MTKEY_ARROW_LEFT) == ImGuiKey_LeftArrow && CMarkdownEditorBindings::KeyCodeToImGuiKey(']') == ImGuiKey_RightBracket,
+			"engine key codes map to ImGui keys");
 	}
 
 	TestCompleted(true, "Markdown live editor: commands and undo");
