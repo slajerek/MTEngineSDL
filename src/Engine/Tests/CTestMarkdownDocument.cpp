@@ -10,7 +10,7 @@
 	do { \
 		if (!(cond)) { \
 			char buf[512]; \
-			snprintf(buf, sizeof(buf), "FAIL: %s", (msg)); \
+			snprintf(buf, sizeof(buf), "FAIL: %.500s", (msg)); \
 			LOGD("CTestMarkdownDocument: %s", buf); \
 			TestCompleted(false, buf); \
 			return; \
@@ -156,6 +156,13 @@ void CTestMarkdownDocument::Run(ITestCallback *callback)
 	MD_ASSERT(code > 0 && Slice(d, code) == "```cpp~int x;~```", "a fenced code block's range includes both fences");
 	MD_ASSERT(blocks[code].isFenced && blocks[code].fenceChar == '`', "fence char is reported");
 	MD_ASSERT(src.substr(blocks[code].langBeg, blocks[code].langEnd - blocks[code].langBeg) == "cpp", "the code language maps to its source bytes");
+	{
+		// Empty code lines right after the opening fence are synthesized line
+		// breaks, not content: the fence is still found past them.
+		CMarkdownDocument e("a\n\n```\n\n\nint y;\n```\n");
+		const int32_t c = FirstOfType(e, EMarkdownBlockType::Code);
+		MD_ASSERT(c > 0 && Slice(e, c) == "```~~~int y;~```", "a fenced block starting with empty lines still includes its opening fence");
+	}
 
 	const int32_t hr = FirstOfType(d, EMarkdownBlockType::HorizontalRule);
 	MD_ASSERT(hr > 0 && Slice(d, hr) == "---", "a rule (no content at all) is placed on its line");

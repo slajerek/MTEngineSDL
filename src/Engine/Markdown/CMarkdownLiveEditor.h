@@ -357,6 +357,9 @@ public:
 	void MoveHorizontal(int direction, bool extend);
 	void MoveVertical(int direction, bool extend);
 	void MoveLineEdge(bool toEnd, bool extend);
+	// Word-like: is this caret position a blank line between blocks (an
+	// empty paragraph not yet typed into)?
+	bool IsGapPosition(uint32_t offset) const;
 private:
 
 	void EnsureLayout(float width);
@@ -414,14 +417,23 @@ private:
 
 	// ---- Word-like editing (CMarkdownLiveEditorWord.cpp)
 	struct Stop { uint32_t offset; int32_t block; };
+	// An empty paragraph: a blank line beyond the one that separates two
+	// blocks (every blank line at the document's start or end). The caret
+	// stands after the line's own prefix (quote markers, indentation).
+	struct Gap { uint32_t lineStart; uint32_t caret; std::string prefix; };
 	void RebuildStops() const;
 	const std::vector<Stop> &GetStops() const { RebuildStops(); return stops; }
 	bool IsContentAt(uint32_t offset) const;
+	const std::vector<Gap> &GetGaps() const;              // the empty paragraphs, in order
+	int32_t GapIndexOfLine(uint32_t offset) const;        // the gap whose line holds offset, -1
+	uint32_t NextPosition(uint32_t offset, int direction) const;   // the next stop or gap past offset, UINT32_MAX at the ends
+	void GapAffixes(int32_t gap, std::string *lead, std::string *tail) const;   // what text typed on a gap needs around it
+	void ConvertEmptyItemToGap();                          // the caret's empty list item becomes an empty paragraph
 	uint32_t Snap(uint32_t offset) const;                 // the caret position for a raw offset
-	bool IsGapPosition(uint32_t offset) const;            // a blank line between blocks
 	int32_t StopIndexAtOrBefore(uint32_t offset) const;
 	uint32_t BlockFirstStop(int32_t unitBlock) const;
 	int32_t UnitBlockOf(uint32_t offset) const;
+	bool CodeContentRange(int32_t block, uint32_t *beg, uint32_t *end) const;   // a code block's bytes between its fences
 	bool InCodeAt(uint32_t offset) const;
 	uint32_t DelimiterChainEnd(uint32_t at, uint8_t *styles) const;
 	bool AtBlockTextEnd(uint32_t offset) const;          // no more text in the caret's block after it
@@ -430,6 +442,7 @@ private:
 	void WordBackspace();
 	void WordDeleteForward();
 	void WordNewline(bool lineBreak);
+	uint32_t JoinBlocks(uint32_t prevStop, uint32_t rightStop);   // the break between two blocks goes; returns the caret
 	uint32_t DeleteRangeSafe(uint32_t a, uint32_t b);     // returns the caret position after
 	void SplitAt(uint32_t at, const std::string &separator, const std::string &afterPrefix);
 	std::string ContainerPrefixAt(uint32_t offset, bool forParagraph) const;
@@ -478,16 +491,17 @@ private:
 
 	EMarkdownEditMode editMode = EMarkdownEditMode::Rendered;
 	EMarkdownEditMode layoutEditMode = EMarkdownEditMode::Rendered;
-	uint32_t layoutGapCaret = UINT32_MAX;
 	bool toolbarVisible = true;
 	mutable std::vector<Stop> stops;
 	mutable std::vector<uint8_t> contentMask;
 	mutable uint32_t stopsParseCount = UINT32_MAX;
+	mutable std::vector<Gap> gaps;
+	size_t layoutNextGap = 0;                  // gaps emitted so far by the running layout
+	void EmitGapsBefore(Emit &e, uint32_t lineStart);
 	// Rendered mode: inline styles toggled with no selection apply to the next
 	// typed text (bit per EMarkdownInlineStyle); cleared when the caret moves.
 	uint8_t pendingOn = 0, pendingOff = 0;
 	uint32_t pendingAt = UINT32_MAX;
-	uint32_t gapCaret = UINT32_MAX;            // a caret on a blank line, drawn as an empty line
 	bool linkDialogOpen = false, linkDialogFocus = false;
 	char linkText[256] = {0}, linkUrl[512] = {0};
 	uint32_t linkA = 0, linkB = 0;

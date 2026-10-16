@@ -75,12 +75,20 @@ The source stays the only truth and every edit a byte replacement; what the
 mode changes is how a caret that never sees syntax maps onto the source.
 
 - **Caret stops** are the content code-point boundaries (an entity is one),
-  plus one point for a block with no text. Two stops with only syntax
+  plus one point for a block with no text (an empty list item's marker line,
+  an empty cell, every line of a code block). Two stops with only syntax
   between them on one line are one position, and the left one is kept:
   typing after `**bold**` inserts before the closing `**`, so the text goes
   on in bold -- the formatting of the character left of the caret, as in a
   word processor. `SetCaret()`, clicks, arrows and Home/End land on stops.
-  A blank line made by Enter is a position too, drawn as an empty line.
+- **Empty paragraphs** are blank lines beyond the one that separates two
+  blocks: in a run of blank lines between two lines of one container (the
+  document, a quote, a list, an item) the first is the separator and the
+  rest are empty paragraphs; at the container's start or end every blank
+  line is one (`GetGaps()`, `IsGapPosition()`). They are drawn as empty
+  lines, are caret positions like any other (arrows, clicks, Home/End), and
+  text typed on one gets the blank lines it needs around it so it joins
+  neither neighbour. A blank line inside a code block is a code line.
 - **Typed text is literal**: `*`, `_`, `` ` ``, `[`, `]`, `<`, `~`, `|`, `&`
   and `\` are escaped, and `#`, `>`, `+`, `-`, `=` at a block's start (and
   `1.` after digits) -- not inside code. Typed at a paragraph's start, `- `,
@@ -91,12 +99,24 @@ mode changes is how a caret that never sees syntax maps onto the source.
 - **Deletion never breaks syntax**: a span left empty goes with its markers;
   a range that cuts a span gives the rest its markers back; an escape goes
   with its backslash.
-- **Enter** starts a new paragraph, continues a list (an empty item ends
-  it), and at the end of styled text the new line goes on in that style.
-  Shift+Enter is a line break (`\` + newline) inside a block; at a block's
-  end, where Markdown has no empty last line, it acts as Enter.
-  **Backspace** at a block's start turns an item or heading into a paragraph,
-  takes a line out of a quote, or merges the paragraph into the one before.
+- **Enter** inside a block's text splits it in two (blanks at the split stay
+  with the first part, so the caret lands on text); at a block's end it opens
+  an empty paragraph below with the caret on it; at a block's start it opens
+  an empty paragraph (or, in a list, an empty item) above and the caret stays
+  with the text; on an empty paragraph it adds another; in a list it adds an
+  item, and on an empty item it ends the list, leaving an empty paragraph; in
+  a code block it is a plain newline; in a table's last row it adds a row.
+  At the end of styled text the new line goes on in that style. Shift+Enter
+  is a line break (`\` + newline) inside a block; at a block's end, where
+  Markdown has no empty last line, it acts as Enter.
+  **Backspace** on an empty paragraph removes it (the caret goes to the
+  position before); at a block's start it first removes an empty paragraph
+  right above, else turns an item or heading into a paragraph (an empty item
+  becomes an empty paragraph), takes the first block of a quote out of it,
+  or merges the block into the one before -- and a span cut in two by Enter
+  becomes one span again. **Delete** at a block's end first removes an empty
+  paragraph below, else merges the next block. In a code block both act on
+  bytes.
 - **Styles with no selection** (Ctrl/Cmd+B, I, the toolbar) apply to the
   next typed text; with a selection they wrap it in each selected block, or
   take the style off when it is all styled (splitting a span when the
@@ -211,9 +231,10 @@ seeds were run during development. Typing in a 57 KB document costs about
   each operation.
 - `RegisterMarkdownEditorTests(engine)`: imgui_test_engine tests that drive
   one `CGuiViewMarkdownEditor` with real input (Word-like typing and the
-  toolbar's buttons among them), and one that captures the window in six
-  states and checks the pixels (set `MT_MD_CAPTURE_DIR` to keep the captures
-  as raw RGBA files).
+  toolbar's buttons among them), one that walks every caret position of an
+  agenda checking the Word-like invariants (arrows, Enter, Backspace, typing),
+  and one that captures the window in seven states and checks the pixels
+  (set `MT_MD_CAPTURE_DIR` to keep the captures as raw RGBA files).
 
 Register the first two in a host's `CTestSuite` and the third next to its
 own UI tests.

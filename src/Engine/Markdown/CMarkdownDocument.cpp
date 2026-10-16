@@ -850,13 +850,20 @@ void CMarkdownDocument::ResolveLeafRange(int32_t index, uint32_t &cursor)
 	// Lines md4c swallows and never names.
 	if (block.type == EMarkdownBlockType::Code && block.isFenced)
 	{
-		// Opening fence: the line above the first content line -- or the
-		// placed line itself when the block has no content.
+		// Opening fence: the fence line above the first content line -- past
+		// blank lines, which are empty code lines (synthesized line breaks,
+		// not content) -- or the placed line itself when the block has no content.
 		if (minBeg != UINT32_MAX && block.beg > 0)
 		{
-			const uint32_t prevEnd = block.beg - 1;
-			const uint32_t prevBeg = LineStart(prevEnd);
-			if (LineIsFence(prevBeg, prevEnd, block.fenceChar)) block.beg = prevBeg;
+			uint32_t probeBeg = block.beg;
+			while (probeBeg > 0)
+			{
+				const uint32_t prevEnd = probeBeg - 1;
+				const uint32_t prevBeg = LineStart(prevEnd);
+				if (LineIsFence(prevBeg, prevEnd, block.fenceChar)) { block.beg = prevBeg; break; }
+				if (SkipContainerMarkers(prevBeg, prevEnd) < prevEnd) break;   // not blank: no opening fence here
+				probeBeg = prevBeg;
+			}
 		}
 		// Closing fence: the next fence line after the last content line.
 		// Blank lines inside the block come as synthesized line breaks, not as

@@ -134,6 +134,29 @@ void CMarkdownLiveEditor::RebuildStops() const
 		uint32_t at = b.IsCell() || b.type == EMarkdownBlockType::HorizontalRule ? b.beg : doc.LineEnd(b.beg);
 		raw.push_back({at, i});
 	}
+	// Every line of a code block is a caret position, an empty one too (its
+	// newline is a synthesized run with no bytes of its own). The fences are not.
+	for (int32_t i = 1; i < (int32_t)blocks.size(); i++)
+	{
+		const CMarkdownBlock &b = blocks[i];
+		if (b.type != EMarkdownBlockType::Code) continue;
+		uint32_t ls = doc.LineStart(b.beg);
+		const uint32_t lastLine = b.end > b.beg ? doc.LineStart(b.end - 1) : ls;
+		if (b.isFenced) ls = doc.LineEnd(ls) + 1;   // past the opening fence
+		for (; ls <= lastLine && ls < src.size(); ls = doc.LineEnd(ls) + 1)
+		{
+			const uint32_t le = doc.LineEnd(ls);
+			if (b.isFenced && ls == lastLine && le > ls)
+			{
+				uint32_t k = ls;
+				while (k < le && src[k] == ' ') k++;
+				if (k < le && src[k] == b.fenceChar) break;   // the closing fence
+			}
+			bool content = false;
+			for (uint32_t o = ls; o < le; o++) if (contentMask[o]) { content = true; break; }
+			if (!content) raw.push_back({le, i});
+		}
+	}
 	std::stable_sort(raw.begin(), raw.end(), [](const Stop &a, const Stop &b) { return a.offset < b.offset; });
 
 	stops.clear();
@@ -154,6 +177,42 @@ void CMarkdownLiveEditor::RebuildStops() const
 		}
 		stops.push_back(s);
 	}
+
+	// The empty paragraphs (see GetGaps()). A run is consecutive blank lines
+	// of one container (the document, a quote, a list, an item): between two
+	// of the container's other lines its first line is the separator; at the
+	// container's start or end every line is an empty paragraph.
+	gaps.clear();
+	struct LineInfo { uint32_t ls, le; bool blank; int32_t container; };
+	std::vector<LineInfo> lines;
+	for (uint32_t ls = 0; ls < src.size();)
+	{
+		const uint32_t le = doc.LineEnd(ls);
+		bool blank = true;
+		for (uint32_t o = ls; o < le; o++) if (!IsBlankChar(src[o]) && src[o] != '>') { blank = false; break; }
+		// The innermost block the line is inside (FindBlockAt() would give the
+		// nearest one); none is the document.
+		int32_t container = 0;
+		if (blank)
+			for (int32_t i = 1; i < (int32_t)blocks.size(); i++)
+				if (blocks[i].beg <= ls && ls < blocks[i].end && (container == 0 || blocks[i].depth >= blocks[container].depth)) container = i;
+		if (blank && container > 0 && (blocks[container].type == EMarkdownBlockType::Code || blocks[container].type == EMarkdownBlockType::Html)) blank = false;
+		lines.push_back({ls, le, blank, container});
+		ls = le + 1;
+	}
+	for (size_t a = 0; a < lines.size();)
+	{
+		if (!lines[a].blank) { a++; continue; }
+		size_t z = a;
+		while (z + 1 < lines.size() && lines[z + 1].blank && lines[z + 1].container == lines[a].container) z++;
+		const int32_t c = lines[a].container;
+		const uint32_t cBeg = c > 0 ? blocks[c].beg : 0, cEnd = c > 0 ? blocks[c].end : (uint32_t)src.size();
+		const bool prevInside = a > 0 && lines[a - 1].ls >= doc.LineStart(cBeg);
+		const bool nextInside = z + 1 < lines.size() && lines[z + 1].ls < cEnd;
+		for (size_t k = a + (prevInside && nextInside ? 1 : 0); k <= z; k++)
+			gaps.push_back({lines[k].ls, lines[k].le, src.substr(lines[k].ls, lines[k].le - lines[k].ls)});
+		a = z + 1;
+	}
 }
 
 bool CMarkdownLiveEditor::IsContentAt(uint32_t offset) const
@@ -171,33 +230,51 @@ int32_t CMarkdownLiveEditor::StopIndexAtOrBefore(uint32_t offset) const
 
 bool CMarkdownLiveEditor::IsGapPosition(uint32_t offset) const
 {
-	const uint32_t ls = doc.LineStart(offset), le = doc.LineEnd(offset);
-	if (le > ls)
-	{
-		// Only blanks and quote markers on the line.
-		for (uint32_t o = ls; o < le; o++)
-			if (!IsBlankChar(doc.GetSource()[o]) && doc.GetSource()[o] != '>') return false;
-	}
-	// The line after a hard break ("\\" at a line's end) is the same block's.
-	if (ls >= 2)
-	{
-		const std::string &src = doc.GetSource();
-		uint32_t k = ls - 1, n = 0;
-		while (k > 0 && src[k - 1] == '\\') { k--; n++; }
-		if (n % 2 == 1) return false;
-	}
-	// The empty line after a document's final newline is not a paragraph of
-	// its own unless a blank line comes before it (Enter at the end made it).
-	if (offset == doc.Size() && le == ls && ls > 0)
-	{
-		const uint32_t ps = doc.LineStart(ls - 1);
-		bool prevBlank = true;
-		for (uint32_t o = ps; o < ls - 1; o++) if (!IsBlankChar(doc.GetSource()[o]) && doc.GetSource()[o] != '>') prevBlank = false;
-		if (!prevBlank) return false;
-	}
+	return GapIndexOfLine(offset) >= 0;
+}
+
+// Empty paragraphs. Lines are the source split on '\n' (the piece after a
+// final '\n' is not a line); a line holding only blanks and quote markers is
+// blank, except inside a code or HTML block. In a run of blank lines between
+// two non-blank lines the first one separates the blocks and the others are
+// empty paragraphs; at the document's start or end every blank line is one.
+const std::vector<CMarkdownLiveEditor::Gap> &CMarkdownLiveEditor::GetGaps() const
+{
 	RebuildStops();
-	const int32_t i = StopIndexAtOrBefore(offset);
-	return !(i >= 0 && stops[i].offset == offset);
+	return gaps;
+}
+
+int32_t CMarkdownLiveEditor::GapIndexOfLine(uint32_t offset) const
+{
+	RebuildStops();
+	if (gaps.empty()) return -1;
+	const uint32_t ls = doc.LineStart(std::min(offset, doc.Size()));
+	auto it = std::lower_bound(gaps.begin(), gaps.end(), ls, [](const Gap &g, uint32_t o) { return g.lineStart < o; });
+	if (it == gaps.end() || it->lineStart != ls) return -1;
+	// The piece after a final '\n' is not a line (its start equals Size()).
+	if (ls == doc.Size() && ls > 0 && doc.GetSource()[ls - 1] == '\n') return -1;
+	return (int32_t)(it - gaps.begin());
+}
+
+uint32_t CMarkdownLiveEditor::NextPosition(uint32_t offset, int direction) const
+{
+	RebuildStops();
+	uint32_t best = UINT32_MAX;
+	if (direction > 0)
+	{
+		auto st = std::upper_bound(stops.begin(), stops.end(), offset, [](uint32_t o, const Stop &s) { return o < s.offset; });
+		if (st != stops.end()) best = st->offset;
+		auto gp = std::upper_bound(gaps.begin(), gaps.end(), offset, [](uint32_t o, const Gap &g) { return o < g.caret; });
+		if (gp != gaps.end() && gp->caret < best) best = gp->caret;
+	}
+	else
+	{
+		auto st = std::lower_bound(stops.begin(), stops.end(), offset, [](const Stop &s, uint32_t o) { return s.offset < o; });
+		if (st != stops.begin()) best = (st - 1)->offset;
+		auto gp = std::lower_bound(gaps.begin(), gaps.end(), offset, [](const Gap &g, uint32_t o) { return g.caret < o; });
+		if (gp != gaps.begin() && (best == UINT32_MAX || (gp - 1)->caret > best)) best = (gp - 1)->caret;
+	}
+	return best;
 }
 
 uint32_t CMarkdownLiveEditor::Snap(uint32_t offset) const
@@ -205,10 +282,11 @@ uint32_t CMarkdownLiveEditor::Snap(uint32_t offset) const
 	RebuildStops();
 	const uint32_t size = doc.Size();
 	if (offset > size) offset = size;
-	if (stops.empty()) return offset;
 	const int32_t i = StopIndexAtOrBefore(offset);
 	if (i >= 0 && stops[i].offset == offset) return offset;
-	if (IsGapPosition(offset)) return offset;
+	const int32_t gi = GapIndexOfLine(offset);
+	if (gi >= 0) return gaps[gi].caret;
+	if (stops.empty() && gaps.empty()) return offset;
 	const std::string &src = doc.GetSource();
 	// After blanks typed at a line's end (not content: Markdown drops them).
 	if (i >= 0 && offset > 0 && IsBlankChar(src[offset - 1]) && !contentMask[offset - 1])
@@ -218,6 +296,9 @@ uint32_t CMarkdownLiveEditor::Snap(uint32_t offset) const
 		for (uint32_t o = offset; o < size && src[o] != '\n' && tail; o++) if (contentMask[o]) tail = false;
 		if (tail) return offset;
 	}
+	// The positions around it; the one on the same line with only syntax
+	// between wins (the left one first), else the nearer one.
+	const uint32_t prev = NextPosition(offset, -1), next = NextPosition(offset, 1);
 	auto clean = [&](uint32_t a, uint32_t b, bool allowContent) {
 		for (uint32_t o = a; o < b && o < size; o++)
 		{
@@ -226,11 +307,11 @@ uint32_t CMarkdownLiveEditor::Snap(uint32_t offset) const
 		}
 		return true;
 	};
-	if (i >= 0 && clean(stops[i].offset, offset, false)) return stops[i].offset;
-	if (i + 1 < (int32_t)stops.size() && clean(offset, stops[i + 1].offset, true)) return stops[i + 1].offset;
-	if (i < 0) return stops[0].offset;
-	if (i + 1 >= (int32_t)stops.size()) return stops[i].offset;
-	return (offset - stops[i].offset <= stops[i + 1].offset - offset) ? stops[i].offset : stops[i + 1].offset;
+	if (prev != UINT32_MAX && clean(prev, offset, false)) return prev;
+	if (next != UINT32_MAX && clean(offset, next, true)) return next;
+	if (prev == UINT32_MAX) return next;
+	if (next == UINT32_MAX) return prev;
+	return (offset - prev <= next - offset) ? prev : next;
 }
 
 int32_t CMarkdownLiveEditor::UnitBlockOf(uint32_t offset) const
@@ -238,6 +319,7 @@ int32_t CMarkdownLiveEditor::UnitBlockOf(uint32_t offset) const
 	RebuildStops();
 	const int32_t i = StopIndexAtOrBefore(offset);
 	if (i >= 0 && stops[i].offset == offset) return stops[i].block;
+	if (GapIndexOfLine(offset) >= 0) return 0;   // an empty paragraph belongs to no block
 	return doc.FindBlockAt(offset);
 }
 
@@ -248,6 +330,31 @@ uint32_t CMarkdownLiveEditor::BlockFirstStop(int32_t block) const
 	return UINT32_MAX;
 }
 
+bool CMarkdownLiveEditor::CodeContentRange(int32_t block, uint32_t *beg, uint32_t *end) const
+{
+	// The bytes of a code block between its fences (all of it when indented).
+	const auto &blocks = doc.GetBlocks();
+	if (block <= 0 || block >= (int32_t)blocks.size() || blocks[block].type != EMarkdownBlockType::Code) return false;
+	const CMarkdownBlock &b = blocks[block];
+	const std::string &src = doc.GetSource();
+	uint32_t a = doc.LineStart(b.beg), z = b.end;
+	if (b.isFenced)
+	{
+		a = std::min((uint32_t)src.size(), doc.LineEnd(a) + 1);
+		const uint32_t last = b.end > b.beg ? doc.LineStart(b.end - 1) : a;
+		if (last > a)
+		{
+			uint32_t k = last;
+			while (k < src.size() && src[k] == ' ') k++;
+			if (k < src.size() && src[k] == b.fenceChar) z = last - 1;   // before the closing fence's newline
+		}
+	}
+	if (z < a) z = a;
+	*beg = a;
+	*end = z;
+	return true;
+}
+
 bool CMarkdownLiveEditor::InCodeAt(uint32_t offset) const
 {
 	const int32_t b = doc.FindBlockAt(offset);
@@ -255,6 +362,56 @@ bool CMarkdownLiveEditor::InCodeAt(uint32_t offset) const
 	for (const CMarkdownSpan &sp : doc.GetSpans())
 		if (sp.type == EMarkdownSpanType::Code && offset >= sp.contentBeg && offset <= sp.contentEnd && sp.contentEnd > sp.contentBeg) return true;
 	return false;
+}
+
+void CMarkdownLiveEditor::GapAffixes(int32_t gap, std::string *lead, std::string *tail) const
+{
+	// Text on an empty paragraph needs a blank line before it when the line
+	// above is not blank, and after it when the line below is not; a quote's
+	// blank line is ">" and the text follows it after a space.
+	const std::string &src = doc.GetSource();
+	const Gap &g = gaps[gap];
+	std::string qpTrim = g.prefix;
+	while (!qpTrim.empty() && IsBlankChar(qpTrim.back())) qpTrim.pop_back();
+	auto blankLine = [&](uint32_t ls) {
+		const uint32_t le = doc.LineEnd(ls);
+		for (uint32_t o = ls; o < le; o++) if (!IsBlankChar(src[o]) && src[o] != '>') return false;
+		return true;
+	};
+	const uint32_t ls = g.lineStart, le = doc.LineEnd(ls);
+	*lead = ls > 0 && !blankLine(doc.LineStart(ls - 1)) ? "\n" + qpTrim : "";
+	if (!qpTrim.empty() && qpTrim.back() == '>' && !IsBlankChar(g.prefix.back())) *lead += " ";
+	*tail = le + 1 < src.size() && !blankLine(le + 1) ? "\n" + qpTrim : "";
+}
+
+void CMarkdownLiveEditor::ConvertEmptyItemToGap()
+{
+	// The marker goes and the line is an empty paragraph with the caret on
+	// it (what Enter and Backspace do on an empty item in a word processor).
+	// By the blank-line model a run between two blocks starts with the
+	// separator, so where the line above is not blank a second line is added.
+	const std::string &src = doc.GetSource();
+	const uint32_t ls = doc.LineStart(caret), le = doc.LineEnd(caret);
+	std::string qpTrim = ContainerPrefixAt(caret, true);
+	while (!qpTrim.empty() && IsBlankChar(qpTrim.back())) qpTrim.pop_back();
+	auto blankLine = [&](uint32_t from) {
+		const uint32_t e = doc.LineEnd(from);
+		for (uint32_t o = from; o < e; o++) if (!IsBlankChar(src[o]) && src[o] != '>') return false;
+		return true;
+	};
+	const bool prevBlank = ls == 0 || blankLine(doc.LineStart(ls - 1));
+	const bool nextLine = le + 1 < src.size();
+	const bool nextBlank = nextLine && blankLine(le + 1);
+	std::string text = qpTrim;
+	if (!prevBlank && nextLine && !nextBlank) text = qpTrim + "\n" + qpTrim;
+	doc.Replace(ls, le, text);
+	// A pure blank last line needs a newline after it to be a line at all.
+	if (ls + (uint32_t)text.size() >= doc.Size() && qpTrim.empty()) doc.Replace(doc.Size(), doc.Size(), "\n");
+	// The caret onto the empty paragraph: this line, or the blank one right
+	// after it when this one became the separator.
+	uint32_t at = UINT32_MAX;
+	for (const Gap &g : GetGaps()) if (g.lineStart >= ls) { at = g.caret; break; }
+	caret = anchor = at != UINT32_MAX ? at : Snap(ls);
 }
 
 // ---- Typing --------------------------------------------------------------------------
@@ -342,25 +499,14 @@ void CMarkdownLiveEditor::WordInsertText(std::string_view text)
 				lead = " ";
 		}
 	}
-	// A new paragraph on a blank line: blank lines around it, so it does not
-	// join the block above or below (a lazy continuation line).
+	// Text typed on an empty paragraph: after the line's prefix, with blank
+	// lines around it so it joins neither neighbour.
 	std::string gapTail;
-	if (lead.empty() && IsGapPosition(at) && !InCodeAt(at))
+	const int32_t gap = lead.empty() && !InCodeAt(at) ? GapIndexOfLine(at) : -1;
+	if (gap >= 0)
 	{
-		const std::string &src = doc.GetSource();
-		const uint32_t ls = doc.LineStart(at), le = doc.LineEnd(at);
-		bool quoted = false;
-		for (uint32_t o = ls; o < le; o++) if (src[o] == '>') quoted = true;
-		auto blank = [&](uint32_t from) {
-			const uint32_t e = doc.LineEnd(from);
-			for (uint32_t o = from; o < e; o++) if (!IsBlankChar(src[o])) return false;
-			return true;
-		};
-		if (!quoted)
-		{
-			if (ls > 0 && !blank(doc.LineStart(ls - 1))) lead = "\n";
-			if (le < src.size() && le + 1 < src.size() && !blank(le + 1)) gapTail = "\n";
-		}
+		at = gaps[gap].caret;
+		GapAffixes(gap, &lead, &gapTail);
 	}
 	std::string body = EscapeTyped(text, at);
 	std::string open, close;
@@ -600,6 +746,35 @@ uint32_t CMarkdownLiveEditor::DeleteRangeSafe(uint32_t a, uint32_t b)
 	return a + (uint32_t)closers.size();
 }
 
+uint32_t CMarkdownLiveEditor::JoinBlocks(uint32_t prevStop, uint32_t rightStop)
+{
+	// The break between two blocks goes; trailing blanks and closing markers
+	// of the first stay. When the first ends in the spans the second begins
+	// with (a split made them), the markers go too and the spans are one again.
+	const std::string &src = doc.GetSource();
+	const auto &spans = doc.GetSpans();
+	uint32_t from = prevStop;
+	while (from < rightStop && src[from] != '\n') from++;
+	std::vector<int32_t> closing, opening;   // innermost first / outermost first
+	for (int32_t i = (int32_t)spans.size() - 1; i >= 0; i--)
+		if (spans[i].contentEnd == prevStop && spans[i].end > prevStop && spans[i].end <= from && spans[i].contentEnd > spans[i].contentBeg) closing.push_back(i);
+	for (int32_t i = 0; i < (int32_t)spans.size(); i++)
+		if (spans[i].contentBeg == rightStop && spans[i].beg < rightStop && spans[i].beg >= from && spans[i].contentEnd > spans[i].contentBeg) opening.push_back(i);
+	bool same = !closing.empty() && closing.size() == opening.size();
+	for (size_t k = 0; same && k < closing.size(); k++)
+	{
+		const CMarkdownSpan &c = spans[closing[k]], &o = spans[opening[opening.size() - 1 - k]];
+		same = c.type == o.type && src.substr(c.contentEnd, c.end - c.contentEnd) == src.substr(o.contentEnd, o.end - o.contentEnd)
+			&& src.substr(c.beg, c.contentBeg - c.beg) == src.substr(o.beg, o.contentBeg - o.beg);
+	}
+	if (same)
+	{
+		doc.Replace(prevStop, rightStop, "");
+		return prevStop;
+	}
+	return DeleteRangeSafe(from, rightStop);
+}
+
 void CMarkdownLiveEditor::WordBackspace()
 {
 	if (readOnly) return;
@@ -613,21 +788,49 @@ void CMarkdownLiveEditor::WordBackspace()
 		return;
 	}
 	RebuildStops();
-	const int32_t i = StopIndexAtOrBefore(caret);
-	const bool exact = i >= 0 && stops[i].offset == caret;
-	if (!exact)
+	int32_t gi = GapIndexOfLine(caret);
+	int32_t i = StopIndexAtOrBefore(caret);
+	bool exact = i >= 0 && stops[i].offset == caret;
+	if (!exact && gi < 0)
 	{
-		// A caret on a blank line (an empty paragraph): the line goes.
-		if (i < 0) return;
-		BeginCompound();
-		doc.Replace(stops[i].offset, caret, "");
-		caret = anchor = stops[i].offset;
-		EndCompound();
 		caret = anchor = Snap(caret);
+		gi = GapIndexOfLine(caret);
+		i = StopIndexAtOrBefore(caret);
+		exact = i >= 0 && stops[i].offset == caret;
+		if (!exact && gi < 0) return;
+	}
+	if (gi >= 0)
+	{
+		// An empty paragraph goes; the caret to the position before it.
+		const uint32_t ls = gaps[gi].lineStart, le = doc.LineEnd(ls);
+		const uint32_t target = NextPosition(ls, -1);
+		BeginCompound();
+		if (ls > 0) doc.Replace(ls - 1, le, "");
+		else doc.Replace(0, std::min(le + 1, doc.Size()), "");
+		caret = anchor = target == UINT32_MAX ? Snap(0) : target;
+		EndCompound();
+		preferredX = -1;
+		scrollToCaret = true;
 		Changed();
 		return;
 	}
 	const bool blockStart = i == 0 || stops[i - 1].block != stops[i].block;
+	{
+		// In a code block every byte is literal: the one before the caret goes.
+		uint32_t cb = 0, ce = 0;
+		if (CodeContentRange(stops[i].block, &cb, &ce) && caret > cb && caret <= ce)
+		{
+			BeginCompound();
+			const uint32_t from = doc.PrevCodepoint(caret);
+			doc.Replace(from, caret, "");
+			caret = anchor = from;
+			EndCompound();
+			preferredX = -1;
+			scrollToCaret = true;
+			Changed();
+			return;
+		}
+	}
 	if (!blockStart)
 	{
 		const uint32_t from = doc.PrevCodepoint(caret);
@@ -652,11 +855,40 @@ void CMarkdownLiveEditor::WordBackspace()
 	const auto &blocks = doc.GetBlocks();
 	if (blk <= 0) return;
 	const CMarkdownBlock &b = blocks[blk];
+	// An empty paragraph right above it goes; the text stays as it is.
+	{
+		const uint32_t ls = doc.LineStart(caret);
+		const int32_t above = ls > 0 ? GapIndexOfLine(ls - 1) : -1;
+		if (above >= 0)
+		{
+			const uint32_t gls = gaps[above].lineStart;
+			BeginCompound();
+			doc.Replace(gls, ls, "");
+			caret = anchor = caret - (ls - gls);
+			EndCompound();
+			preferredX = -1;
+			scrollToCaret = true;
+			Changed();
+			return;
+		}
+	}
 	int32_t item = -1;
 	if (b.type == EMarkdownBlockType::ListItem) item = blk;
 	else if (b.parent > 0 && blocks[b.parent].type == EMarkdownBlockType::ListItem && doc.LineStart(b.beg) == doc.LineStart(blocks[b.parent].beg)) item = b.parent;
 	if (item > 0)
 	{
+		BeginCompound();
+		if (blk == item && !doc.OwnsContentPublic(item) && doc.GetChildren(item).empty())
+		{
+			// An empty item: its marker goes, an empty paragraph stays.
+			ConvertEmptyItemToGap();
+			EndCompound();
+			preferredX = -1;
+			scrollToCaret = true;
+			Changed();
+			return;
+		}
+		EndCompound();
 		// The bullet goes; the text stays, as a paragraph of its own.
 		const EMarkdownListKind kind = blocks[item].isTask ? EMarkdownListKind::Task
 			: (blocks[blocks[item].parent].type == EMarkdownBlockType::OrderedList ? EMarkdownListKind::Numbered : EMarkdownListKind::Bullet);
@@ -669,8 +901,13 @@ void CMarkdownLiveEditor::WordBackspace()
 		if (doc.GetAtxMarkerRange(blk, &mb, &me) && mb != me) { SetHeadingLevel(0); caret = anchor = Snap(caret); return; }
 	}
 	if (b.IsCell()) return;
+	// The first block of a quote leaves it; a later one merges within it.
 	for (int32_t p = b.parent; p > 0; p = blocks[p].parent)
-		if (blocks[p].type == EMarkdownBlockType::Quote) { ToggleQuote(); return; }
+		if (blocks[p].type == EMarkdownBlockType::Quote)
+		{
+			if (i == 0 || !IsDescendant(stops[i - 1].block, p)) { ToggleQuote(); return; }
+			break;
+		}
 	if (i == 0) return;
 	const Stop prev = stops[i - 1];
 	const CMarkdownBlock &pb = blocks[prev.block];
@@ -689,14 +926,13 @@ void CMarkdownLiveEditor::WordBackspace()
 		SetCaret(prev.offset);
 		return;
 	}
-	// Merge into the block before: only the break between them goes, so
-	// trailing blanks and closing markers of the block before stay.
-	uint32_t from = prev.offset;
-	while (from < caret && doc.GetSource()[from] != '\n') from++;
+	// Merge into the block before.
 	BeginCompound();
-	caret = anchor = DeleteRangeSafe(from, caret);
+	caret = anchor = JoinBlocks(prev.offset, caret);
 	EndCompound();
 	caret = anchor = Snap(caret);
+	preferredX = -1;
+	scrollToCaret = true;
 	Changed();
 }
 
@@ -705,19 +941,45 @@ void CMarkdownLiveEditor::WordDeleteForward()
 	if (readOnly) return;
 	if (HasSelection()) { WordBackspace(); return; }
 	RebuildStops();
-	const int32_t i = StopIndexAtOrBefore(caret);
-	const bool exact = i >= 0 && stops[i].offset == caret;
+	// An empty paragraph goes; the caret stays, on what follows.
+	auto deleteGapLine = [&](int32_t g) {
+		const uint32_t ls = gaps[g].lineStart, le = doc.LineEnd(ls);
+		BeginCompound();
+		if (le < doc.Size()) doc.Replace(ls, le + 1, "");
+		else if (ls > 0) doc.Replace(ls - 1, le, "");
+		else doc.Replace(0, le, "");
+		EndCompound();
+		caret = anchor = Snap(std::min(caret, doc.Size()));
+		preferredX = -1;
+		scrollToCaret = true;
+		Changed();
+	};
+	int32_t gi = GapIndexOfLine(caret);
+	if (gi >= 0) { deleteGapLine(gi); return; }
+	int32_t i = StopIndexAtOrBefore(caret);
+	bool exact = i >= 0 && stops[i].offset == caret;
 	if (!exact)
 	{
-		if (i + 1 >= (int32_t)stops.size()) return;
-		BeginCompound();
-		doc.Replace(caret, stops[i + 1].offset, "");
-		EndCompound();
 		caret = anchor = Snap(caret);
-		Changed();
-		return;
+		gi = GapIndexOfLine(caret);
+		if (gi >= 0) { deleteGapLine(gi); return; }
+		i = StopIndexAtOrBefore(caret);
+		exact = i >= 0 && stops[i].offset == caret;
+		if (!exact) return;
 	}
 	const bool blockEnd = i + 1 >= (int32_t)stops.size() || stops[i + 1].block != stops[i].block;
+	{
+		uint32_t cb = 0, ce = 0;
+		if (CodeContentRange(stops[i].block, &cb, &ce) && caret >= cb && caret < ce)
+		{
+			BeginCompound();
+			doc.Replace(caret, doc.NextCodepoint(caret), "");
+			EndCompound();
+			anchor = caret;
+			Changed();
+			return;
+		}
+	}
 	if (!blockEnd)
 	{
 		uint32_t k = caret;
@@ -729,6 +991,12 @@ void CMarkdownLiveEditor::WordDeleteForward()
 		caret = anchor = Snap(caret);
 		Changed();
 		return;
+	}
+	// At a block's end: an empty paragraph below it goes first.
+	{
+		const uint32_t nextStop = i + 1 < (int32_t)stops.size() ? stops[i + 1].offset : UINT32_MAX;
+		for (int32_t g = 0; g < (int32_t)gaps.size(); g++)
+			if (gaps[g].caret > caret && gaps[g].caret < nextStop) { deleteGapLine(g); return; }
 	}
 	if (i + 1 >= (int32_t)stops.size()) return;
 	const Stop next = stops[i + 1];
@@ -742,12 +1010,7 @@ void CMarkdownLiveEditor::WordDeleteForward()
 		const uint32_t ls = doc.LineStart(nb.beg);
 		doc.Replace(ls, std::min(doc.Size(), nb.end + 1), "");
 	}
-	else
-	{
-		uint32_t from = caret;
-		while (from < next.offset && doc.GetSource()[from] != '\n') from++;
-		DeleteRangeSafe(from, next.offset);
-	}
+	else JoinBlocks(caret, next.offset);
 	EndCompound();
 	caret = anchor = Snap(caret);
 	Changed();
@@ -805,8 +1068,22 @@ void CMarkdownLiveEditor::SplitAt(uint32_t at, const std::string &separator, con
 		if (spans[i].contentBeg < at && at < spans[i].contentEnd) closers += src.substr(spans[i].contentEnd, spans[i].end - spans[i].contentEnd);
 	for (const CMarkdownSpan &sp : spans)
 		if (sp.contentBeg < at && at < sp.contentEnd) openers += src.substr(sp.beg, sp.contentBeg - sp.beg);
-	doc.Replace(at, at, closers + separator + openers);
-	caret = anchor = at + (uint32_t)(closers.size() + separator.size());
+	// Blanks at the split stay with the first part (after its closers, as an
+	// emphasis cannot end on a blank); a soft line break there goes, with the
+	// next line's indentation and quote markers, so the caret lands on text.
+	uint32_t cut = at;
+	while (cut < src.size() && IsBlankChar(src[cut])) cut++;
+	const std::string blanks = src.substr(at, cut - at);
+	if (cut < src.size() && src[cut] == '\n' && cut + 1 < src.size())
+	{
+		uint32_t k = cut + 1;
+		while (k < src.size() && (IsBlankChar(src[k]) || src[k] == '>')) k++;
+		// Only a continuation line of the same block; the next block's line stays.
+		const int32_t here = doc.FindBlockAt(at > 0 ? at - 1 : at);
+		if (k < src.size() && src[k] != '\n' && doc.FindBlockAt(k) == here) cut = k;
+	}
+	doc.Replace(at, cut, closers + blanks + separator + openers);
+	caret = anchor = Snap(at + (uint32_t)(closers.size() + blanks.size() + separator.size()));
 }
 
 bool CMarkdownLiveEditor::AtBlockTextEnd(uint32_t offset) const
@@ -820,17 +1097,43 @@ bool CMarkdownLiveEditor::AtBlockTextEnd(uint32_t offset) const
 void CMarkdownLiveEditor::WordNewline(bool lineBreak)
 {
 	if (readOnly) return;
+	// A table cell cannot hold a second line: a row below instead.
+	if (CaretInCell(nullptr))
+	{
+		if (EditTable(EMarkdownTableEdit::InsertRowBelow)) SelectFirstCellOfRow();
+		return;
+	}
 	BeginCompound();
 	if (HasSelection()) caret = anchor = DeleteRangeSafe(std::min(anchor, caret), std::max(anchor, caret));
+	RebuildStops();
+	{
+		const int32_t i = StopIndexAtOrBefore(caret);
+		if (!(i >= 0 && stops[i].offset == caret) && GapIndexOfLine(caret) < 0) caret = anchor = Snap(caret);
+	}
 	// At the end of styled text the new line goes on in that style, as in Word.
 	uint8_t carry = 0;
 	DelimiterChainEnd(caret, &carry);
 	const auto &blocks = doc.GetBlocks();
 	const std::string &src = doc.GetSource();
+	auto blankLine = [&](uint32_t ls) {
+		const uint32_t le = doc.LineEnd(ls);
+		for (uint32_t o = ls; o < le; o++) if (!IsBlankChar(src[o]) && src[o] != '>') return false;
+		return true;
+	};
+	auto trimmed = [&](std::string t) { while (!t.empty() && IsBlankChar(t.back())) t.pop_back(); return t; };
+	const int32_t gi = GapIndexOfLine(caret);
 	if (InCodeAt(caret) && doc.FindBlockAt(caret) > 0 && blocks[doc.FindBlockAt(caret)].type == EMarkdownBlockType::Code)
 	{
 		doc.Replace(caret, caret, "\n");
 		caret = anchor = caret + 1;
+	}
+	else if (gi >= 0)
+	{
+		// On an empty paragraph: another one below it, the caret on that.
+		const std::string qpTrim = trimmed(gaps[gi].prefix);
+		const uint32_t at = gaps[gi].caret;
+		doc.Replace(at, at, "\n" + qpTrim);
+		caret = anchor = at + 1 + (uint32_t)qpTrim.size();
 	}
 	else if (lineBreak && !AtBlockTextEnd(caret))
 	{
@@ -842,7 +1145,6 @@ void CMarkdownLiveEditor::WordNewline(bool lineBreak)
 		// Enter, or Shift+Enter with nothing after it in the block: Markdown
 		// has no empty last line ("a\\" before a blank line is a literal
 		// backslash), so it starts the next paragraph or item.
-		RebuildStops();
 		const int32_t i = StopIndexAtOrBefore(caret);
 		const bool exact = i >= 0 && stops[i].offset == caret;
 		const int32_t blk = exact ? stops[i].block : -1;
@@ -850,47 +1152,69 @@ void CMarkdownLiveEditor::WordNewline(bool lineBreak)
 		if (blk > 0)
 		{
 			if (blocks[blk].type == EMarkdownBlockType::ListItem) item = blk;
-			else if (blocks[blk].parent > 0 && blocks[blocks[blk].parent].type == EMarkdownBlockType::ListItem) item = blocks[blk].parent;
+			else if (blocks[blk].parent > 0 && blocks[blocks[blk].parent].type == EMarkdownBlockType::ListItem
+				&& doc.LineStart(blocks[blk].beg) == doc.LineStart(blocks[blocks[blk].parent].beg)) item = blocks[blk].parent;
 		}
 		const bool blockStart = exact && (i == 0 || stops[i - 1].block != stops[i].block);
-		if (item > 0)
+		const bool emptyItem = item > 0 && blk == item && !doc.OwnsContentPublic(item) && doc.GetChildren(item).empty();
+		if (emptyItem)
 		{
-			const std::string prefix = doc.ListContinuationPrefix(blocks[item].beg);
-			// An item with no text and nothing nested.
-			const bool empty = blk == item && !doc.OwnsContentPublic(item) && doc.GetChildren(item).empty();
-			if (empty)
-			{
-				// Enter on an empty item ends the list: its marker line goes.
-				const uint32_t ls = doc.LineStart(caret);
-				doc.Replace(ls, doc.LineEnd(caret), "");
-				caret = anchor = ls;
-			}
+			// Enter on an empty item ends the list: an empty paragraph stays.
+			ConvertEmptyItemToGap();
+		}
+		else if (blockStart && blk > 0)
+		{
+			// At a block's start: an empty item or paragraph opens above; the
+			// caret stays with the text. By the blank-line model, a paragraph
+			// after a non-blank line needs the separator line as well.
+			const uint32_t ls = doc.LineStart(caret);
+			std::string ins;
+			if (item > 0) ins = src.substr(ls, caret - ls) + "\n";
 			else
 			{
-				const int32_t list = blocks[item].parent;
-				const bool tight = list > 0 && blocks[list].listIsTight;
-				SplitAt(caret, (tight ? "\n" : "\n\n") + prefix, "");
+				const std::string qpTrim = trimmed(ContainerPrefixAt(caret, true));
+				const bool prevBlank = ls == 0 || blankLine(doc.LineStart(ls - 1));
+				ins = prevBlank ? qpTrim + "\n" : qpTrim + "\n" + qpTrim + "\n";
 			}
+			doc.Replace(ls, ls, ins);
+			caret = anchor = caret + (uint32_t)ins.size();
 		}
-		else if (blockStart && blk > 0 && !blocks[blk].IsCell())
+		else if (item > 0)
 		{
-			// At a block's start: an empty paragraph opens above; the caret
-			// stays with the text.
-			const uint32_t ls = doc.LineStart(caret);
-			const std::string qp = ContainerPrefixAt(caret, true);
-			std::string qpTrim = qp;
-			while (!qpTrim.empty() && IsBlankChar(qpTrim.back())) qpTrim.pop_back();
-			doc.Replace(ls, ls, qp.empty() ? "\n\n" : qp + "\n" + qpTrim + "\n");
-			caret = anchor = Snap(caret + (uint32_t)(qp.empty() ? 2 : qp.size() + qpTrim.size() + 2));
+			// Inside an item's text: the item splits in two; at its end the new
+			// item is empty.
+			const std::string prefix = doc.ListContinuationPrefix(blocks[item].beg);
+			const int32_t list = blocks[item].parent;
+			const bool tight = list > 0 && blocks[list].listIsTight;
+			SplitAt(caret, (tight ? "\n" : "\n\n") + prefix, "");
+		}
+		else if (AtBlockTextEnd(caret))
+		{
+			// At a block's end: an empty paragraph below, the caret on it. With
+			// a block below, the first blank line between them is the separator.
+			const std::string qpTrim = trimmed(ContainerPrefixAt(caret, true));
+			const uint32_t le = doc.LineEnd(caret);
+			int blanksAfter = 0;
+			bool nextNonBlank = false;
+			for (uint32_t ls = le + 1; ls < src.size(); ls = doc.LineEnd(ls) + 1)
+			{
+				if (!blankLine(ls)) { nextNonBlank = true; break; }
+				blanksAfter++;
+			}
+			std::string ins = "\n" + qpTrim;
+			if (nextNonBlank && blanksAfter == 0) ins += "\n" + qpTrim;
+			doc.Replace(le, le, ins);
+			if (qpTrim.empty() && le + (uint32_t)ins.size() >= doc.Size() && doc.Size() > 0 && src[doc.Size() - 1] == '\n' && le + 1 == doc.Size())
+				doc.Replace(doc.Size(), doc.Size(), "\n");   // a pure blank last line needs a newline after it
+			const uint32_t g = NextPosition(caret, 1);
+			caret = anchor = g == UINT32_MAX ? Snap(le + 1) : g;
 		}
 		else
 		{
+			// Inside a block's text: it splits in two.
 			const std::string qp = ContainerPrefixAt(caret, true);
-			std::string qpTrim = qp;
-			while (!qpTrim.empty() && IsBlankChar(qpTrim.back())) qpTrim.pop_back();
-			SplitAt(caret, "\n" + qpTrim + "\n" + qp, "");
+			SplitAt(caret, "\n" + trimmed(qp) + "\n" + qp, "");
 		}
-		(void)src;
 	}
 	EndCompound();
 	if (carry != 0) { pendingOn = carry; pendingOff = 0; pendingAt = caret; }
@@ -912,12 +1236,8 @@ void CMarkdownLiveEditor::WordMoveHorizontal(int direction, bool extend)
 		scrollToCaret = true;
 		return;
 	}
-	if (stops.empty()) return;
-	const int32_t i = StopIndexAtOrBefore(caret);
-	const bool exact = i >= 0 && stops[i].offset == caret;
-	int32_t t = direction > 0 ? i + 1 : (exact ? i - 1 : i);
-	if (t < 0 || t >= (int32_t)stops.size()) return;
-	const uint32_t o = stops[t].offset;
+	const uint32_t o = NextPosition(caret, direction);
+	if (o == UINT32_MAX) return;
 	SetSelection(extend ? anchor : o, o);
 	preferredX = -1;
 	scrollToCaret = true;
@@ -1134,6 +1454,21 @@ bool CMarkdownLiveEditor::ToggleList(EMarkdownListKind kind)
 	if (readOnly) return false;
 	const auto &blocks = doc.GetBlocks();
 	const std::string &src = doc.GetSource();
+	if (!HasSelection() && IsGapPosition(caret))
+	{
+		// An empty paragraph becomes an empty item, as text typed there would.
+		const int32_t g = GapIndexOfLine(caret);
+		std::string lead, tail;
+		GapAffixes(g, &lead, &tail);
+		const uint32_t at = gaps[g].caret;
+		const std::string marker = kind == EMarkdownListKind::Bullet ? "- " : (kind == EMarkdownListKind::Task ? "- [ ] " : "1. ");
+		BeginCompound();
+		doc.Replace(at, at, lead + marker + tail);
+		caret = anchor = Snap(at + (uint32_t)(lead.size() + marker.size()));
+		EndCompound();
+		Changed();
+		return true;
+	}
 	std::vector<int32_t> sel = SelectedLeafBlocks();
 	if (sel.empty()) return false;
 	auto itemOf = [&](int32_t blk) {

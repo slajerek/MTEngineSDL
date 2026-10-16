@@ -774,6 +774,246 @@ void RegisterMarkdownEditorTests(ImGuiTestEngine *engine)
 		ctx->SetRef("");
 	};
 
+	// Word-like caret invariants over a real agenda, at every caret position:
+	// the caret has a line; Right then Left comes back; Down goes down and Up
+	// comes back; Enter opens the line below with the caret on it, and
+	// Backspace undoes it (in a list the bullet goes first, as in Word, so
+	// there the text is compared without markers); a typed character lands
+	// right after the caret on its line and Backspace removes it.
+	t = IM_REGISTER_TEST(engine, "markdown", "word_like_caret_invariants");
+	t->TestFunc = [](ImGuiTestContext *ctx)
+	{
+		CGuiViewMarkdownEditor *view = EnsureView(ctx);
+		CMarkdownLiveEditor &ed = view->GetEditor();
+		ed.SetEditMode(EMarkdownEditMode::Rendered);
+		ed.SetFindQuery("");
+		const std::string src =
+			"AGENDA: Internal AI meeting 2026/10/24\n\n"
+			"# Internal AI meeting\n\n"
+			"1. Wprowadzenie i kwestie organizacyjne (Marcin S)\n"
+			"2. Podzial projektu na moduly i kamienie milowe (Marcin N)\n\n"
+			"   Przedstawienie proponowanego podzialu aplikacji **WWW** i *mobilnej*.\n\n"
+			"   - Autoryzacja\n"
+			"   - Uzytkownicy\n"
+			"   - Dashboard\n"
+			"   - Urzadzenia\n\n"
+			"3. Analiza biznesowa - Autoryzacja i Uzytkownicy (Michal K)\n\n"
+			"   Przeglad wymagan i acceptance criteria, zob. [notatki](https://example.com/notes).\n\n"
+			"## Action items\n\n"
+			"- [x] Rozeslac agende\n"
+			"- [ ] Przygotowac demo\n"
+			"- [ ] Zebrac uwagi do `release-plan.md`\n\n"
+			"## Timing\n\n"
+			"| Topic        | Owner    | Minutes |\n"
+			"|:-------------|----------|--------:|\n"
+			"| Introduction | Marcin S |       5 |\n"
+			"| Modules      | Marcin N |      20 |\n\n"
+			"> Decyzje zapisujemy w protokole.\n\n"
+			"```\nmake release\n```\n";
+		ed.SetSource(src);
+		ctx->Yield(2);
+		auto lineOf = [&](uint32_t o) {
+			const auto &lines = ed.GetLayoutLines();
+			int fallback = -1;
+			for (size_t i = 0; i < lines.size(); i++)
+			{
+				for (const auto &g : lines[i].glyphs) if (!g.synthetic && g.offset == o) return (int)i;
+				if (o >= lines[i].begOffset && o <= lines[i].endOffset) fallback = (int)i;
+			}
+			return fallback;
+		};
+		auto lineY = [&](int li) { return li >= 0 ? ed.GetLayoutLines()[(size_t)li].y : -1.0f; };
+		auto isPosition = [&](uint32_t o) {
+			const uint32_t c = ed.GetCaret();
+			ed.SetCaret(o);
+			const bool ok = ed.GetCaret() == o;
+			ed.SetCaret(c);
+			return ok;
+		};
+		auto show = [&](uint32_t o) {
+			const std::string &t = ed.GetSource();
+			std::string r = t.substr(o > 12 ? o - 12 : 0, o > 12 ? 12 : o) + "|" + t.substr(std::min<size_t>(o, t.size()), 10);
+			for (char &ch : r) if (ch == '\n') ch = '/';
+			return r;
+		};
+		// The text without any Markdown block syntax or blank lines.
+		auto plain = [](const std::string &t) {
+			std::string out;
+			size_t p = 0;
+			while (p <= t.size())
+			{
+				size_t e = t.find('\n', p);
+				if (e == std::string::npos) e = t.size();
+				std::string line = t.substr(p, e - p);
+				size_t k = 0;
+				while (k < line.size() && (line[k] == ' ' || line[k] == '>' || line[k] == '#')) k++;
+				if (k < line.size() && (line[k] == '-' || line[k] == '*' || line[k] == '+') && (k + 1 == line.size() || line[k + 1] == ' ')) k++;
+				else { size_t d = k; while (d < line.size() && line[d] >= '0' && line[d] <= '9') d++; if (d > k && d < line.size() && line[d] == '.') k = d + 1; }
+				while (k < line.size() && line[k] == ' ') k++;
+				if (k + 3 <= line.size() && line[k] == '[' && line[k + 2] == ']') { k += 3; while (k < line.size() && line[k] == ' ') k++; }
+				std::string body = line.substr(k);
+				while (!body.empty() && body.back() == ' ') body.pop_back();
+				if (!body.empty()) { if (!out.empty()) out += ' '; out += body; }
+				if (e >= t.size()) break;
+				p = e + 1;
+			}
+			return out;
+		};
+		const std::string plainSrc = plain(src);
+		std::vector<uint32_t> positions;
+		ed.SetCaret(0);
+		positions.push_back(ed.GetCaret());
+		for (;;)
+		{
+			ed.MoveHorizontal(1, false);
+			if (ed.GetCaret() == positions.back()) break;
+			positions.push_back(ed.GetCaret());
+		}
+		ctx->LogInfo("%d caret positions", (int)positions.size());
+		IM_CHECK(ClickOffset(ctx, ed, 0));   // the keyboard goes to the editor
+		int failures = 0;
+		auto fail = [&](const char *what, uint32_t at, const std::string &detail) {
+			failures++;
+			ctx->LogWarning("INV %s at %u [%s]: %s", what, at, show(at).c_str(), detail.c_str());
+		};
+		auto reset = [&]() {
+			ed.SetSource(src);
+			// Back to the top (the view may have scrolled), then the keyboard back.
+			ed.SetCaret(0);
+			ed.MoveHorizontal(1, false);
+			ed.MoveHorizontal(-1, false);
+			ctx->Yield(2);
+			IM_CHECK_NO_RET(ClickOffset(ctx, ed, 0));
+		};
+		// After a split before a blank and a merge, the caret stands after the blank.
+		auto caretBack = [&](uint32_t s) {
+			const uint32_t c = ed.GetCaret();
+			if (c == s) return true;
+			if (c < s || ed.GetSource() != src) return false;
+			for (uint32_t o = s; o < c; o++) if (src[o] != ' ' && src[o] != '*' && src[o] != '`' && src[o] != '~') return false;
+			return true;
+		};
+		// Every position gets Right/Left; the costlier checks go to every third
+		// one and to every first and last position of a layout line.
+		std::vector<bool> full(positions.size(), false);
+		for (size_t k = 0; k < positions.size(); k++)
+		{
+			const int l = lineOf(positions[k]);
+			const bool edge = k == 0 || k + 1 == positions.size() || lineOf(positions[k - 1]) != l || lineOf(positions[k + 1]) != l;
+			full[k] = edge || k % 3 == 0;
+		}
+		ImGuiTestEngineIO &eio = ImGuiTestEngine_GetIO(ctx->Engine);
+		const float watchdog = eio.ConfigWatchdogKillTest;
+		eio.ConfigWatchdogKillTest = 300.0f;
+		auto inCode = [&](uint32_t o) {
+			const int32_t b = ed.GetDocument().FindBlockAt(o);
+			return b > 0 && ed.GetDocument().GetBlocks()[b].type == EMarkdownBlockType::Code;
+		};
+		for (size_t pi = 0; pi < positions.size(); pi++)
+		{
+			const uint32_t s = positions[pi];
+			ed.SetCaret(s);
+			ctx->Yield(1);
+			const int li = lineOf(s);
+			ImVec2 cmin, cmax;
+			if (li < 0) fail("no line for caret", s, "");
+			if (!ed.GetCaretScreenRect(&cmin, &cmax)) fail("caret not drawn", s, "");
+
+			// Right then Left.
+			ctx->KeyPress(ImGuiKey_RightArrow);
+			ctx->Yield(1);
+			const uint32_t right = ed.GetCaret();
+			if (right != s)
+			{
+				if (right < s || !isPosition(right)) fail("Right", s, "to " + std::to_string(right));
+				ctx->KeyPress(ImGuiKey_LeftArrow);
+				ctx->Yield(1);
+				if (ed.GetCaret() != s) fail("Left does not come back", s, "right " + std::to_string(right) + " left " + std::to_string(ed.GetCaret()));
+			}
+
+			if (!full[pi]) continue;
+
+			// Down then Up.
+			ed.SetCaret(s);
+			ctx->Yield(1);
+			ctx->KeyPress(ImGuiKey_DownArrow);
+			ctx->Yield(1);
+			const uint32_t down = ed.GetCaret();
+			const int ld = lineOf(down);
+			if (down != s)
+			{
+				const bool lastLine = li >= 0 && (size_t)li + 1 == ed.GetLayoutLines().size();
+				if (!isPosition(down)) fail("Down lands off a position", s, "to " + std::to_string(down));
+				if (ld < 0 || li < 0 || (lineY(ld) <= lineY(li) && !(lastLine && ld == li))) fail("Down did not go down", s, "line " + std::to_string(li) + " -> " + std::to_string(ld));
+				if (ld != li)
+				{
+					ctx->KeyPress(ImGuiKey_UpArrow);
+					ctx->Yield(1);
+					const uint32_t up = ed.GetCaret();
+					if (lineOf(up) != li) fail("Up did not come back to the line", s, "down " + std::to_string(down) + " up " + std::to_string(up));
+				}
+			}
+
+			// Enter, then Backspace undoes it.
+			const bool inList = ed.IsInList(EMarkdownListKind::Bullet) || ed.IsInList(EMarkdownListKind::Numbered) || ed.IsInList(EMarkdownListKind::Task);
+			const bool inCell = ed.GetDocument().GetBlocks()[std::max(0, ed.GetDocument().FindBlockAt(s))].IsCell();
+			ed.SetCaret(s);
+			ctx->Yield(1);
+			ctx->KeyPress(ImGuiKey_Enter);
+			ctx->Yield(1);
+			const uint32_t afterEnter = ed.GetCaret();
+			const int le = lineOf(afterEnter);
+			if (!isPosition(afterEnter)) fail("Enter lands off a position", s, "to " + std::to_string(afterEnter) + " [" + show(afterEnter) + "]");
+			if (le < 0) fail("no line after Enter", s, "caret " + std::to_string(afterEnter));
+			else if (li >= 0 && !inCell && le != li + 1) fail("Enter did not open the next line", s, "line " + std::to_string(li) + " -> " + std::to_string(le) + " caret [" + show(afterEnter) + "]");
+			if (inCell)
+			{
+				// Enter in the last row adds a row; Enter elsewhere moves down a row.
+				if (plain(ed.GetSource()) != plainSrc && ed.GetSource().find("|  ") == std::string::npos) fail("Enter in a cell", s, "");
+				reset();
+			}
+			else
+			{
+				ctx->KeyPress(ImGuiKey_Backspace);
+				ctx->Yield(1);
+				if (ed.GetSource() != src && inList) { ctx->KeyPress(ImGuiKey_Backspace); ctx->Yield(1); }
+				const bool same = ed.GetSource() == src;
+				const bool samePlain = plain(ed.GetSource()) == plainSrc;
+				if (!(same || (inList && samePlain)) || (same && !caretBack(s)))
+				{
+					std::string d = "caret " + std::to_string(ed.GetCaret());
+					if (!same) d += " source differs: [" + show(afterEnter) + "] plain " + (samePlain ? "same" : "DIFFERS");
+					fail("Enter+Backspace is not identity", s, d);
+					reset();
+				}
+				else if (!same) reset();
+			}
+
+			// A typed character.
+			ed.SetCaret(s);
+			ctx->Yield(1);
+			ctx->KeyChars("q");
+			ctx->Yield(1);
+			const uint32_t afterType = ed.GetCaret();
+			const std::string &now = ed.GetSource();
+			const size_t q = now.find('q');
+			if (q == std::string::npos || afterType != (uint32_t)q + 1 || lineOf(afterType) != li)
+				fail("typing", s, "caret " + std::to_string(afterType) + " line " + std::to_string(lineOf(afterType)) + " q at " + std::to_string((long)q));
+			ctx->KeyPress(ImGuiKey_Backspace);
+			ctx->Yield(1);
+			if (ed.GetSource() != src || ed.GetCaret() != s)
+			{
+				fail("type+Backspace is not identity", s, "caret " + std::to_string(ed.GetCaret()) + (ed.GetSource() != src ? " source differs" : ""));
+				reset();
+			}
+			(void)inCode;
+		}
+		eio.ConfigWatchdogKillTest = watchdog;
+		ctx->LogInfo("%d invariant failures", failures);
+		IM_CHECK_EQ(failures, 0);
+		ed.SetEditMode(EMarkdownEditMode::RevealNearCaret);
+	};
+
 	// Pixels, not geometry: the editor's window is captured in four states and
 	// each must have drawn real text. With MT_MD_CAPTURE_DIR set, the captures
 	// are also written there (raw RGBA artifacts) for a human to look at.
@@ -832,6 +1072,22 @@ void RegisterMarkdownEditorTests(ImGuiTestEngine *engine)
 		ed.SetEditMode(EMarkdownEditMode::Rendered);
 		IM_CHECK(ClickOffset(ctx, ed, (uint32_t)src.find("October")));
 		shot("5_word_like");
+		// 7. Word-like editing: Enter at the end of the last nested item and a
+		// word typed on the new item; Enter at the start of the last paragraph
+		// (an empty paragraph opens above it, drawn as an empty line).
+		IM_CHECK(ClickOffset(ctx, ed, (uint32_t)src.find("plan") + 3));
+		ctx->KeyPress(ImGuiKey_End);
+		ctx->KeyPress(ImGuiKey_Enter);
+		ctx->KeyChars("Budget");
+		ctx->Yield(2);
+		IM_CHECK(ed.GetSource().find("   - [ ] Release plan\n   - [ ] Budget\n") != std::string::npos);
+		IM_CHECK(ClickOffset(ctx, ed, (uint32_t)ed.GetSource().find("Closing")));
+		ctx->KeyPress(ImGuiKey_Enter);
+		ctx->Yield(2);
+		IM_CHECK(ed.GetSource().find("```\n\n\nClosing") != std::string::npos);
+		shot("7_word_like_edits");
+		ed.SetSource(src);
+		ctx->Yield(2);
 		// 6. The whole source.
 		ed.SetEditMode(EMarkdownEditMode::Source);
 		shot("6_source");

@@ -231,14 +231,12 @@ bool CMarkdownLiveEditor::IsDescendant(int32_t block, int32_t ancestor) const
 void CMarkdownLiveEditor::ComputeRevealed()
 {
 	touchedSpans.clear();
-	gapCaret = UINT32_MAX;
 	if (editMode != EMarkdownEditMode::RevealNearCaret)
 	{
-		// Rendered: nothing is revealed; a caret on a blank line (a new empty
-		// paragraph) is drawn as an empty line. Source: everything is source.
+		// Rendered: nothing is revealed (empty paragraphs are drawn by the
+		// layout from the source alone). Source: everything is source.
 		revealedBlock = -1;
 		revealBeg = revealEnd = 0;
-		if (editMode == EMarkdownEditMode::Rendered && !HasSelection() && doc.Size() > 0 && IsGapPosition(caret)) gapCaret = caret;
 		return;
 	}
 	if (doc.Size() == 0 || doc.GetBlocks().size() <= 1) { revealedBlock = -1; revealBeg = revealEnd = 0; return; }
@@ -561,6 +559,22 @@ bool CMarkdownLiveEditor::Redo()
 bool CMarkdownLiveEditor::SetHeadingLevel(int level)
 {
 	if (readOnly) return false;
+	if (editMode == EMarkdownEditMode::Rendered && !HasSelection() && level > 0 && IsGapPosition(caret))
+	{
+		// An empty paragraph becomes a heading, as text typed there would.
+		const int32_t g = GapIndexOfLine(caret);
+		std::string lead, tail;
+		GapAffixes(g, &lead, &tail);
+		const uint32_t at = GetGaps()[g].caret;
+		const std::string marker = std::string((size_t)level, '#') + " ";
+		BeginCompound();
+		doc.Replace(at, at, lead + marker + tail);
+		caret = anchor = Snap(at + (uint32_t)(lead.size() + marker.size()));
+		EndCompound();
+		scrollToCaret = true;
+		Changed();
+		return true;
+	}
 	BeginCompound();
 	uint32_t c = caret;
 	const bool changed = doc.SetHeadingLevel(caret, level, &c);
@@ -1560,6 +1574,7 @@ void CMarkdownLiveEditor::LayoutBlock(Emit &e, int32_t block, bool)
 	const CMarkdownBlock &b = blocks[block];
 	const float base = FontSizeFor(0);
 	e.block = block;
+	if (b.IsLeaf() || b.type == EMarkdownBlockType::Table) EmitGapsBefore(e, doc.LineStart(b.beg));
 
 	if (block == revealedBlock && !b.IsCell() && b.type != EMarkdownBlockType::ListItem)
 	{
@@ -1633,6 +1648,7 @@ void CMarkdownLiveEditor::LayoutBlock(Emit &e, int32_t block, bool)
 			for (int32_t li : doc.GetChildren(block))
 			{
 				const CMarkdownBlock &item = blocks[li];
+				EmitGapsBefore(e, doc.LineStart(item.beg));
 				e.block = li;
 				StartLine(e, first ? base * kParagraphSpacing : (b.listIsTight ? 0.0f : base * kParagraphSpacing * 0.5f));
 				first = false;
@@ -1701,7 +1717,8 @@ void CMarkdownLiveEditor::LayoutBlock(Emit &e, int32_t block, bool)
 				for (int32_t c : doc.GetChildren(li))
 				{
 					const CMarkdownBlock &child = blocks[c];
-					if (firstChild && child.type == EMarkdownBlockType::Paragraph && !doc.OwnsContentPublic(li))
+					if (firstChild && child.type == EMarkdownBlockType::Paragraph && !doc.OwnsContentPublic(li)
+						&& doc.LineStart(child.beg) == doc.LineStart(item.beg))
 					{
 						e.block = c;
 						e.curOffset = child.beg;
@@ -1715,6 +1732,19 @@ void CMarkdownLiveEditor::LayoutBlock(Emit &e, int32_t block, bool)
 						LayoutBlock(e, c, false);
 					}
 					firstChild = false;
+				}
+				// An item with no text on its marker line: the line's range runs to
+				// the line's end, where the caret stands (RebuildStops).
+				if (e.line != nullptr)
+				{
+					bool real = false;
+					for (const Glyph &g : e.line->glyphs) if (!g.synthetic) { real = true; break; }
+					if (!real)
+					{
+						e.line->begOffset = item.beg;
+						e.line->endOffset = doc.LineEnd(item.beg);
+						e.curOffset = e.line->endOffset;
+					}
 				}
 				EndLine(e);
 				e.lineLeft = savedLeft;
@@ -1740,9 +1770,9 @@ void CMarkdownLiveEditor::EnsureLayout(float width)
 {
 	const float fontSize = FontSizeFor(0);
 	if (!layoutDirty && width == layoutWidth && fontSize == layoutFontSize && revealedBlock == layoutRevealedBlock
-		&& touchedSpans == layoutTouchedSpans && editMode == layoutEditMode && gapCaret == layoutGapCaret) return;
+		&& touchedSpans == layoutTouchedSpans && editMode == layoutEditMode) return;
 	layoutEditMode = editMode;
-	layoutGapCaret = gapCaret;
+	layoutNextGap = 0;
 
 	layout = Layout();
 	layoutCount++;
@@ -1827,22 +1857,14 @@ void CMarkdownLiveEditor::EnsureLayout(float width)
 
 	// Every block lays itself out rendered unless it is the revealed unit; a
 	// table with a revealed cell stays a grid and LayoutTable reveals the cell.
-	// Rendered mode: a caret on a blank line between blocks gets an empty line.
-	bool gapDone = gapCaret == UINT32_MAX;
-	auto gapLine = [&]() {
-		StartLine(e, FontSizeFor(0) * kParagraphSpacing);
-		e.curOffset = gapCaret;
-		EndLine(e);
-		e.spacingBefore = FontSizeFor(0) * kParagraphSpacing;
-		gapDone = true;
-	};
-	for (int32_t top : doc.GetChildren(0))
+	// Rendered mode: empty paragraphs (GetGaps()) are drawn as empty lines
+	// where they are, by LayoutBlock before each block and here at the end.
+	for (int32_t top : doc.GetChildren(0)) LayoutBlock(e, top, false);
+	if (editMode == EMarkdownEditMode::Rendered)
 	{
-		if (!gapDone && gapCaret < blocks[top].beg) gapLine();
-		LayoutBlock(e, top, false);
-		if (!gapDone && gapCaret >= blocks[top].beg && gapCaret <= blocks[top].end && blocks[top].type == EMarkdownBlockType::Quote) gapLine();
+		EmitGapsBefore(e, UINT32_MAX);
+		return;
 	}
-	if (!gapDone) gapLine();
 	// Trailing blank lines after the last block belong to the last block's
 	// source view; when it is not revealed the caret can still be at Size():
 	// give it an (invisible) empty line.
@@ -1852,6 +1874,23 @@ void CMarkdownLiveEditor::EnsureLayout(float width)
 		e.curOffset = doc.Size();
 		EndLine(e);
 	}
+}
+
+void CMarkdownLiveEditor::EmitGapsBefore(Emit &e, uint32_t lineStart)
+{
+	if (editMode != EMarkdownEditMode::Rendered) return;
+	const std::vector<Gap> &all = GetGaps();
+	const int32_t savedBlock = e.block;
+	while (layoutNextGap < all.size() && all[layoutNextGap].lineStart < lineStart)
+	{
+		e.block = 0;
+		StartLine(e, FontSizeFor(0) * kParagraphSpacing);
+		e.curOffset = all[layoutNextGap].caret;
+		EndLine(e);
+		e.spacingBefore = FontSizeFor(0) * kParagraphSpacing;
+		layoutNextGap++;
+	}
+	e.block = savedBlock;
 }
 
 // ---- Geometry queries ----------------------------------------------------------------
@@ -1875,6 +1914,9 @@ float CMarkdownLiveEditor::XOfOffset(const Line &line, uint32_t offset) const
 		if (!g.synthetic && g.offset >= offset) return g.x0;
 	if (line.glyphs.empty()) return line.indent;
 	const Glyph &last = line.glyphs.back();
+	bool anyReal = false;
+	for (const Glyph &g : line.glyphs) if (!g.synthetic) { anyReal = true; break; }
+	if (!anyReal) return line.indent;   // a bullet with no text yet: the caret at the text column
 	float x = last.x1;
 	// Blanks typed at a line's end are not content (Markdown drops them) but
 	// the caret after them still moves right, as in any editor.
@@ -2010,7 +2052,8 @@ void CMarkdownLiveEditor::MoveVertical(int direction, bool extend)
 	if (target < 0 || target >= (int)layout.lines.size())
 	{
 		// Beyond the ends: caret to the start / end of the document.
-		const uint32_t o = direction < 0 ? 0 : doc.Size();
+		uint32_t o = direction < 0 ? 0 : doc.Size();
+		if (editMode == EMarkdownEditMode::Rendered) o = Snap(o);
 		SetSelection(extend ? anchor : o, o);
 		return;
 	}

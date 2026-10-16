@@ -74,11 +74,15 @@ the syntax whole, Bold and Italic with no selection apply to the next text --
 `RevealNearCaret` is the behaviour above, `Source` shows everything. A
 toolbar above the text (`SetToolbarVisible()`) has paragraph style, inline
 styles, link (a dialog), lists, indent, quote, table, undo/redo and find;
-icons are drawn shapes.
+icons are drawn shapes. Empty paragraphs (blank lines beyond a block
+separator) are drawn, are caret positions, and Enter, Backspace and Delete
+treat them as a word processor does; an empty list item is a caret position
+too. Found on the way and fixed: a fenced code block starting with empty
+lines lost its opening fence from its range.
 
 Tests: `CTestMarkdownDocument` (model) and `CTestMarkdownLiveEditor`
 (commands, undo, bindings, find, Word-like rules) for a host's `CTestSuite`;
-`RegisterMarkdownEditorTests()` for its imgui_test_engine tests, fourteen of
+`RegisterMarkdownEditorTests()` for its imgui_test_engine tests, fifteen of
 them driving the widget with real input and one checking captured pixels.
 AgendaScene registers all three.
 
