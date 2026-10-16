@@ -407,6 +407,12 @@ void VID_RestoreMainWindowPosition();
 
 void VID_SetMainWindowTitle(const char *title);
 
+// Asked when the user asks to quit (the window's close button, the system's
+// Quit, Cmd+Q / Alt+F4 through SDL_EVENT_QUIT). Return true to quit, false to
+// stay -- an app with unsaved work asks the user first and quits later with
+// SYS_Shutdown(), which does not ask. Null (the default) quits at once.
+void VID_SetQuitRequestHandler(bool (*handler)());
+
 void VID_LockRenderMutex();
 void VID_UnlockRenderMutex();
 // How many times the CALLING thread currently holds the render mutex.

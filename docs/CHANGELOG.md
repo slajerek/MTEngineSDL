@@ -86,6 +86,13 @@ Tests: `CTestMarkdownDocument` (model) and `CTestMarkdownLiveEditor`
 them driving the widget with real input and one checking captured pixels.
 AgendaScene registers all three.
 
+**`VID_SetQuitRequestHandler()`.** The window's close button and the
+system's Quit (`SDL_EVENT_QUIT`, including Cmd+Q from SDL's macOS
+application menu) set the quit flag at once, so an app could not ask about
+unsaved work. A handler set here is asked first; returning false keeps the app
+running, and the app quits later with `SYS_Shutdown()`, which does not ask.
+Null (the default) keeps the old behaviour.
+
 Also declared, because they were shipped undeclared: `md4c` (MIT), `imgui_md`
 (MIT) and `imgui_markdown` (Zlib) now have rows in the caps vocabulary's core
 list, so LICENSES.txt names them.
