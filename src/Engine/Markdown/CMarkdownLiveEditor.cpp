@@ -2089,12 +2089,71 @@ void CMarkdownLiveEditor::MoveLineEdge(bool toEnd, bool extend)
 	scrollToCaret = true;
 }
 
-void CMarkdownLiveEditor::EnsureCaretVisible()
+void CMarkdownLiveEditor::MovePage(int direction, bool extend)
 {
 	const int li = FindLineOfOffset(caret);
 	if (li < 0) return;
 	const Line &line = layout.lines[li];
-	const float viewTop = ImGui::GetScrollY();
+	const float x = preferredX >= 0 ? preferredX : XOfOffset(line, caret);
+	// A page is the visible height less one line, so a line stays in view.
+	const float page = std::max(line.height, (pageHeight > 0 ? pageHeight : 20.0f * FontSizeFor(0)) - line.height);
+	const float targetY = line.y + direction * page;
+	// The furthest line in that direction that does not pass the target.
+	int target = -1;
+	for (int i = 0; i < (int)layout.lines.size(); i++)
+	{
+		const Line &t = layout.lines[i];
+		if (direction > 0 ? (t.y > line.y && t.y <= targetY) : (t.y < line.y && t.y >= targetY))
+		{
+			if (target < 0 || (direction > 0 ? t.y > layout.lines[target].y : t.y < layout.lines[target].y)) target = i;
+		}
+	}
+	uint32_t o;
+	if (target < 0)
+	{
+		// Less than a page left: the first or last line.
+		for (int i = 0; i < (int)layout.lines.size(); i++)
+		{
+			const Line &t = layout.lines[i];
+			if (direction > 0 ? t.y > line.y : t.y < line.y)
+				if (target < 0 || (direction > 0 ? t.y >= layout.lines[target].y : t.y < layout.lines[target].y)) target = i;
+		}
+	}
+	if (target < 0)
+	{
+		o = direction < 0 ? 0 : doc.Size();   // already on the first / last line
+		if (editMode == EMarkdownEditMode::Rendered) o = Snap(o);
+	}
+	else
+	{
+		// Among lines on the target's band (table cells), the one under x.
+		int bestLine = target;
+		float bestDist = 1e30f;
+		for (int i = 0; i < (int)layout.lines.size(); i++)
+		{
+			const Line &t = layout.lines[i];
+			if (t.y != layout.lines[target].y) continue;
+			const float lx0 = t.indent, lx1 = t.indent + t.width;
+			const float dx = x < lx0 ? lx0 - x : (x > lx1 ? x - lx1 : 0);
+			if (dx < bestDist) { bestDist = dx; bestLine = i; }
+		}
+		o = OffsetAtX(layout.lines[bestLine], x);
+		if (editMode == EMarkdownEditMode::Rendered) o = Snap(o);
+		pendingScroll += target >= 0 ? layout.lines[target].y - line.y : 0.0f;
+	}
+	SetSelection(extend ? anchor : o, o);
+	preferredX = x;
+	scrollToCaret = true;
+}
+
+void CMarkdownLiveEditor::EnsureCaretVisible(float viewTop)
+{
+	const int li = FindLineOfOffset(caret);
+	if (li < 0) return;
+	const Line &line = layout.lines[li];
+	// SetScrollY() takes effect next frame, so a scroll requested this frame
+	// is passed in.
+	if (viewTop < 0) viewTop = ImGui::GetScrollY();
 	const float viewH = ImGui::GetWindowHeight();
 	if (line.y < viewTop) ImGui::SetScrollY(std::max(0.0f, line.y - line.height));
 	else if (line.y + line.height > viewTop + viewH) ImGui::SetScrollY(line.y + line.height - viewH + line.height);
@@ -2315,6 +2374,10 @@ void CMarkdownLiveEditor::ProcessKeyboard()
 	else if (ImGui::Shortcut(ImGuiMod_Shift | ImGuiKey_UpArrow, rep)) MoveVertical(-1, true);
 	else if (ImGui::Shortcut(ImGuiKey_DownArrow, rep)) MoveVertical(1, false);
 	else if (ImGui::Shortcut(ImGuiMod_Shift | ImGuiKey_DownArrow, rep)) MoveVertical(1, true);
+	else if (ImGui::Shortcut(ImGuiKey_PageUp, rep)) MovePage(-1, false);
+	else if (ImGui::Shortcut(ImGuiMod_Shift | ImGuiKey_PageUp, rep)) MovePage(-1, true);
+	else if (ImGui::Shortcut(ImGuiKey_PageDown, rep)) MovePage(1, false);
+	else if (ImGui::Shortcut(ImGuiMod_Shift | ImGuiKey_PageDown, rep)) MovePage(1, true);
 	else if (ImGui::Shortcut(ImGuiKey_Home, rep)) MoveLineEdge(false, false);
 	else if (ImGui::Shortcut(ImGuiMod_Shift | ImGuiKey_Home, rep)) MoveLineEdge(false, true);
 	else if (ImGui::Shortcut(ImGuiKey_End, rep)) MoveLineEdge(true, false);
@@ -2564,6 +2627,7 @@ void CMarkdownLiveEditor::Render(const char *id, ImVec2 size)
 	const float pad = ImGui::GetStyle().FramePadding.x;
 	const float width = std::max(10.0f, ImGui::GetContentRegionAvail().x - 2 * pad);
 	EnsureLayout(width);
+	pageHeight = ImGui::GetWindowHeight();
 
 	const ImVec2 cursor = ImGui::GetCursorScreenPos();
 	contentOrigin = ImVec2(cursor.x + pad, cursor.y + pad);
@@ -2585,9 +2649,19 @@ void CMarkdownLiveEditor::Render(const char *id, ImVec2 size)
 	// Edits and caret moves may have invalidated the layout: redo it before
 	// drawing so the frame shows the new state.
 	EnsureLayout(width);
+	float scrolledTo = -1;
+	if (pendingScroll != 0)
+	{
+		// A page move scrolls the view by as much as the caret moved, so the
+		// caret keeps its place on screen.
+		const float maxY = std::max(0.0f, layout.height + 2 * pad - ImGui::GetWindowHeight());
+		scrolledTo = std::clamp(ImGui::GetScrollY() + pendingScroll, 0.0f, maxY);
+		ImGui::SetScrollY(scrolledTo);
+		pendingScroll = 0;
+	}
 	if (scrollToCaret)
 	{
-		EnsureCaretVisible();
+		EnsureCaretVisible(scrolledTo);
 		scrollToCaret = false;
 	}
 

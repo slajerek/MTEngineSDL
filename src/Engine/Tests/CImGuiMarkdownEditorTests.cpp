@@ -11,6 +11,7 @@
 
 #include <cmath>
 #include <cstdlib>
+#include <cstring>
 #include <string>
 
 namespace
@@ -772,6 +773,58 @@ void RegisterMarkdownEditorTests(ImGuiTestEngine *engine)
 		ed.SetToolbarVisible(true);
 		ed.SetEditMode(EMarkdownEditMode::RevealNearCaret);
 		ctx->SetRef("");
+	};
+
+	// Page Up / Page Down: the caret moves about one visible page and the view
+	// scrolls with it; Shift extends the selection; at the ends they stop.
+	t = IM_REGISTER_TEST(engine, "markdown", "page_up_down_move_by_a_page");
+	t->TestFunc = [](ImGuiTestContext *ctx)
+	{
+		CGuiViewMarkdownEditor *view = EnsureView(ctx);
+		CMarkdownLiveEditor &ed = view->GetEditor();
+		ed.SetEditMode(EMarkdownEditMode::Rendered);
+		ed.SetFindQuery("");
+		std::string src;
+		for (int i = 1; i <= 80; i++) src += "Paragraph number " + std::to_string(i) + " of the long document.\n\n";
+		ed.SetSource(src);
+		ctx->Yield(2);
+		IM_CHECK(ClickOffset(ctx, ed, 0));
+		ImGuiWindow *child = nullptr;
+		for (ImGuiWindow *w : GImGui->Windows)
+			if (strstr(w->Name, "##md_live_editor") != nullptr && strstr(w->Name, "MarkdownEditorTest") != nullptr) child = w;
+		IM_CHECK(child != nullptr);
+		auto caretY = [&]() { ImVec2 a, b; ed.GetCaretScreenRect(&a, &b); return a.y; };
+		const float y0 = caretY();
+		ctx->KeyPress(ImGuiKey_PageDown);
+		ctx->Yield(2);
+		const uint32_t afterDown = ed.GetCaret();
+		IM_CHECK_GT(afterDown, 0u);
+		IM_CHECK_GT(child->Scroll.y, 0.0f);                          // the view scrolled
+		const float onScreen = caretY();
+		IM_CHECK_GE(onScreen, child->Pos.y);                          // and the caret is in view
+		IM_CHECK_LE(onScreen, child->Pos.y + child->Size.y);
+		IM_CHECK_LT(ImFabs(onScreen - y0), child->Size.y * 0.5f);     // about where it was on screen
+		// The caret moved about a page: the first paragraphs are now above.
+		const uint32_t pageChars = afterDown;
+		IM_CHECK(ed.GetSource().substr(0, afterDown).find("number 5 ") != std::string::npos);
+		ctx->KeyPress(ImGuiKey_PageUp);
+		ctx->Yield(2);
+		IM_CHECK_EQ(ed.GetCaret(), 0u);                               // back on the first line, same column
+		IM_CHECK_EQ(child->Scroll.y, 0.0f);
+		ctx->KeyPress(ImGuiKey_PageUp);
+		ctx->Yield(2);
+		IM_CHECK_EQ(ed.GetCaret(), 0u);                               // nothing above
+		ctx->KeyPress(ImGuiMod_Shift | ImGuiKey_PageDown);
+		ctx->Yield(2);
+		IM_CHECK(ed.HasSelection());
+		IM_CHECK_EQ(ed.GetCaret(), pageChars);
+		for (int i = 0; i < 40; i++) { ctx->KeyPress(ImGuiKey_PageDown); ctx->Yield(); }
+		ctx->Yield(2);
+		IM_CHECK_GE(ed.GetCaret(), (uint32_t)ed.GetSource().rfind("Paragraph number 80"));   // on the last paragraph
+		// Leave the view at the top for the next tests.
+		ed.SetSource("");
+		ctx->Yield(3);
+		ed.SetEditMode(EMarkdownEditMode::RevealNearCaret);
 	};
 
 	// Word-like caret invariants over a real agenda, at every caret position:

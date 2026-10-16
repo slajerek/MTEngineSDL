@@ -63,7 +63,8 @@ Interaction: mouse caret and drag selection; a click on a task box toggles
 it in place; Ctrl/Cmd+click opens a link (`onLinkActivated`, default the
 platform shell) and hovering shows its destination; right-click in a table
 opens the table menu. Keyboard: arrows across wrapped lines and units,
-Home/End, Shift to select, Ctrl/Cmd+A/C/X/V, Enter with list continuation,
+Home/End, Page Up/Page Down (a visible page, the view scrolling with the
+caret), Shift to select, Ctrl/Cmd+A/C/X/V, Enter with list continuation,
 Shift+Enter, Tab / Shift+Tab between cells (Tab in the last cell adds a row),
 Enter to the cell below, plus the remappable commands below. Ctrl/Cmd+F
 opens the find bar above the text: matches in the source, highlighted, the

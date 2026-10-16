@@ -357,6 +357,9 @@ public:
 	void MoveHorizontal(int direction, bool extend);
 	void MoveVertical(int direction, bool extend);
 	void MoveLineEdge(bool toEnd, bool extend);
+	// Page Up / Page Down: the caret one visible page up or down (at the
+	// column it keeps for vertical moves) and the view scrolls with it.
+	void MovePage(int direction, bool extend);
 	// Word-like: is this caret position a blank line between blocks (an
 	// empty paragraph not yet typed into)?
 	bool IsGapPosition(uint32_t offset) const;
@@ -392,7 +395,7 @@ private:
 	int FindLineOfOffset(uint32_t offset) const;      // in current layout; -1 none
 	float XOfOffset(const Line &line, uint32_t offset) const;
 	uint32_t OffsetAtX(const Line &line, float x) const;
-	void EnsureCaretVisible();
+	void EnsureCaretVisible(float viewTop = -1);   // viewTop: the scroll already requested this frame
 
 	// ---- Editing internals
 	enum class EEditKind : uint8_t { Insert, Backspace, DeleteForward, Structural };
@@ -523,6 +526,8 @@ private:
 	bool caretRectValid = false;
 	ImVec2 caretMin, caretMax;
 	float preferredX = -1;     // for vertical movement
+	float pageHeight = 0;      // the text area's visible height at the last Render()
+	float pendingScroll = 0;   // a page move's scroll, applied in Render()
 	bool dragging = false;
 
 	// Undo. The actions hold the target weakly: a destroyed editor, or one
