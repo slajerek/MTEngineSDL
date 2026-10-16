@@ -1614,6 +1614,9 @@ void CMarkdownLiveEditor::LayoutBlock(Emit &e, int32_t block, bool)
 					e.lineLeft = savedLeft;
 					continue;
 				}
+				// A proportional font's space is narrow (Inter: a quarter em); the
+				// marker needs a clear gap before the text.
+				const float markerGap = std::max(Advance(st, ' '), st.size * 0.4f);
 				// Marker, right-aligned in the indent column: the number as text,
 				// a bullet and a task box as drawn shapes (fonts do not reliably
 				// carry U+2022 / U+2610, and ImGui's default font does not).
@@ -1624,13 +1627,13 @@ void CMarkdownLiveEditor::LayoutBlock(Emit &e, int32_t block, bool)
 					snprintf(marker, sizeof(marker), "%u%c", itemNumber, b.listMark ? b.listMark : '.');
 					float mw = 0;
 					for (const char *p = marker; *p; p++) mw += Advance(st, (ImWchar)(unsigned char)*p);
-					e.x = std::max(savedLeft, savedLeft + indent - mw - Advance(st, ' '));
+					e.x = std::max(savedLeft, savedLeft + indent - mw - markerGap);
 					PutSynthetic(e, marker, item.beg, st);
 				}
 				else
 				{
 					const float bw = st.size * 0.5f;
-					e.x = std::max(savedLeft, savedLeft + indent - bw - Advance(st, ' '));
+					e.x = std::max(savedLeft, savedLeft + indent - bw - markerGap);
 					PutDeco(e, kDecoBullet, item.beg, st, bw);
 				}
 				e.x = savedLeft + indent;
@@ -2291,6 +2294,8 @@ void CMarkdownLiveEditor::Draw(ImDrawList *dl, ImVec2 origin)
 			{
 				const Style &st = layout.styles[first.style];
 				const float gx0 = origin.x + first.x0, gx1 = origin.x + first.x1;
+				// Shapes sit on the glyphs' baseline, half the line gap above baseY.
+				const float shapeBase = baseY - (LineHeightFor(st) - st.size) * 0.5f;
 				if (first.image >= 0 && first.image < (int)layout.images.size())
 				{
 					const float h = first.ascent - st.size * 0.1f;
@@ -2298,12 +2303,12 @@ void CMarkdownLiveEditor::Draw(ImDrawList *dl, ImVec2 origin)
 				}
 				else if (first.deco == kDecoBullet)
 				{
-					dl->AddCircleFilled(ImVec2((gx0 + gx1) * 0.5f, baseY - st.size * 0.32f), st.size * 0.16f, st.color);
+					dl->AddCircleFilled(ImVec2((gx0 + gx1) * 0.5f, shapeBase - st.size * 0.3f), st.size * 0.14f, st.color);
 				}
 				else
 				{
 					const float side = st.size * 0.8f;
-					const ImVec2 bmin(gx0, baseY - side * 0.95f), bmax(gx0 + side, baseY + side * 0.05f);
+					const ImVec2 bmin(gx0, shapeBase - side * 0.92f), bmax(gx0 + side, shapeBase + side * 0.08f);
 					if (first.deco == kDecoBoxChecked)
 					{
 						dl->AddRectFilled(bmin, bmax, ImGui::GetColorU32(ImGuiCol_CheckMark), side * 0.18f);
@@ -2322,7 +2327,9 @@ void CMarkdownLiveEditor::Draw(ImDrawList *dl, ImVec2 origin)
 			segment.clear();
 			size_t j = i;
 			float x1 = x0;
-			while (j < line.glyphs.size() && line.glyphs[j].style == style && line.glyphs[j].x0 >= x1 - 0.01f
+			// One AddText() per run of touching glyphs: AddText lays a string out
+			// contiguously, so a gap (a list marker's, an aligned cell's) ends it.
+			while (j < line.glyphs.size() && line.glyphs[j].style == style && std::fabs(line.glyphs[j].x0 - x1) < 0.5f
 				&& line.glyphs[j].image < 0 && line.glyphs[j].deco == kDecoNone)
 			{
 				const Glyph &g = line.glyphs[j];
