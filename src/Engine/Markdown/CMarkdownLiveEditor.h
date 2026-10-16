@@ -48,6 +48,20 @@
 class CUndoManager;
 class CUndoAction;
 
+// How the editor presents the Markdown it edits.
+enum class EMarkdownEditMode : uint8_t
+{
+	Rendered,           // Word-like: no syntax is ever shown; the caret moves over rendered text
+	RevealNearCaret,    // the unit under the caret shows its source (Obsidian-like)
+	Source              // the whole document as Markdown, syntax dimmed
+};
+
+// Inline styles the Word-like commands toggle.
+enum class EMarkdownInlineStyle : uint8_t { Strong, Emphasis, Strikethrough, Code };
+
+// Block kinds the toolbar's paragraph-level commands set.
+enum class EMarkdownListKind : uint8_t { Bullet, Numbered, Task };
+
 struct CMarkdownEditorFonts
 {
 	ImFont *regular = nullptr;
@@ -73,6 +87,15 @@ public:
 	void ClearDirty() { dirty = false; }
 	void SetReadOnly(bool value) { readOnly = value; }
 	bool IsReadOnly() const { return readOnly; }
+
+	// ---- Mode. Rendered (Word-like) is the default.
+	void SetEditMode(EMarkdownEditMode mode);
+	EMarkdownEditMode GetEditMode() const { return editMode; }
+
+	// ---- Toolbar above the text (formatting buttons). Shown by default; a
+	// host that has its own can hide it.
+	void SetToolbarVisible(bool value) { toolbarVisible = value; }
+	bool IsToolbarVisible() const { return toolbarVisible; }
 
 	// ---- Appearance
 	void SetFonts(const CMarkdownEditorFonts &f) { fonts = f; layoutDirty = true; }
@@ -131,6 +154,7 @@ public:
 	void Backspace();
 	void DeleteForward();
 	void InsertNewline();                                // continues a list item
+	void InsertLineBreak();                              // Shift+Enter
 	void Cut();
 	void Copy() const;
 	void Paste();
@@ -143,6 +167,33 @@ public:
 	bool SetHeadingLevel(int level);                     // 0 = paragraph
 	void ToggleStrong();                                 // `**`
 	void ToggleEmphasis();                               // `*`
+	// Any inline style. With a selection: wrap it, or -- when it is already
+	// all in that style -- take the style off (splitting the span). Without
+	// one, in Rendered mode: the style applies to what is typed next.
+	void ToggleInlineStyle(EMarkdownInlineStyle style);
+	// The style at the caret as the toolbar shows it (the text left of the
+	// caret, plus a pending toggle).
+	bool IsInlineStyleActive(EMarkdownInlineStyle style) const;
+	// The heading level of the caret's block: 1..6, 0 for a paragraph, -1 for
+	// anything else (a list item, a table cell, code).
+	int GetHeadingLevelAtCaret() const;
+	// Lists and quotes on the caret's block (or every block the selection
+	// touches): turn into / out of a list of that kind, a quote; indent and
+	// outdent a list item (with its children).
+	bool ToggleList(EMarkdownListKind kind);
+	bool IsInList(EMarkdownListKind kind) const;
+	bool ToggleQuote();
+	bool IsInQuote() const;
+	bool IndentListItem(bool outdent);
+	// A table with `columns` x `rows` (header row included) after the caret's
+	// block; the caret goes to the first header cell.
+	bool InsertTable(int columns, int rows);
+	// The Word-like link dialog (Ctrl/Cmd+K in Rendered mode): text and
+	// address; OK writes `[text](address)` over the selection.
+	void OpenLinkDialog();
+	bool IsLinkDialogOpen() const { return linkDialogOpen; }
+	// What the dialog's OK does, callable directly.
+	bool ApplyLink(std::string_view text, std::string_view url);
 	// Task items: flip the box of the task at the caret (Ctrl/Cmd+Enter), or
 	// of the one whose mark byte is `markOffset` (a click on the box). One
 	// byte changes; the caret stays.
@@ -301,6 +352,11 @@ public:
 public:
 	// Internal layout structures are public for the test (it inspects lines).
 	const std::vector<Line> &GetLayoutLines() const { return layout.lines; }
+	// Caret movement as the arrow keys do it (vertical and line-edge moves
+	// need a layout, so they act after the first Render()).
+	void MoveHorizontal(int direction, bool extend);
+	void MoveVertical(int direction, bool extend);
+	void MoveLineEdge(bool toEnd, bool extend);
 private:
 
 	void EnsureLayout(float width);
@@ -333,14 +389,12 @@ private:
 	int FindLineOfOffset(uint32_t offset) const;      // in current layout; -1 none
 	float XOfOffset(const Line &line, uint32_t offset) const;
 	uint32_t OffsetAtX(const Line &line, float x) const;
-	void MoveVertical(int direction, bool extend);
-	void MoveHorizontal(int direction, bool extend);
-	void MoveLineEdge(bool toEnd, bool extend);
 	void EnsureCaretVisible();
 
 	// ---- Editing internals
 	enum class EEditKind : uint8_t { Insert, Backspace, DeleteForward, Structural };
-	void ApplyReplace(uint32_t beg, uint32_t end, std::string_view text, EEditKind kind);
+	// caretAfter: where the caret goes (default: after the inserted text).
+	void ApplyReplace(uint32_t beg, uint32_t end, std::string_view text, EEditKind kind, uint32_t caretAfter = UINT32_MAX);
 	// Records the replacement of [pos, pos + removed.size()) by `inserted` on
 	// the CURRENT source (call before applying it), merging into the previous
 	// action when it continues the same burst.
@@ -355,6 +409,35 @@ private:
 	void Changed();
 	void ComputeRevealed();
 	void RenderTableMenu();
+	void RenderToolbar();
+	void RenderLinkDialog();
+
+	// ---- Word-like editing (CMarkdownLiveEditorWord.cpp)
+	struct Stop { uint32_t offset; int32_t block; };
+	void RebuildStops() const;
+	const std::vector<Stop> &GetStops() const { RebuildStops(); return stops; }
+	bool IsContentAt(uint32_t offset) const;
+	uint32_t Snap(uint32_t offset) const;                 // the caret position for a raw offset
+	bool IsGapPosition(uint32_t offset) const;            // a blank line between blocks
+	int32_t StopIndexAtOrBefore(uint32_t offset) const;
+	uint32_t BlockFirstStop(int32_t unitBlock) const;
+	int32_t UnitBlockOf(uint32_t offset) const;
+	bool InCodeAt(uint32_t offset) const;
+	uint32_t DelimiterChainEnd(uint32_t at, uint8_t *styles) const;
+	bool AtBlockTextEnd(uint32_t offset) const;          // no more text in the caret's block after it
+	std::string EscapeTyped(std::string_view text, uint32_t at) const;
+	void WordInsertText(std::string_view text);
+	void WordBackspace();
+	void WordDeleteForward();
+	void WordNewline(bool lineBreak);
+	uint32_t DeleteRangeSafe(uint32_t a, uint32_t b);     // returns the caret position after
+	void SplitAt(uint32_t at, const std::string &separator, const std::string &afterPrefix);
+	std::string ContainerPrefixAt(uint32_t offset, bool forParagraph) const;
+	bool TryAutoformat();
+	void WordMoveHorizontal(int direction, bool extend);
+	int32_t InnermostSpanOfType(EMarkdownSpanType type, uint32_t a, uint32_t b) const;
+	bool ToggleInlineInBlock(EMarkdownSpanType type, const char *delim, uint32_t a, uint32_t b, uint32_t *newA, uint32_t *newB);
+	std::vector<int32_t> SelectedLeafBlocks() const;
 	void RenderFindBar();
 	void UpdateFindMatches() const;
 	bool SelectFirstCellOfRow();
@@ -393,9 +476,25 @@ private:
 	std::vector<int32_t> revealImages;          // image spans in the revealed range the caret does not touch
 	static const char *(*translateFunc)(const char *key);
 
+	EMarkdownEditMode editMode = EMarkdownEditMode::Rendered;
+	EMarkdownEditMode layoutEditMode = EMarkdownEditMode::Rendered;
+	uint32_t layoutGapCaret = UINT32_MAX;
+	bool toolbarVisible = true;
+	mutable std::vector<Stop> stops;
+	mutable std::vector<uint8_t> contentMask;
+	mutable uint32_t stopsParseCount = UINT32_MAX;
+	// Rendered mode: inline styles toggled with no selection apply to the next
+	// typed text (bit per EMarkdownInlineStyle); cleared when the caret moves.
+	uint8_t pendingOn = 0, pendingOff = 0;
+	uint32_t pendingAt = UINT32_MAX;
+	uint32_t gapCaret = UINT32_MAX;            // a caret on a blank line, drawn as an empty line
+	bool linkDialogOpen = false, linkDialogFocus = false;
+	char linkText[256] = {0}, linkUrl[512] = {0};
+	uint32_t linkA = 0, linkB = 0;
+
 	bool findOpen = false;
 	bool findFocusRequest = false;
-	bool findReturnFocus = false;
+	bool returnFocus = false;
 	bool findCaseSensitive = false;
 	std::string findQuery;
 	char findBuffer[256] = {0};

@@ -38,8 +38,17 @@ finds in it, with everything mapped back to byte ranges of the source:
 `Render(id, size)` draws the document rendered -- headings at
 `SetHeadingScale()` sizes, emphasis through `SetFonts()`, numbers, drawn
 bullets and task boxes, tables as a grid with column alignment, quote bars,
-code backgrounds, pictures through the host's `imageResolver` -- except the
-**reveal unit** the caret is in, which shows its source:
+code backgrounds, pictures through the host's `imageResolver` -- and a
+formatting toolbar above it (`SetToolbarVisible()`). How Markdown shows while
+editing is the **edit mode** (`SetEditMode()`):
+
+- `Rendered` (the default): Word-like. No syntax is ever drawn; the caret
+  and the keys work on the text you see (next section).
+- `RevealNearCaret`: the **reveal unit** the caret is in shows its source
+  (below). For people who know Markdown.
+- `Source`: the whole document as source, syntax dimmed.
+
+In `RevealNearCaret`:
 
 - The unit is the innermost leaf: a paragraph, a heading, a code block, a
   rule, one list item's own line, a table cell (a table outside its cells
@@ -59,6 +68,53 @@ Shift+Enter, Tab / Shift+Tab between cells (Tab in the last cell adds a row),
 Enter to the cell below, plus the remappable commands below. Ctrl/Cmd+F
 opens the find bar above the text: matches in the source, highlighted, the
 current one selected; Enter / Shift+Enter, F3 / Shift+F3, Esc.
+
+## Word-like editing (`Rendered`)
+
+The source stays the only truth and every edit a byte replacement; what the
+mode changes is how a caret that never sees syntax maps onto the source.
+
+- **Caret stops** are the content code-point boundaries (an entity is one),
+  plus one point for a block with no text. Two stops with only syntax
+  between them on one line are one position, and the left one is kept:
+  typing after `**bold**` inserts before the closing `**`, so the text goes
+  on in bold -- the formatting of the character left of the caret, as in a
+  word processor. `SetCaret()`, clicks, arrows and Home/End land on stops.
+  A blank line made by Enter is a position too, drawn as an empty line.
+- **Typed text is literal**: `*`, `_`, `` ` ``, `[`, `]`, `<`, `~`, `|`, `&`
+  and `\` are escaped, and `#`, `>`, `+`, `-`, `=` at a block's start (and
+  `1.` after digits) -- not inside code. Typed at a paragraph's start, `- `,
+  `* `, `1. `, `# `..`###### `, `> ` and `[ ] ` become the block they spell.
+- **Emphasis stays valid.** `**a **` is not bold, so a blank typed (or left
+  by a deletion) at the end of a bold, italic or struck span goes past its
+  closers, and the style carries on for the next text.
+- **Deletion never breaks syntax**: a span left empty goes with its markers;
+  a range that cuts a span gives the rest its markers back; an escape goes
+  with its backslash.
+- **Enter** starts a new paragraph, continues a list (an empty item ends
+  it), and at the end of styled text the new line goes on in that style.
+  Shift+Enter is a line break (`\` + newline) inside a block; at a block's
+  end, where Markdown has no empty last line, it acts as Enter.
+  **Backspace** at a block's start turns an item or heading into a paragraph,
+  takes a line out of a quote, or merges the paragraph into the one before.
+- **Styles with no selection** (Ctrl/Cmd+B, I, the toolbar) apply to the
+  next typed text; with a selection they wrap it in each selected block, or
+  take the style off when it is all styled (splitting a span when the
+  selection is inside it).
+- **Block commands**: `ToggleList(Bullet | Numbered | Task)` and
+  `ToggleQuote()` over the selected blocks, `IndentListItem()` (Tab and
+  Shift+Tab in a list), `SetHeadingLevel()`, `InsertTable()`, and a link
+  dialog on Ctrl/Cmd+K (`OpenLinkDialog()`, `ApplyLink()`).
+- **Paste** inserts the clipboard as Markdown: Copy takes the source, so
+  what is copied in the editor comes back with its formatting.
+
+The **toolbar** has the paragraph style (Normal, Heading 1-4), bold, italic,
+strikethrough, inline code, link | bulleted, numbered and task list,
+outdent, indent, quote | table | undo, redo | find. Buttons show the state
+at the caret and wrap to a second row in a narrow window. It offers only
+what Markdown stores: no underline, colour, size or alignment. Icons are
+drawn shapes (the engine has no icon font). In the other modes Bold and
+Italic with no selection insert a marker pair, as before.
 
 **`CMarkdownEditorBindings`** holds the remappable commands as
 `CSlrKeyboardShortcut` objects in their own zone (`kZone`), registered with
@@ -102,9 +158,9 @@ IME UI would apply to every text field of the app.
 
 ## Strings
 
-Labels the editor draws (link hint, find bar, table menu) and the command
-names in `CMarkdownEditorBindings` have translation keys
-(`markdown.editor.*`) and English fallbacks. A host installs
+Labels the editor draws (toolbar, link dialog, link hint, find bar, table
+menu) and the command names in `CMarkdownEditorBindings` have translation
+keys (`markdown.editor.*`) and English fallbacks. A host installs
 `CMarkdownLiveEditor::SetTranslateFunction()` to translate them, the pattern
 of the engine's media views.
 
@@ -151,17 +207,22 @@ seeds were run during development. Typing in a 57 KB document costs about
 - `CTestMarkdownLiveEditor`: the command layer without a window -- undo
   (grouping, compound commands, a shared host manager, orphaned actions),
   the reveal partition over every offset, tasks, links, table commands,
-  bindings, find.
+  bindings, find, and every Word-like rule above as the exact source after
+  each operation.
 - `RegisterMarkdownEditorTests(engine)`: imgui_test_engine tests that drive
-  one `CGuiViewMarkdownEditor` with real input, and one that captures the
-  window in four states and checks the pixels (set `MT_MD_CAPTURE_DIR` to
-  keep the captures as raw RGBA files).
+  one `CGuiViewMarkdownEditor` with real input (Word-like typing and the
+  toolbar's buttons among them), and one that captures the window in six
+  states and checks the pixels (set `MT_MD_CAPTURE_DIR` to keep the captures
+  as raw RGBA files).
 
 Register the first two in a host's `CTestSuite` and the third next to its
 own UI tests.
 
 ## Not done yet
 
+- Word-like: a code block from the paragraph style menu, Shift+Enter that
+  leaves an empty last line, pasting plain text from outside as literal text
+  (paste is Markdown).
 - Inline preedit (see Text input), word-wise caret movement and selection,
   double-click word selection, autoscroll while dragging, replace in find.
 - Entities are drawn as written; math, wikilinks and underline are parsed

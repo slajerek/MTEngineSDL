@@ -69,6 +69,7 @@ void RegisterMarkdownEditorTests(ImGuiTestEngine *engine)
 	{
 		CGuiViewMarkdownEditor *view = EnsureView(ctx);
 		CMarkdownLiveEditor &ed = view->GetEditor();
+		ed.SetEditMode(EMarkdownEditMode::RevealNearCaret);
 		ed.SetSource("Hello **bold** world\n\nSecond paragraph here\n");
 		ctx->Yield(2);
 
@@ -111,6 +112,7 @@ void RegisterMarkdownEditorTests(ImGuiTestEngine *engine)
 	{
 		CGuiViewMarkdownEditor *view = EnsureView(ctx);
 		CMarkdownLiveEditor &ed = view->GetEditor();
+		ed.SetEditMode(EMarkdownEditMode::RevealNearCaret);
 		const std::string original = "First line *kept* exactly\n\n- item one\n- item two\n\n```\ncode block\n```\n";
 		ed.SetSource(original);
 		ctx->Yield(2);
@@ -154,6 +156,7 @@ void RegisterMarkdownEditorTests(ImGuiTestEngine *engine)
 	{
 		CGuiViewMarkdownEditor *view = EnsureView(ctx);
 		CMarkdownLiveEditor &ed = view->GetEditor();
+		ed.SetEditMode(EMarkdownEditMode::RevealNearCaret);
 		ed.SetSource("Plain title\n\nBody text.\n");
 		ctx->Yield(2);
 
@@ -203,6 +206,7 @@ void RegisterMarkdownEditorTests(ImGuiTestEngine *engine)
 	{
 		CGuiViewMarkdownEditor *view = EnsureView(ctx);
 		CMarkdownLiveEditor &ed = view->GetEditor();
+		ed.SetEditMode(EMarkdownEditMode::RevealNearCaret);
 		ed.SetSource("1. one\n2. two\n");
 		ctx->Yield(2);
 
@@ -234,6 +238,7 @@ void RegisterMarkdownEditorTests(ImGuiTestEngine *engine)
 	{
 		CGuiViewMarkdownEditor *view = EnsureView(ctx);
 		CMarkdownLiveEditor &ed = view->GetEditor();
+		ed.SetEditMode(EMarkdownEditMode::RevealNearCaret);
 		const std::string original =
 			"Intro paragraph.\n"
 			"\n"
@@ -298,6 +303,7 @@ void RegisterMarkdownEditorTests(ImGuiTestEngine *engine)
 	{
 		CGuiViewMarkdownEditor *view = EnsureView(ctx);
 		CMarkdownLiveEditor &ed = view->GetEditor();
+		ed.SetEditMode(EMarkdownEditMode::RevealNearCaret);
 		std::string longPara = "# Head\n\n";
 		for (int i = 0; i < 40; i++) longPara += "word" + std::to_string(i) + " ";
 		longPara += "\n\n> quoted\n";
@@ -340,6 +346,7 @@ void RegisterMarkdownEditorTests(ImGuiTestEngine *engine)
 	{
 		CGuiViewMarkdownEditor *view = EnsureView(ctx);
 		CMarkdownLiveEditor &ed = view->GetEditor();
+		ed.SetEditMode(EMarkdownEditMode::RevealNearCaret);
 		const std::string src = "- one\n- two **b** x\n- three\n";
 		ed.SetSource(src);
 		ctx->Yield(2);
@@ -379,6 +386,7 @@ void RegisterMarkdownEditorTests(ImGuiTestEngine *engine)
 	{
 		CGuiViewMarkdownEditor *view = EnsureView(ctx);
 		CMarkdownLiveEditor &ed = view->GetEditor();
+		ed.SetEditMode(EMarkdownEditMode::RevealNearCaret);
 		const std::string src = "Intro [site](http://s.t) end\n\n- [ ] task one\n- next\n\nPic ![alt](a.png) after\n";
 		std::string opened;
 		ed.onLinkActivated = [&opened](const std::string &href) { opened = href; };
@@ -461,6 +469,7 @@ void RegisterMarkdownEditorTests(ImGuiTestEngine *engine)
 	{
 		CGuiViewMarkdownEditor *view = EnsureView(ctx);
 		CMarkdownLiveEditor &ed = view->GetEditor();
+		ed.SetEditMode(EMarkdownEditMode::RevealNearCaret);
 		const std::string src = "Top\n\n| Item | Who |\n|------|-----|\n| Plan | Ann |\n| Ship | Bob |\n";
 		ed.SetSource(src);
 		ctx->Yield(2);
@@ -511,6 +520,7 @@ void RegisterMarkdownEditorTests(ImGuiTestEngine *engine)
 	{
 		CGuiViewMarkdownEditor *view = EnsureView(ctx);
 		CMarkdownLiveEditor &ed = view->GetEditor();
+		ed.SetEditMode(EMarkdownEditMode::RevealNearCaret);
 		ed.SetSource("make me bold\n");
 		ctx->Yield(2);
 		CMarkdownEditorBindings *kb = ed.GetBindings();
@@ -549,6 +559,7 @@ void RegisterMarkdownEditorTests(ImGuiTestEngine *engine)
 	{
 		CGuiViewMarkdownEditor *view = EnsureView(ctx);
 		CMarkdownLiveEditor &ed = view->GetEditor();
+		ed.SetEditMode(EMarkdownEditMode::RevealNearCaret);
 		ed.SetSource("First line\n\nSecond paragraph\n");
 		ctx->Yield(2);
 		IM_CHECK(ClickOffset(ctx, ed, 3));
@@ -582,6 +593,7 @@ void RegisterMarkdownEditorTests(ImGuiTestEngine *engine)
 	{
 		CGuiViewMarkdownEditor *view = EnsureView(ctx);
 		CMarkdownLiveEditor &ed = view->GetEditor();
+		ed.SetEditMode(EMarkdownEditMode::RevealNearCaret);
 		ed.SetFindQuery("");
 		ed.SetSource("alpha beta\n\nBeta gamma beta\n");
 		ctx->Yield(2);
@@ -623,6 +635,145 @@ void RegisterMarkdownEditorTests(ImGuiTestEngine *engine)
 		IM_CHECK_EQ(ed.GetSource(), std::string("alpha Z\n\nBeta gamma beta\n"));
 	};
 
+	t = IM_REGISTER_TEST(engine, "markdown", "word_like_typing_never_shows_syntax");
+	t->TestFunc = [](ImGuiTestContext *ctx)
+	{
+		CGuiViewMarkdownEditor *view = EnsureView(ctx);
+		CMarkdownLiveEditor &ed = view->GetEditor();
+		ed.SetEditMode(EMarkdownEditMode::Rendered);
+		ed.SetFindQuery("");
+		ed.SetSource("Hello **bold** world\n\nSecond\n");
+		ctx->Yield(2);
+		const uint32_t world = (uint32_t)ed.GetSource().find("world");
+		IM_CHECK(ClickOffset(ctx, ed, world));
+		IM_CHECK_EQ(ed.GetCaret(), world);
+		IM_CHECK_EQ(ed.GetRevealedBlock(), -1);
+		IM_CHECK(!OffsetHasGlyph(ed, 6));          // the paragraph with the caret still hides '**'
+		IM_CHECK(ClickOffset(ctx, ed, 9));         // into "bold"
+		IM_CHECK_EQ(ed.GetCaret(), 9u);
+		IM_CHECK(!OffsetHasGlyph(ed, 6));
+		IM_CHECK(!OffsetHasGlyph(ed, 12));
+		ctx->KeyChars("*X");
+		ctx->Yield(2);
+		IM_CHECK_EQ(ed.GetSource(), std::string("Hello **b\\*Xold** world\n\nSecond\n"));
+		// Left over the closer-free text: one press, one glyph.
+		const uint32_t before = ed.GetCaret();
+		ctx->KeyPress(ImGuiKey_LeftArrow);
+		ctx->Yield();
+		IM_CHECK_EQ(ed.GetCaret(), before - 1);
+		ctx->KeyPress(ImGuiKey_LeftArrow);
+		ctx->Yield();
+		IM_CHECK_EQ(ed.GetCaret(), before - 3);    // over '*' and its backslash at once
+
+		// End, Enter, a list typed as text.
+		ctx->KeyPress(ImGuiKey_End);
+		ctx->Yield();
+		ctx->KeyPress(ImGuiKey_Enter);
+		ctx->Yield();
+		ctx->KeyChars("- one");
+		ctx->Yield(2);
+		IM_CHECK_EQ(ed.GetSource(), std::string("Hello **b\\*Xold** world\n\n- one\n\nSecond\n"));
+		ctx->KeyPress(ImGuiKey_Enter);
+		ctx->Yield();
+		ctx->KeyChars("two");
+		ctx->KeyPress(ImGuiKey_Tab);
+		ctx->Yield(2);
+		IM_CHECK_EQ(ed.GetSource(), std::string("Hello **b\\*Xold** world\n\n- one\n  - two\n\nSecond\n"));
+		ctx->KeyPress(ImGuiMod_Shift | ImGuiKey_Tab);
+		ctx->Yield();
+		// Ctrl+B with no selection: the next typed text is bold.
+		ctx->KeyPress(ImGuiMod_Ctrl | ImGuiKey_B);
+		ctx->Yield();
+		ctx->KeyChars(" big");
+		ctx->Yield(2);
+		IM_CHECK_EQ(ed.GetSource(), std::string("Hello **b\\*Xold** world\n\n- one\n- two **big**\n\nSecond\n"));
+		// Enter at the end of bold text: the next item goes on in bold.
+		ctx->KeyPress(ImGuiKey_Enter);
+		ctx->Yield();
+		ctx->KeyChars("xy");
+		ctx->Yield(2);
+		IM_CHECK(ed.GetSource().find("- two **big**\n- **xy**\n") != std::string::npos);
+		// Shift+Enter inside the text: a line break in the same item.
+		ctx->KeyPress(ImGuiKey_LeftArrow);
+		ctx->Yield();
+		ctx->KeyPress(ImGuiMod_Shift | ImGuiKey_Enter);
+		ctx->Yield(2);
+		IM_CHECK(ed.GetSource().find("- **x**\\\n  **y**\n") != std::string::npos);
+		ctx->KeyPress(ImGuiMod_Ctrl | ImGuiKey_Z);
+		ctx->Yield();
+		ed.SetEditMode(EMarkdownEditMode::RevealNearCaret);
+	};
+
+	t = IM_REGISTER_TEST(engine, "markdown", "toolbar_buttons_format_the_text");
+	t->TestFunc = [](ImGuiTestContext *ctx)
+	{
+		CGuiViewMarkdownEditor *view = EnsureView(ctx);
+		CMarkdownLiveEditor &ed = view->GetEditor();
+		ed.SetEditMode(EMarkdownEditMode::Rendered);
+		ed.SetToolbarVisible(true);
+		ed.SetFindQuery("");
+		ed.SetSource("make it bold\n\nsecond line\n");
+		ctx->Yield(2);
+		ctx->SetRef("//MarkdownEditorTest/##markdowneditor/##md_toolbar");
+		IM_CHECK(ClickOffset(ctx, ed, 8));
+		ed.SetSelection(8, 12);
+		ctx->ItemClick("###md_tb_bold");
+		ctx->Yield(2);
+		IM_CHECK_EQ(ed.GetSource(), std::string("make it **bold**\n\nsecond line\n"));
+		IM_CHECK(ed.IsFocused());                   // the text has the keyboard back
+		IM_CHECK(ed.IsInlineStyleActive(EMarkdownInlineStyle::Strong));
+		ctx->ItemClick("###md_tb_italic");
+		ctx->Yield(2);
+		IM_CHECK_EQ(ed.GetSource(), std::string("make it ***bold***\n\nsecond line\n"));
+		ctx->ItemClick("###md_tb_undo");
+		ctx->Yield(2);
+		IM_CHECK_EQ(ed.GetSource(), std::string("make it **bold**\n\nsecond line\n"));
+		ctx->ItemClick("###md_tb_redo");
+		ctx->Yield(2);
+		IM_CHECK_EQ(ed.GetSource(), std::string("make it ***bold***\n\nsecond line\n"));
+
+		IM_CHECK(ClickOffset(ctx, ed, (uint32_t)ed.GetSource().find("line")));
+		ctx->ItemClick("###md_tb_bullets");
+		ctx->Yield(2);
+		IM_CHECK(ed.GetSource().find("- second line") != std::string::npos);
+		IM_CHECK(ed.IsInList(EMarkdownListKind::Bullet));
+		ctx->ItemClick("###md_tb_numbers");
+		ctx->Yield(2);
+		IM_CHECK(ed.GetSource().find("1. second line") != std::string::npos);
+		ctx->ItemClick("###md_tb_numbers");
+		ctx->Yield(2);
+		IM_CHECK(!ed.IsInList(EMarkdownListKind::Numbered));
+		ctx->ItemClick("###md_tb_quote");
+		ctx->Yield(2);
+		IM_CHECK(ed.GetSource().find("> second line") != std::string::npos);
+		ctx->ItemClick("###md_tb_quote");
+		ctx->Yield(2);
+
+		// The link button opens the dialog; OK writes the link.
+		const uint32_t s = (uint32_t)ed.GetSource().find("second");
+		ed.SetSelection(s, s + 6);
+		ctx->ItemClick("###md_tb_link");
+		ctx->Yield(2);
+		IM_CHECK(ed.IsLinkDialogOpen());
+		ctx->KeyChars("https://example.com");
+		ctx->KeyPress(ImGuiKey_Enter);
+		ctx->Yield(2);
+		IM_CHECK(!ed.IsLinkDialogOpen());
+		IM_CHECK(ed.GetSource().find("[second](https://example.com) line") != std::string::npos);
+
+		// Hidden toolbar: nothing drawn, the text starts higher.
+		ImVec2 withBar, withoutBar;
+		float gh = 0;
+		IM_CHECK(ed.GetOffsetScreenPos(0, &withBar, &gh));
+		ed.SetToolbarVisible(false);
+		ctx->Yield(2);
+		IM_CHECK(ed.GetOffsetScreenPos(0, &withoutBar, &gh));
+		IM_CHECK_LT(withoutBar.y, withBar.y - 4.0f);
+		ed.SetToolbarVisible(true);
+		ed.SetEditMode(EMarkdownEditMode::RevealNearCaret);
+		ctx->SetRef("");
+	};
+
 	// Pixels, not geometry: the editor's window is captured in four states and
 	// each must have drawn real text. With MT_MD_CAPTURE_DIR set, the captures
 	// are also written there (raw RGBA artifacts) for a human to look at.
@@ -631,6 +782,7 @@ void RegisterMarkdownEditorTests(ImGuiTestEngine *engine)
 	{
 		CGuiViewMarkdownEditor *view = EnsureView(ctx);
 		CMarkdownLiveEditor &ed = view->GetEditor();
+		ed.SetEditMode(EMarkdownEditMode::RevealNearCaret);
 		const std::string src =
 			"# Internal AI meeting\n\n"
 			"Agenda for **24 October**, see [the notes](http://example.com) and `build.sh`.\n\n"
@@ -676,6 +828,14 @@ void RegisterMarkdownEditorTests(ImGuiTestEngine *engine)
 		// 3. A table cell revealed: the grid stays a grid.
 		IM_CHECK(ClickOffset(ctx, ed, (uint32_t)src.find("Bob") + 1));
 		shot("3_table_cell");
+		// 5. Word-like (the default): no syntax anywhere, the toolbar above.
+		ed.SetEditMode(EMarkdownEditMode::Rendered);
+		IM_CHECK(ClickOffset(ctx, ed, (uint32_t)src.find("October")));
+		shot("5_word_like");
+		// 6. The whole source.
+		ed.SetEditMode(EMarkdownEditMode::Source);
+		shot("6_source");
+		ed.SetEditMode(EMarkdownEditMode::RevealNearCaret);
 		// 4. The find bar with three matches.
 		ctx->KeyPress(ImGuiMod_Ctrl | ImGuiKey_F);
 		ctx->Yield(2);

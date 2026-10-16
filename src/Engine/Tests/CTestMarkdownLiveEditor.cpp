@@ -37,6 +37,7 @@ void CTestMarkdownLiveEditor::Run(ITestCallback *callback)
 	// ---- Undo through Tools/Undo ------------------------------------------------
 	{
 		CMarkdownLiveEditor ed;
+		ed.SetEditMode(EMarkdownEditMode::RevealNearCaret);   // these steps test the M2 reveal behaviour
 		ed.SetSource("Hello\n\nWorld\n");
 		MDE_ASSERT(ed.GetUndoManager() != nullptr && !ed.CanUndo() && !ed.CanRedo(), "a fresh editor has its own empty undo manager");
 
@@ -103,6 +104,7 @@ void CTestMarkdownLiveEditor::Run(ITestCallback *callback)
 		setting = 2;
 
 		auto ed = std::make_unique<CMarkdownLiveEditor>();
+		ed->SetEditMode(EMarkdownEditMode::RevealNearCaret);
 		ed->SetSource("abc\n");
 		ed->SetUndoManager(&host);
 		MDE_ASSERT(ed->GetUndoManager() == &host, "the editor records into the host's manager");
@@ -139,6 +141,7 @@ void CTestMarkdownLiveEditor::Run(ITestCallback *callback)
 #else
 	{
 		CMarkdownLiveEditor ed;
+		ed.SetEditMode(EMarkdownEditMode::RevealNearCaret);   // these steps test the M2 reveal behaviour
 		ed.SetSource("abc\n");
 		ed.SetCaret(3);
 		ed.InsertText("d");
@@ -149,6 +152,7 @@ void CTestMarkdownLiveEditor::Run(ITestCallback *callback)
 	// ---- Reveal units partition the source ---------------------------------------
 	{
 		CMarkdownLiveEditor ed;
+		ed.SetEditMode(EMarkdownEditMode::RevealNearCaret);   // these steps test the M2 reveal behaviour
 		const std::string src = "\n# H\n\npara one\nline two\n\n- a\n- b\n  - c\n\n> q1\n>\n> q2\n\n| x | y |\n|---|---|\n| 1 |   |\n\n```\ncode\n```\n\n---\n";
 		ed.SetSource(src);
 		bool covered = true, monotonic = true, cells = true;
@@ -188,6 +192,7 @@ void CTestMarkdownLiveEditor::Run(ITestCallback *callback)
 	// ---- Tasks and links -------------------------------------------------------
 	{
 		CMarkdownLiveEditor ed;
+		ed.SetEditMode(EMarkdownEditMode::RevealNearCaret);   // these steps test the M2 reveal behaviour
 		ed.SetSource("- [ ] buy milk\n- [x] done\n- plain\n");
 		ed.SetCaret(8);
 		MDE_ASSERT(ed.ToggleTask() && ed.GetSource() == "- [x] buy milk\n- [x] done\n- plain\n" && ed.GetCaret() == 8,
@@ -230,6 +235,7 @@ void CTestMarkdownLiveEditor::Run(ITestCallback *callback)
 	// ---- Table commands ------------------------------------------------------------
 	{
 		CMarkdownLiveEditor ed;
+		ed.SetEditMode(EMarkdownEditMode::RevealNearCaret);   // these steps test the M2 reveal behaviour
 		const std::string tsrc = "| A | B |\n|---|---|\n| 1 | 2 |\n";
 		ed.SetSource(tsrc);
 		ed.SetCaret(2);
@@ -282,6 +288,7 @@ void CTestMarkdownLiveEditor::Run(ITestCallback *callback)
 	// ---- Find -------------------------------------------------------------------------
 	{
 		CMarkdownLiveEditor ed;
+		ed.SetEditMode(EMarkdownEditMode::RevealNearCaret);   // these steps test the M2 reveal behaviour
 		ed.SetSource("Plan **beta** now\n\nBeta test, then beta.\n");
 		ed.SetFindQuery("beta");
 		MDE_ASSERT(ed.GetFindMatches().size() == 3, "matching is case-insensitive by default and runs over the source");
@@ -305,6 +312,251 @@ void CTestMarkdownLiveEditor::Run(ITestCallback *callback)
 		MDE_ASSERT(ed.GetFindMatches().size() == 3 && ed.GetFindMatches()[0].first == firstBefore + 2, "matches follow edits");
 		ed.SetFindQuery("");
 		MDE_ASSERT(ed.GetFindMatches().empty() && !ed.FindNext(), "an empty query finds nothing");
+	}
+
+	// ---- Word-like editing (the default mode) ---------------------------------------
+	{
+		CMarkdownLiveEditor ed;
+		MDE_ASSERT(ed.GetEditMode() == EMarkdownEditMode::Rendered, "a new editor edits Word-like");
+		ed.SetSource("Hello **bold** end\n");
+		ed.SetCaret(7);
+		MDE_ASSERT(ed.GetCaret() == 6, "the caret never stands inside syntax: inside the opener it snaps to the stop before");
+		MDE_ASSERT(ed.GetRevealedBlock() < 0, "nothing is revealed");
+		ed.MoveHorizontal(1, false);
+		MDE_ASSERT(ed.GetCaret() == 9, "one Right moves over one glyph, skipping the markers");
+		ed.SetCaret(12);
+		ed.InsertText("er");
+		MDE_ASSERT(ed.GetSource() == "Hello **bolder** end\n", "typing after a bold word continues the bold");
+		ed.SetCaret(6);
+		ed.InsertText("x");
+		MDE_ASSERT(ed.GetSource() == "Hello x**bolder** end\n", "typing before it does not");
+
+		ed.SetSource("Hi\n");
+		ed.SetCaret(2);
+		ed.InsertText("*a* [b]");
+		MDE_ASSERT(ed.GetSource() == "Hi\\*a\\* \\[b\\]\n", "typed Markdown specials are literal");
+		ed.SetSource("x\n");
+		ed.SetCaret(0);
+		ed.InsertText("#");
+		MDE_ASSERT(ed.GetSource() == "\\#x\n", "a '#' at a block start is escaped");
+		ed.SetSource("Run `a*b` now\n");
+		ed.SetCaret(7);
+		ed.InsertText("*");
+		MDE_ASSERT(ed.GetSource() == "Run `a**b` now\n", "inside code nothing is escaped");
+
+		// Autoformat at a paragraph's start.
+		ed.SetSource("");
+		ed.InsertText("-");
+		ed.InsertText(" ");
+		ed.InsertText("item");
+		MDE_ASSERT(ed.GetSource() == "- item", "'- ' starts a bulleted list");
+		ed.SetSource("");
+		ed.InsertText("#");
+		ed.InsertText("#");
+		ed.InsertText(" ");
+		ed.InsertText("T");
+		MDE_ASSERT(ed.GetSource() == "## T" && ed.GetHeadingLevelAtCaret() == 2, "'## ' starts a heading");
+		ed.SetSource("");
+		ed.InsertText("1");
+		ed.InsertText(".");
+		ed.InsertText(" ");
+		ed.InsertText("a");
+		MDE_ASSERT(ed.GetSource() == "1. a" && ed.IsInList(EMarkdownListKind::Numbered), "'1. ' starts a numbered list");
+		ed.SetSource("");
+		ed.InsertText(">");
+		ed.InsertText(" ");
+		ed.InsertText("q");
+		MDE_ASSERT(ed.GetSource() == "> q" && ed.IsInQuote(), "'> ' starts a quote");
+		ed.SetSource("- a\n");
+		ed.SetCaret(3);
+		ed.InsertNewline();
+		ed.InsertText("[");
+		ed.InsertText(" ");
+		ed.InsertText("]");
+		ed.InsertText(" ");
+		ed.InsertText("t");
+		MDE_ASSERT(ed.GetSource() == "- a\n- [ ] t\n" && ed.IsInList(EMarkdownListKind::Task), "'[ ] ' in an item makes it a task");
+
+		// Deletion keeps the syntax whole.
+		ed.SetSource("a **b** c\n");
+		ed.SetCaret(5);
+		ed.Backspace();
+		MDE_ASSERT(ed.GetSource() == "a  c\n" && ed.GetCaret() == 2, "a span left empty goes with its markers");
+		ed.SetSource("x **bold** y\n");
+		ed.SetSelection(1, 6);
+		ed.Backspace();
+		MDE_ASSERT(ed.GetSource() == "x**ld** y\n", "a selection cut through a span gives the rest its opener back");
+		ed.SetSource("a \\* b\n");
+		ed.SetCaret(4);
+		ed.Backspace();
+		MDE_ASSERT(ed.GetSource() == "a  b\n", "an escaped character goes with its backslash");
+		ed.SetSource("x **bold** y\n");
+		ed.SetCaret(1);
+		ed.DeleteForward();
+		MDE_ASSERT(ed.GetSource() == "x**bold** y\n", "Delete removes the next glyph");
+
+		// Enter and Backspace on blocks.
+		ed.SetSource("Hello world\n");
+		ed.SetCaret(6);
+		ed.InsertNewline();
+		MDE_ASSERT(ed.GetSource() == "Hello \n\nworld\n" && ed.GetCaret() == 8, "Enter starts a new paragraph");
+		ed.Backspace();
+		MDE_ASSERT(ed.GetSource() == "Hello world\n" && ed.GetCaret() == 6, "Backspace at a paragraph's start merges it with the one before");
+		ed.SetSource("a **b**\n\nc\n");
+		ed.SetCaret(9);
+		ed.Backspace();
+		MDE_ASSERT(ed.GetSource() == "a **b**c\n" && ed.GetCaret() == 5, "a merge keeps the closing markers of the block before");
+		ed.SetCaret(5);
+		ed.InsertNewline();
+		ed.SetCaret(5);
+		ed.DeleteForward();
+		MDE_ASSERT(ed.GetSource() == "a **b**c\n", "Delete at a block's end merges the next one");
+		ed.SetCaret(ed.GetDocument().Size());
+		MDE_ASSERT(ed.GetCaret() == 8, "the line after the final newline is not a caret position");
+		ed.SetSource("Hello **bold** x\n");
+		ed.SetCaret(10);
+		ed.InsertNewline();
+		MDE_ASSERT(ed.GetSource() == "Hello **bo**\n\n**ld** x\n", "Enter inside a span splits it in two");
+		ed.SetSource("- one\n");
+		ed.SetCaret(5);
+		ed.InsertNewline();
+		MDE_ASSERT(ed.GetSource() == "- one\n- \n" && ed.IsInList(EMarkdownListKind::Bullet), "Enter in a list item continues the list");
+		ed.InsertNewline();
+		MDE_ASSERT(ed.GetSource() == "- one\n\n" && !ed.IsInList(EMarkdownListKind::Bullet), "Enter on an empty item ends the list");
+		ed.InsertText("p");
+		MDE_ASSERT(ed.GetSource() == "- one\n\np\n", "text typed on the new line is a paragraph of its own");
+		ed.SetSource("Hello\n\nWorld\n");
+		ed.SetCaret(5);
+		ed.InsertNewline();
+		ed.InsertText("x");
+		MDE_ASSERT(ed.GetSource() == "Hello\n\nx\n\nWorld\n", "an empty paragraph made by Enter takes text");
+		ed.SetSource("ab\n");
+		ed.SetCaret(1);
+		ed.InsertLineBreak();
+		MDE_ASSERT(ed.GetSource() == "a\\\nb\n" && ed.GetCaret() == 3, "Shift+Enter is a line break in the paragraph");
+		ed.SetCaret(4);
+		ed.InsertLineBreak();
+		MDE_ASSERT(ed.GetSource() == "a\\\nb\n\n\n", "at a paragraph's end, where Markdown has no empty last line, it starts a new paragraph");
+		ed.SetSource("# Title\n");
+		ed.SetCaret(2);
+		ed.Backspace();
+		MDE_ASSERT(ed.GetSource() == "Title\n" && ed.GetCaret() == 0, "Backspace at a heading's start makes it a paragraph");
+		ed.SetSource("- one\n");
+		ed.SetCaret(2);
+		ed.Backspace();
+		MDE_ASSERT(ed.GetSource() == "one\n" && ed.GetCaret() == 0, "Backspace at an item's start takes the bullet off");
+		ed.SetSource("> q\n");
+		ed.SetCaret(2);
+		ed.Backspace();
+		MDE_ASSERT(ed.GetSource() == "q\n", "Backspace at a quote's start leaves the quote");
+
+		// Inline styles.
+		ed.SetSource("a\n");
+		ed.SetCaret(1);
+		ed.ToggleInlineStyle(EMarkdownInlineStyle::Strong);
+		MDE_ASSERT(ed.GetSource() == "a\n" && ed.IsInlineStyleActive(EMarkdownInlineStyle::Strong), "Bold with no selection changes nothing yet");
+		ed.InsertText("b");
+		ed.InsertText("c");
+		MDE_ASSERT(ed.GetSource() == "a**bc**\n", "the next typed text is bold");
+		ed.ToggleInlineStyle(EMarkdownInlineStyle::Strong);
+		ed.InsertText("d");
+		MDE_ASSERT(ed.GetSource() == "a**bc**d\n", "Bold off again: typing continues outside the span");
+		ed.SetSource("**bold**\n");
+		ed.SetCaret(6);
+		ed.InsertText(" ");
+		MDE_ASSERT(ed.GetSource() == "**bold** \n" && ed.GetCaret() == 9 && ed.IsInlineStyleActive(EMarkdownInlineStyle::Strong),
+			"a blank typed at a bold word's end goes past the closer ('**bold **' is not bold) and bold carries on");
+		ed.InsertText("x");
+		MDE_ASSERT(ed.GetSource() == "**bold** **x**\n", "so the next word is bold too");
+		ed.SetSource("**bold x**\n");
+		ed.SetCaret(8);
+		ed.Backspace();
+		MDE_ASSERT(ed.GetSource() == "**bold** \n" && ed.GetCaret() == 9, "deleting the last word keeps the span valid the same way");
+		ed.InsertText("y");
+		MDE_ASSERT(ed.GetSource() == "**bold** **y**\n", "and typing goes on in bold");
+		ed.SetSource("a\n");
+		ed.SetCaret(1);
+		ed.ToggleInlineStyle(EMarkdownInlineStyle::Emphasis);
+		ed.InsertText(" ");
+		ed.InsertText("b");
+		MDE_ASSERT(ed.GetSource() == "a *b*\n", "a pending style leaves blanks outside its markers");
+		ed.SetSource("make it bold\n");
+		ed.SetSelection(8, 12);
+		ed.ToggleInlineStyle(EMarkdownInlineStyle::Strong);
+		MDE_ASSERT(ed.GetSource() == "make it **bold**\n" && ed.GetSelectedText() == "bold", "Bold on a selection wraps it");
+		ed.ToggleInlineStyle(EMarkdownInlineStyle::Strong);
+		MDE_ASSERT(ed.GetSource() == "make it bold\n" && ed.GetSelectedText() == "bold", "and again unwraps it");
+		ed.SetSource("**abc**\n");
+		ed.SetSelection(3, 4);
+		ed.ToggleInlineStyle(EMarkdownInlineStyle::Strong);
+		MDE_ASSERT(ed.GetSource() == "**a**b**c**\n", "unbolding the middle splits the span");
+		ed.SetSource("one\n\ntwo\n");
+		ed.SelectAll();
+		ed.ToggleInlineStyle(EMarkdownInlineStyle::Emphasis);
+		MDE_ASSERT(ed.GetSource() == "*one*\n\n*two*\n", "a style over two paragraphs is one span in each");
+		ed.SetSource("say hi\n");
+		ed.SetSelection(4, 6);
+		ed.ToggleInlineStyle(EMarkdownInlineStyle::Code);
+		MDE_ASSERT(ed.GetSource() == "say `hi`\n" && ed.IsInlineStyleActive(EMarkdownInlineStyle::Code), "inline code");
+
+		// Block commands.
+		ed.SetSource("one\n\ntwo\n");
+		ed.SelectAll();
+		ed.ToggleList(EMarkdownListKind::Bullet);
+		MDE_ASSERT(ed.GetSource() == "- one\n- two\n", "two paragraphs become a bulleted list");
+		ed.SelectAll();
+		ed.ToggleList(EMarkdownListKind::Numbered);
+		MDE_ASSERT(ed.GetSource() == "1. one\n2. two\n", "a bulleted list becomes a numbered one");
+		ed.SelectAll();
+		ed.ToggleList(EMarkdownListKind::Numbered);
+		MDE_ASSERT(ed.GetSource() == "one\n\ntwo\n", "and back to paragraphs");
+		ed.SetSource("- a\n- b\n");
+		ed.SetCaret(7);
+		MDE_ASSERT(ed.IndentListItem(false) && ed.GetSource() == "- a\n  - b\n", "Indent nests an item under the one before");
+		MDE_ASSERT(ed.IndentListItem(true) && ed.GetSource() == "- a\n- b\n", "Outdent takes it back");
+		MDE_ASSERT(!ed.IndentListItem(true), "an item at the top level cannot be outdented");
+		ed.SetSource("q\n");
+		ed.SetCaret(1);
+		MDE_ASSERT(ed.ToggleQuote() && ed.GetSource() == "> q\n" && ed.IsInQuote(), "Quote");
+		MDE_ASSERT(ed.ToggleQuote() && ed.GetSource() == "q\n" && !ed.IsInQuote(), "and back");
+		ed.SetSource("Title\n");
+		ed.SetCaret(2);
+		MDE_ASSERT(ed.SetHeadingLevel(1) && ed.GetSource() == "# Title\n" && ed.GetHeadingLevelAtCaret() == 1, "paragraph style: Heading 1");
+		ed.SetSource("x\n");
+		ed.SetCaret(1);
+		MDE_ASSERT(ed.InsertTable(2, 2) && ed.GetDocument().GetBlocks().size() > 3, "Insert table");
+		{
+			bool table = false;
+			for (const CMarkdownBlock &b : ed.GetDocument().GetBlocks()) if (b.type == EMarkdownBlockType::Table) table = true;
+			MDE_ASSERT(table && ed.GetSource().rfind("x\n\n|", 0) == 0, "the table is a table block after the paragraph");
+		}
+		ed.SetSource("see docs\n");
+		ed.SetSelection(4, 8);
+		ed.OpenLinkDialog();
+		MDE_ASSERT(ed.IsLinkDialogOpen(), "Ctrl+K opens the link dialog");
+		MDE_ASSERT(ed.ApplyLink("docs", "https://example.com") && ed.GetSource() == "see [docs](https://example.com)\n" && !ed.IsLinkDialogOpen(),
+			"the dialog writes a link");
+
+		// Undo of a Word-like command is one step.
+		ed.SetSource("one\n\ntwo\n");
+		ed.SelectAll();
+		ed.ToggleList(EMarkdownListKind::Bullet);
+#if MT_ENABLE_UNDO
+		MDE_ASSERT(ed.Undo() && ed.GetSource() == "one\n\ntwo\n", "a list toggle undoes in one step");
+#endif
+
+		// The other modes.
+		ed.SetSource("Hello **bold** end\n");
+		ed.SetEditMode(EMarkdownEditMode::Source);
+		ed.SetCaret(7);
+		MDE_ASSERT(ed.GetCaret() == 7, "Source mode: the caret goes anywhere");
+		ed.InsertText("*");
+		MDE_ASSERT(ed.GetSource() == "Hello ***bold** end\n", "and typing is raw");
+		ed.SetEditMode(EMarkdownEditMode::RevealNearCaret);
+		ed.SetCaret(8);
+		MDE_ASSERT(ed.GetRevealedBlock() > 0, "RevealNearCaret shows the caret's unit");
+		ed.SetEditMode(EMarkdownEditMode::Rendered);
+		MDE_ASSERT(ed.GetRevealedBlock() < 0, "back to Word-like: nothing revealed");
 	}
 
 	TestCompleted(true, "Markdown live editor: commands and undo");

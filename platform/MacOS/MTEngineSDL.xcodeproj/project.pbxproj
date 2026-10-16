@@ -677,6 +677,8 @@
 		41E1CFDC2DDF8434006B32FB /* imgui_stdlib.h in Headers */ = {isa = PBXBuildFile; fileRef = 41E1CFDA2DDF8434006B32FB /* imgui_stdlib.h */; };
 		41E1CFDD2DDF8434006B32FB /* imgui_stdlib.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 41E1CFDB2DDF8434006B32FB /* imgui_stdlib.cpp */; };
 		41E4CA97285343B6007509C3 /* CRenderBackend.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 41E4CA93285343B6007509C3 /* CRenderBackend.cpp */; };
+		C47723CFA79ECB1C7F11C8FB /* CMarkdownLiveEditorToolbar.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3D1834688A99A616372F1604 /* CMarkdownLiveEditorToolbar.cpp */; };
+		C1A6AB73714913585F8BD1F6 /* CMarkdownLiveEditorWord.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 721E9BD3F3B79D0464266E60 /* CMarkdownLiveEditorWord.cpp */; };
 		8DF8A7B03C31893491C349EC /* CMarkdownEditorBindings.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7D3D43D482A9A3688398E655 /* CMarkdownEditorBindings.cpp */; };
 		B02807C13B01D23A4C522411 /* CTestMarkdownLiveEditor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D84250D429C36ADDBD3E26C0 /* CTestMarkdownLiveEditor.cpp */; };
 		CC453B3B192C31AC7C1022DD /* CImGuiMarkdownEditorTests.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4D1545A7CF47E642324DD5D2 /* CImGuiMarkdownEditorTests.cpp */; };
@@ -1716,6 +1718,8 @@
 		41E1CFDA2DDF8434006B32FB /* imgui_stdlib.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = imgui_stdlib.h; path = imguiext/imgui_stdlib.h; sourceTree = "<group>"; };
 		41E1CFDB2DDF8434006B32FB /* imgui_stdlib.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = imgui_stdlib.cpp; path = imguiext/imgui_stdlib.cpp; sourceTree = "<group>"; };
 		41E4CA93285343B6007509C3 /* CRenderBackend.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CRenderBackend.cpp; sourceTree = "<group>"; };
+		3D1834688A99A616372F1604 /* CMarkdownLiveEditorToolbar.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CMarkdownLiveEditorToolbar.cpp; path = ../../src/Engine/Markdown/CMarkdownLiveEditorToolbar.cpp; sourceTree = SOURCE_ROOT; };
+		721E9BD3F3B79D0464266E60 /* CMarkdownLiveEditorWord.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CMarkdownLiveEditorWord.cpp; path = ../../src/Engine/Markdown/CMarkdownLiveEditorWord.cpp; sourceTree = SOURCE_ROOT; };
 		7D3D43D482A9A3688398E655 /* CMarkdownEditorBindings.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CMarkdownEditorBindings.cpp; path = ../../src/Engine/Markdown/CMarkdownEditorBindings.cpp; sourceTree = SOURCE_ROOT; };
 		02F8EA17A0036E9F3D617C24 /* CMarkdownEditorBindings.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CMarkdownEditorBindings.h; path = ../../src/Engine/Markdown/CMarkdownEditorBindings.h; sourceTree = SOURCE_ROOT; };
 		D84250D429C36ADDBD3E26C0 /* CTestMarkdownLiveEditor.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CTestMarkdownLiveEditor.cpp; path = ../../src/Engine/Tests/CTestMarkdownLiveEditor.cpp; sourceTree = SOURCE_ROOT; };
@@ -3524,6 +3528,8 @@
 				41D5E267239D891200143F1C /* VID_ImageBinding.cpp */,
 				41D5E268239D891200143F1C /* VID_ImageBinding.h */,
 				41E4CA93285343B6007509C3 /* CRenderBackend.cpp */,
+				3D1834688A99A616372F1604 /* CMarkdownLiveEditorToolbar.cpp */,
+				721E9BD3F3B79D0464266E60 /* CMarkdownLiveEditorWord.cpp */,
 				7D3D43D482A9A3688398E655 /* CMarkdownEditorBindings.cpp */,
 				02F8EA17A0036E9F3D617C24 /* CMarkdownEditorBindings.h */,
 				D84250D429C36ADDBD3E26C0 /* CTestMarkdownLiveEditor.cpp */,
@@ -4948,6 +4954,8 @@
 				4143A3D829DE45F9006F2318 /* implot_items.cpp in Sources */,
 				41DAE4BB23BA18C90011FEA9 /* nfd_cocoa.m in Sources */,
 				41E4CA97285343B6007509C3 /* CRenderBackend.cpp in Sources */,
+				C47723CFA79ECB1C7F11C8FB /* CMarkdownLiveEditorToolbar.cpp in Sources */,
+				C1A6AB73714913585F8BD1F6 /* CMarkdownLiveEditorWord.cpp in Sources */,
 				8DF8A7B03C31893491C349EC /* CMarkdownEditorBindings.cpp in Sources */,
 				B02807C13B01D23A4C522411 /* CTestMarkdownLiveEditor.cpp in Sources */,
 				CC453B3B192C31AC7C1022DD /* CImGuiMarkdownEditorTests.cpp in Sources */,

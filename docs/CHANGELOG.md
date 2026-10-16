@@ -66,9 +66,19 @@ is provably equal to a full parse; a randomized test compares 3000 edits with
 full parses field by field. Typing in a 57 KB document: 0.13 ms per keystroke
 instead of 8.2 ms.
 
+**Word-like editing and a formatting toolbar.** `SetEditMode()` picks how
+Markdown shows while editing: `Rendered` (the default) never draws syntax --
+the caret stands on the text you see, typed text is literal (specials are
+escaped), `- ` / `1. ` / `# ` / `> ` autoformat, deletion and Enter keep
+the syntax whole, Bold and Italic with no selection apply to the next text --
+`RevealNearCaret` is the behaviour above, `Source` shows everything. A
+toolbar above the text (`SetToolbarVisible()`) has paragraph style, inline
+styles, link (a dialog), lists, indent, quote, table, undo/redo and find;
+icons are drawn shapes.
+
 Tests: `CTestMarkdownDocument` (model) and `CTestMarkdownLiveEditor`
-(commands, undo, bindings, find) for a host's `CTestSuite`;
-`RegisterMarkdownEditorTests()` for its imgui_test_engine tests, twelve of
+(commands, undo, bindings, find, Word-like rules) for a host's `CTestSuite`;
+`RegisterMarkdownEditorTests()` for its imgui_test_engine tests, fourteen of
 them driving the widget with real input and one checking captured pixels.
 AgendaScene registers all three.
 

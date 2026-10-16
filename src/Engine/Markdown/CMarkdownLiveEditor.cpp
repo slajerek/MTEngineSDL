@@ -125,6 +125,8 @@ void CMarkdownLiveEditor::SetHeadingScale(int level, float scale)
 
 void CMarkdownLiveEditor::SetCaret(uint32_t offset)
 {
+	// Word-like: the caret never stands inside syntax.
+	if (editMode == EMarkdownEditMode::Rendered) offset = Snap(std::min(offset, doc.Size()));
 	SetSelection(offset, offset);
 }
 
@@ -134,6 +136,18 @@ void CMarkdownLiveEditor::SetSelection(uint32_t anchorOffset, uint32_t caretOffs
 	caret = std::min(caretOffset, size);
 	anchor = std::min(anchorOffset, size);
 	groupOpen = false;
+	// A style toggled for the next typed text applies only where it was toggled.
+	if (caret != pendingAt) pendingOn = pendingOff = 0;
+	ComputeRevealed();
+}
+
+void CMarkdownLiveEditor::SetEditMode(EMarkdownEditMode mode)
+{
+	if (mode == editMode) return;
+	editMode = mode;
+	pendingOn = pendingOff = 0;
+	if (mode == EMarkdownEditMode::Rendered) caret = anchor = Snap(caret);
+	layoutDirty = true;
 	ComputeRevealed();
 }
 
@@ -217,6 +231,16 @@ bool CMarkdownLiveEditor::IsDescendant(int32_t block, int32_t ancestor) const
 void CMarkdownLiveEditor::ComputeRevealed()
 {
 	touchedSpans.clear();
+	gapCaret = UINT32_MAX;
+	if (editMode != EMarkdownEditMode::RevealNearCaret)
+	{
+		// Rendered: nothing is revealed; a caret on a blank line (a new empty
+		// paragraph) is drawn as an empty line. Source: everything is source.
+		revealedBlock = -1;
+		revealBeg = revealEnd = 0;
+		if (editMode == EMarkdownEditMode::Rendered && !HasSelection() && doc.Size() > 0 && IsGapPosition(caret)) gapCaret = caret;
+		return;
+	}
 	if (doc.Size() == 0 || doc.GetBlocks().size() <= 1) { revealedBlock = -1; revealBeg = revealEnd = 0; return; }
 	RebuildUnits();
 	const int32_t u = FindUnitAt(caret);
@@ -387,16 +411,16 @@ bool CMarkdownLiveEditor::CanRedo() const
 #endif
 }
 
-void CMarkdownLiveEditor::ApplyReplace(uint32_t beg, uint32_t end, std::string_view text, EEditKind kind)
+void CMarkdownLiveEditor::ApplyReplace(uint32_t beg, uint32_t end, std::string_view text, EEditKind kind, uint32_t caretAfter)
 {
 	if (readOnly) return;
 	const uint32_t size = doc.Size();
 	beg = std::min(beg, size);
 	end = std::min(std::max(beg, end), size);
-	const uint32_t caretAfter = beg + (uint32_t)text.size();
+	if (caretAfter == UINT32_MAX) caretAfter = beg + (uint32_t)text.size();
 	RecordEdit(beg, std::string_view(doc.GetSource()).substr(beg, end - beg), text, caret, anchor, caretAfter, caretAfter, kind);
-	const uint32_t after = doc.Replace(beg, end, text);
-	caret = anchor = after;
+	doc.Replace(beg, end, text);
+	caret = anchor = caretAfter;
 	preferredX = -1;
 	scrollToCaret = true;
 	Changed();
@@ -404,12 +428,14 @@ void CMarkdownLiveEditor::ApplyReplace(uint32_t beg, uint32_t end, std::string_v
 
 void CMarkdownLiveEditor::InsertText(std::string_view text)
 {
+	if (editMode == EMarkdownEditMode::Rendered) { WordInsertText(text); return; }
 	const uint32_t a = std::min(anchor, caret), b = std::max(anchor, caret);
 	ApplyReplace(a, b, text, EEditKind::Insert);
 }
 
 void CMarkdownLiveEditor::Backspace()
 {
+	if (editMode == EMarkdownEditMode::Rendered) { WordBackspace(); return; }
 	if (HasSelection()) { InsertText(""); return; }
 	if (caret == 0) return;
 	const uint32_t prev = doc.PrevCodepoint(caret);
@@ -418,6 +444,7 @@ void CMarkdownLiveEditor::Backspace()
 
 void CMarkdownLiveEditor::DeleteForward()
 {
+	if (editMode == EMarkdownEditMode::Rendered) { WordDeleteForward(); return; }
 	if (HasSelection()) { InsertText(""); return; }
 	if (caret >= doc.Size()) return;
 	if (readOnly) return;
@@ -435,6 +462,7 @@ void CMarkdownLiveEditor::DeleteForward()
 
 void CMarkdownLiveEditor::InsertNewline()
 {
+	if (editMode == EMarkdownEditMode::Rendered) { WordNewline(false); return; }
 	std::string text = "\n";
 	if (!HasSelection())
 	{
@@ -476,10 +504,31 @@ void CMarkdownLiveEditor::Copy() const
 	ImGui::SetClipboardText(GetSelectedText().c_str());
 }
 
+void CMarkdownLiveEditor::InsertLineBreak()
+{
+	if (editMode == EMarkdownEditMode::Rendered) WordNewline(true);
+	else InsertText("\n");
+}
+
 void CMarkdownLiveEditor::Paste()
 {
 	const char *text = ImGui::GetClipboardText();
 	if (text == nullptr || *text == 0) return;
+	if (editMode == EMarkdownEditMode::Rendered && !readOnly)
+	{
+		// Copy takes the source, so a paste is Markdown: what was copied in
+		// the editor comes back with its formatting.
+		BeginCompound();
+		if (HasSelection()) caret = anchor = DeleteRangeSafe(std::min(anchor, caret), std::max(anchor, caret));
+		const uint32_t at = caret;
+		doc.Replace(at, at, text);
+		caret = anchor = Snap(at + (uint32_t)strlen(text));
+		EndCompound();
+		preferredX = -1;
+		scrollToCaret = true;
+		Changed();
+		return;
+	}
 	InsertText(text);
 }
 
@@ -515,7 +564,7 @@ bool CMarkdownLiveEditor::SetHeadingLevel(int level)
 	BeginCompound();
 	uint32_t c = caret;
 	const bool changed = doc.SetHeadingLevel(caret, level, &c);
-	if (changed) caret = anchor = c;
+	if (changed) caret = anchor = editMode == EMarkdownEditMode::Rendered ? Snap(c) : c;
 	EndCompound();
 	if (!changed) return false;
 	scrollToCaret = true;
@@ -563,6 +612,7 @@ static void ToggleDelimiter(CMarkdownLiveEditor &ed, CMarkdownDocument &doc, uin
 
 void CMarkdownLiveEditor::ToggleStrong()
 {
+	if (editMode == EMarkdownEditMode::Rendered) { ToggleInlineStyle(EMarkdownInlineStyle::Strong); return; }
 	if (readOnly) return;
 	BeginCompound();
 	auto apply = [this](uint32_t beg, uint32_t end, std::string_view text, bool) { doc.Replace(beg, end, text); };
@@ -574,6 +624,7 @@ void CMarkdownLiveEditor::ToggleStrong()
 
 void CMarkdownLiveEditor::ToggleEmphasis()
 {
+	if (editMode == EMarkdownEditMode::Rendered) { ToggleInlineStyle(EMarkdownInlineStyle::Emphasis); return; }
 	if (readOnly) return;
 	BeginCompound();
 	auto apply = [this](uint32_t beg, uint32_t end, std::string_view text, bool) { doc.Replace(beg, end, text); };
@@ -740,7 +791,7 @@ void CMarkdownLiveEditor::CloseFind()
 {
 	if (!findOpen) return;
 	findOpen = false;
-	findReturnFocus = true;
+	returnFocus = true;
 }
 
 void CMarkdownLiveEditor::SetFindQuery(std::string_view query)
@@ -1689,7 +1740,9 @@ void CMarkdownLiveEditor::EnsureLayout(float width)
 {
 	const float fontSize = FontSizeFor(0);
 	if (!layoutDirty && width == layoutWidth && fontSize == layoutFontSize && revealedBlock == layoutRevealedBlock
-		&& touchedSpans == layoutTouchedSpans) return;
+		&& touchedSpans == layoutTouchedSpans && editMode == layoutEditMode && gapCaret == layoutGapCaret) return;
+	layoutEditMode = editMode;
+	layoutGapCaret = gapCaret;
 
 	layout = Layout();
 	layoutCount++;
@@ -1762,10 +1815,34 @@ void CMarkdownLiveEditor::EnsureLayout(float width)
 		return;
 	}
 
+	if (editMode == EMarkdownEditMode::Source)
+	{
+		// The whole document as source, syntax dimmed, nothing hidden.
+		StartLine(e, 0);
+		e.curOffset = 0;
+		LayoutSourceRange(e, 0, 0, doc.Size(), 0, false);
+		EndLine(e);
+		return;
+	}
+
 	// Every block lays itself out rendered unless it is the revealed unit; a
 	// table with a revealed cell stays a grid and LayoutTable reveals the cell.
+	// Rendered mode: a caret on a blank line between blocks gets an empty line.
+	bool gapDone = gapCaret == UINT32_MAX;
+	auto gapLine = [&]() {
+		StartLine(e, FontSizeFor(0) * kParagraphSpacing);
+		e.curOffset = gapCaret;
+		EndLine(e);
+		e.spacingBefore = FontSizeFor(0) * kParagraphSpacing;
+		gapDone = true;
+	};
 	for (int32_t top : doc.GetChildren(0))
+	{
+		if (!gapDone && gapCaret < blocks[top].beg) gapLine();
 		LayoutBlock(e, top, false);
+		if (!gapDone && gapCaret >= blocks[top].beg && gapCaret <= blocks[top].end && blocks[top].type == EMarkdownBlockType::Quote) gapLine();
+	}
+	if (!gapDone) gapLine();
 	// Trailing blank lines after the last block belong to the last block's
 	// source view; when it is not revealed the caret can still be at Size():
 	// give it an (invisible) empty line.
@@ -1796,8 +1873,28 @@ float CMarkdownLiveEditor::XOfOffset(const Line &line, uint32_t offset) const
 {
 	for (const Glyph &g : line.glyphs)
 		if (!g.synthetic && g.offset >= offset) return g.x0;
-	if (!line.glyphs.empty()) return line.glyphs.back().x1;
-	return line.indent;
+	if (line.glyphs.empty()) return line.indent;
+	const Glyph &last = line.glyphs.back();
+	float x = last.x1;
+	// Blanks typed at a line's end are not content (Markdown drops them) but
+	// the caret after them still moves right, as in any editor.
+	if (editMode == EMarkdownEditMode::Rendered && !last.synthetic && last.next < offset && offset <= doc.Size())
+	{
+		const std::string &src = doc.GetSource();
+		int blanks = 0;
+		for (uint32_t o = last.next; o < offset; o++)
+		{
+			if (src[o] == ' ') blanks++;
+			else if (src[o] == '\t') blanks += 4;
+			else if (src[o] == '\n') break;
+		}
+		if (blanks > 0 && last.style < layout.styles.size())
+		{
+			const Style &st = layout.styles[last.style];
+			x += blanks * st.font->CalcTextSizeA(st.size, FLT_MAX, 0, " ").x;
+		}
+	}
+	return x;
 }
 
 uint32_t CMarkdownLiveEditor::OffsetAtX(const Line &line, float x) const
@@ -1884,6 +1981,7 @@ bool CMarkdownLiveEditor::GetCaretScreenRect(ImVec2 *min, ImVec2 *max) const
 
 void CMarkdownLiveEditor::MoveHorizontal(int direction, bool extend)
 {
+	if (editMode == EMarkdownEditMode::Rendered) { WordMoveHorizontal(direction, extend); return; }
 	uint32_t target = caret;
 	if (!extend && HasSelection())
 		target = direction < 0 ? std::min(anchor, caret) : std::max(anchor, caret);
@@ -1927,7 +2025,8 @@ void CMarkdownLiveEditor::MoveVertical(int direction, bool extend)
 		const float dx = x < lx0 ? lx0 - x : (x > lx1 ? x - lx1 : 0);
 		if (dx < bestDist) { bestDist = dx; bestLine = i; }
 	}
-	const uint32_t o = OffsetAtX(layout.lines[bestLine], x);
+	uint32_t o = OffsetAtX(layout.lines[bestLine], x);
+	if (editMode == EMarkdownEditMode::Rendered) o = Snap(o);
 	SetSelection(extend ? anchor : o, o);
 	preferredX = x;
 	scrollToCaret = true;
@@ -1941,6 +2040,7 @@ void CMarkdownLiveEditor::MoveLineEdge(bool toEnd, bool extend)
 	uint32_t o = toEnd ? line.endOffset : line.begOffset;
 	// A line that ends with a revealed newline: the end is before the '\n'.
 	if (toEnd && o > 0 && o <= doc.Size() && o > line.begOffset && doc.GetSource()[o - 1] == '\n' && line.endOffset == o) o--;
+	if (editMode == EMarkdownEditMode::Rendered) o = Snap(o);
 	SetSelection(extend ? anchor : o, o);
 	preferredX = -1;
 	scrollToCaret = true;
@@ -1965,6 +2065,7 @@ void CMarkdownLiveEditor::ClickAt(ImVec2 screenPos, bool extendSelection)
 	const ImVec2 p(screenPos.x - contentOrigin.x, screenPos.y - contentOrigin.y);
 	bool hit = false;
 	if (!HitTestContent(p, &offset, &hit)) return;
+	if (editMode == EMarkdownEditMode::Rendered) offset = Snap(offset);
 	SetSelection(extendSelection ? anchor : offset, offset);
 	preferredX = -1;
 	focused = true;
@@ -2024,7 +2125,9 @@ void CMarkdownLiveEditor::HandleMouse(ImVec2)
 				uint32_t offset = 0;
 				bool hit = false;
 				const ImVec2 p(io.MousePos.x - contentOrigin.x, io.MousePos.y - contentOrigin.y);
-				if (HitTestContent(p, &offset, &hit) && offset != caret)
+				const bool ok = HitTestContent(p, &offset, &hit);
+				if (ok && editMode == EMarkdownEditMode::Rendered) offset = Snap(offset);
+				if (ok && offset != caret)
 				{
 					const uint32_t a = anchor;
 					caret = offset;
@@ -2124,7 +2227,11 @@ void CMarkdownLiveEditor::ProcessKeyboard()
 	else if (inCell && pressed(EMarkdownEditorCommand::TableMoveColumnRight, true)) EditTable(EMarkdownTableEdit::MoveColumnRight);
 	else if (pressed(EMarkdownEditorCommand::Bold, false)) ToggleStrong();
 	else if (pressed(EMarkdownEditorCommand::Italic, false)) ToggleEmphasis();
-	else if (pressed(EMarkdownEditorCommand::InsertLink, false)) InsertLink();
+	else if (pressed(EMarkdownEditorCommand::InsertLink, false))
+	{
+		if (editMode == EMarkdownEditMode::Rendered) OpenLinkDialog();
+		else InsertLink();
+	}
 	else if (pressed(EMarkdownEditorCommand::Heading1, false)) SetHeadingLevel(1);
 	else if (pressed(EMarkdownEditorCommand::Heading2, false)) SetHeadingLevel(2);
 	else if (pressed(EMarkdownEditorCommand::Heading3, false)) SetHeadingLevel(3);
@@ -2149,9 +2256,14 @@ void CMarkdownLiveEditor::ProcessKeyboard()
 	// appends a row and goes to its first cell.
 	else if (ImGui::Shortcut(ImGuiKey_Tab, rep))
 	{
-		if (!MoveToNextCell(false) && inCell && EditTable(EMarkdownTableEdit::InsertRowBelow)) SelectFirstCellOfRow();
+		if (inCell) { if (!MoveToNextCell(false) && EditTable(EMarkdownTableEdit::InsertRowBelow)) SelectFirstCellOfRow(); }
+		else if (IsInList(EMarkdownListKind::Bullet) || IsInList(EMarkdownListKind::Numbered) || IsInList(EMarkdownListKind::Task)) IndentListItem(false);
 	}
-	else if (ImGui::Shortcut(ImGuiMod_Shift | ImGuiKey_Tab, rep)) MoveToNextCell(true);
+	else if (ImGui::Shortcut(ImGuiMod_Shift | ImGuiKey_Tab, rep))
+	{
+		if (inCell) MoveToNextCell(true);
+		else IndentListItem(true);
+	}
 	else if (ImGui::Shortcut(ImGuiKey_LeftArrow, rep)) MoveHorizontal(-1, false);
 	else if (ImGui::Shortcut(ImGuiMod_Shift | ImGuiKey_LeftArrow, rep)) MoveHorizontal(-1, true);
 	else if (ImGui::Shortcut(ImGuiKey_RightArrow, rep)) MoveHorizontal(1, false);
@@ -2176,7 +2288,7 @@ void CMarkdownLiveEditor::ProcessKeyboard()
 	{
 		if (!MoveToCellBelow()) InsertNewline();
 	}
-	else if (ImGui::Shortcut(ImGuiMod_Shift | ImGuiKey_Enter, rep)) InsertText("\n");
+	else if (ImGui::Shortcut(ImGuiMod_Shift | ImGuiKey_Enter, rep)) InsertLineBreak();
 	(void)shift;
 
 	// Typed characters.
@@ -2191,7 +2303,20 @@ void CMarkdownLiveEditor::ProcessKeyboard()
 			const int n = ImTextCharToUtf8(buf, (unsigned int)c);
 			text.append(buf, (size_t)n);
 		}
-		if (!text.empty()) InsertText(text);
+		if (!text.empty() && editMode == EMarkdownEditMode::Rendered)
+		{
+			// Several characters in one frame: one word at a time, so "- " at a
+			// paragraph's start autoformats as if typed slowly.
+			size_t p = 0;
+			while (p < text.size())
+			{
+				size_t e = text.find(' ', p);
+				e = e == std::string::npos ? text.size() : e + 1;
+				InsertText(std::string_view(text).substr(p, e - p));
+				p = e;
+			}
+		}
+		else if (!text.empty()) InsertText(text);
 		io.InputQueueCharacters.resize(0);
 	}
 }
@@ -2371,6 +2496,13 @@ void CMarkdownLiveEditor::Draw(ImDrawList *dl, ImVec2 origin)
 void CMarkdownLiveEditor::Render(const char *id, ImVec2 size)
 {
 	ImGui::PushID(id);
+	if (toolbarVisible)
+	{
+		// The toolbar sits above the find bar and the text.
+		const float y0 = ImGui::GetCursorPosY();
+		RenderToolbar();
+		if (size.y > 0) size.y = std::max(1.0f, size.y - (ImGui::GetCursorPosY() - y0));
+	}
 	if (findOpen)
 	{
 		// The bar sits above the text, outside the scrolling area.
@@ -2379,11 +2511,11 @@ void CMarkdownLiveEditor::Render(const char *id, ImVec2 size)
 	}
 	const ImGuiWindowFlags flags = ImGuiWindowFlags_NoMove;
 	ImGui::BeginChild("##md_live_editor", size, ImGuiChildFlags_None, flags);
-	if (findReturnFocus)
+	if (returnFocus)
 	{
 		ImGui::SetWindowFocus();
 		focused = true;
-		findReturnFocus = false;
+		returnFocus = false;
 	}
 
 	const float pad = ImGui::GetStyle().FramePadding.x;
@@ -2400,6 +2532,7 @@ void CMarkdownLiveEditor::Render(const char *id, ImVec2 size)
 	GetBindings()->RegisterWithGuiMain();
 	HandleMouse(contentOrigin);
 	RenderTableMenu();
+	RenderLinkDialog();
 
 	const bool windowFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows);
 	if (windowFocused && (ImGui::IsItemActive() || ImGui::IsItemHovered() || focused)) focused = true;
