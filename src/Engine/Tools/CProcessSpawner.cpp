@@ -1,5 +1,7 @@
 #include "CProcessSpawner.h"
 #include "DBG_Log.h"
+#include <chrono>
+#include <cstdint>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -9,10 +11,21 @@
 #include <unistd.h>
 #include <signal.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
 #include <spawn.h>
+#include <poll.h>
+#include <fcntl.h>
 #include <errno.h>
 #include <cstring>
+#include <cstdlib>
 extern char **environ;
+
+// posix_spawn_file_actions_addchdir_np: glibc 2.29+, macOS 10.15+ (the engine's
+// deployment target). Without it Run refuses a workingDirectory rather than
+// fork()ing a multi-threaded process.
+#if defined(__APPLE__) || (defined(__GLIBC__) && __GLIBC_PREREQ(2, 29))
+#define MT_SPAWN_HAVE_ADDCHDIR 1
+#endif
 #endif
 
 #ifdef __APPLE__
@@ -272,6 +285,464 @@ pid_t CProcessSpawner::SpawnWithEnv(const vector<string> &args, const vector<str
 	return pid;
 #endif
 }
+
+// How long Run waits after SIGTERM before it sends SIGKILL to the process group.
+static const int kRunTerminateGraceMs = 2000;
+
+static int64_t RunNowMs()
+{
+	return std::chrono::duration_cast<std::chrono::milliseconds>(
+		std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
+#ifdef _WIN32
+
+static wstring RunUtf8ToWide(const string &s)
+{
+	if (s.empty())
+		return wstring();
+	int len = MultiByteToWideChar(CP_UTF8, 0, s.data(), (int)s.size(), NULL, 0);
+	wstring w(len, L'\0');
+	MultiByteToWideChar(CP_UTF8, 0, s.data(), (int)s.size(), &w[0], len);
+	return w;
+}
+
+bool CProcessSpawner::Run(const vector<string> &args, const CProcessSpawnOptions &options,
+						  CProcessRunResult &result, int timeoutMs, const atomic<bool> *cancel,
+						  const function<void(bool isStdErr, const char *data, size_t length)> &onOutput)
+{
+	result = CProcessRunResult();
+	if (args.empty())
+	{
+		result.error = "empty args";
+		return false;
+	}
+
+	SECURITY_ATTRIBUTES sa = {};
+	sa.nLength = sizeof(sa);
+	sa.bInheritHandle = TRUE;
+
+	HANDLE outRead = NULL, outWrite = NULL, errRead = NULL, errWrite = NULL;
+	if (!CreatePipe(&outRead, &outWrite, &sa, 0) || !CreatePipe(&errRead, &errWrite, &sa, 0))
+	{
+		result.error = "CreatePipe failed: " + to_string(GetLastError());
+		if (outRead) { CloseHandle(outRead); CloseHandle(outWrite); }
+		return false;
+	}
+	SetHandleInformation(outRead, HANDLE_FLAG_INHERIT, 0);
+	SetHandleInformation(errRead, HANDLE_FLAG_INHERIT, 0);
+	HANDLE nulIn = CreateFileW(L"NUL", GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, &sa,
+							   OPEN_EXISTING, 0, NULL);
+
+	// Inherit ONLY these three handles: without the list, a concurrent spawn on
+	// another thread would hand our pipe ends to its child and the pipes would
+	// never report EOF.
+	HANDLE inherited[3] = { nulIn, outWrite, errWrite };
+	SIZE_T attrSize = 0;
+	InitializeProcThreadAttributeList(NULL, 1, 0, &attrSize);
+	vector<char> attrBuf(attrSize);
+	LPPROC_THREAD_ATTRIBUTE_LIST attrList = (LPPROC_THREAD_ATTRIBUTE_LIST)attrBuf.data();
+	InitializeProcThreadAttributeList(attrList, 1, 0, &attrSize);
+	UpdateProcThreadAttribute(attrList, 0, PROC_THREAD_ATTRIBUTE_HANDLE_LIST,
+							  inherited, sizeof(inherited), NULL, NULL);
+
+	STARTUPINFOEXW si = {};
+	si.StartupInfo.cb = sizeof(si);
+	si.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
+	si.StartupInfo.hStdInput = nulIn;
+	si.StartupInfo.hStdOutput = outWrite;
+	si.StartupInfo.hStdError = errWrite;
+	si.lpAttributeList = attrList;
+
+	wstring cmdLine = RunUtf8ToWide(BuildWindowsCommandLine(args));
+	vector<wchar_t> cmdLineBuf(cmdLine.begin(), cmdLine.end());
+	cmdLineBuf.push_back(L'\0');
+
+	DWORD flags = EXTENDED_STARTUPINFO_PRESENT | CREATE_SUSPENDED | CREATE_NO_WINDOW;
+	wstring envBlock;
+	if (!options.envVars.empty())
+	{
+		LPWCH currentEnv = GetEnvironmentStringsW();
+		if (currentEnv)
+		{
+			const wchar_t *p = currentEnv;
+			while (*p)
+			{
+				size_t n = wcslen(p);
+				envBlock.append(p, n);
+				envBlock.push_back(L'\0');
+				p += n + 1;
+			}
+			FreeEnvironmentStringsW(currentEnv);
+		}
+		for (const auto &ev : options.envVars)
+		{
+			envBlock.append(RunUtf8ToWide(ev));
+			envBlock.push_back(L'\0');
+		}
+		envBlock.push_back(L'\0');
+		flags |= CREATE_UNICODE_ENVIRONMENT;
+	}
+	wstring cwd = RunUtf8ToWide(options.workingDirectory);
+
+	// The job holds the child and everything it starts, so a timeout or cancel
+	// stops the whole tree, and closing the job reaps stragglers.
+	HANDLE job = CreateJobObjectW(NULL, NULL);
+	if (job)
+	{
+		JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits = {};
+		limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+		SetInformationJobObject(job, JobObjectExtendedLimitInformation, &limits, sizeof(limits));
+	}
+
+	PROCESS_INFORMATION pi = {};
+	BOOL created = CreateProcessW(NULL, cmdLineBuf.data(), NULL, NULL, TRUE, flags,
+								  envBlock.empty() ? NULL : (LPVOID)envBlock.data(),
+								  cwd.empty() ? NULL : cwd.c_str(), &si.StartupInfo, &pi);
+	DWORD createError = created ? 0 : GetLastError();
+	DeleteProcThreadAttributeList(attrList);
+	CloseHandle(outWrite);
+	CloseHandle(errWrite);
+	if (nulIn != INVALID_HANDLE_VALUE)
+		CloseHandle(nulIn);
+
+	if (!created)
+	{
+		result.error = "CreateProcess failed: " + to_string(createError);
+		CloseHandle(outRead);
+		CloseHandle(errRead);
+		if (job)
+			CloseHandle(job);
+		return false;
+	}
+	if (job)
+		AssignProcessToJobObject(job, pi.hProcess);
+	ResumeThread(pi.hThread);
+	CloseHandle(pi.hThread);
+	result.started = true;
+
+	HANDLE pipes[2] = { outRead, errRead };
+	string *sinks[2] = { &result.stdOut, &result.stdErr };
+	bool exited = false;
+	bool stopRequested = false;
+	int64_t deadline = timeoutMs > 0 ? RunNowMs() + timeoutMs : 0;
+	int64_t killDeadline = 0;
+	char buf[4096];
+
+	while (pipes[0] || pipes[1] || !exited)
+	{
+		bool readAny = false;
+		for (int i = 0; i < 2; i++)
+		{
+			if (!pipes[i])
+				continue;
+			DWORD avail = 0;
+			if (!PeekNamedPipe(pipes[i], NULL, 0, NULL, &avail, NULL))
+			{
+				CloseHandle(pipes[i]);	// ERROR_BROKEN_PIPE: every writer is gone
+				pipes[i] = NULL;
+				continue;
+			}
+			if (avail == 0)
+				continue;
+			DWORD got = 0;
+			DWORD want = avail < (DWORD)sizeof(buf) ? avail : (DWORD)sizeof(buf);
+			if (ReadFile(pipes[i], buf, want, &got, NULL) && got > 0)
+			{
+				sinks[i]->append(buf, got);
+				if (onOutput)
+					onOutput(i == 1, buf, got);
+				readAny = true;
+			}
+		}
+
+		if (!exited && WaitForSingleObject(pi.hProcess, 0) == WAIT_OBJECT_0)
+			exited = true;
+
+		if (!stopRequested)
+		{
+			if (cancel && cancel->load())
+				result.cancelled = stopRequested = true;
+			else if (deadline && RunNowMs() >= deadline)
+				result.timedOut = stopRequested = true;
+			if (stopRequested)
+			{
+				if (job)
+					TerminateJobObject(job, 1);
+				else
+					TerminateProcess(pi.hProcess, 1);
+				killDeadline = RunNowMs() + kRunTerminateGraceMs;
+			}
+		}
+		else if (RunNowMs() >= killDeadline)
+		{
+			// Something outside the job still holds a pipe: stop waiting for it.
+			for (int i = 0; i < 2; i++)
+				if (pipes[i])
+				{
+					CloseHandle(pipes[i]);
+					pipes[i] = NULL;
+				}
+		}
+
+		if (!readAny)
+			Sleep(10);
+	}
+
+	DWORD code = (DWORD)-1;
+	GetExitCodeProcess(pi.hProcess, &code);
+	result.exitCode = (int)code;
+	CloseHandle(pi.hProcess);
+	if (job)
+		CloseHandle(job);
+	return !stopRequested;
+}
+
+#else
+
+// The executable posix_spawn should run: args[0] itself when it names a path
+// (or PATH lookup is off), else the first executable regular file on PATH.
+static string RunResolveExecutable(const string &name, bool searchPath)
+{
+	if (!searchPath || name.find('/') != string::npos)
+		return name;
+	const char *pathEnv = getenv("PATH");
+	if (!pathEnv)
+		return "";
+	string path(pathEnv);
+	size_t start = 0;
+	while (start <= path.size())
+	{
+		size_t end = path.find(':', start);
+		if (end == string::npos)
+			end = path.size();
+		string dir = path.substr(start, end - start);
+		string candidate = (dir.empty() ? string(".") : dir) + "/" + name;
+		struct stat st;
+		if (stat(candidate.c_str(), &st) == 0 && S_ISREG(st.st_mode) && access(candidate.c_str(), X_OK) == 0)
+			return candidate;
+		start = end + 1;
+	}
+	return "";
+}
+
+static bool RunMakePipe(int fds[2])
+{
+	if (pipe(fds) != 0)
+		return false;
+	// Both ends close-on-exec so no OTHER child inherits them; posix_spawn's
+	// dup2 onto 1/2 gives our child its own non-CLOEXEC copies.
+	fcntl(fds[0], F_SETFD, FD_CLOEXEC);
+	fcntl(fds[1], F_SETFD, FD_CLOEXEC);
+	fcntl(fds[0], F_SETFL, fcntl(fds[0], F_GETFL) | O_NONBLOCK);
+	return true;
+}
+
+bool CProcessSpawner::Run(const vector<string> &args, const CProcessSpawnOptions &options,
+						  CProcessRunResult &result, int timeoutMs, const atomic<bool> *cancel,
+						  const function<void(bool isStdErr, const char *data, size_t length)> &onOutput)
+{
+	result = CProcessRunResult();
+	if (args.empty())
+	{
+		result.error = "empty args";
+		return false;
+	}
+
+#ifndef MT_SPAWN_HAVE_ADDCHDIR
+	if (!options.workingDirectory.empty())
+	{
+		result.error = "workingDirectory is not supported on this platform";
+		return false;
+	}
+#endif
+
+	string exe = RunResolveExecutable(args[0], options.searchPath);
+	if (exe.empty())
+	{
+		result.error = "not found on PATH: " + args[0];
+		return false;
+	}
+
+	int outPipe[2], errPipe[2];
+	if (!RunMakePipe(outPipe))
+	{
+		result.error = string("pipe failed: ") + strerror(errno);
+		return false;
+	}
+	if (!RunMakePipe(errPipe))
+	{
+		result.error = string("pipe failed: ") + strerror(errno);
+		close(outPipe[0]);
+		close(outPipe[1]);
+		return false;
+	}
+
+	vector<char*> argv;
+	for (const auto &arg : args)
+		argv.push_back(const_cast<char*>(arg.c_str()));
+	argv.push_back(nullptr);
+
+	vector<string> envStrs;
+	vector<char*> envp;
+	if (!options.envVars.empty())
+	{
+		if (environ)
+			for (char **ep = environ; *ep; ep++)
+				envStrs.push_back(*ep);
+		for (const auto &ev : options.envVars)
+			envStrs.push_back(ev);
+		for (auto &e : envStrs)
+			envp.push_back(const_cast<char*>(e.c_str()));
+		envp.push_back(nullptr);
+	}
+
+	posix_spawn_file_actions_t actions;
+	posix_spawn_file_actions_init(&actions);
+	posix_spawn_file_actions_addopen(&actions, 0, "/dev/null", O_RDONLY, 0);
+	posix_spawn_file_actions_adddup2(&actions, outPipe[1], 1);
+	posix_spawn_file_actions_adddup2(&actions, errPipe[1], 2);
+#ifdef MT_SPAWN_HAVE_ADDCHDIR
+	if (!options.workingDirectory.empty())
+		posix_spawn_file_actions_addchdir_np(&actions, options.workingDirectory.c_str());
+#endif
+
+	posix_spawnattr_t attr;
+	posix_spawnattr_init(&attr);
+	sigset_t sigdefault;
+	sigfillset(&sigdefault);
+	posix_spawnattr_setsigdefault(&attr, &sigdefault);
+	sigset_t sigmask;
+	sigemptyset(&sigmask);
+	posix_spawnattr_setsigmask(&attr, &sigmask);
+	// Own process group (pgid == pid), so a stop reaches the grandchildren too.
+	posix_spawnattr_setpgroup(&attr, 0);
+	posix_spawnattr_setflags(&attr, POSIX_SPAWN_SETSIGDEF | POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETPGROUP);
+
+	pid_t pid;
+	int err = posix_spawn(&pid, exe.c_str(), &actions, &attr, argv.data(),
+						  envp.empty() ? environ : envp.data());
+	posix_spawn_file_actions_destroy(&actions);
+	posix_spawnattr_destroy(&attr);
+	close(outPipe[1]);
+	close(errPipe[1]);
+
+	if (err != 0)
+	{
+		result.error = string("posix_spawn failed: ") + strerror(err);
+		close(outPipe[0]);
+		close(errPipe[0]);
+		return false;
+	}
+	result.started = true;
+	LOGM("CProcessSpawner::Run: spawned pid=%d cmd=%s", pid, exe.c_str());
+
+	int fds[2] = { outPipe[0], errPipe[0] };
+	string *sinks[2] = { &result.stdOut, &result.stdErr };
+	bool exited = false;
+	int status = 0;
+	bool haveStatus = false;
+	bool stopRequested = false;
+	bool killed = false;
+	int64_t deadline = timeoutMs > 0 ? RunNowMs() + timeoutMs : 0;
+	int64_t killDeadline = 0;
+	char buf[4096];
+
+	// Runs until BOTH the child has exited and every writer of the pipes is
+	// gone: a grandchild that keeps stdout open keeps the run going (or is
+	// stopped with the group on timeout/cancel).
+	while (fds[0] >= 0 || fds[1] >= 0 || !exited)
+	{
+		if (!exited)
+		{
+			pid_t r = waitpid(pid, &status, WNOHANG);
+			if (r == pid)
+				exited = haveStatus = true;
+			else if (r == -1 && errno == ECHILD)
+				exited = true;	// reaped elsewhere (a SIGCHLD handler); status unknown
+		}
+
+		if (!stopRequested)
+		{
+			if (cancel && cancel->load())
+				result.cancelled = stopRequested = true;
+			else if (deadline && RunNowMs() >= deadline)
+				result.timedOut = stopRequested = true;
+			if (stopRequested)
+			{
+				::kill(-pid, SIGTERM);
+				killDeadline = RunNowMs() + kRunTerminateGraceMs;
+			}
+		}
+		else if (!killed && RunNowMs() >= killDeadline)
+		{
+			::kill(-pid, SIGKILL);
+			killed = true;
+		}
+		else if (killed && RunNowMs() >= killDeadline + kRunTerminateGraceMs)
+		{
+			// A writer left the process group (setsid) and still holds a pipe:
+			// stop waiting for it. The child itself got SIGKILL and is reaped above.
+			for (int i = 0; i < 2; i++)
+				if (fds[i] >= 0)
+				{
+					close(fds[i]);
+					fds[i] = -1;
+				}
+		}
+
+		if (fds[0] < 0 && fds[1] < 0)
+		{
+			usleep(10 * 1000);
+			continue;
+		}
+
+		struct pollfd pfds[2];
+		int idx[2];
+		int n = 0;
+		for (int i = 0; i < 2; i++)
+		{
+			if (fds[i] < 0)
+				continue;
+			pfds[n].fd = fds[i];
+			pfds[n].events = POLLIN;
+			pfds[n].revents = 0;
+			idx[n++] = i;
+		}
+		if (poll(pfds, n, 50) <= 0)
+			continue;
+
+		for (int k = 0; k < n; k++)
+		{
+			if (!(pfds[k].revents & (POLLIN | POLLHUP | POLLERR)))
+				continue;
+			int i = idx[k];
+			ssize_t got = read(fds[i], buf, sizeof(buf));
+			if (got > 0)
+			{
+				sinks[i]->append(buf, (size_t)got);
+				if (onOutput)
+					onOutput(i == 1, buf, (size_t)got);
+			}
+			else if (got == 0 || (errno != EAGAIN && errno != EINTR))
+			{
+				close(fds[i]);
+				fds[i] = -1;
+			}
+		}
+	}
+
+	if (haveStatus)
+	{
+		if (WIFEXITED(status))
+			result.exitCode = WEXITSTATUS(status);
+		else if (WIFSIGNALED(status))
+			result.exitCode = 128 + WTERMSIG(status);
+	}
+	return !stopRequested;
+}
+
+#endif
 
 bool CProcessSpawner::IsRunning(pid_t pid)
 {

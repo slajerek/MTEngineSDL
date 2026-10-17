@@ -610,6 +610,7 @@ add_library(MTEngineSDL STATIC
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/Render/VID_Main.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/Render/VID_ImageBinding.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Core/Render/CRenderBackend.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Tests/CTestProcessSpawner.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Markdown/CMarkdownLiveEditorToolbar.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Markdown/CMarkdownLiveEditorWord.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/./src/Engine/Markdown/CMarkdownEditorBindings.cpp"

@@ -2,6 +2,8 @@
 
 #include <string>
 #include <vector>
+#include <atomic>
+#include <functional>
 
 #ifdef _WIN32
 #include <process.h>
@@ -11,6 +13,34 @@ typedef int pid_t;
 #endif
 
 using namespace std;
+
+// How CProcessSpawner::Run starts a child. Empty fields inherit from the parent.
+struct CProcessSpawnOptions
+{
+	// Directory the child starts in; "" keeps the parent's current directory.
+	string workingDirectory;
+
+	// KEY=VALUE strings appended to the inherited environment.
+	vector<string> envVars;
+
+	// Resolve args[0] through the parent's PATH when it has no directory part
+	// (needed for tools such as "cl65" or "java"). On Windows CreateProcess
+	// always applies its own lookup, so this flag changes nothing there.
+	bool searchPath = false;
+};
+
+// What CProcessSpawner::Run observed. stdOut/stdErr hold everything the child
+// wrote, also when onOutput streamed it.
+struct CProcessRunResult
+{
+	bool started = false;		// false: error says why the child never ran
+	bool timedOut = false;		// stopped because timeoutMs elapsed
+	bool cancelled = false;		// stopped because *cancel became true
+	int exitCode = -1;			// 128+signal on POSIX when the child died of a signal
+	string stdOut;
+	string stdErr;
+	string error;
+};
 
 // Cross-platform process spawn utility
 class CProcessSpawner
@@ -23,6 +53,26 @@ public:
 	// Spawn with extra environment variables (KEY=VALUE strings).
 	// Inherits the current process environment and appends envVars.
 	static pid_t SpawnWithEnv(const vector<string> &args, const vector<string> &envVars);
+
+	// Run a child to completion with stdin on the null device and stdout/stderr
+	// captured through pipes. Arguments go to the child verbatim -- there is no
+	// shell, so nothing needs quoting. BLOCKS the calling thread: call it from a
+	// worker thread, never the UI thread.
+	//
+	// onOutput, when set, receives every chunk as it arrives, on the calling
+	// thread. timeoutMs <= 0 means no timeout; cancel, when set, is polled. On
+	// timeout or cancel the child AND everything it started are stopped
+	// (POSIX: SIGTERM to its process group, SIGKILL after a grace period;
+	// Windows: the job object is terminated), so a compiler driver cannot
+	// leave its back ends running.
+	//
+	// Returns true when the child started and exited on its own; its status is
+	// in result.exitCode. Returns false when it did not start, timed out or was
+	// cancelled.
+	static bool Run(const vector<string> &args, const CProcessSpawnOptions &options,
+					CProcessRunResult &result, int timeoutMs = 0,
+					const atomic<bool> *cancel = nullptr,
+					const function<void(bool isStdErr, const char *data, size_t length)> &onOutput = nullptr);
 
 	// Check if a process with the given PID is still running.
 	static bool IsRunning(pid_t pid);
