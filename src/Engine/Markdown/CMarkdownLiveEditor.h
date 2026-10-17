@@ -95,6 +95,14 @@ public:
 	// ---- Toolbar above the text (formatting buttons). Shown by default; a
 	// host that has its own can hide it.
 	void SetToolbarVisible(bool value) { toolbarVisible = value; }
+	// The caret: blinking (it shows solid for a moment after every edit or
+	// move, then blinks) or steady, and its colour; 0 is the theme's text colour.
+	void SetCaretBlink(bool value) { caretBlink = value; }
+	bool GetCaretBlink() const { return caretBlink; }
+	void SetCaretColor(ImU32 color) { caretColor = color; }
+	ImU32 GetCaretColor() const { return caretColor; }
+	// Is the caret drawn in the current blink phase (for the tests)?
+	bool IsCaretShownNow() const;
 	bool IsToolbarVisible() const { return toolbarVisible; }
 
 	// ---- Appearance
@@ -527,6 +535,10 @@ private:
 	ImVec2 caretMin, caretMax;
 	float preferredX = -1;     // for vertical movement
 	float pageHeight = 0;      // the text area's visible height at the last Render()
+	bool caretBlink = true;
+	ImU32 caretColor = 0;
+	double caretBlinkStart = 0;   // when the caret last moved or the text changed
+	uint32_t caretSeenOffset = UINT32_MAX, caretSeenAnchor = UINT32_MAX, caretSeenParse = UINT32_MAX;
 	float pendingScroll = 0;   // a page move's scroll, applied in Render()
 	bool dragging = false;
 

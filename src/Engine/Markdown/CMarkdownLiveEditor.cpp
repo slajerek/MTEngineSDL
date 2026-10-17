@@ -1644,6 +1644,26 @@ void CMarkdownLiveEditor::LayoutBlock(Emit &e, int32_t block, bool)
 			const float savedLeft = e.lineLeft;
 			const Style st = StyleFor(0, 0, false, false, false);
 			const float indent = base * kListIndent;
+			// Numbers start at one column, as in a word processor: a proportional
+			// font's "1." is narrower than "2.", so right-aligning them in the
+			// indent made the "1." stand out to the right. The column leaves room
+			// for the list's widest number.
+			float numbersX = savedLeft;
+			if (ordered)
+			{
+				const float gap = std::max(Advance(st, ' '), st.size * 0.4f);
+				float widest = 0;
+				uint32_t n = b.listStart;
+				for (size_t k = 0; k < doc.GetChildren(block).size(); k++, n++)
+				{
+					char marker[32];
+					snprintf(marker, sizeof(marker), "%u%c", n, b.listMark ? b.listMark : '.');
+					float mw = 0;
+					for (const char *p = marker; *p; p++) mw += Advance(st, (ImWchar)(unsigned char)*p);
+					widest = std::max(widest, mw);
+				}
+				numbersX = std::max(savedLeft, savedLeft + indent - widest - gap);
+			}
 			bool first = true;
 			for (int32_t li : doc.GetChildren(block))
 			{
@@ -1684,17 +1704,16 @@ void CMarkdownLiveEditor::LayoutBlock(Emit &e, int32_t block, bool)
 				// A proportional font's space is narrow (Inter: a quarter em); the
 				// marker needs a clear gap before the text.
 				const float markerGap = std::max(Advance(st, ' '), st.size * 0.4f);
-				// Marker, right-aligned in the indent column: the number as text,
-				// a bullet and a task box as drawn shapes (fonts do not reliably
-				// carry U+2022 / U+2610, and ImGui's default font does not).
+				// Marker in the indent column: the number as text (left-aligned at
+				// the list's number column), a bullet and a task box as drawn shapes
+				// (fonts do not reliably carry U+2022 / U+2610, and ImGui's default
+				// font does not).
 				e.lineLeft = savedLeft + indent;
 				if (ordered)
 				{
 					char marker[32];
 					snprintf(marker, sizeof(marker), "%u%c", itemNumber, b.listMark ? b.listMark : '.');
-					float mw = 0;
-					for (const char *p = marker; *p; p++) mw += Advance(st, (ImWchar)(unsigned char)*p);
-					e.x = std::max(savedLeft, savedLeft + indent - mw - markerGap);
+					e.x = numbersX;
 					PutSynthetic(e, marker, item.beg, st);
 				}
 				else
@@ -2467,7 +2486,17 @@ void CMarkdownLiveEditor::Draw(ImDrawList *dl, ImVec2 origin)
 	caretRectValid = false;
 	if (findOpen) UpdateFindMatches();
 	const int caretLine = FindLineOfOffset(caret);
+	// Any move or edit restarts the blink with the caret shown, so it never
+	// hides while the user types or moves.
+	if (caret != caretSeenOffset || anchor != caretSeenAnchor || doc.GetParseCount() != caretSeenParse)
+	{
+		caretSeenOffset = caret;
+		caretSeenAnchor = anchor;
+		caretSeenParse = doc.GetParseCount();
+		caretBlinkStart = ImGui::GetTime();
+	}
 	const bool showCaret = focused;
+	const bool caretOn = IsCaretShownNow();
 
 	std::string segment;
 	for (size_t li = 0; li < layout.lines.size(); li++)
@@ -2590,13 +2619,20 @@ void CMarkdownLiveEditor::Draw(ImDrawList *dl, ImVec2 origin)
 		{
 			const float cx = origin.x + XOfOffset(line, caret);
 			caretMin = ImVec2(cx, origin.y + line.y);
-			caretMax = ImVec2(cx + 1.5f, origin.y + line.y + line.height);
-			caretRectValid = true;
-			const double t = ImGui::GetTime();
-			const bool on = ((int)(t * 2.0) % 2) == 0 || HasSelection() || scrollToCaret;
-			if (on) dl->AddRectFilled(caretMin, caretMax, ImGui::GetColorU32(ImGuiCol_Text));
+			caretMax = ImVec2(cx + std::max(2.0f, FontSizeFor(0) * 0.11f), origin.y + line.y + line.height);
+			caretRectValid = true;   // the IME and the tests need it in the off phase too
+			if (caretOn) dl->AddRectFilled(caretMin, caretMax, caretColor != 0 ? caretColor : ImGui::GetColorU32(ImGuiCol_Text));
 		}
 	}
+}
+
+bool CMarkdownLiveEditor::IsCaretShownNow() const
+{
+	// From the last move or edit: 0.53 s on, 0.53 s off (the common
+	// platform rate), so the caret is always visible right after typing.
+	if (!caretBlink || HasSelection()) return true;
+	const double since = ImGui::GetTime() - caretBlinkStart;
+	return std::fmod(std::max(0.0, since), 1.06) < 0.53;
 }
 
 void CMarkdownLiveEditor::Render(const char *id, ImVec2 size)

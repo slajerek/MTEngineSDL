@@ -39,7 +39,11 @@ finds in it, with everything mapped back to byte ranges of the source:
 `SetHeadingScale()` sizes, emphasis through `SetFonts()`, numbers, drawn
 bullets and task boxes, tables as a grid with column alignment, quote bars,
 code backgrounds, pictures through the host's `imageResolver` -- and a
-formatting toolbar above it (`SetToolbarVisible()`). How Markdown shows while
+formatting toolbar above it (`SetToolbarVisible()`). The caret blinks from
+its last move or edit, visible first, so it never hides while the user types
+(`SetCaretBlink(false)` makes it steady); `SetCaretColor()` colours it (0 is
+the theme's text colour). Numbered-list numbers start at one column wide
+enough for the list's widest number, as in a word processor. How Markdown shows while
 editing is the **edit mode** (`SetEditMode()`):
 
 - `Rendered` (the default): Word-like. No syntax is ever drawn; the caret

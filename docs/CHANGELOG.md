@@ -78,7 +78,11 @@ icons are drawn shapes. Empty paragraphs (blank lines beyond a block
 separator) are drawn, are caret positions, and Enter, Backspace and Delete
 treat them as a word processor does; an empty list item is a caret position
 too. Found on the way and fixed: a fenced code block starting with empty
-lines lost its opening fence from its range.
+lines lost its opening fence from its range. Page Up / Page Down move the caret a
+visible page. The caret's blink restarts, visible, on every move and edit
+(it used to blink on a fixed clock and could hide while typing); it can be
+steady and coloured. List numbers are left-aligned at one column: right-
+aligned, a proportional "1." stood to the right of "2.".
 
 Tests: `CTestMarkdownDocument` (model) and `CTestMarkdownLiveEditor`
 (commands, undo, bindings, find, Word-like rules) for a host's `CTestSuite`;

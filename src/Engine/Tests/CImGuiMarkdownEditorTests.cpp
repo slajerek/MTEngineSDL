@@ -9,6 +9,7 @@
 #include "CSlrKeyboardShortcuts.h"
 #include "MT_CaptureHelpers.h"
 
+#include <chrono>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
@@ -775,6 +776,72 @@ void RegisterMarkdownEditorTests(ImGuiTestEngine *engine)
 		ctx->SetRef("");
 	};
 
+	// The caret blinks from its last move or edit, visible first, so it never
+	// hides while the user types; it can be steady and coloured. List numbers
+	// start at one column, whatever their width in a proportional font.
+	t = IM_REGISTER_TEST(engine, "markdown", "caret_blink_and_list_numbers");
+	t->TestFunc = [](ImGuiTestContext *ctx)
+	{
+		CGuiViewMarkdownEditor *view = EnsureView(ctx);
+		CMarkdownLiveEditor &ed = view->GetEditor();
+		ed.SetEditMode(EMarkdownEditMode::Rendered);
+		ed.SetFindQuery("");
+		std::string src = "Text\n\n";
+		for (int i = 1; i <= 11; i++) src += std::to_string(i) + ". Item " + std::to_string(i) + "\n";
+		ed.SetSource(src);
+		ctx->Yield(2);
+		IM_CHECK(ClickOffset(ctx, ed, 2));
+		ed.SetCaretBlink(true);
+		ctx->Yield(2);
+		IM_CHECK(ed.IsCaretShownNow());                 // shown right after the click
+		ctx->SleepNoSkip(0.62f, 0.05f);
+		IM_CHECK(!ed.IsCaretShownNow());                // then the off phase
+		ctx->KeyChars("x");
+		ctx->Yield(2);
+		IM_CHECK(ed.IsCaretShownNow());                 // typing shows it at once
+		ctx->SleepNoSkip(0.62f, 0.05f);
+		ctx->KeyPress(ImGuiKey_LeftArrow);
+		ctx->Yield(2);
+		IM_CHECK(ed.IsCaretShownNow());                 // and so does a move
+		ImVec2 cmin, cmax;
+		IM_CHECK(ed.GetCaretScreenRect(&cmin, &cmax));  // known in either phase (IME)
+		ed.SetCaretBlink(false);
+		ctx->SleepNoSkip(0.62f, 0.05f);
+		IM_CHECK(ed.IsCaretShownNow());                 // steady
+		ed.SetCaretBlink(true);
+		ed.SetCaretColor(IM_COL32(41, 121, 255, 255));
+		IM_CHECK_EQ(ed.GetCaretColor(), (ImU32)IM_COL32(41, 121, 255, 255));
+		ed.SetCaretColor(0);
+
+		// Every number's first glyph at one x: "1." no further right than "10.".
+		float x1 = -1, x2 = -1, x10 = -1;
+		for (const auto &line : ed.GetLayoutLines())
+		{
+			if (line.glyphs.empty() || !line.glyphs[0].synthetic) continue;
+			const ImWchar c0 = line.glyphs[0].cp, c1 = line.glyphs.size() > 1 ? line.glyphs[1].cp : 0;
+			if (c0 == '1' && c1 == '.') x1 = line.glyphs[0].x0;
+			else if (c0 == '2' && c1 == '.') x2 = line.glyphs[0].x0;
+			else if (c0 == '1' && c1 == '0') x10 = line.glyphs[0].x0;
+		}
+		IM_CHECK(x1 >= 0 && x2 >= 0 && x10 >= 0);
+		IM_CHECK_EQ(x1, x2);
+		IM_CHECK_EQ(x1, x10);
+		// And the text of every item starts at one x after them.
+		float t1 = -1, t11 = -1;
+		for (const auto &line : ed.GetLayoutLines())
+			for (const auto &g : line.glyphs)
+				if (!g.synthetic)
+				{
+					const std::string &now = ed.GetSource();
+					if (now.compare(g.offset, 7, "Item 1\n") == 0) t1 = g.x0;
+					if (now.compare(g.offset, 7, "Item 11") == 0) t11 = g.x0;
+					break;
+				}
+		IM_CHECK(t1 >= 0 && t1 == t11);
+		IM_CHECK_GT(t1, x10);
+		ed.SetEditMode(EMarkdownEditMode::RevealNearCaret);
+	};
+
 	// Page Up / Page Down: the caret moves about one visible page and the view
 	// scrolls with it; Shift extends the selection; at the ends they stop.
 	t = IM_REGISTER_TEST(engine, "markdown", "page_up_down_move_by_a_page");
@@ -958,6 +1025,7 @@ void RegisterMarkdownEditorTests(ImGuiTestEngine *engine)
 		ImGuiTestEngineIO &eio = ImGuiTestEngine_GetIO(ctx->Engine);
 		const float watchdog = eio.ConfigWatchdogKillTest;
 		eio.ConfigWatchdogKillTest = 300.0f;
+		const auto started = std::chrono::steady_clock::now();
 		auto inCode = [&](uint32_t o) {
 			const int32_t b = ed.GetDocument().FindBlockAt(o);
 			return b > 0 && ed.GetDocument().GetBlocks()[b].type == EMarkdownBlockType::Code;
@@ -1061,8 +1129,11 @@ void RegisterMarkdownEditorTests(ImGuiTestEngine *engine)
 			}
 			(void)inCode;
 		}
-		eio.ConfigWatchdogKillTest = watchdog;
-		ctx->LogInfo("%d invariant failures", failures);
+		// The usual limit back -- unless this test already ran past it, when
+		// lowering it would kill the test that is just finishing.
+		const float ran = std::chrono::duration<float>(std::chrono::steady_clock::now() - started).count();
+		if (ran < watchdog - 10.0f) eio.ConfigWatchdogKillTest = watchdog;
+		ctx->LogInfo("%d invariant failures in %.0f s", failures, ran);
 		IM_CHECK_EQ(failures, 0);
 		ed.SetEditMode(EMarkdownEditMode::RevealNearCaret);
 	};
