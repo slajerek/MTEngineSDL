@@ -15,6 +15,12 @@
 #include <cstring>
 #include <string>
 
+// <windows.h>, pulled in by a header after imgui_te_context.h undid it, defines
+// a function-like Yield() that eats ctx->Yield(n).
+#if defined(Yield)
+#undef Yield
+#endif
+
 namespace
 {
 	CGuiViewMarkdownEditor *s_view = nullptr;
