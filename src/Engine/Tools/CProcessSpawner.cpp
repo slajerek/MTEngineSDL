@@ -23,8 +23,14 @@ extern char **environ;
 // posix_spawn_file_actions_addchdir_np: glibc 2.29+, macOS 10.15+ (the engine's
 // deployment target). Without it Run refuses a workingDirectory rather than
 // fork()ing a multi-threaded process.
-#if defined(__APPLE__) || (defined(__GLIBC__) && __GLIBC_PREREQ(2, 29))
+// __GLIBC_PREREQ is tested in its own #if: clang rejects an undefined
+// function-like macro anywhere in an #if expression, short-circuit or not.
+#if defined(__APPLE__)
 #define MT_SPAWN_HAVE_ADDCHDIR 1
+#elif defined(__GLIBC__)
+#if __GLIBC_PREREQ(2, 29)
+#define MT_SPAWN_HAVE_ADDCHDIR 1
+#endif
 #endif
 #endif
 

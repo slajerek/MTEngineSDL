@@ -238,6 +238,14 @@ ALSA sequencer (`/dev/snd/seq`: containers, GitHub-hosted runners)
 `CMidiInKeyboard` leaves `midiIn` NULL, and the piano keyboard's constructor
 dereferenced it, so a host showing one segfaulted at startup there.
 
+**macOS and Windows builds compile again.** `CProcessSpawner.cpp` tested
+`__GLIBC_PREREQ` in the same `#if` as `defined(__APPLE__)`, and clang rejects an
+undefined function-like macro anywhere in an `#if`, so every macOS build stopped
+there; the glibc check now has its own `#if`. On Windows a header included
+after `imgui_te_context.h` brought back `<windows.h>`'s `Yield()` macro, which
+ate every `ctx->Yield(n)` in `CImGuiMarkdownEditorTests.cpp`; the file now
+undefines it after its includes, as `imgui_te_context.h` itself does.
+
 ## 3.21.21 — development
 
 **The Windows x64 build with `MT_CAP_YOLO=1` had never completed, and five
