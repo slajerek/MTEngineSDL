@@ -222,6 +222,22 @@ from another place shows as two different paths. HE-AAC on Apple decoded about
 one packet in seventy and played scrambled; it now decodes in full.
 `CDcpProfile::ReadFileTags` reads the head of a profile instead of all of it.
 
+**`CProcessSpawner::Run`: an argv launcher with captured output.** A host's
+build tasks (compilers, assemblers, linkers) get a blocking run on a worker
+thread with a working directory, extra environment, PATH lookup for a bare
+tool name, stdout and stderr captured separately (and optionally streamed to
+a callback), a timeout and a cancel flag. Arguments go to the child verbatim,
+no shell. Both pipes drain together, so a chatty child cannot deadlock. A stop
+reaches everything the child started: POSIX gives it its own process group
+(SIGTERM, then SIGKILL after a grace period), Windows a kill-on-close job
+object; Windows runs `CreateProcessW` from UTF-8 with an explicit
+inherited-handle list. `CTestProcessSpawner` for a host's `CTestSuite`.
+
+**No MIDI backend no longer crashes `CPianoKeyboard`.** On Linux without the
+ALSA sequencer (`/dev/snd/seq`: containers, GitHub-hosted runners)
+`CMidiInKeyboard` leaves `midiIn` NULL, and the piano keyboard's constructor
+dereferenced it, so a host showing one segfaulted at startup there.
+
 ## 3.21.21 — development
 
 **The Windows x64 build with `MT_CAP_YOLO=1` had never completed, and five
