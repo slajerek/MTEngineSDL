@@ -797,5 +797,74 @@ void CTestMarkdownLiveEditor::Run(ITestCallback *callback)
 		io.ConfigMacOSXBehaviors = wasMac;
 	}
 
+	// ---- Underline (`<u>...</u>`) and find / replace ------------------------------
+	{
+		CMarkdownLiveEditor ed;
+		ed.SetSource("make it plain\n");
+		ed.SetSelection(8, 13);
+		ed.ToggleInlineStyle(EMarkdownInlineStyle::Underline);
+		MDE_ASSERT(ed.GetSource() == "make it <u>plain</u>\n" && ed.GetSelectedText() == "plain" && ed.IsInlineStyleActive(EMarkdownInlineStyle::Underline),
+			"Underline on a selection wraps it in <u></u>");
+		ed.ToggleInlineStyle(EMarkdownInlineStyle::Underline);
+		MDE_ASSERT(ed.GetSource() == "make it plain\n", "and again takes it off");
+		ed.SetSource("a\n");
+		ed.SetCaret(1);
+		ed.ToggleInlineStyle(EMarkdownInlineStyle::Underline);
+		MDE_ASSERT(ed.IsInlineStyleActive(EMarkdownInlineStyle::Underline), "Underline with no selection is pending");
+		ed.InsertText(" ");
+		ed.InsertText("b");
+		MDE_ASSERT(ed.GetSource() == "a <u>b</u>\n", "and what is typed next is underlined");
+		ed.SetSource("<u>ab</u>\n");
+		ed.SetCaret(5);
+		ed.InsertText("c");
+		MDE_ASSERT(ed.GetSource() == "<u>abc</u>\n", "typing at the end of underlined text goes on underlined");
+		ed.SetSource("<u>**x**</u>\n");
+		ed.SetSelection(5, 6);
+		ed.ToggleInlineStyle(EMarkdownInlineStyle::Strong);
+		MDE_ASSERT(ed.GetSource() == "<u>x</u>\n", "unbolding inside underline keeps the underline");
+		ed.SetSource("**<u>x</u>**\n");
+		ed.SetSelection(5, 6);
+		ed.ToggleInlineStyle(EMarkdownInlineStyle::Strong);
+		MDE_ASSERT(ed.GetSource() == "<u>x</u>\n", "unbolding around underline keeps the tags paired");
+		ed.SetSource("a <u>b</u> c\n");
+		ed.SetSelection(5, 6);
+		ed.Backspace();
+		MDE_ASSERT(ed.GetSource() == "a  c\n", "deleting all the underlined text takes the tags too");
+		ed.SetSource("x <u>under</u> y\n");
+		ed.SetEditMode(EMarkdownEditMode::Source);
+		ed.SetCaret(1);
+		ed.ToggleInlineStyle(EMarkdownInlineStyle::Underline);
+		MDE_ASSERT(ed.GetSource() == "x<u></u> <u>under</u> y\n" && ed.GetCaret() == 4, "Source mode: Ctrl+U inserts the tag pair, the caret between");
+		ed.SetEditMode(EMarkdownEditMode::Rendered);
+
+		ed.SetSource("cat and cat and Cat\n");
+		ed.OpenReplace();
+		MDE_ASSERT(ed.IsFindOpen() && ed.IsReplaceOpen(), "Ctrl+H opens find with the replace row");
+		ed.SetFindQuery("cat");
+		ed.SetReplaceText("dog");
+		ed.SetCaret(0);
+		MDE_ASSERT(!ed.ReplaceCurrent() && ed.GetCurrentFindMatch() == 0, "Replace with no match selected only selects the first");
+		MDE_ASSERT(ed.ReplaceCurrent() && ed.GetSource() == "dog and cat and Cat\n" && ed.GetCurrentFindMatch() == 0 && ed.GetSelectedText() == "cat",
+			"Replace replaces the selected match and selects the next");
+		MDE_ASSERT(ed.ReplaceAll() == 2 && ed.GetSource() == "dog and dog and dog\n", "Replace all replaces every match (case-insensitive)");
+#if MT_ENABLE_UNDO
+		MDE_ASSERT(ed.Undo() && ed.GetSource() == "dog and cat and Cat\n", "and undoes in one step");
+#endif
+		ed.SetFindCaseSensitive(true);
+		MDE_ASSERT(ed.ReplaceAll() == 1 && ed.GetSource() == "dog and dog and Cat\n", "matching case leaves Cat");
+		ed.SetFindCaseSensitive(false);
+		ed.SetSource("**bold** word\n");
+		ed.SetFindQuery("bold");
+		ed.SetReplaceText("strong");
+		MDE_ASSERT(ed.ReplaceAll() == 1 && ed.GetSource() == "**strong** word\n", "replacing styled text keeps its style");
+		ed.SetReadOnly(true);
+		ed.SetFindQuery("word");
+		MDE_ASSERT(ed.ReplaceAll() == 0 && ed.GetSource() == "**strong** word\n", "a read-only editor replaces nothing");
+		ed.SetReadOnly(false);
+		ed.OpenFind();
+		MDE_ASSERT(ed.IsFindOpen() && !ed.IsReplaceOpen(), "Ctrl+F opens find alone");
+		ed.CloseFind();
+	}
+
 	TestCompleted(true, "Markdown live editor: commands and undo");
 }

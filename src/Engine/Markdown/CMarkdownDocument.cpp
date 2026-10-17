@@ -2,6 +2,7 @@
 #include "md4c.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cstring>
 
 // ---- Range derivation --------------------------------------------------------
@@ -287,6 +288,7 @@ void CMarkdownDocument::Parse()
 
 	ResolveRanges();
 	ResolveSpans();
+	ResolveHtmlUnderline();
 }
 
 static EMarkdownBlockType BlockTypeFromMd(int type)
@@ -1327,6 +1329,78 @@ void CMarkdownDocument::ResolveSpans()
 			blocks[k].beg = std::min(blocks[k].beg, newBeg);
 		}
 	}
+}
+
+// Underline as `<u>text</u>`. Markdown has none, and inline HTML is how the
+// common renderers (GitHub, Obsidian, Typora, VS Code, pandoc) take it.
+// md4c passes the tags through as raw HTML runs; a pair in the same leaf and
+// the same enclosing span becomes an Underline span here: the tags turn into
+// syntax (their runs go: a byte no run names is syntax), the text between is
+// underlined. An empty pair, or tags across spans, stay raw HTML.
+void CMarkdownDocument::ResolveHtmlUnderline()
+{
+	auto isTag = [&](const CMarkdownRun &r, bool closing) {
+		if (r.kind != EMarkdownRunKind::Html || r.IsSynthesized()) return false;
+		const char *want = closing ? "</u>" : "<u>";
+		const size_t n = strlen(want);
+		if (r.end - r.beg != n) return false;
+		for (size_t k = 0; k < n; k++)
+			if (tolower((unsigned char)source[r.beg + k]) != want[k]) return false;
+		return true;
+	};
+	auto eraseRun = [&](uint32_t idx) {
+		auto fix = [idx](uint32_t &first, uint32_t &count) {
+			if (first > idx) first--;
+			else if (idx < first + count) count--;
+		};
+		for (CMarkdownBlock &b : blocks) fix(b.firstRun, b.runCount);
+		for (CMarkdownSpan &sp : spans) fix(sp.firstRun, sp.runCount);
+		runs.erase(runs.begin() + idx);
+	};
+	for (uint32_t i = 0; i < runs.size(); i++)
+	{
+		if (!isTag(runs[i], false)) continue;
+		const int32_t parent = runs[i].span, block = runs[i].block;
+		uint32_t j = i + 1;
+		int depth = 0;
+		bool found = false;
+		for (; j < runs.size() && runs[j].block == block; j++)
+		{
+			if (runs[j].span != parent) continue;
+			if (isTag(runs[j], false)) depth++;
+			else if (isTag(runs[j], true)) { if (depth == 0) { found = true; break; } depth--; }
+		}
+		if (!found || j == i + 1) continue;
+
+		CMarkdownSpan u;
+		u.type = EMarkdownSpanType::Underline;
+		u.beg = runs[i].beg;
+		u.contentBeg = runs[i].end;
+		u.contentEnd = runs[j].beg;
+		u.end = runs[j].end;
+		u.block = block;
+		u.parent = parent;
+		eraseRun(j);
+		eraseRun(i);
+		u.firstRun = i;
+		u.runCount = j - i - 1;
+
+		// In pre-order: before the first span that starts after it.
+		int32_t pos = 0;
+		while (pos < (int32_t)spans.size() && spans[pos].beg <= u.beg) pos++;
+		for (CMarkdownRun &r : runs) if (r.span >= pos) r.span++;
+		for (CMarkdownSpan &sp : spans) if (sp.parent >= pos) sp.parent++;
+		spans.insert(spans.begin() + pos, u);
+		for (uint32_t k = u.firstRun; k < u.firstRun + u.runCount; k++)
+		{
+			runs[k].styles |= MD_STYLE_UNDERLINE;
+			if (runs[k].span == parent) runs[k].span = pos;
+		}
+		for (int32_t k = pos + 1; k < (int32_t)spans.size() && spans[k].beg < u.end; k++)
+			if (spans[k].parent == parent && spans[k].beg >= u.contentBeg && spans[k].end <= u.contentEnd) spans[k].parent = pos;
+		i--;   // the first run inside comes next
+	}
+	if (!blocks.empty()) blocks[0].runCount = (uint32_t)runs.size();
 }
 
 int32_t CMarkdownDocument::FindSpanAt(uint32_t offset, EMarkdownSpanType type) const

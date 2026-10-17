@@ -794,6 +794,7 @@ int CMarkdownLiveEditor::GetCurrentFindMatch() const
 void CMarkdownLiveEditor::OpenFind()
 {
 	findOpen = true;
+	replaceOpen = false;
 	findFocusRequest = true;
 	// A selection on one line seeds the query, as in every editor.
 	if (HasSelection())
@@ -801,6 +802,56 @@ void CMarkdownLiveEditor::OpenFind()
 		const std::string sel = GetSelectedText();
 		if (sel.find('\n') == std::string::npos && sel.size() < sizeof(findBuffer)) SetFindQuery(sel);
 	}
+}
+
+void CMarkdownLiveEditor::OpenReplace()
+{
+	OpenFind();
+	replaceOpen = true;
+	// With a query already there, straight to the replacement.
+	if (!findQuery.empty()) { findFocusRequest = false; replaceFocusRequest = true; }
+}
+
+void CMarkdownLiveEditor::SetReplaceText(std::string_view text)
+{
+	replaceText.assign(text.data(), std::min(text.size(), sizeof(replaceBuffer) - 1));
+	memcpy(replaceBuffer, replaceText.data(), replaceText.size());
+	replaceBuffer[replaceText.size()] = 0;
+}
+
+bool CMarkdownLiveEditor::ReplaceCurrent()
+{
+	if (readOnly || findQuery.empty()) return false;
+	const int cur = GetCurrentFindMatch();
+	if (cur < 0) { FindNext(); return false; }
+	const std::pair<uint32_t, uint32_t> m = GetFindMatches()[cur];
+	BeginCompound();
+	doc.Replace(m.first, m.second, replaceText);
+	caret = anchor = m.first + (uint32_t)replaceText.size();
+	EndCompound();
+	Changed();
+	// The next match after the replacement (not inside it).
+	if (!FindNext()) SetCaret(caret);
+	return true;
+}
+
+int CMarkdownLiveEditor::ReplaceAll()
+{
+	if (readOnly || findQuery.empty()) return 0;
+	const std::vector<std::pair<uint32_t, uint32_t>> m = GetFindMatches();
+	if (m.empty()) return 0;
+	BeginCompound();
+	for (size_t i = m.size(); i-- > 0; ) doc.Replace(m[i].first, m[i].second, replaceText);
+	// The caret after the last replacement.
+	const int64_t delta = (int64_t)replaceText.size() - (int64_t)findQuery.size();
+	caret = anchor = (uint32_t)((int64_t)m.back().first + delta * (int64_t)(m.size() - 1) + (int64_t)replaceText.size());
+	if (editMode == EMarkdownEditMode::Rendered) caret = anchor = Snap(caret);
+	EndCompound();
+	preferredX = -1;
+	scrollToCaret = true;
+	ComputeRevealed();
+	Changed();
+	return (int)m.size();
 }
 
 void CMarkdownLiveEditor::CloseFind()
@@ -861,6 +912,8 @@ void CMarkdownLiveEditor::RenderFindBar()
 	const float countW = ImGui::CalcTextSize("0000 / 0000").x + ImGui::GetStyle().ItemSpacing.x;
 	const float inputW = std::max(h * 4.0f, ImGui::GetContentRegionAvail().x - countW - 4 * (buttonW + ImGui::GetStyle().ItemSpacing.x));
 
+	// The bar's buttons hand the keyboard back to its field, so Esc and Enter
+	// keep working after a click.
 	if (findFocusRequest) { ImGui::SetKeyboardFocusHere(); findFocusRequest = false; }
 	ImGui::SetNextItemWidth(inputW);
 	const bool enter = ImGui::InputTextWithHint("###md_find_query", L("markdown.editor.find.hint", "Find"), findBuffer, sizeof(findBuffer),
@@ -895,20 +948,49 @@ void CMarkdownLiveEditor::RenderFindBar()
 	ImGui::AlignTextToFramePadding();
 	ImGui::TextUnformatted(count);
 	ImGui::SameLine(lineRight - 4 * buttonW - 3 * ImGui::GetStyle().ItemSpacing.x);
-	if (ImGui::Button("<###md_find_prev", ImVec2(buttonW, h))) FindPrevious();
+	if (ImGui::Button("<###md_find_prev", ImVec2(buttonW, h))) { FindPrevious(); findFocusRequest = true; }
 	ImGui::SetItemTooltip("%s", L("markdown.editor.find.previous", "Previous match (Shift+Enter)"));
 	ImGui::SameLine();
-	if (ImGui::Button(">###md_find_next", ImVec2(buttonW, h))) FindNext();
+	if (ImGui::Button(">###md_find_next", ImVec2(buttonW, h))) { FindNext(); findFocusRequest = true; }
 	ImGui::SetItemTooltip("%s", L("markdown.editor.find.next", "Next match (Enter)"));
 	ImGui::SameLine();
 	if (findCaseSensitive) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetColorU32(ImGuiCol_ButtonActive));
 	const bool caseClicked = ImGui::Button("Aa###md_find_case", ImVec2(buttonW, h));
 	if (findCaseSensitive) ImGui::PopStyleColor();
-	if (caseClicked) findCaseSensitive = !findCaseSensitive;
+	if (caseClicked) { findCaseSensitive = !findCaseSensitive; findFocusRequest = true; }
 	ImGui::SetItemTooltip("%s", L("markdown.editor.find.match_case", "Match case"));
 	ImGui::SameLine();
 	if (ImGui::Button("x###md_find_close", ImVec2(buttonW, h))) CloseFind();
 	ImGui::SetItemTooltip("%s", L("markdown.editor.find.close", "Close (Esc)"));
+
+	if (replaceOpen)
+	{
+		const char *replaceLabel = L("markdown.editor.replace.one", "Replace");
+		const char *allLabel = L("markdown.editor.replace.all", "Replace all");
+		const ImGuiStyle &st = ImGui::GetStyle();
+		const float oneW = ImGui::CalcTextSize(replaceLabel).x + 2 * st.FramePadding.x;
+		const float allW = ImGui::CalcTextSize(allLabel).x + 2 * st.FramePadding.x;
+		if (replaceFocusRequest) { ImGui::SetKeyboardFocusHere(); replaceFocusRequest = false; }
+		ImGui::SetNextItemWidth(std::max(h * 4.0f, lineRight - ImGui::GetCursorPosX() - oneW - allW - 2 * st.ItemSpacing.x));
+		const bool replaceEnter = ImGui::InputTextWithHint("###md_replace_text", L("markdown.editor.replace.hint", "Replace with"),
+			replaceBuffer, sizeof(replaceBuffer), ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
+		const bool replaceActive = ImGui::IsItemActive() || ImGui::IsItemDeactivated();
+		replaceText = replaceBuffer;
+		if (replaceEnter)
+		{
+			ReplaceCurrent();
+			ImGui::SetKeyboardFocusHere(-1);
+		}
+		if (replaceActive && ImGui::IsKeyPressed(ImGuiKey_Escape, false)) CloseFind();
+		ImGui::SameLine();
+		ImGui::BeginDisabled(readOnly || m.empty());
+		if (ImGui::Button((std::string(replaceLabel) + "###md_replace_one").c_str(), ImVec2(oneW, h))) { ReplaceCurrent(); replaceFocusRequest = true; }
+		ImGui::SetItemTooltip("%s", L("markdown.editor.replace.one_tip", "Replace this match and go to the next (Enter)"));
+		ImGui::SameLine();
+		if (ImGui::Button((std::string(allLabel) + "###md_replace_all").c_str(), ImVec2(allW, h))) { ReplaceAll(); replaceFocusRequest = true; }
+		ImGui::SetItemTooltip("%s", L("markdown.editor.replace.all_tip", "Replace every match"));
+		ImGui::EndDisabled();
+	}
 	ImGui::PopID();
 }
 
@@ -2645,6 +2727,7 @@ void CMarkdownLiveEditor::ProcessKeyboard()
 	else if (inCell && pressed(EMarkdownEditorCommand::TableMoveColumnRight, true)) EditTable(EMarkdownTableEdit::MoveColumnRight);
 	else if (pressed(EMarkdownEditorCommand::Bold, false)) ToggleStrong();
 	else if (pressed(EMarkdownEditorCommand::Italic, false)) ToggleEmphasis();
+	else if (pressed(EMarkdownEditorCommand::Underline, false)) ToggleInlineStyle(EMarkdownInlineStyle::Underline);
 	else if (pressed(EMarkdownEditorCommand::Strikethrough, false)) ToggleInlineStyle(EMarkdownInlineStyle::Strikethrough);
 	else if (pressed(EMarkdownEditorCommand::InlineCode, false)) ToggleInlineStyle(EMarkdownInlineStyle::Code);
 	else if (pressed(EMarkdownEditorCommand::BulletList, false)) ToggleList(EMarkdownListKind::Bullet);
@@ -2666,6 +2749,7 @@ void CMarkdownLiveEditor::ProcessKeyboard()
 	else if (pressed(EMarkdownEditorCommand::Undo, true)) Undo();
 	else if (pressed(EMarkdownEditorCommand::Redo, true) || pressed(EMarkdownEditorCommand::RedoAlternate, true)) Redo();
 	else if (pressed(EMarkdownEditorCommand::Find, false)) OpenFind();
+	else if (pressed(EMarkdownEditorCommand::Replace, false)) OpenReplace();
 	else if (pressed(EMarkdownEditorCommand::FindNext, true)) { if (findQuery.empty()) OpenFind(); else FindNext(); }
 	else if (pressed(EMarkdownEditorCommand::FindPrevious, true)) { if (findQuery.empty()) OpenFind(); else FindPrevious(); }
 	else if (findOpen && ImGui::Shortcut(ImGuiKey_Escape)) CloseFind();
@@ -2928,7 +3012,7 @@ void CMarkdownLiveEditor::Render(const char *id, ImVec2 size)
 	{
 		// The bar sits above the text, outside the scrolling area.
 		RenderFindBar();
-		if (size.y > 0) size.y = std::max(1.0f, size.y - ImGui::GetFrameHeightWithSpacing());
+		if (size.y > 0) size.y = std::max(1.0f, size.y - ImGui::GetFrameHeightWithSpacing() * (replaceOpen ? 2 : 1));
 	}
 	const ImGuiWindowFlags flags = ImGuiWindowFlags_NoMove;
 	ImGui::BeginChild("##md_live_editor", size, ImGuiChildFlags_None, flags);

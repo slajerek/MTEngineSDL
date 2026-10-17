@@ -637,6 +637,72 @@ void RegisterMarkdownEditorTests(ImGuiTestEngine *engine)
 		IM_CHECK_EQ(ed.GetSource(), std::string("alpha Z\n\nBeta gamma beta\n"));
 	};
 
+	// Replace, with real input: Ctrl+H (Cmd+Alt+F on a Mac) opens the bar with
+	// its second row; Enter in the replacement replaces and steps; the
+	// Replace all button replaces the rest.
+	t = IM_REGISTER_TEST(engine, "markdown", "replace_bar_and_underline");
+	t->TestFunc = [](ImGuiTestContext *ctx)
+	{
+		CGuiViewMarkdownEditor *view = EnsureView(ctx);
+		CMarkdownLiveEditor &ed = view->GetEditor();
+		ed.SetEditMode(EMarkdownEditMode::Rendered);
+		ed.SetFindQuery("");
+		ed.SetReplaceText("");
+		ed.SetSource("alpha beta\n\nBeta gamma beta\n");
+		ctx->Yield(2);
+		IM_CHECK(ClickOffset(ctx, ed, 0));
+		ctx->KeyPress(ed.GetBindings()->GetChord(EMarkdownEditorCommand::Replace));
+		ctx->Yield(3);
+		IM_CHECK(ed.IsReplaceOpen());
+		ctx->KeyChars("beta");          // the query, in the focused find field
+		ctx->Yield(2);
+		IM_CHECK_EQ(ed.GetCurrentFindMatch(), 0);
+		ctx->SetRef("//MarkdownEditorTest/##markdowneditor/##md_find");
+		ctx->ItemClick("###md_replace_text");
+		ctx->KeyChars("delta");
+		ctx->KeyPress(ImGuiKey_Enter);   // replace this one, go to the next
+		ctx->Yield(2);
+		IM_CHECK_EQ(ed.GetSource(), std::string("alpha delta\n\nBeta gamma beta\n"));
+		IM_CHECK_EQ(ed.GetSelectedText(), std::string("Beta"));
+		ctx->ItemClick("###md_replace_all");
+		ctx->Yield(2);
+		IM_CHECK_EQ(ed.GetSource(), std::string("alpha delta\n\ndelta gamma delta\n"));
+		ctx->KeyPress(ImGuiKey_Escape);
+		ctx->Yield(3);
+		IM_CHECK(!ed.IsFindOpen());
+		IM_CHECK(ed.IsFocused());
+
+		// Ctrl+U on a double-clicked word, then off with the toolbar button.
+		ed.SetSource("make it plain\n");
+		ctx->Yield(2);
+		ImVec2 pos;
+		float h = 0;
+		IM_CHECK(ed.GetOffsetScreenPos(9, &pos, &h));
+		ctx->MouseMoveToPos(ImVec2(pos.x + 1.0f, pos.y + h * 0.5f));
+		ctx->MouseDoubleClick(ImGuiMouseButton_Left);
+		ctx->Yield(2);
+		IM_CHECK_EQ(ed.GetSelectedText(), std::string("plain"));
+		ctx->KeyPress(ImGuiMod_Ctrl | ImGuiKey_U);
+		ctx->Yield(2);
+		IM_CHECK_EQ(ed.GetSource(), std::string("make it <u>plain</u>\n"));
+		// Drawn underlined, the tags hidden.
+		IM_CHECK(!OffsetHasGlyph(ed, 8));
+		bool underlined = false;
+		for (const auto &line : ed.GetLayoutLines())
+			for (const auto &g : line.glyphs)
+				if (!g.synthetic && g.offset == 11) underlined = ed.GetLayoutStyles()[g.style].underline;
+		IM_CHECK(underlined);
+		ctx->SetRef("//MarkdownEditorTest/##markdowneditor/##md_toolbar");
+		ctx->ItemClick("###md_tb_underline");
+		ctx->Yield(2);
+		IM_CHECK_EQ(ed.GetSource(), std::string("make it plain\n"));
+		ed.SetSource("");
+		ed.SetFindQuery("");
+		ed.SetReplaceText("");
+		ctx->Yield(3);
+		ed.SetEditMode(EMarkdownEditMode::RevealNearCaret);
+	};
+
 	t = IM_REGISTER_TEST(engine, "markdown", "word_like_typing_never_shows_syntax");
 	t->TestFunc = [](ImGuiTestContext *ctx)
 	{
@@ -1316,6 +1382,20 @@ void RegisterMarkdownEditorTests(ImGuiTestEngine *engine)
 		ctx->KeyChars("an");
 		shot("4_find");
 		ctx->KeyPress(ImGuiKey_Escape);
+		ctx->Yield(2);
+		// 8. Word-like: an underlined word (`<u>`) and the replace bar.
+		ed.SetEditMode(EMarkdownEditMode::Rendered);
+		ed.SetSource("An <u>underlined</u> word, **bold <u>and underlined</u>**, and plain.\n");
+		ctx->Yield(2);
+		IM_CHECK(ClickOffset(ctx, ed, 0));
+		ctx->KeyPress(ed.GetBindings()->GetChord(EMarkdownEditorCommand::Replace));
+		ctx->Yield(2);
+		ctx->KeyChars("word");
+		shot("8_underline_replace");
+		ctx->KeyPress(ImGuiKey_Escape);
+		ed.SetFindQuery("");
+		ed.SetSource(src);
+		ed.SetEditMode(EMarkdownEditMode::RevealNearCaret);
 		ctx->Yield(2);
 	};
 }

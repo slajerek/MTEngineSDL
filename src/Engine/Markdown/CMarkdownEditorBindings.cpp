@@ -43,6 +43,13 @@ namespace
 		{EMarkdownEditorCommand::NumberedList, "markdown.editor.command.numbered_list", "Numbered list", "Markdown editor: Numbered list", '7', true, false, true, false},
 		{EMarkdownEditorCommand::TaskList, "markdown.editor.command.task_list", "Task list", "Markdown editor: Task list", '9', true, false, true, false},
 		{EMarkdownEditorCommand::Quote, "markdown.editor.command.quote", "Quote", "Markdown editor: Quote", '.', true, false, true, false},
+#if defined(__APPLE__)
+		// Cmd+H hides the app on a Mac; replace is Cmd+Alt+F there.
+		{EMarkdownEditorCommand::Replace, "markdown.editor.command.replace", "Replace", "Markdown editor: Replace", 'f', false, true, true, false},
+#else
+		{EMarkdownEditorCommand::Replace, "markdown.editor.command.replace", "Replace", "Markdown editor: Replace", 'h', false, false, true, false},
+#endif
+		{EMarkdownEditorCommand::Underline, "markdown.editor.command.underline", "Underline", "Markdown editor: Underline", 'u', false, false, true, false},
 	};
 	static_assert(sizeof(kDefaults) / sizeof(kDefaults[0]) == (size_t)EMarkdownEditorCommand::Count, "one default per command");
 

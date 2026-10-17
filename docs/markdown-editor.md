@@ -23,7 +23,12 @@ finds in it, with everything mapped back to byte ranges of the source:
 - `GetSpans()`: inline spans (emphasis, strong, code, link, image,
   strikethrough, underline, math, wikilink) with their range including the
   markers, their content range and their destination. `SpansTouching()`,
-  `FindSpanAt()`.
+  `FindSpanAt()`. Underline is `<u>text</u>`: Markdown has none, and inline
+  HTML is how GitHub, Obsidian, Typora, VS Code and pandoc take it. md4c
+  passes the tags through as raw HTML runs; `ResolveHtmlUnderline()` turns
+  a pair in one leaf and one enclosing span into an Underline span (the tags
+  become syntax, the text between is underlined). An empty pair, an
+  unclosed tag or tags across another span stay raw HTML.
 - `IsContentByte(offset)`: a byte inside a run is content; every other byte
   of a block is syntax.
 - `Replace(beg, end, text)`: the only mutation. It splices bytes and reparses
@@ -90,7 +95,13 @@ A word is a run of letters and digits (any non-ASCII letter counts), a run
 of punctuation is one, and a paragraph break is a step of its own, as in
 Word; in Rendered mode syntax is skipped. Ctrl/Cmd+F opens the find bar
 above the text: matches in the source, highlighted, the current one
-selected; Enter / Shift+Enter, F3 / Shift+F3, Esc.
+selected; Enter / Shift+Enter, F3 / Shift+F3, Esc. Ctrl+H (Cmd+Alt+F on a
+Mac, where Cmd+H hides the app) opens it with a second row: the replacement,
+Replace (also Enter in that field: this match, then the next) and Replace
+all (one undo step). The replacement is written into the source as typed,
+as the query is matched in it; `OpenReplace()`, `ReplaceCurrent()`,
+`ReplaceAll()`. The bar's buttons hand the keyboard back to its field.
+`RequestFocus()` gives it back to the text, for a host's Edit menu.
 
 ## Word-like editing (`Rendered`)
 
@@ -152,10 +163,10 @@ mode changes is how a caret that never sees syntax maps onto the source.
   what is copied in the editor comes back with its formatting.
 
 The **toolbar** has the paragraph style (Normal, Heading 1-4), bold, italic,
-strikethrough, inline code, link | bulleted, numbered and task list,
-outdent, indent, quote | table | undo, redo | find. Buttons show the state
-at the caret and wrap to a second row in a narrow window. It offers only
-what Markdown stores: no underline, colour, size or alignment. Icons are
+underline, strikethrough, inline code, link | bulleted, numbered and task
+list, outdent, indent, quote | table | undo, redo | find. Buttons show the
+state at the caret and wrap to a second row in a narrow window. It offers
+only what the file can store: no colour, size or alignment. Icons are
 drawn shapes (the engine has no icon font). In the other modes Bold and
 Italic with no selection insert a marker pair, as before.
 
@@ -165,11 +176,11 @@ Italic with no selection insert a marker pair, as before.
 screen lists, remaps and stores them with the rest. CGuiMain dispatches only
 the GLOBAL zone itself, so these act only in a focused editor, which turns
 each binding into an ImGui chord every frame (a change applies from the next
-frame). Defaults: Ctrl/Cmd+B, I, K (link), 1..6 (headings), Shift+0
-(paragraph), Shift+X (strikethrough), E (inline code), Shift+8 / Shift+7 /
+frame). Defaults: Ctrl/Cmd+B, I, U (underline), K (link), 1..6 (headings),
+Shift+0 (paragraph), Shift+X (strikethrough), E (inline code), Shift+8 / Shift+7 /
 Shift+9 (bulleted / numbered / task list), Shift+. (quote), Z, Shift+Z and Y
-(undo/redo), Enter (task box, or a table row below), F (find), F3 /
-Shift+F3, Alt+Shift+arrows (move table row/column). Movement, deletion,
+(undo/redo), Enter (task box, or a table row below), F (find), H (replace;
+Cmd+Alt+F on a Mac), F3 / Shift+F3, Alt+Shift+arrows (move table row/column). Movement, deletion,
 Enter, Tab and the clipboard are fixed.
 
 **`CGuiViewMarkdownEditor`** is the window: it owns an editor, fills its
@@ -270,9 +281,9 @@ own UI tests.
   leaves an empty last line, pasting plain text from outside as literal text
   (paste is Markdown).
 - Inline preedit (see Text input), drag selection by words after a double
-  click, autoscroll while dragging, replace in find.
-- Entities are drawn as written; math, wikilinks and underline are parsed
-  when their `MD_FLAG`s are set but drawn as plain styled text.
+  click, autoscroll while dragging, replace with regular expressions.
+- Entities are drawn as written; math and wikilinks are parsed when their
+  `MD_FLAG`s are set but drawn as plain styled text.
 - Column resize in tables; a table with more columns than fit is squeezed,
   not scrolled.
 - Converging with `TextEditor` on shared pieces (clipboard, undo grouping)

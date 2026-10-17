@@ -2,7 +2,8 @@
 //
 // A row above the text: paragraph style, inline styles, link, lists, indent,
 // quote, table, undo/redo, find. Buttons show the state at the caret. Only
-// what Markdown stores is offered (no underline, colour, size, alignment).
+// what Markdown stores is offered (no colour, size, alignment); underline is
+// `<u>text</u>`.
 // Icons are drawn shapes: the engine has no icon font. Every command goes
 // through the same public API a host would call, then gives the keyboard
 // focus back to the text.
@@ -153,6 +154,14 @@ void CMarkdownLiveEditor::RenderToolbar()
 	if (button("###md_tb_italic", IsInlineStyleActive(EMarkdownInlineStyle::Emphasis), editable, letter(fonts.italic, "I")))
 		ToggleInlineStyle(EMarkdownInlineStyle::Emphasis);
 	tooltip("markdown.editor.toolbar.italic", "Italic", kb->GetChord(EMarkdownEditorCommand::Italic));
+	if (button("###md_tb_underline", IsInlineStyleActive(EMarkdownInlineStyle::Underline), editable,
+		[&](ImDrawList *dl, ImVec2 a, ImVec2 b, ImU32 col) {
+			letter(fonts.regular, "U")(dl, ImVec2(a.x, a.y - (b.y - a.y) * 0.08f), ImVec2(b.x, b.y - (b.y - a.y) * 0.08f), col);
+			const float y = b.y + (b.y - a.y) * 0.16f;
+			dl->AddLine(ImVec2(a.x + (b.x - a.x) * 0.1f, y), ImVec2(b.x - (b.x - a.x) * 0.1f, y), col, t);
+		}))
+		ToggleInlineStyle(EMarkdownInlineStyle::Underline);
+	tooltip("markdown.editor.toolbar.underline", "Underline", kb->GetChord(EMarkdownEditorCommand::Underline));
 	if (button("###md_tb_strike", IsInlineStyleActive(EMarkdownInlineStyle::Strikethrough), editable,
 		[&](ImDrawList *dl, ImVec2 a, ImVec2 b, ImU32 col) {
 			letter(fonts.regular, "S")(dl, a, b, col);

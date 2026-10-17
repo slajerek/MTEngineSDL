@@ -58,7 +58,9 @@ enum class EMarkdownEditMode : uint8_t
 };
 
 // Inline styles the Word-like commands toggle.
-enum class EMarkdownInlineStyle : uint8_t { Strong, Emphasis, Strikethrough, Code };
+// Underline is written `<u>text</u>` (Markdown has none; inline HTML is how
+// GitHub, Obsidian, Typora and VS Code take it).
+enum class EMarkdownInlineStyle : uint8_t { Strong, Emphasis, Strikethrough, Code, Underline, Count };
 
 // Block kinds the toolbar's paragraph-level commands set.
 enum class EMarkdownListKind : uint8_t { Bullet, Numbered, Task };
@@ -242,6 +244,17 @@ public:
 	// there is none.
 	bool FindNext();
 	bool FindPrevious();
+	// Replace (Ctrl+H; Cmd+Alt+F on a Mac): the find bar with a second row.
+	// The replacement is written into the source as typed, as the query is
+	// matched in it. ReplaceCurrent() replaces the selected match and selects
+	// the next one (with no match selected it only finds the next); false when
+	// nothing was replaced. ReplaceAll() is one undo step and returns how many.
+	void OpenReplace();
+	bool IsReplaceOpen() const { return findOpen && replaceOpen; }
+	void SetReplaceText(std::string_view text);
+	const std::string &GetReplaceText() const { return replaceText; }
+	bool ReplaceCurrent();
+	int ReplaceAll();
 
 	// Table navigation; false when the caret is not in a cell. Tab in the last
 	// cell appends a row.
@@ -255,6 +268,9 @@ public:
 	// The source range the revealed unit shows as source: [beg, end).
 	void GetRevealedRange(uint32_t *beg, uint32_t *end) const { *beg = revealBeg; *end = revealEnd; }
 	bool IsFocused() const { return focused; }
+	// Give the text the keyboard on the next Render() (after a host's menu
+	// or button acted on the editor).
+	void RequestFocus() { returnFocus = true; }
 	// The screen rectangle of the caret as drawn in the last Render(); false
 	// when it was not visible.
 	bool GetCaretScreenRect(ImVec2 *min, ImVec2 *max) const;
@@ -361,6 +377,7 @@ public:
 public:
 	// Internal layout structures are public for the test (it inspects lines).
 	const std::vector<Line> &GetLayoutLines() const { return layout.lines; }
+	const std::vector<Style> &GetLayoutStyles() const { return layout.styles; }
 	// Caret movement as the arrow keys do it (vertical and line-edge moves
 	// need a layout, so they act after the first Render()).
 	void MoveHorizontal(int direction, bool extend);
@@ -492,7 +509,7 @@ private:
 	void MoveCaretTo(uint32_t offset, bool extend);
 	void DeleteTo(uint32_t target);                              // the range caret..target, as a selection would go
 	int32_t InnermostSpanOfType(EMarkdownSpanType type, uint32_t a, uint32_t b) const;
-	bool ToggleInlineInBlock(EMarkdownSpanType type, const char *delim, uint32_t a, uint32_t b, uint32_t *newA, uint32_t *newB);
+	bool ToggleInlineInBlock(EMarkdownSpanType type, const char *open, const char *close, uint32_t a, uint32_t b, uint32_t *newA, uint32_t *newB);
 	std::vector<int32_t> SelectedLeafBlocks() const;
 	void RenderFindBar();
 	void UpdateFindMatches() const;
@@ -555,6 +572,10 @@ private:
 	bool findCaseSensitive = false;
 	std::string findQuery;
 	char findBuffer[256] = {0};
+	bool replaceOpen = false;
+	bool replaceFocusRequest = false;
+	std::string replaceText;
+	char replaceBuffer[256] = {0};
 	mutable std::vector<std::pair<uint32_t, uint32_t>> findMatches;
 	mutable uint32_t findMatchesParse = UINT32_MAX;
 	mutable std::string findMatchesQuery;

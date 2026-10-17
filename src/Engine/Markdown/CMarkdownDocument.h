@@ -112,7 +112,8 @@ enum class EMarkdownSpanType : uint8_t
 };
 
 // An inline span (`**strong**`, `*em*`, `` `code` ``, `~~del~~`, `[link](url)`,
-// `![image](src)`, `<autolink>`) with its source range. md4c reports spans
+// `![image](src)`, `<autolink>`, `<u>underline</u>`) with its source range.
+// Underline is the engine's extension over inline HTML (ResolveHtmlUnderline). md4c reports spans
 // without offsets, like blocks; the derivation is in the .cpp:
 //
 //   content = the runs inside the span;
@@ -360,6 +361,7 @@ private:
 	void ResolveLeafRange(int32_t index, uint32_t &cursor);
 	void ResolveCellRange(int32_t index, uint32_t rowLineBeg, uint32_t &cursor);
 	void ResolveSpans();
+	void ResolveHtmlUnderline();
 	uint32_t NextBlankLine(uint32_t from) const;
 	uint32_t SpanCloseEnd(const CMarkdownSpan &span) const;
 	uint32_t MatchLinkTail(uint32_t from, uint32_t limit) const;

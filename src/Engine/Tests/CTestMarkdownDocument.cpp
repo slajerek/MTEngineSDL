@@ -406,5 +406,62 @@ void CTestMarkdownDocument::Run(ITestCallback *callback)
 	CMarkdownDocument crlf("# A\r\n\r\nB\r\n");
 	MD_ASSERT(crlf.GetBlocks().size() == 3 && crlf.GetBlocks()[1].type == EMarkdownBlockType::Heading, "CRLF sources parse");
 
+	// Underline: `<u>text</u>`, inline HTML, as a span of its own.
+	{
+		CMarkdownDocument u("a <u>bc</u> d\n");
+		MD_ASSERT(SpanText(u, EMarkdownSpanType::Underline) == "<u>bc</u>", "<u>...</u> is an Underline span");
+		MD_ASSERT(!u.IsContentByte(2) && !u.IsContentByte(4) && u.IsContentByte(5) && !u.IsContentByte(7) && u.IsContentByte(11),
+			"its tags are syntax, the text between is content");
+		const int32_t r = u.FindRunAt(5);
+		MD_ASSERT(r >= 0 && (u.GetRuns()[r].styles & MD_STYLE_UNDERLINE) != 0 && u.GetRuns()[r].span >= 0
+			&& u.GetSpans()[u.GetRuns()[r].span].type == EMarkdownSpanType::Underline, "the text is underlined and inside the span");
+		MD_ASSERT(u.GetBlocks()[0].runCount == u.GetRuns().size() && Slice(u, 1) == "a <u>bc</u> d", "the paragraph keeps its range and run count");
+		CMarkdownDocument outer("<u>**b** c</u>\n");
+		const auto &os = outer.GetSpans();
+		MD_ASSERT(os.size() == 2 && os[0].type == EMarkdownSpanType::Underline && os[1].type == EMarkdownSpanType::Strong && os[1].parent == 0 && os[0].parent == -1,
+			"bold inside underline: the underline is the parent, in pre-order");
+		CMarkdownDocument inner("**<u>b</u>**\n");
+		const auto &is = inner.GetSpans();
+		MD_ASSERT(is.size() == 2 && is[0].type == EMarkdownSpanType::Strong && is[1].type == EMarkdownSpanType::Underline && is[1].parent == 0,
+			"underline inside bold: bold is the parent");
+		const int32_t ri = inner.FindRunAt(5);
+		MD_ASSERT(ri >= 0 && (inner.GetRuns()[ri].styles & (MD_STYLE_UNDERLINE | MD_STYLE_STRONG)) == (MD_STYLE_UNDERLINE | MD_STYLE_STRONG), "and the text is both");
+		CMarkdownDocument upper("<U>x</U>\n");
+		MD_ASSERT(SpanText(upper, EMarkdownSpanType::Underline) == "<U>x</U>", "the tags in any case");
+		CMarkdownDocument nested("<u>a <u>b</u> c</u>\n");
+		MD_ASSERT(SpanText(nested, EMarkdownSpanType::Underline) == "<u>a <u>b</u> c</u>" && SpanText(nested, EMarkdownSpanType::Underline, 1) == "<u>b</u>",
+			"nested pairs match by depth");
+		CMarkdownDocument empty("<u></u> x\n"), open("<u>x\n"), crossed("**a <u>b** c</u>\n");
+		MD_ASSERT(SpanText(empty, EMarkdownSpanType::Underline).empty() && empty.IsContentByte(0), "an empty pair stays raw HTML");
+		MD_ASSERT(SpanText(open, EMarkdownSpanType::Underline).empty(), "an unclosed tag stays raw HTML");
+		MD_ASSERT(SpanText(crossed, EMarkdownSpanType::Underline).empty(), "tags across another span stay raw HTML");
+		CMarkdownDocument two("<u>a</u>\n\nb <u>c</u>\n");
+		MD_ASSERT(SpanText(two, EMarkdownSpanType::Underline, 1) == "<u>c</u>" && two.GetSpans()[1].block > two.GetSpans()[0].block, "one span per paragraph, in block order");
+
+		// Incremental reparse with the tags as tokens.
+		CMarkdownDocument inc("Intro <u>under</u> line.\n\n- <u>item</u>\n- **b**\n\n## H <u>x</u>\n\nEnd.\n");
+		const char *tokens[] = { "<u>", "</u>", "**", "x", " ", "\n\n", "- ", "`" };
+		uint32_t seed = 20261017u;
+		auto rnd = [&seed](uint32_t n) { seed = seed * 1664525u + 1013904223u; return n ? (seed >> 8) % n : 0; };
+		std::string why;
+		bool ok = true;
+		int failedAt = -1;
+		for (int i = 0; i < 1500 && ok; i++)
+		{
+			const uint32_t size = inc.Size();
+			const uint32_t pos = rnd(size + 1);
+			if (rnd(3) == 0 || size > 1200) inc.Replace(pos, std::min(size, pos + 1 + rnd(4)), "");
+			else inc.Replace(pos, pos, tokens[rnd(sizeof(tokens) / sizeof(tokens[0]))]);
+			CMarkdownDocument full;
+			full.SetIncrementalParse(false);
+			full.SetSource(inc.GetSource());
+			if (!SameModel(inc, full, &why)) { ok = false; failedAt = i; }
+		}
+		char m[900];
+		snprintf(m, sizeof(m), "1500 random edits with <u> tags: incremental equals full%s%s%s", ok ? "" : "; FIRST DIFFERENCE at edit ",
+			ok ? "" : std::to_string(failedAt).c_str(), ok ? "" : (": " + why).substr(0, 600).c_str());
+		MD_ASSERT(ok, m);
+	}
+
 	TestCompleted(true, "Markdown document: ranges, content/syntax, edits, lists, degenerate inputs");
 }

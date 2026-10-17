@@ -31,7 +31,8 @@ namespace
 {
 	bool IsBlankChar(char c) { return c == ' ' || c == '\t' || c == '\r'; }
 
-	const char *DelimFor(EMarkdownInlineStyle s)
+	// The opening and closing markers of a style.
+	const char *OpenFor(EMarkdownInlineStyle s)
 	{
 		switch (s)
 		{
@@ -39,8 +40,15 @@ namespace
 			case EMarkdownInlineStyle::Emphasis: return "*";
 			case EMarkdownInlineStyle::Strikethrough: return "~~";
 			case EMarkdownInlineStyle::Code: return "`";
+			case EMarkdownInlineStyle::Underline: return "<u>";
+			case EMarkdownInlineStyle::Count: break;
 		}
 		return "**";
+	}
+
+	const char *CloseFor(EMarkdownInlineStyle s)
+	{
+		return s == EMarkdownInlineStyle::Underline ? "</u>" : OpenFor(s);
 	}
 
 	EMarkdownSpanType SpanTypeFor(EMarkdownInlineStyle s)
@@ -51,6 +59,8 @@ namespace
 			case EMarkdownInlineStyle::Emphasis: return EMarkdownSpanType::Emphasis;
 			case EMarkdownInlineStyle::Strikethrough: return EMarkdownSpanType::Strikethrough;
 			case EMarkdownInlineStyle::Code: return EMarkdownSpanType::Code;
+			case EMarkdownInlineStyle::Underline: return EMarkdownSpanType::Underline;
+			case EMarkdownInlineStyle::Count: break;
 		}
 		return EMarkdownSpanType::Strong;
 	}
@@ -63,6 +73,8 @@ namespace
 			case EMarkdownInlineStyle::Emphasis: return MD_STYLE_EMPHASIS;
 			case EMarkdownInlineStyle::Strikethrough: return MD_STYLE_STRIKETHROUGH;
 			case EMarkdownInlineStyle::Code: return MD_STYLE_CODE;
+			case EMarkdownInlineStyle::Underline: return MD_STYLE_UNDERLINE;
+			case EMarkdownInlineStyle::Count: break;
 		}
 		return 0;
 	}
@@ -546,14 +558,14 @@ void CMarkdownLiveEditor::WordInsertText(std::string_view text)
 			}
 		}
 	}
-	for (int s = 0; s < 4; s++)
+	for (int s = 0; s < (int)EMarkdownInlineStyle::Count; s++)
 	{
 		const uint8_t bit = (uint8_t)(1u << s);
 		const EMarkdownInlineStyle style = (EMarkdownInlineStyle)s;
 		if (pendingOn & bit)
 		{
-			open += DelimFor(style);
-			close = std::string(DelimFor(style)) + close;
+			open += OpenFor(style);
+			close = std::string(CloseFor(style)) + close;
 		}
 		else if (pendingOff & bit)
 		{
@@ -1271,7 +1283,7 @@ bool CMarkdownLiveEditor::IsInlineStyleActive(EMarkdownInlineStyle style) const
 	return r >= 0 && (doc.GetRuns()[r].styles & StyleFlagFor(style)) != 0;
 }
 
-bool CMarkdownLiveEditor::ToggleInlineInBlock(EMarkdownSpanType type, const char *delim, uint32_t a, uint32_t b, uint32_t *newA, uint32_t *newB)
+bool CMarkdownLiveEditor::ToggleInlineInBlock(EMarkdownSpanType type, const char *openMark, const char *closeMark, uint32_t a, uint32_t b, uint32_t *newA, uint32_t *newB)
 {
 	const std::string &src = doc.GetSource();
 	const int32_t inside = InnermostSpanOfType(type, a, b);
@@ -1279,6 +1291,14 @@ bool CMarkdownLiveEditor::ToggleInlineInBlock(EMarkdownSpanType type, const char
 	{
 		// Take the style off [a, b): the span splits around it.
 		const CMarkdownSpan sp = doc.GetSpans()[inside];
+		// Markers alone between the span's edge and the range (another
+		// span's, "**<u>x</u>**") go with the range, so they stay paired.
+		auto noContent = [&](uint32_t x, uint32_t y) {
+			for (uint32_t o = x; o < y; o++) if (doc.IsContentByte(o)) return false;
+			return true;
+		};
+		if (noContent(sp.contentBeg, a)) a = sp.contentBeg;
+		if (noContent(b, sp.contentEnd)) b = sp.contentEnd;
 		const std::string open = src.substr(sp.beg, sp.contentBeg - sp.beg);
 		const std::string close = src.substr(sp.contentEnd, sp.end - sp.contentEnd);
 		const std::string left = src.substr(sp.contentBeg, a - sp.contentBeg);
@@ -1321,9 +1341,9 @@ bool CMarkdownLiveEditor::ToggleInlineInBlock(EMarkdownSpanType type, const char
 	while (l < r && IsBlankChar(inner[l])) l++;
 	while (r > l && IsBlankChar(inner[r - 1])) r--;
 	if (l == r) return false;
-	const std::string text = inner.substr(0, l) + delim + inner.substr(l, r - l) + delim + inner.substr(r);
+	const std::string text = inner.substr(0, l) + openMark + inner.substr(l, r - l) + closeMark + inner.substr(r);
 	doc.Replace(a, b, text);
-	*newA = a + (uint32_t)(l + strlen(delim));
+	*newA = a + (uint32_t)(l + strlen(openMark));
 	*newB = *newA + (uint32_t)(r - l);
 	return true;
 }
@@ -1351,7 +1371,7 @@ std::vector<int32_t> CMarkdownLiveEditor::SelectedLeafBlocks() const
 void CMarkdownLiveEditor::ToggleInlineStyle(EMarkdownInlineStyle style)
 {
 	if (readOnly) return;
-	const char *delim = DelimFor(style);
+	const char *openMark = OpenFor(style), *closeMark = CloseFor(style);
 	const EMarkdownSpanType type = SpanTypeFor(style);
 	if (!HasSelection())
 	{
@@ -1359,8 +1379,8 @@ void CMarkdownLiveEditor::ToggleInlineStyle(EMarkdownInlineStyle style)
 		{
 			// Source-visible modes: a pair of markers with the caret between.
 			BeginCompound();
-			doc.Replace(caret, caret, std::string(delim) + delim);
-			caret = anchor = caret + (uint32_t)strlen(delim);
+			doc.Replace(caret, caret, std::string(openMark) + closeMark);
+			caret = anchor = caret + (uint32_t)strlen(openMark);
 			EndCompound();
 			Changed();
 			return;
@@ -1403,7 +1423,7 @@ void CMarkdownLiveEditor::ToggleInlineStyle(EMarkdownInlineStyle style)
 		const Seg sg = segs[k];
 		uint32_t na = sg.a, nb = sg.b;
 		if (allOn || InnermostSpanOfType(type, sg.a, sg.b) < 0)
-			ToggleInlineInBlock(type, delim, sg.a, sg.b, &na, &nb);
+			ToggleInlineInBlock(type, openMark, closeMark, sg.a, sg.b, &na, &nb);
 		if (k == (int32_t)segs.size() - 1) { lastB = nb; sizeAfterLast = doc.Size(); }
 		if (k == 0) firstA = na;
 	}

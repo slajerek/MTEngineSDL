@@ -87,11 +87,15 @@ keys: by word (Ctrl+arrows, Alt on a Mac) and paragraph, Ctrl+Shift+Home /
 End, word deletion, Shift+Backspace, Ctrl/Shift+Insert, Shift+Delete, the
 Mac's Cmd+arrows and Cmd+Backspace, double and triple click; shortcuts for
 strikethrough, inline code, the three lists and quote. Cut did nothing in
-Word-like mode; it cuts.
+Word-like mode; it cuts. Underline, written `<u>text</u>` (inline HTML, which the
+common renderers draw underlined): read as a span by the document model,
+Ctrl/Cmd+U and a toolbar button. Find gets replace: Ctrl+H (Cmd+Alt+F on a
+Mac), Replace and Replace all, one undo step. `RequestFocus()` for a host's
+Edit menu.
 
 Tests: `CTestMarkdownDocument` (model) and `CTestMarkdownLiveEditor`
 (commands, undo, bindings, find, Word-like rules) for a host's `CTestSuite`;
-`RegisterMarkdownEditorTests()` for its imgui_test_engine tests: nineteen
+`RegisterMarkdownEditorTests()` for its imgui_test_engine tests: twenty
 that drive the widget with real input, one of them checking captured pixels.
 AgendaScene registers all three.
 

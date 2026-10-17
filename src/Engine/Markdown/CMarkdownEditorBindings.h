@@ -51,6 +51,8 @@ enum class EMarkdownEditorCommand : uint8_t
 	NumberedList,
 	TaskList,
 	Quote,
+	Replace,
+	Underline,
 	Count
 };
 
