@@ -72,7 +72,9 @@ CPianoKeyboard::CPianoKeyboard(const char *name, float posX, float posY, float p
 	
 	// TODO
 	midiInKeyboard = new CMidiInKeyboard(0, this);
-	if (midiInKeyboard->midiIn->isPortOpen())
+	// midiIn stays NULL when no MIDI backend is available (Linux without the
+	// ALSA sequencer: containers, CI runners), so it is checked before use.
+	if (midiInKeyboard->midiIn != NULL && midiInKeyboard->midiIn->isPortOpen())
 	{
 		midiPortNum = 0;
 	}
@@ -593,8 +595,15 @@ void CPianoKeyboard::RenderContextMenuItems()
 				if (ImGui::MenuItem(strMidiInPort, NULL, &checked))
 				{
 					LOGD("SELECTED %s", strMidiInPort);
-					midiInKeyboard->midiIn->closePort();
-					midiInKeyboard->midiIn->openPort(p);
+					if (midiInKeyboard->midiIn != NULL)
+					{
+						midiInKeyboard->midiIn->closePort();
+						midiInKeyboard->midiIn->openPort(p);
+					}
+					else
+					{
+						midiInKeyboard->Init(p);
+					}
 					midiPortNum = p;
 				}
 				p++;
