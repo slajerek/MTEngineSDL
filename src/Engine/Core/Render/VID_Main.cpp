@@ -699,6 +699,19 @@ void VID_SetFPS(float fps)
 }
 
 volatile bool mtQuitApplication = false;
+static bool (*vidQuitRequestHandler)() = nullptr;
+
+void VID_SetQuitRequestHandler(bool (*handler)())
+{
+	vidQuitRequestHandler = handler;
+}
+
+// The user asked to quit: the app's handler may keep it running.
+static void VID_QuitRequested()
+{
+	if (vidQuitRequestHandler == nullptr || vidQuitRequestHandler())
+		mtQuitApplication = true;
+}
 volatile bool mtEventLoopRunning = false;
 
 // Workaround for a Bug in SDL2, SDL_CaptureMouse does not work since 2.0.22, let's do our own mouse move events
@@ -853,13 +866,13 @@ void VID_ProcessEvents()
 		if (event.type == SDL_EVENT_QUIT)
 		{
 //			LOGM("SDL_EVENT_QUIT");
-			mtQuitApplication = true;
+			VID_QuitRequested();
 		}
 		
 		else if (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED && event.window.windowID == SDL_GetWindowID(gMainWindow))
 		{
 //			LOGM("SDL_EVENT_WINDOW_CLOSE_REQUESTED");
-			mtQuitApplication = true;
+			VID_QuitRequested();
 		}
 
 		else if (event.type == SDL_EVENT_TEXT_INPUT)

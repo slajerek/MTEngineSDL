@@ -35,6 +35,81 @@ however it likes.
 
 ## 3.21.22 — development
 
+**A live Markdown editor (M0 and M2 of the Agenda Scene programme).**
+`src/Engine/Markdown/` is new. `CMarkdownDocument` is a Markdown source string
+plus the block, span and text-run structure md4c finds in it, every element
+mapped back to a BYTE RANGE of the source. `CMarkdownLiveEditor` is a Dear
+ImGui widget that draws that source RENDERED -- headings, emphasis, numbers,
+drawn bullets and task boxes, tables as an aligned grid, quotes, code,
+pictures -- except the unit the caret is in (a paragraph, a heading, one list
+item's line, a table cell), which shows its source with block markers dimmed
+and inline markers only for the span the caret touches. The source is the
+single truth: an edit is a byte replacement, so untouched formatting survives
+by construction and there is no serializer to get wrong.
+`CGuiViewMarkdownEditor` (GUI/Controls) is the window over it.
+
+What it does: caret and selection by mouse and keyboard; typing, deletion,
+clipboard; list continuation; task boxes that toggle on click; links that
+open on Ctrl/Cmd+click; images through a host resolver; table commands (rows,
+columns, alignment) on a right-click menu and keys; a find bar; undo through
+Tools/Undo (`CUndoManager`, shareable with the host, `CUndoManager::PeekUndo()`
+added for grouping); remappable commands as `CSlrKeyboardShortcut` objects
+(`CMarkdownEditorBindings`, own zone, registered with `guiMain`); IME data at
+the caret, which is also what makes SDL3 deliver text to it; translatable
+labels through `SetTranslateFunction()`.
+
+md4c reports no source offsets (mity/md4c#91), so the ranges are derived:
+content runs are pointers into the input buffer, and blocks and spans are
+widened from them by rules `docs/markdown-editor.md` lists. Edits reparse
+INCREMENTALLY (the touched top-level blocks and their neighbours) when that
+is provably equal to a full parse; a randomized test compares 3000 edits with
+full parses field by field. Typing in a 57 KB document: 0.13 ms per keystroke
+instead of 8.2 ms.
+
+**Word-like editing and a formatting toolbar.** `SetEditMode()` picks how
+Markdown shows while editing: `Rendered` (the default) never draws syntax --
+the caret stands on the text you see, typed text is literal (specials are
+escaped), `- ` / `1. ` / `# ` / `> ` autoformat, deletion and Enter keep
+the syntax whole, Bold and Italic with no selection apply to the next text --
+`RevealNearCaret` is the behaviour above, `Source` shows everything. A
+toolbar above the text (`SetToolbarVisible()`) has paragraph style, inline
+styles, link (a dialog), lists, indent, quote, table, undo/redo and find;
+icons are drawn shapes. Empty paragraphs (blank lines beyond a block
+separator) are drawn, are caret positions, and Enter, Backspace and Delete
+treat them as a word processor does; an empty list item is a caret position
+too. Found on the way and fixed: a fenced code block starting with empty
+lines lost its opening fence from its range. Page Up / Page Down move the caret a
+visible page. The caret's blink restarts, visible, on every move and edit
+(it used to blink on a fixed clock and could hide while typing); it can be
+steady and coloured. List numbers are left-aligned at one column: right-
+aligned, a proportional "1." stood to the right of "2.". A word processor's
+keys: by word (Ctrl+arrows, Alt on a Mac) and paragraph, Ctrl+Shift+Home /
+End, word deletion, Shift+Backspace, Ctrl/Shift+Insert, Shift+Delete, the
+Mac's Cmd+arrows and Cmd+Backspace, double and triple click; shortcuts for
+strikethrough, inline code, the three lists and quote. Cut did nothing in
+Word-like mode; it cuts. Underline, written `<u>text</u>` (inline HTML, which the
+common renderers draw underlined): read as a span by the document model,
+Ctrl/Cmd+U and a toolbar button. Find gets replace: Ctrl+H (Cmd+Alt+F on a
+Mac), Replace and Replace all, one undo step. `RequestFocus()` for a host's
+Edit menu.
+
+Tests: `CTestMarkdownDocument` (model) and `CTestMarkdownLiveEditor`
+(commands, undo, bindings, find, Word-like rules) for a host's `CTestSuite`;
+`RegisterMarkdownEditorTests()` for its imgui_test_engine tests: twenty
+that drive the widget with real input, one of them checking captured pixels.
+AgendaScene registers all three.
+
+**`VID_SetQuitRequestHandler()`.** The window's close button and the
+system's Quit (`SDL_EVENT_QUIT`, including Cmd+Q from SDL's macOS
+application menu) set the quit flag at once, so an app could not ask about
+unsaved work. A handler set here is asked first; returning false keeps the app
+running, and the app quits later with `SYS_Shutdown()`, which does not ask.
+Null (the default) keeps the old behaviour.
+
+Also declared, because they were shipped undeclared: `md4c` (MIT), `imgui_md`
+(MIT) and `imgui_markdown` (Zlib) now have rows in the caps vocabulary's core
+list, so LICENSES.txt names them.
+
 **The app could die at exec with no crash report, after switching licence
 tiers.** Xcode's copy-files phase overwrites the dylib already in
 `Contents/Frameworks`, reusing its **inode**. macOS caches a code signature

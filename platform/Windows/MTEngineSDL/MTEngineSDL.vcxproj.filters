@@ -1107,6 +1107,54 @@
     <ClCompile Include="..\..\..\src\Engine\Core\Render\CRenderBackend.cpp">
       <Filter>Source Files\src\Engine\Core\Render</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Markdown\CMarkdownLiveEditorToolbar.cpp">
+      <Filter>Source Files\src\Engine\Markdown</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Markdown\CMarkdownLiveEditorWord.cpp">
+      <Filter>Source Files\src\Engine\Markdown</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Engine\Markdown\CMarkdownEditorBindings.cpp">
+      <Filter>Source Files\src\Engine\Markdown</Filter>
+    </ClCompile>
+    <ClInclude Include="..\..\..\src\Engine\Markdown\CMarkdownEditorBindings.h">
+      <Filter>Source Files\src\Engine\Markdown</Filter>
+    </ClInclude>
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestMarkdownLiveEditor.cpp">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClCompile>
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestMarkdownLiveEditor.h">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClInclude>
+    <ClCompile Include="..\..\..\src\Engine\Tests\CImGuiMarkdownEditorTests.cpp">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClCompile>
+    <ClInclude Include="..\..\..\src\Engine\Tests\CImGuiMarkdownEditorTests.h">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClInclude>
+    <ClCompile Include="..\..\..\src\Engine\Tests\CTestMarkdownDocument.cpp">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClCompile>
+    <ClInclude Include="..\..\..\src\Engine\Tests\CTestMarkdownDocument.h">
+      <Filter>Source Files\src\Engine\Tests</Filter>
+    </ClInclude>
+    <ClCompile Include="..\..\..\src\Engine\GUI\Controls\CGuiViewMarkdownEditor.cpp">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClCompile>
+    <ClInclude Include="..\..\..\src\Engine\GUI\Controls\CGuiViewMarkdownEditor.h">
+      <Filter>Source Files\src\Engine\GUI\Controls</Filter>
+    </ClInclude>
+    <ClCompile Include="..\..\..\src\Engine\Markdown\CMarkdownLiveEditor.cpp">
+      <Filter>Source Files\src\Engine\Markdown</Filter>
+    </ClCompile>
+    <ClInclude Include="..\..\..\src\Engine\Markdown\CMarkdownLiveEditor.h">
+      <Filter>Source Files\src\Engine\Markdown</Filter>
+    </ClInclude>
+    <ClCompile Include="..\..\..\src\Engine\Markdown\CMarkdownDocument.cpp">
+      <Filter>Source Files\src\Engine\Markdown</Filter>
+    </ClCompile>
+    <ClInclude Include="..\..\..\src\Engine\Markdown\CMarkdownDocument.h">
+      <Filter>Source Files\src\Engine\Markdown</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\src\Engine\Tests\CTestMenuBarMode.h">
       <Filter>Source Files\src\Engine\Tests</Filter>
     </ClInclude>
