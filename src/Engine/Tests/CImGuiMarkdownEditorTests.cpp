@@ -894,6 +894,100 @@ void RegisterMarkdownEditorTests(ImGuiTestEngine *engine)
 		ed.SetEditMode(EMarkdownEditMode::RevealNearCaret);
 	};
 
+	// The fixed word-processor keys, pressed for real: Shift+Backspace, the
+	// clipboard keys (Ctrl+X used to do nothing in Word-like mode), word and
+	// paragraph moves, word deletion, Ctrl+Shift+End, double and triple
+	// click, and the list / strikethrough chords.
+	t = IM_REGISTER_TEST(engine, "markdown", "word_processor_keys");
+	t->TestFunc = [](ImGuiTestContext *ctx)
+	{
+		CGuiViewMarkdownEditor *view = EnsureView(ctx);
+		CMarkdownLiveEditor &ed = view->GetEditor();
+		ed.SetEditMode(EMarkdownEditMode::Rendered);
+		ed.SetFindQuery("");
+		const bool mac = ImGui::GetIO().ConfigMacOSXBehaviors;
+		const ImGuiKeyChord word = mac ? ImGuiMod_Alt : ImGuiMod_Ctrl;
+		const std::string plain = "Hello big world, again\n\nNext para\n";
+		ed.SetSource(plain);
+		ctx->Yield(2);
+		IM_CHECK(ClickOffset(ctx, ed, 0));
+		ctx->KeyPress(word | ImGuiKey_RightArrow);
+		IM_CHECK_EQ(ed.GetCaret(), mac ? 5u : 6u);
+		ctx->KeyPress(word | ImGuiMod_Shift | ImGuiKey_RightArrow);
+		IM_CHECK_EQ(ed.GetSelectedText(), std::string(mac ? " big" : "big "));
+		ctx->KeyPress(ImGuiMod_Ctrl | ImGuiKey_X);                      // cut
+		IM_CHECK_EQ(ed.GetSource(), std::string("Hello world, again\n\nNext para\n"));
+		IM_CHECK_EQ(std::string(ImGui::GetClipboardText()), std::string(mac ? " big" : "big "));
+		ctx->KeyPress(ImGuiMod_Shift | ImGuiKey_Insert);               // paste back
+		IM_CHECK_EQ(ed.GetSource(), plain);
+		ctx->KeyPress(ImGuiMod_Shift | ImGuiKey_Backspace);            // Shift+Backspace is Backspace
+		IM_CHECK_EQ(ed.GetSource(), std::string(mac ? "Hello bi world, again\n\nNext para\n" : "Hello bigworld, again\n\nNext para\n"));
+		ctx->KeyPress(ImGuiMod_Ctrl | ImGuiKey_Z);
+		IM_CHECK_EQ(ed.GetSource(), plain);
+		ed.SetCaret(15);
+		ctx->KeyPress(word | ImGuiKey_Backspace);                       // the word before goes
+		IM_CHECK_EQ(ed.GetSource(), std::string("Hello big , again\n\nNext para\n"));
+		ctx->KeyPress(ImGuiMod_Ctrl | ImGuiKey_Z);
+		IM_CHECK_EQ(ed.GetSource(), plain);
+		ed.SetCaret(12);
+		ctx->KeyPress(word | ImGuiKey_DownArrow);
+		IM_CHECK_EQ(ed.GetCaret(), mac ? 22u : 24u);
+		ctx->KeyPress(word | ImGuiKey_UpArrow);
+		IM_CHECK_EQ(ed.GetCaret(), 0u);
+		ctx->KeyPress(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_End);   // select to the end
+		IM_CHECK(ed.HasSelection());
+		IM_CHECK_EQ(ed.GetAnchor(), 0u);
+		IM_CHECK_GE(ed.GetCaret(), 32u);
+		if (!mac)
+		{
+			ed.SetSelection(6, 10);
+			ctx->KeyPress(ImGuiMod_Ctrl | ImGuiKey_Insert);            // copy
+			IM_CHECK_EQ(std::string(ImGui::GetClipboardText()), std::string("big "));
+			ctx->KeyPress(ImGuiMod_Shift | ImGuiKey_Delete);           // cut
+			IM_CHECK_EQ(ed.GetSource(), std::string("Hello world, again\n\nNext para\n"));
+			ctx->KeyPress(ImGuiMod_Ctrl | ImGuiKey_Z);
+			IM_CHECK_EQ(ed.GetSource(), plain);
+		}
+		else
+		{
+			ed.SetCaret(14);
+			ctx->KeyPress(ImGuiMod_Ctrl | ImGuiKey_LeftArrow);         // Cmd+Left: the line's start
+			IM_CHECK_EQ(ed.GetCaret(), 0u);
+		}
+
+		// Double click: the word; triple click: the paragraph.
+		{
+			ImVec2 pos;
+			float h = 0;
+			IM_CHECK(ed.GetOffsetScreenPos(11, &pos, &h));
+			ctx->MouseMoveToPos(ImVec2(pos.x + 1.0f, pos.y + h * 0.5f));
+			ctx->MouseDoubleClick(ImGuiMouseButton_Left);
+			ctx->Yield(2);
+			IM_CHECK_EQ(ed.GetSelectedText(), std::string("world"));
+			ctx->Yield(30);   // past the double-click time
+			ctx->MouseClickMulti(ImGuiMouseButton_Left, 3);
+			ctx->Yield(2);
+			IM_CHECK_EQ(ed.GetSelectedText(), std::string("Hello big world, again"));
+		}
+
+		// Formatting chords that had none.
+		ed.SetSelection(6, 9);
+		ctx->KeyPress(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_X);
+		IM_CHECK_EQ(ed.GetSource(), std::string("Hello ~~big~~ world, again\n\nNext para\n"));
+		ed.SetCaret(2);
+		ctx->KeyPress(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_8);
+		IM_CHECK(ed.IsInList(EMarkdownListKind::Bullet));
+		ctx->KeyPress(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_7);
+		IM_CHECK(ed.IsInList(EMarkdownListKind::Numbered));
+		ctx->KeyPress(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_7);
+		IM_CHECK(!ed.IsInList(EMarkdownListKind::Numbered));
+		ctx->KeyPress(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_Period);
+		IM_CHECK(ed.IsInQuote());
+		ed.SetSource("");
+		ctx->Yield(3);
+		ed.SetEditMode(EMarkdownEditMode::RevealNearCaret);
+	};
+
 	// Word-like caret invariants over a real agenda, at every caret position:
 	// the caret has a line; Right then Left comes back; Down goes down and Up
 	// comes back; Enter opens the line below with the caret on it, and

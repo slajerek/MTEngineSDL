@@ -1,5 +1,6 @@
 #include "CTestMarkdownLiveEditor.h"
 #include "CMarkdownLiveEditor.h"
+#include "imgui.h"
 #include "CMarkdownEditorBindings.h"
 #include "CSlrKeyboardShortcuts.h"
 #include "SYS_KeyCodes.h"
@@ -10,6 +11,7 @@
 #include "CUndoFieldChange.h"
 #endif
 
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <memory>
@@ -682,6 +684,117 @@ void CTestMarkdownLiveEditor::Run(ITestCallback *callback)
 		MDE_ASSERT(ed.GetRevealedBlock() > 0, "RevealNearCaret shows the caret's unit");
 		ed.SetEditMode(EMarkdownEditMode::Rendered);
 		MDE_ASSERT(ed.GetRevealedBlock() < 0, "back to Word-like: nothing revealed");
+	}
+
+	// ---- Word processor keys: words, paragraphs, Cut, double / triple click ------
+	{
+		ImGuiIO &io = ImGui::GetIO();
+		const bool wasMac = io.ConfigMacOSXBehaviors;
+		CMarkdownLiveEditor ed;
+		const std::string plain = "Hello big world, again\n\nNext para\n";
+		ed.SetSource(plain);
+		io.ConfigMacOSXBehaviors = false;
+		std::string seen;
+		auto walk = [&](int direction, uint32_t from, int steps) {
+			ed.SetCaret(from);
+			seen.clear();
+			for (int i = 0; i < steps; i++) { ed.MoveWord(direction, false); seen += std::to_string(ed.GetCaret()) + " "; }
+		};
+		walk(1, 0, 8);
+		MDE_ASSERT(seen == "6 10 15 17 22 24 29 33 ", "Ctrl+Right: word starts, a comma on its own, the paragraph's end, the next one");
+		walk(-1, 33, 8);
+		MDE_ASSERT(seen == "29 24 22 17 15 10 6 0 ", "Ctrl+Left: word starts back");
+		io.ConfigMacOSXBehaviors = true;
+		walk(1, 0, 6);
+		MDE_ASSERT(seen == "5 9 15 22 24 28 ", "Mac Alt+Right: word ends, punctuation skipped");
+		walk(-1, 22, 4);
+		MDE_ASSERT(seen == "17 10 6 0 ", "Mac Alt+Left: word starts, punctuation skipped");
+		io.ConfigMacOSXBehaviors = false;
+		ed.SetCaret(0);
+		ed.MoveWord(1, true);
+		ed.MoveWord(1, true);
+		MDE_ASSERT(ed.GetSelectedText() == "Hello big ", "Ctrl+Shift+Right selects word by word");
+
+		ed.SetCaret(12);
+		ed.MoveParagraph(-1, false);
+		MDE_ASSERT(ed.GetCaret() == 0, "Ctrl+Up: the paragraph's start");
+		ed.MoveParagraph(1, false);
+		MDE_ASSERT(ed.GetCaret() == 24, "Ctrl+Down: the next paragraph's start");
+		ed.MoveParagraph(1, false);
+		MDE_ASSERT(ed.GetCaret() == 33, "and at the last one, its end");
+		ed.MoveParagraph(-1, false);
+		ed.MoveParagraph(-1, false);
+		MDE_ASSERT(ed.GetCaret() == 0, "Ctrl+Up twice: back over the paragraph's start to the previous one");
+		io.ConfigMacOSXBehaviors = true;
+		ed.SetCaret(12);
+		ed.MoveParagraph(1, false);
+		MDE_ASSERT(ed.GetCaret() == 22, "Mac Alt+Down: the paragraph's end");
+		ed.MoveParagraph(1, false);
+		MDE_ASSERT(ed.GetCaret() == 33, "then the next one's");
+		io.ConfigMacOSXBehaviors = false;
+		ed.SetCaret(12);
+		ed.MoveDocumentEdge(true, true);
+		MDE_ASSERT(ed.GetSelectedText() == "rld, again\n\nNext para\n" || ed.GetSelectedText() == "rld, again\n\nNext para",
+			"Ctrl+Shift+End selects to the document's end");
+
+		ed.SetCaret(15);
+		ed.DeleteWord(-1);
+		MDE_ASSERT(ed.GetSource() == "Hello big , again\n\nNext para\n" && ed.GetCaret() == 10, "Ctrl+Backspace deletes the word before the caret");
+		ed.SetSource(plain);
+		ed.SetCaret(10);
+		ed.DeleteWord(1);
+		MDE_ASSERT(ed.GetSource() == "Hello big , again\n\nNext para\n" && ed.GetCaret() == 10, "Ctrl+Delete deletes the word after it");
+		ed.SetSource(plain);
+		ed.SetCaret(24);
+		ed.DeleteWord(-1);
+		MDE_ASSERT(ed.GetSource() == "Hello big world, againNext para\n" && ed.GetCaret() == 22, "Ctrl+Backspace at a paragraph's start joins it to the one before, as Backspace");
+#if MT_ENABLE_UNDO
+		MDE_ASSERT(ed.Undo() && ed.GetSource() == plain, "and undoes in one step");
+#endif
+
+		// Syntax is skipped and stays sound.
+		ed.SetSource("Hello **big** world\n");
+		ed.SetCaret(0);
+		ed.MoveWord(1, false);
+		MDE_ASSERT(ed.GetCaret() == 6 || ed.GetCaret() == 8, "Ctrl+Right stops before the bold word, not inside its markers");
+		ed.MoveWord(1, false);
+		MDE_ASSERT(ed.GetCaret() == 14, "and over it to the next word");
+		ed.DeleteWord(-1);
+		MDE_ASSERT(ed.GetSource() == "Hello world\n", "Ctrl+Backspace takes the bold word and its markers");
+		ed.SetSource("Hello **big** world\n");
+		ed.SelectWordAt(9);
+		{
+			// The selection runs between caret stops, which may lie either side of a marker.
+			std::string t = ed.GetSelectedText();
+			t.erase(std::remove(t.begin(), t.end(), '*'), t.end());
+			MDE_ASSERT(t == "big", "double click selects the word under the pointer");
+		}
+		ed.SetSource(plain);
+		ed.SelectWordAt(15);
+		MDE_ASSERT(ed.GetSelectedText() == ",", "on punctuation, the punctuation");
+		ed.SelectParagraphAt(12);
+		MDE_ASSERT(ed.GetSelectedText() == "Hello big world, again", "triple click selects the paragraph");
+
+		// Cut in Word-like mode (it used to do nothing) and in Source mode.
+		ed.SetSource(plain);
+		ed.SetSelection(6, 10);
+		ed.Cut();
+		const char *clip = ImGui::GetClipboardText();
+		MDE_ASSERT(ed.GetSource() == "Hello world, again\n\nNext para\n" && clip != nullptr && std::string(clip) == "big ", "Cut takes the selection to the clipboard");
+		ed.SetEditMode(EMarkdownEditMode::Source);
+		ed.SetSelection(0, 6);
+		ed.Cut();
+		MDE_ASSERT(ed.GetSource() == "world, again\n\nNext para\n", "and in Source mode");
+
+		// Source mode: code points, a line break ends a paragraph.
+		ed.SetSource("Hello big\n\nNext\n");
+		walk(1, 0, 5);
+		MDE_ASSERT(seen == "6 9 10 11 15 ", "Source mode: Ctrl+Right, with every line break a step");
+		ed.SetCaret(13);
+		ed.MoveParagraph(-1, false);
+		MDE_ASSERT(ed.GetCaret() == 11, "Source mode: Ctrl+Up to the paragraph's first line");
+		ed.SetEditMode(EMarkdownEditMode::Rendered);
+		io.ConfigMacOSXBehaviors = wasMac;
 	}
 
 	TestCompleted(true, "Markdown live editor: commands and undo");

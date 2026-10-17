@@ -160,7 +160,7 @@ void CMarkdownLiveEditor::RenderToolbar()
 			dl->AddLine(ImVec2(a.x, y), ImVec2(b.x, y), col, t);
 		}))
 		ToggleInlineStyle(EMarkdownInlineStyle::Strikethrough);
-	tooltip("markdown.editor.toolbar.strikethrough", "Strikethrough", 0);
+	tooltip("markdown.editor.toolbar.strikethrough", "Strikethrough", kb->GetChord(EMarkdownEditorCommand::Strikethrough));
 	if (button("###md_tb_code", IsInlineStyleActive(EMarkdownInlineStyle::Code), editable,
 		[&](ImDrawList *dl, ImVec2 a, ImVec2 b, ImU32 col) {
 			// "< >" drawn as two chevrons.
@@ -169,7 +169,7 @@ void CMarkdownLiveEditor::RenderToolbar()
 			dl->AddPolyline(std::array<ImVec2, 3>{ ImVec2(b.x - w * 0.35f, cy - s), ImVec2(b.x, cy), ImVec2(b.x - w * 0.35f, cy + s) }.data(), 3, col, 0, t);
 		}))
 		ToggleInlineStyle(EMarkdownInlineStyle::Code);
-	tooltip("markdown.editor.toolbar.code", "Inline code", 0);
+	tooltip("markdown.editor.toolbar.code", "Inline code", kb->GetChord(EMarkdownEditorCommand::InlineCode));
 	if (button("###md_tb_link", false, editable,
 		[&](ImDrawList *dl, ImVec2 a, ImVec2 b, ImU32 col) {
 			// Two links of a chain, at 45 degrees drawn as overlapping rounded boxes.
@@ -194,7 +194,7 @@ void CMarkdownLiveEditor::RenderToolbar()
 			DrawLines(dl, a, b, a.x + hh * 0.38f, 3, col, t);
 		}))
 		ToggleList(EMarkdownListKind::Bullet);
-	tooltip("markdown.editor.toolbar.bullets", "Bulleted list", 0);
+	tooltip("markdown.editor.toolbar.bullets", "Bulleted list", kb->GetChord(EMarkdownEditorCommand::BulletList));
 	if (button("###md_tb_numbers", inNumbered, editable,
 		[&](ImDrawList *dl, ImVec2 a, ImVec2 b, ImU32 col) {
 			const float hh = b.y - a.y;
@@ -206,7 +206,7 @@ void CMarkdownLiveEditor::RenderToolbar()
 			DrawLines(dl, a, b, a.x + hh * 0.38f, 3, col, t);
 		}))
 		ToggleList(EMarkdownListKind::Numbered);
-	tooltip("markdown.editor.toolbar.numbers", "Numbered list", 0);
+	tooltip("markdown.editor.toolbar.numbers", "Numbered list", kb->GetChord(EMarkdownEditorCommand::NumberedList));
 	if (button("###md_tb_tasks", inTask, editable,
 		[&](ImDrawList *dl, ImVec2 a, ImVec2 b, ImU32 col) {
 			const float hh = b.y - a.y, s = hh * 0.2f;
@@ -220,7 +220,7 @@ void CMarkdownLiveEditor::RenderToolbar()
 			DrawLines(dl, a, b, a.x + hh * 0.45f, 2, col, t);
 		}))
 		ToggleList(EMarkdownListKind::Task);
-	tooltip("markdown.editor.toolbar.tasks", "Task list", 0);
+	tooltip("markdown.editor.toolbar.tasks", "Task list", kb->GetChord(EMarkdownEditorCommand::TaskList));
 	const bool inList = inBullet || inNumbered || inTask;
 	auto indentIcon = [&](bool out) {
 		return [&, out](ImDrawList *dl, ImVec2 a, ImVec2 b, ImU32 col) {
@@ -242,7 +242,7 @@ void CMarkdownLiveEditor::RenderToolbar()
 			DrawLines(dl, a, b, a.x + hh * 0.38f, 3, col, t);
 		}))
 		ToggleQuote();
-	tooltip("markdown.editor.toolbar.quote", "Quote", 0);
+	tooltip("markdown.editor.toolbar.quote", "Quote", kb->GetChord(EMarkdownEditorCommand::Quote));
 
 	separator();
 	if (button("###md_tb_table", false, editable,

@@ -66,13 +66,31 @@ In `RevealNearCaret`:
 Interaction: mouse caret and drag selection; a click on a task box toggles
 it in place; Ctrl/Cmd+click opens a link (`onLinkActivated`, default the
 platform shell) and hovering shows its destination; right-click in a table
-opens the table menu. Keyboard: arrows across wrapped lines and units,
-Home/End, Page Up/Page Down (a visible page, the view scrolling with the
-caret), Shift to select, Ctrl/Cmd+A/C/X/V, Enter with list continuation,
-Shift+Enter, Tab / Shift+Tab between cells (Tab in the last cell adds a row),
-Enter to the cell below, plus the remappable commands below. Ctrl/Cmd+F
-opens the find bar above the text: matches in the source, highlighted, the
-current one selected; Enter / Shift+Enter, F3 / Shift+F3, Esc.
+opens the table menu; a double click selects a word, a triple click its
+paragraph. Keyboard: Enter with list continuation, Shift+Enter, Tab /
+Shift+Tab between cells (Tab in the last cell adds a row), Enter to the cell
+below, the remappable commands below, and a word processor's fixed keys,
+each with Shift to select (`ProcessMovementAndDeletionKeys()`;
+`io.ConfigMacOSXBehaviors` picks the Mac column):
+
+| | Windows / Linux | Mac |
+|---|---|---|
+| character, line | arrows | arrows |
+| word | Ctrl+Left / Right | Alt+Left / Right (to the word's end) |
+| paragraph | Ctrl+Up / Down | Alt+Up / Down (to its end) |
+| line start / end | Home / End | Cmd+Left / Right, Home / End, Ctrl+A / E |
+| page | Page Up / Down (the view scrolls with the caret) | the same |
+| document | Ctrl+Home / End | Cmd+Up / Down, Cmd+Home / End |
+| delete | Backspace, Shift+Backspace, Delete | the same, Ctrl+H / D |
+| delete a word | Ctrl+Backspace / Delete | Alt+Backspace / Delete |
+| delete to the line's edge | | Cmd+Backspace / Delete |
+| clipboard | Ctrl+A / C / X / V, Ctrl+Insert, Shift+Insert, Shift+Delete (cut) | Cmd+A / C / X / V |
+
+A word is a run of letters and digits (any non-ASCII letter counts), a run
+of punctuation is one, and a paragraph break is a step of its own, as in
+Word; in Rendered mode syntax is skipped. Ctrl/Cmd+F opens the find bar
+above the text: matches in the source, highlighted, the current one
+selected; Enter / Shift+Enter, F3 / Shift+F3, Esc.
 
 ## Word-like editing (`Rendered`)
 
@@ -148,9 +166,11 @@ screen lists, remaps and stores them with the rest. CGuiMain dispatches only
 the GLOBAL zone itself, so these act only in a focused editor, which turns
 each binding into an ImGui chord every frame (a change applies from the next
 frame). Defaults: Ctrl/Cmd+B, I, K (link), 1..6 (headings), Shift+0
-(paragraph), Z, Shift+Z and Y (undo/redo), Enter (task box, or a table row
-below), F (find), F3 / Shift+F3, Alt+Shift+arrows (move table row/column).
-Movement, deletion, Enter, Tab and the clipboard are fixed.
+(paragraph), Shift+X (strikethrough), E (inline code), Shift+8 / Shift+7 /
+Shift+9 (bulleted / numbered / task list), Shift+. (quote), Z, Shift+Z and Y
+(undo/redo), Enter (task box, or a table row below), F (find), F3 /
+Shift+F3, Alt+Shift+arrows (move table row/column). Movement, deletion,
+Enter, Tab and the clipboard are fixed.
 
 **`CGuiViewMarkdownEditor`** is the window: it owns an editor, fills its
 window with it and takes fonts from `CGuiFontManager` after
@@ -249,8 +269,8 @@ own UI tests.
 - Word-like: a code block from the paragraph style menu, Shift+Enter that
   leaves an empty last line, pasting plain text from outside as literal text
   (paste is Markdown).
-- Inline preedit (see Text input), word-wise caret movement and selection,
-  double-click word selection, autoscroll while dragging, replace in find.
+- Inline preedit (see Text input), drag selection by words after a double
+  click, autoscroll while dragging, replace in find.
 - Entities are drawn as written; math, wikilinks and underline are parsed
   when their `MD_FLAG`s are set but drawn as plain styled text.
 - Column resize in tables; a table with more columns than fit is squeezed,

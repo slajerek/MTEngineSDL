@@ -493,7 +493,9 @@ void CMarkdownLiveEditor::Cut()
 {
 	if (!HasSelection() || readOnly) return;
 	Copy();
-	InsertText("");
+	// Backspace takes a selection in every mode (InsertText("") does nothing
+	// in Rendered mode).
+	Backspace();
 }
 
 void CMarkdownLiveEditor::Copy() const
@@ -2094,18 +2096,234 @@ void CMarkdownLiveEditor::MoveVertical(int direction, bool extend)
 	scrollToCaret = true;
 }
 
-void CMarkdownLiveEditor::MoveLineEdge(bool toEnd, bool extend)
+uint32_t CMarkdownLiveEditor::LineEdgeOffset(bool toEnd) const
 {
 	const int li = FindLineOfOffset(caret);
-	if (li < 0) return;
+	if (li < 0) return UINT32_MAX;
 	const Line &line = layout.lines[li];
 	uint32_t o = toEnd ? line.endOffset : line.begOffset;
 	// A line that ends with a revealed newline: the end is before the '\n'.
 	if (toEnd && o > 0 && o <= doc.Size() && o > line.begOffset && doc.GetSource()[o - 1] == '\n' && line.endOffset == o) o--;
 	if (editMode == EMarkdownEditMode::Rendered) o = Snap(o);
-	SetSelection(extend ? anchor : o, o);
+	return o;
+}
+
+void CMarkdownLiveEditor::MoveLineEdge(bool toEnd, bool extend)
+{
+	const uint32_t o = LineEdgeOffset(toEnd);
+	if (o != UINT32_MAX) MoveCaretTo(o, extend);
+}
+
+void CMarkdownLiveEditor::MoveCaretTo(uint32_t offset, bool extend)
+{
+	SetSelection(extend ? anchor : offset, offset);
 	preferredX = -1;
 	scrollToCaret = true;
+}
+
+void CMarkdownLiveEditor::MoveDocumentEdge(bool toEnd, bool extend)
+{
+	uint32_t o = toEnd ? doc.Size() : 0;
+	if (editMode == EMarkdownEditMode::Rendered) o = Snap(o);
+	MoveCaretTo(o, extend);
+}
+
+// ---- Words and paragraphs ------------------------------------------------------------------
+
+uint32_t CMarkdownLiveEditor::StepPosition(uint32_t offset, int direction) const
+{
+	if (editMode == EMarkdownEditMode::Rendered) return NextPosition(offset, direction);
+	if (direction < 0) return offset == 0 ? UINT32_MAX : doc.PrevCodepoint(offset);
+	return offset >= doc.Size() ? UINT32_MAX : doc.NextCodepoint(offset);
+}
+
+CMarkdownLiveEditor::ECharClass CMarkdownLiveEditor::ClassBetween(uint32_t a, uint32_t b) const
+{
+	const std::string &src = doc.GetSource();
+	const bool rendered = editMode == EMarkdownEditMode::Rendered;
+	if (rendered) RebuildStops();
+	for (uint32_t o = a; o < b && o < (uint32_t)src.size(); o++)
+	{
+		const unsigned char c = (unsigned char)src[o];
+		// Rendered: syntax is skipped; a newline is a break between blocks,
+		// a blank inside one (a soft or hard line break).
+		if (rendered && !contentMask[o])
+		{
+			if (c == '\n') return ParagraphKey(a) != ParagraphKey(b) ? ECharClass::Break : ECharClass::Space;
+			continue;
+		}
+		if (c == '\n') return rendered ? ECharClass::Space : ECharClass::Break;
+		if (c == ' ' || c == '\t' || c == '\r') return ECharClass::Space;
+		if (c < 0x80) return (isalnum(c) || c == '_') ? ECharClass::Word : ECharClass::Punct;
+		unsigned int cp = 0;
+		ImTextCharFromUtf8(&cp, src.c_str() + o, src.c_str() + src.size());
+		if (cp == 0xA0 || cp == 0x202F || (cp >= 0x2000 && cp <= 0x200B) || cp == 0x3000) return ECharClass::Space;
+		// Latin-1 and general punctuation (quotes, dashes, the ellipsis) and symbols.
+		if ((cp >= 0xA1 && cp <= 0xBF) || cp == 0xD7 || cp == 0xF7 || (cp >= 0x2010 && cp <= 0x205E) || (cp >= 0x20A0 && cp <= 0x20CF))
+			return ECharClass::Punct;
+		return ECharClass::Word;
+	}
+	return rendered ? ECharClass::Break : ECharClass::Space;
+}
+
+uint32_t CMarkdownLiveEditor::WordTarget(uint32_t from, int direction) const
+{
+	const bool mac = ImGui::GetIO().ConfigMacOSXBehaviors;
+	ECharClass c = ECharClass::Break;
+	auto step = [&](uint32_t p) {
+		const uint32_t q = StepPosition(p, direction);
+		if (q != UINT32_MAX) c = direction > 0 ? ClassBetween(p, q) : ClassBetween(q, p);
+		return q;
+	};
+	uint32_t p = from, q = step(p);
+	if (q == UINT32_MAX) return from;
+	if (c == ECharClass::Break) return q;   // a paragraph break is a step of its own
+	auto skip = [&](auto keep) {
+		while (q != UINT32_MAX && c != ECharClass::Break && keep(c)) { p = q; q = step(p); }
+	};
+	if (direction < 0 || mac)
+	{
+		// Over the blanks (a Mac: and punctuation) before the word, then the word.
+		skip([&](ECharClass k) { return k == ECharClass::Space || (mac && k == ECharClass::Punct); });
+		const ECharClass run = c;
+		skip([&](ECharClass k) { return k == run; });
+		return p;
+	}
+	// Windows / Linux, rightwards: past this word (or run of punctuation),
+	// then past the blanks after it.
+	const ECharClass run = c;
+	if (run != ECharClass::Space) skip([&](ECharClass k) { return k == run; });
+	skip([&](ECharClass k) { return k == ECharClass::Space; });
+	return p;
+}
+
+void CMarkdownLiveEditor::MoveWord(int direction, bool extend)
+{
+	MoveCaretTo(WordTarget(caret, direction), extend);
+}
+
+int64_t CMarkdownLiveEditor::ParagraphKey(uint32_t offset) const
+{
+	if (editMode == EMarkdownEditMode::Rendered)
+	{
+		const int32_t gi = GapIndexOfLine(offset);
+		if (gi >= 0) return -2 - (int64_t)gi;
+		const int32_t i = StopIndexAtOrBefore(offset);
+		return i >= 0 ? (int64_t)stops[i].block : -1;
+	}
+	// Source: a run of non-blank lines; each blank line is one of its own.
+	const std::string &src = doc.GetSource();
+	auto blank = [&](uint32_t ls) {
+		for (uint32_t o = ls; o < (uint32_t)src.size() && src[o] != '\n'; o++)
+			if (src[o] != ' ' && src[o] != '\t' && src[o] != '\r') return false;
+		return true;
+	};
+	uint32_t ls = doc.LineStart(offset);
+	if (blank(ls)) return -2 - (int64_t)ls;
+	while (ls > 0)
+	{
+		const uint32_t prev = doc.LineStart(ls - 1);
+		if (blank(prev)) break;
+		ls = prev;
+	}
+	return ls;
+}
+
+uint32_t CMarkdownLiveEditor::ParagraphEdge(uint32_t from, int direction) const
+{
+	const int64_t key = ParagraphKey(from);
+	uint32_t p = from;
+	for (;;)
+	{
+		const uint32_t q = StepPosition(p, direction);
+		if (q == UINT32_MAX || ParagraphKey(q) != key) return p;
+		p = q;
+	}
+}
+
+uint32_t CMarkdownLiveEditor::ParagraphTarget(uint32_t from, int direction) const
+{
+	const bool mac = ImGui::GetIO().ConfigMacOSXBehaviors;
+	if (direction < 0 || mac)
+	{
+		// This paragraph's edge; already there: the neighbour's.
+		const uint32_t e = ParagraphEdge(from, direction);
+		if (e != from) return e;
+		const uint32_t q = StepPosition(from, direction);
+		return q == UINT32_MAX ? from : ParagraphEdge(q, direction);
+	}
+	// Windows / Linux, down: the next paragraph's start, or the end.
+	const uint32_t e = ParagraphEdge(from, 1);
+	const uint32_t q = StepPosition(e, 1);
+	return q == UINT32_MAX ? e : q;
+}
+
+void CMarkdownLiveEditor::MoveParagraph(int direction, bool extend)
+{
+	MoveCaretTo(ParagraphTarget(caret, direction), extend);
+}
+
+void CMarkdownLiveEditor::DeleteTo(uint32_t target)
+{
+	if (target == caret) return;
+	SetSelection(caret, target);
+	Backspace();   // a selection goes as Backspace takes it (Rendered: keeping the syntax sound)
+}
+
+void CMarkdownLiveEditor::DeleteWord(int direction)
+{
+	if (readOnly) return;
+	if (HasSelection()) { Backspace(); return; }
+	const uint32_t target = WordTarget(caret, direction);
+	// One step (a paragraph break, a single character): what Backspace /
+	// Delete do there, joining blocks the Word-like way.
+	if (target == StepPosition(caret, direction))
+	{
+		if (direction < 0) Backspace();
+		else DeleteForward();
+		return;
+	}
+	DeleteTo(target);
+}
+
+void CMarkdownLiveEditor::DeleteToLineEdge(bool toEnd)
+{
+	if (readOnly) return;
+	if (HasSelection()) { Backspace(); return; }
+	const uint32_t o = LineEdgeOffset(toEnd);
+	if (o == UINT32_MAX || o == caret)
+	{
+		if (toEnd) DeleteForward();
+		else Backspace();
+		return;
+	}
+	DeleteTo(o);
+}
+
+void CMarkdownLiveEditor::SelectWordAt(uint32_t offset)
+{
+	uint32_t p = editMode == EMarkdownEditMode::Rendered ? Snap(offset) : std::min(offset, doc.Size());
+	// The class of what follows (at the end: what precedes).
+	uint32_t q = StepPosition(p, 1);
+	ECharClass cls = q != UINT32_MAX ? ClassBetween(p, q) : ECharClass::Break;
+	if (cls == ECharClass::Break)
+	{
+		q = StepPosition(p, -1);
+		cls = q != UINT32_MAX ? ClassBetween(q, p) : ECharClass::Break;
+	}
+	if (cls == ECharClass::Break) { SetSelection(p, p); return; }
+	uint32_t a = p, b = p;
+	while ((q = StepPosition(a, -1)) != UINT32_MAX && ClassBetween(q, a) == cls) a = q;
+	while ((q = StepPosition(b, 1)) != UINT32_MAX && ClassBetween(b, q) == cls) b = q;
+	SetSelection(a, b);
+	preferredX = -1;
+}
+
+void CMarkdownLiveEditor::SelectParagraphAt(uint32_t offset)
+{
+	const uint32_t p = editMode == EMarkdownEditMode::Rendered ? Snap(offset) : std::min(offset, doc.Size());
+	SetSelection(ParagraphEdge(p, -1), ParagraphEdge(p, 1));
+	preferredX = -1;
 }
 
 void CMarkdownLiveEditor::MovePage(int direction, bool extend)
@@ -2217,6 +2435,15 @@ void CMarkdownLiveEditor::HandleMouse(ImVec2)
 		}
 		ClickAt(io.MousePos, io.KeyShift);
 		dragging = true;
+		// Double click: the word under the pointer; triple click: its paragraph.
+		const int clicks = ImGui::GetMouseClickedCount(ImGuiMouseButton_Left);
+		if (clicks >= 2 && !io.KeyShift)
+		{
+			const uint32_t at = under != nullptr && !under->synthetic ? under->offset : caret;
+			if (clicks == 2) SelectWordAt(at);
+			else SelectParagraphAt(at);
+			dragging = false;
+		}
 	}
 	if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
 	{
@@ -2325,12 +2552,82 @@ bool CMarkdownLiveEditor::ActivateLinkAt(uint32_t offset)
 	return true;
 }
 
+// The fixed keys of a word processor. Each key with and without Shift (the
+// selection grows). io.ConfigMacOSXBehaviors picks the Mac set; there ImGui
+// has already swapped the modifiers, so ImGuiMod_Ctrl is Cmd and
+// ImGuiMod_Super is Ctrl.
+//
+//                      Windows / Linux              Mac
+//   character          Left / Right                 Left / Right
+//   word               Ctrl+Left / Right            Alt+Left / Right
+//   line               Up / Down                    Up / Down
+//   paragraph          Ctrl+Up / Down               Alt+Up / Down
+//   line start / end   Home / End                   Cmd+Left / Right, Home / End, Ctrl+A / E
+//   page               Page Up / Down               Page Up / Down
+//   document           Ctrl+Home / End              Cmd+Up / Down, Cmd+Home / End
+//   delete             Backspace, Delete            Backspace, Delete, Ctrl+H / D
+//   delete a word      Ctrl+Backspace / Delete      Alt+Backspace / Delete
+//   delete to the line edge                         Cmd+Backspace / Delete
+//   clipboard          Ctrl+X / C / V, Shift+Delete (cut), Ctrl+Insert (copy), Shift+Insert (paste)
+bool CMarkdownLiveEditor::ProcessMovementAndDeletionKeys()
+{
+	const bool mac = ImGui::GetIO().ConfigMacOSXBehaviors;
+	const ImGuiInputFlags rep = ImGuiInputFlags_Repeat;
+	const ImGuiKeyChord wordMod = mac ? ImGuiMod_Alt : ImGuiMod_Ctrl;
+	// Key, or Shift+key to extend the selection.
+	auto key = [&](ImGuiKeyChord chord, bool *extend) {
+		if (ImGui::Shortcut(chord, rep)) { *extend = false; return true; }
+		if (ImGui::Shortcut(chord | ImGuiMod_Shift, rep)) { *extend = true; return true; }
+		return false;
+	};
+	bool ext = false;
+	if (key(ImGuiKey_LeftArrow, &ext)) MoveHorizontal(-1, ext);
+	else if (key(ImGuiKey_RightArrow, &ext)) MoveHorizontal(1, ext);
+	else if (key(ImGuiKey_UpArrow, &ext)) MoveVertical(-1, ext);
+	else if (key(ImGuiKey_DownArrow, &ext)) MoveVertical(1, ext);
+	else if (key(wordMod | ImGuiKey_LeftArrow, &ext)) MoveWord(-1, ext);
+	else if (key(wordMod | ImGuiKey_RightArrow, &ext)) MoveWord(1, ext);
+	else if (key(wordMod | ImGuiKey_UpArrow, &ext)) MoveParagraph(-1, ext);
+	else if (key(wordMod | ImGuiKey_DownArrow, &ext)) MoveParagraph(1, ext);
+	else if (key(ImGuiKey_PageUp, &ext)) MovePage(-1, ext);
+	else if (key(ImGuiKey_PageDown, &ext)) MovePage(1, ext);
+	else if (key(ImGuiKey_Home, &ext)) MoveLineEdge(false, ext);
+	else if (key(ImGuiKey_End, &ext)) MoveLineEdge(true, ext);
+	else if (key(ImGuiMod_Ctrl | ImGuiKey_Home, &ext)) MoveDocumentEdge(false, ext);
+	else if (key(ImGuiMod_Ctrl | ImGuiKey_End, &ext)) MoveDocumentEdge(true, ext);
+	else if (mac && key(ImGuiMod_Ctrl | ImGuiKey_LeftArrow, &ext)) MoveLineEdge(false, ext);
+	else if (mac && key(ImGuiMod_Ctrl | ImGuiKey_RightArrow, &ext)) MoveLineEdge(true, ext);
+	else if (mac && key(ImGuiMod_Ctrl | ImGuiKey_UpArrow, &ext)) MoveDocumentEdge(false, ext);
+	else if (mac && key(ImGuiMod_Ctrl | ImGuiKey_DownArrow, &ext)) MoveDocumentEdge(true, ext);
+	else if (mac && key(ImGuiMod_Super | ImGuiKey_A, &ext)) MoveLineEdge(false, ext);
+	else if (mac && key(ImGuiMod_Super | ImGuiKey_E, &ext)) MoveLineEdge(true, ext);
+	else if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_A)) SelectAll();
+	else if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_C) || ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Insert)) Copy();
+	else if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_X)) Cut();
+	else if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_V, rep) || ImGui::Shortcut(ImGuiMod_Shift | ImGuiKey_Insert, rep)) Paste();
+	// Shift+Backspace is Backspace (Shift is often still down while typing).
+	else if (ImGui::Shortcut(ImGuiKey_Backspace, rep) || ImGui::Shortcut(ImGuiMod_Shift | ImGuiKey_Backspace, rep)) Backspace();
+	else if (ImGui::Shortcut(ImGuiKey_Delete, rep)) DeleteForward();
+	else if (ImGui::Shortcut(ImGuiMod_Shift | ImGuiKey_Delete, rep))
+	{
+		if (!mac && HasSelection()) Cut();
+		else DeleteForward();
+	}
+	else if (ImGui::Shortcut(wordMod | ImGuiKey_Backspace, rep)) DeleteWord(-1);
+	else if (ImGui::Shortcut(wordMod | ImGuiKey_Delete, rep)) DeleteWord(1);
+	else if (mac && ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Backspace, rep)) DeleteToLineEdge(false);
+	else if (mac && ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Delete, rep)) DeleteToLineEdge(true);
+	else if (mac && ImGui::Shortcut(ImGuiMod_Super | ImGuiKey_H, rep)) Backspace();
+	else if (mac && ImGui::Shortcut(ImGuiMod_Super | ImGuiKey_D, rep)) DeleteForward();
+	else return false;
+	return true;
+}
+
 void CMarkdownLiveEditor::ProcessKeyboard()
 {
 	ImGuiIO &io = ImGui::GetIO();
 	io.WantCaptureKeyboard = true;
 	io.WantTextInput = true;
-	const bool shift = io.KeyShift;
 	const ImGuiInputFlags rep = ImGuiInputFlags_Repeat;
 
 	// Remappable commands first (CMarkdownEditorBindings), so a binding the
@@ -2348,6 +2645,12 @@ void CMarkdownLiveEditor::ProcessKeyboard()
 	else if (inCell && pressed(EMarkdownEditorCommand::TableMoveColumnRight, true)) EditTable(EMarkdownTableEdit::MoveColumnRight);
 	else if (pressed(EMarkdownEditorCommand::Bold, false)) ToggleStrong();
 	else if (pressed(EMarkdownEditorCommand::Italic, false)) ToggleEmphasis();
+	else if (pressed(EMarkdownEditorCommand::Strikethrough, false)) ToggleInlineStyle(EMarkdownInlineStyle::Strikethrough);
+	else if (pressed(EMarkdownEditorCommand::InlineCode, false)) ToggleInlineStyle(EMarkdownInlineStyle::Code);
+	else if (pressed(EMarkdownEditorCommand::BulletList, false)) ToggleList(EMarkdownListKind::Bullet);
+	else if (pressed(EMarkdownEditorCommand::NumberedList, false)) ToggleList(EMarkdownListKind::Numbered);
+	else if (pressed(EMarkdownEditorCommand::TaskList, false)) ToggleList(EMarkdownListKind::Task);
+	else if (pressed(EMarkdownEditorCommand::Quote, false)) ToggleQuote();
 	else if (pressed(EMarkdownEditorCommand::InsertLink, false))
 	{
 		if (editMode == EMarkdownEditMode::Rendered) OpenLinkDialog();
@@ -2385,36 +2688,12 @@ void CMarkdownLiveEditor::ProcessKeyboard()
 		if (inCell) MoveToNextCell(true);
 		else IndentListItem(true);
 	}
-	else if (ImGui::Shortcut(ImGuiKey_LeftArrow, rep)) MoveHorizontal(-1, false);
-	else if (ImGui::Shortcut(ImGuiMod_Shift | ImGuiKey_LeftArrow, rep)) MoveHorizontal(-1, true);
-	else if (ImGui::Shortcut(ImGuiKey_RightArrow, rep)) MoveHorizontal(1, false);
-	else if (ImGui::Shortcut(ImGuiMod_Shift | ImGuiKey_RightArrow, rep)) MoveHorizontal(1, true);
-	else if (ImGui::Shortcut(ImGuiKey_UpArrow, rep)) MoveVertical(-1, false);
-	else if (ImGui::Shortcut(ImGuiMod_Shift | ImGuiKey_UpArrow, rep)) MoveVertical(-1, true);
-	else if (ImGui::Shortcut(ImGuiKey_DownArrow, rep)) MoveVertical(1, false);
-	else if (ImGui::Shortcut(ImGuiMod_Shift | ImGuiKey_DownArrow, rep)) MoveVertical(1, true);
-	else if (ImGui::Shortcut(ImGuiKey_PageUp, rep)) MovePage(-1, false);
-	else if (ImGui::Shortcut(ImGuiMod_Shift | ImGuiKey_PageUp, rep)) MovePage(-1, true);
-	else if (ImGui::Shortcut(ImGuiKey_PageDown, rep)) MovePage(1, false);
-	else if (ImGui::Shortcut(ImGuiMod_Shift | ImGuiKey_PageDown, rep)) MovePage(1, true);
-	else if (ImGui::Shortcut(ImGuiKey_Home, rep)) MoveLineEdge(false, false);
-	else if (ImGui::Shortcut(ImGuiMod_Shift | ImGuiKey_Home, rep)) MoveLineEdge(false, true);
-	else if (ImGui::Shortcut(ImGuiKey_End, rep)) MoveLineEdge(true, false);
-	else if (ImGui::Shortcut(ImGuiMod_Shift | ImGuiKey_End, rep)) MoveLineEdge(true, true);
-	else if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Home)) SetCaret(0);
-	else if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_End)) SetCaret(doc.Size());
-	else if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_A)) SelectAll();
-	else if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_C)) Copy();
-	else if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_X)) Cut();
-	else if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_V, rep)) Paste();
-	else if (ImGui::Shortcut(ImGuiKey_Backspace, rep)) Backspace();
-	else if (ImGui::Shortcut(ImGuiKey_Delete, rep)) DeleteForward();
+	else if (ProcessMovementAndDeletionKeys()) {}
 	else if (ImGui::Shortcut(ImGuiKey_Enter, rep) || ImGui::Shortcut(ImGuiKey_KeypadEnter, rep))
 	{
 		if (!MoveToCellBelow()) InsertNewline();
 	}
 	else if (ImGui::Shortcut(ImGuiMod_Shift | ImGuiKey_Enter, rep)) InsertLineBreak();
-	(void)shift;
 
 	// Typed characters.
 	if (!readOnly && io.InputQueueCharacters.Size > 0)

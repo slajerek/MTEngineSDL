@@ -45,6 +45,12 @@ enum class EMarkdownEditorCommand : uint8_t
 	TableMoveRowDown,
 	TableMoveColumnLeft,
 	TableMoveColumnRight,
+	Strikethrough,
+	InlineCode,
+	BulletList,
+	NumberedList,
+	TaskList,
+	Quote,
 	Count
 };
 

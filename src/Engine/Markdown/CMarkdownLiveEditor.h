@@ -32,8 +32,9 @@
 // cells, Enter to the cell below. Fonts come from the host (SetFonts); any
 // null font falls back to the ImGui default font at the requested size.
 //
-// NOT YET (production items, see the M0 report): incremental reparse, images,
-// link activation, IME composition display, word-level caret jumps, find.
+// Since M2: incremental reparse, images, link activation, find, word and
+// paragraph moves and the rest of a word processor's keys
+// (ProcessMovementAndDeletionKeys). NOT YET: IME composition display.
 
 #include "CMarkdownDocument.h"
 #include "CMarkdownEditorBindings.h"
@@ -368,6 +369,24 @@ public:
 	// Page Up / Page Down: the caret one visible page up or down (at the
 	// column it keeps for vertical moves) and the view scrolls with it.
 	void MovePage(int direction, bool extend);
+	// Word processor moves (Ctrl+arrows; Alt+arrows on a Mac, where
+	// io.ConfigMacOSXBehaviors picks the Mac rules). A word is a run of letters
+	// and digits, a run of punctuation counts as one, and a paragraph break
+	// is one step of its own. Right goes to the next word's start (a Mac: to
+	// the word's end); left to the word's start.
+	void MoveWord(int direction, bool extend);
+	// To the start of this / the previous paragraph (up), or of the next one
+	// (down; a Mac: this paragraph's end, then the next one's).
+	void MoveParagraph(int direction, bool extend);
+	void MoveDocumentEdge(bool toEnd, bool extend);      // Ctrl+Home / Ctrl+End
+	// Ctrl+Backspace / Ctrl+Delete (Alt on a Mac): the word before / after the
+	// caret goes; at a paragraph's edge, the paragraph break does, as
+	// Backspace / Delete would. A selection goes instead.
+	void DeleteWord(int direction);
+	void DeleteToLineEdge(bool toEnd);                   // Cmd+Backspace / Cmd+Delete on a Mac
+	// Double and triple click.
+	void SelectWordAt(uint32_t offset);
+	void SelectParagraphAt(uint32_t offset);
 	// Word-like: is this caret position a blank line between blocks (an
 	// empty paragraph not yet typed into)?
 	bool IsGapPosition(uint32_t offset) const;
@@ -396,6 +415,7 @@ private:
 	// ---- Drawing / input
 	void Draw(ImDrawList *dl, ImVec2 origin);
 	void HandleMouse(ImVec2 origin);
+	bool ProcessMovementAndDeletionKeys();          // the fixed word-processor keys; true when one was pressed
 	bool HitTestContent(ImVec2 contentPos, uint32_t *offset, bool *hit) const;
 	const Glyph *GlyphAtScreen(ImVec2 screenPos) const;
 	bool LinkOfGlyph(const Glyph &g, std::string *href) const;
@@ -459,6 +479,18 @@ private:
 	std::string ContainerPrefixAt(uint32_t offset, bool forParagraph) const;
 	bool TryAutoformat();
 	void WordMoveHorizontal(int direction, bool extend);
+	// Word and paragraph steps over caret positions (stops in Rendered mode,
+	// code points otherwise).
+	enum class ECharClass : uint8_t { Break, Space, Punct, Word };
+	uint32_t StepPosition(uint32_t offset, int direction) const;   // UINT32_MAX at the ends
+	ECharClass ClassBetween(uint32_t a, uint32_t b) const;       // what a step from a to b (a < b) crosses
+	uint32_t WordTarget(uint32_t from, int direction) const;
+	int64_t ParagraphKey(uint32_t offset) const;                // equal for the positions of one paragraph
+	uint32_t ParagraphEdge(uint32_t from, int direction) const;  // the paragraph's first / last position
+	uint32_t ParagraphTarget(uint32_t from, int direction) const;
+	uint32_t LineEdgeOffset(bool toEnd) const;                  // UINT32_MAX without a layout
+	void MoveCaretTo(uint32_t offset, bool extend);
+	void DeleteTo(uint32_t target);                              // the range caret..target, as a selection would go
 	int32_t InnermostSpanOfType(EMarkdownSpanType type, uint32_t a, uint32_t b) const;
 	bool ToggleInlineInBlock(EMarkdownSpanType type, const char *delim, uint32_t a, uint32_t b, uint32_t *newA, uint32_t *newB);
 	std::vector<int32_t> SelectedLeafBlocks() const;

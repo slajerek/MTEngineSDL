@@ -82,12 +82,17 @@ lines lost its opening fence from its range. Page Up / Page Down move the caret 
 visible page. The caret's blink restarts, visible, on every move and edit
 (it used to blink on a fixed clock and could hide while typing); it can be
 steady and coloured. List numbers are left-aligned at one column: right-
-aligned, a proportional "1." stood to the right of "2.".
+aligned, a proportional "1." stood to the right of "2.". A word processor's
+keys: by word (Ctrl+arrows, Alt on a Mac) and paragraph, Ctrl+Shift+Home /
+End, word deletion, Shift+Backspace, Ctrl/Shift+Insert, Shift+Delete, the
+Mac's Cmd+arrows and Cmd+Backspace, double and triple click; shortcuts for
+strikethrough, inline code, the three lists and quote. Cut did nothing in
+Word-like mode; it cuts.
 
 Tests: `CTestMarkdownDocument` (model) and `CTestMarkdownLiveEditor`
 (commands, undo, bindings, find, Word-like rules) for a host's `CTestSuite`;
-`RegisterMarkdownEditorTests()` for its imgui_test_engine tests, fifteen of
-them driving the widget with real input and one checking captured pixels.
+`RegisterMarkdownEditorTests()` for its imgui_test_engine tests: nineteen
+that drive the widget with real input, one of them checking captured pixels.
 AgendaScene registers all three.
 
 **`VID_SetQuitRequestHandler()`.** The window's close button and the

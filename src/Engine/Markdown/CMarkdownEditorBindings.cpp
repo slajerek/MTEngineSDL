@@ -37,6 +37,12 @@ namespace
 		{EMarkdownEditorCommand::TableMoveRowDown, "markdown.editor.command.table_move_row_down", "Move table row down", "Markdown editor: Move table row down", MTKEY_ARROW_DOWN, true, true, false, false},
 		{EMarkdownEditorCommand::TableMoveColumnLeft, "markdown.editor.command.table_move_column_left", "Move table column left", "Markdown editor: Move table column left", MTKEY_ARROW_LEFT, true, true, false, false},
 		{EMarkdownEditorCommand::TableMoveColumnRight, "markdown.editor.command.table_move_column_right", "Move table column right", "Markdown editor: Move table column right", MTKEY_ARROW_RIGHT, true, true, false, false},
+		{EMarkdownEditorCommand::Strikethrough, "markdown.editor.command.strikethrough", "Strikethrough", "Markdown editor: Strikethrough", 'x', true, false, true, false},
+		{EMarkdownEditorCommand::InlineCode, "markdown.editor.command.inline_code", "Inline code", "Markdown editor: Inline code", 'e', false, false, true, false},
+		{EMarkdownEditorCommand::BulletList, "markdown.editor.command.bullet_list", "Bulleted list", "Markdown editor: Bulleted list", '8', true, false, true, false},
+		{EMarkdownEditorCommand::NumberedList, "markdown.editor.command.numbered_list", "Numbered list", "Markdown editor: Numbered list", '7', true, false, true, false},
+		{EMarkdownEditorCommand::TaskList, "markdown.editor.command.task_list", "Task list", "Markdown editor: Task list", '9', true, false, true, false},
+		{EMarkdownEditorCommand::Quote, "markdown.editor.command.quote", "Quote", "Markdown editor: Quote", '.', true, false, true, false},
 	};
 	static_assert(sizeof(kDefaults) / sizeof(kDefaults[0]) == (size_t)EMarkdownEditorCommand::Count, "one default per command");
 
