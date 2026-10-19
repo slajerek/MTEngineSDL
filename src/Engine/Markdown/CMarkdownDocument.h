@@ -191,6 +191,9 @@ struct CMarkdownBlock
 	char fenceChar = 0;
 	uint32_t infoBeg = 0, infoEnd = 0;   // the info string (language) range, if any
 	uint32_t langBeg = 0, langEnd = 0;
+	// YAML front matter (SetFrontMatter): a fenced Code block whose fences
+	// are `---` and `---` or `...`.
+	bool isFrontMatter = false;
 
 	// Table / cells
 	uint16_t columnCount = 0;     // Table
@@ -245,6 +248,20 @@ public:
 	// reparses.
 	void SetParserFlags(unsigned flags);
 	unsigned GetParserFlags() const { return parserFlags; }
+
+	// YAML front matter: a first line `---` up to the next line `---` or
+	// `...`. On, it is one block, a fenced Code block with isFrontMatter, the
+	// first child of the Document; md4c never sees its lines (they reach it
+	// blank, so every offset stays the source's). Off (the default), it parses
+	// as CommonMark does: a rule, then a setext heading or paragraphs.
+	// Without a closing line there is no front matter. Changing it reparses.
+	void SetFrontMatter(bool value);
+	bool GetFrontMatter() const { return frontMatter; }
+	// Where the front matter ends (past its closing line's newline); 0 when
+	// there is none.
+	uint32_t GetFrontMatterEnd() const { return frontMatterEnd; }
+	// The same rule on any text, front matter on or off.
+	static uint32_t FindFrontMatterEnd(std::string_view text);
 
 	const std::vector<CMarkdownBlock> &GetBlocks() const { return blocks; }
 	const std::vector<CMarkdownRun> &GetRuns() const { return runs; }
@@ -390,8 +407,12 @@ private:
 	bool lastParseIncremental = false;
 	uint32_t incrementalParseCount = 0;
 	bool hasRefDefs = false;
+	bool frontMatter = false;
+	uint32_t frontMatterEnd = 0;
 
 	// Parse-time state
+	const char *parseBase = nullptr;   // what md4c reads: the source, or a copy with the front matter blanked
+	void AddFrontMatterBlock();
 	std::vector<int32_t> blockStack;
 	struct SpanState { uint32_t style; std::string href; };
 	std::vector<SpanState> spanStack;

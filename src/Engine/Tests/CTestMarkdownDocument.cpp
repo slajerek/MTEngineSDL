@@ -59,7 +59,7 @@ namespace
 				&& x.level == y.level && x.listStart == y.listStart && x.listMark == y.listMark && x.listIsTight == y.listIsTight
 				&& x.isTask == y.isTask && x.taskMark == y.taskMark && (!x.isTask || x.taskMarkOffset == y.taskMarkOffset)
 				&& x.isFenced == y.isFenced && x.fenceChar == y.fenceChar && x.infoBeg == y.infoBeg && x.infoEnd == y.infoEnd
-				&& x.langBeg == y.langBeg && x.langEnd == y.langEnd && x.columnCount == y.columnCount
+				&& x.langBeg == y.langBeg && x.langEnd == y.langEnd && x.isFrontMatter == y.isFrontMatter && x.columnCount == y.columnCount
 				&& x.headRowCount == y.headRowCount && x.bodyRowCount == y.bodyRowCount && x.align == y.align
 				&& x.firstRun == y.firstRun && x.runCount == y.runCount;
 			if (!same) { snprintf(buf, sizeof(buf), "block %zu (type %d [%u,%u) vs type %d [%u,%u))", i, (int)x.type, x.beg, x.end, (int)y.type, y.beg, y.end); *why = buf; return false; }
@@ -463,5 +463,73 @@ void CTestMarkdownDocument::Run(ITestCallback *callback)
 		MD_ASSERT(ok, m);
 	}
 
-	TestCompleted(true, "Markdown document: ranges, content/syntax, edits, lists, degenerate inputs");
+	// YAML front matter: off (the default) it is CommonMark, on it is one block.
+	{
+		const std::string fm = "---\ntitle: Weekly\ndate: 2026-10-24\n---\n\n# Agenda\n\n1. One\n";
+		CMarkdownDocument off(fm);
+		MD_ASSERT(!off.GetFrontMatter() && off.GetFrontMatterEnd() == 0 && off.GetBlocks()[1].type == EMarkdownBlockType::HorizontalRule,
+			"front matter off (the default): a rule, as CommonMark has it");
+		CMarkdownDocument on;
+		on.SetFrontMatter(true);
+		on.SetSource(fm);
+		const auto &b = on.GetBlocks();
+		MD_ASSERT(b.size() > 2 && b[1].type == EMarkdownBlockType::Code && b[1].isFrontMatter && b[1].isFenced && b[1].parent == 0
+			&& Slice(on, 1) == "---~title: Weekly~date: 2026-10-24~---", "front matter on: one fenced Code block, from its first line to its closing line");
+		MD_ASSERT(on.GetFrontMatterEnd() == (uint32_t)fm.find("\n\n# Agenda") + 1, "it ends after its closing line's newline");
+		const int32_t h = FirstOfType(on, EMarkdownBlockType::Heading);
+		MD_ASSERT(h > 0 && b[h].level == 1 && Slice(on, h) == "# Agenda" && on.GetChildren(0).size() == 3
+			&& FirstOfType(on, EMarkdownBlockType::HorizontalRule) < 0, "the rest parses as if it were not there: a heading and a list, no rule");
+		MD_ASSERT(!on.IsContentByte(0) && on.IsContentByte((uint32_t)fm.find("title")) && !on.IsContentByte((uint32_t)fm.find("---\n\n")),
+			"its fences are syntax, its lines content");
+		CMarkdownDocument dots, crlf2, unclosed, later;
+		for (CMarkdownDocument *d : { &dots, &crlf2, &unclosed, &later }) d->SetFrontMatter(true);
+		dots.SetSource("---\na: 1\n...\nText\n");
+		MD_ASSERT(dots.GetBlocks()[1].isFrontMatter && Slice(dots, 1) == "---~a: 1~..." && dots.GetBlocks()[2].type == EMarkdownBlockType::Paragraph,
+			"`...` closes it too");
+		crlf2.SetSource("---\r\na: 1\r\n---\r\n\r\nText\r\n");
+		const int32_t crun = crlf2.FindRunAt(5);
+		MD_ASSERT(crlf2.GetBlocks()[1].isFrontMatter && crlf2.GetFrontMatterEnd() == 16 && crun >= 0 && crlf2.GetRuns()[crun].end == 9,
+			"CRLF front matter: its lines end before the CR");
+		unclosed.SetSource("---\na: 1\n\nText\n");
+		MD_ASSERT(unclosed.GetFrontMatterEnd() == 0 && unclosed.GetBlocks()[1].type == EMarkdownBlockType::HorizontalRule, "without a closing line there is none");
+		later.SetSource("Text\n\n---\na: 1\n---\n");
+		bool anyFm = false;
+		for (const CMarkdownBlock &x : later.GetBlocks()) anyFm = anyFm || x.isFrontMatter;
+		MD_ASSERT(!anyFm && later.GetFrontMatterEnd() == 0, "only the first line can open it");
+		MD_ASSERT(CMarkdownDocument::FindFrontMatterEnd(fm) == on.GetFrontMatterEnd(), "FindFrontMatterEnd is the same rule");
+		off.SetFrontMatter(true);
+		MD_ASSERT(off.GetBlocks()[1].isFrontMatter, "turning it on reparses");
+
+		// Incremental reparse with front matter on: edits that open, close
+		// and break it, and edits below it.
+		CMarkdownDocument inc;
+		inc.SetFrontMatter(true);
+		inc.SetSource(fm + "\n## Two\n\nMore *text*.\n\n- a\n- b\n\nEnd.\n");
+		const char *tokens[] = { "---", "...", "\n", "\n\n", "a: 1", "# ", "- ", " ", "x" };
+		uint32_t seed = 20261019u;
+		auto rnd = [&seed](uint32_t n) { seed = seed * 1664525u + 1013904223u; return n ? (seed >> 8) % n : 0; };
+		std::string why;
+		bool ok = true;
+		int failedAt = -1, incremental = 0;
+		for (int i = 0; i < 1500 && ok; i++)
+		{
+			const uint32_t size = inc.Size();
+			const uint32_t pos = rnd(4) == 0 ? rnd(std::min(size, 24u) + 1) : rnd(size + 1);   // often at the top
+			if (rnd(3) == 0 || size > 900) inc.Replace(pos, std::min(size, pos + 1 + rnd(4)), "");
+			else inc.Replace(pos, pos, tokens[rnd(sizeof(tokens) / sizeof(tokens[0]))]);
+			if (inc.WasLastParseIncremental()) incremental++;
+			CMarkdownDocument full;
+			full.SetIncrementalParse(false);
+			full.SetFrontMatter(true);
+			full.SetSource(inc.GetSource());
+			if (!SameModel(inc, full, &why)) { ok = false; failedAt = i; }
+		}
+		char m[900];
+		snprintf(m, sizeof(m), "1500 random edits with front matter on: incremental equals full (%d incremental)%s%s%s", incremental,
+			ok ? "" : "; FIRST DIFFERENCE at edit ", ok ? "" : std::to_string(failedAt).c_str(), ok ? "" : (": " + why).substr(0, 600).c_str());
+		MD_ASSERT(ok, m);
+		MD_ASSERT(incremental > 100, "edits below the front matter stay incremental");
+	}
+
+	TestCompleted(true, "Markdown document: ranges, content/syntax, edits, lists, degenerate inputs, front matter");
 }

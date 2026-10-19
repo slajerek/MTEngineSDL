@@ -31,6 +31,12 @@ finds in it, with everything mapped back to byte ranges of the source:
   unclosed tag or tags across another span stay raw HTML.
 - `IsContentByte(offset)`: a byte inside a run is content; every other byte
   of a block is syntax.
+- YAML front matter, `SetFrontMatter(true)` (off by default): a first line
+  `---` up to the next line `---` or `...` is one fenced Code block with
+  `isFrontMatter`, the Document's first child, and `GetFrontMatterEnd()` says
+  where it ends. md4c reads a copy with those lines blanked, so it parses the
+  rest at the same offsets; no closing line, no front matter. Off, the lines
+  parse as CommonMark has them (a rule, then a setext heading).
 - `Replace(beg, end, text)`: the only mutation. It splices bytes and reparses
   **incrementally** when that is provably the same as a full parse (see
   below). Built on it, each documenting its exact byte effect:
@@ -71,7 +77,8 @@ In `RevealNearCaret`:
 Interaction: mouse caret and drag selection; a click on a task box toggles
 it in place; Ctrl/Cmd+click opens a link (`onLinkActivated`, default the
 platform shell) and hovering shows its destination; right-click in a table
-opens the table menu; a double click selects a word, a triple click its
+opens the table menu (rows, columns, alignment, with their keys, and Delete
+table, `DeleteTable()`); a double click selects a word, a triple click its
 paragraph. Keyboard: Enter with list continuation, Shift+Enter, Tab /
 Shift+Tab between cells (Tab in the last cell adds a row), Enter to the cell
 below, the remappable commands below, and a word processor's fixed keys,
@@ -94,8 +101,8 @@ each with Shift to select (`ProcessMovementAndDeletionKeys()`;
 A word is a run of letters and digits (any non-ASCII letter counts), a run
 of punctuation is one, and a paragraph break is a step of its own, as in
 Word; in Rendered mode syntax is skipped. Ctrl/Cmd+F opens the find bar
-above the text: matches in the source, highlighted, the current one
-selected; Enter / Shift+Enter, F3 / Shift+F3, Esc. Ctrl+H (Cmd+Alt+F on a
+above the text: matches in the source, highlighted pale amber, the current
+one (the selection) strong amber with an outline; Enter / Shift+Enter, F3 / Shift+F3, Esc. Ctrl+H (Cmd+Alt+F on a
 Mac, where Cmd+H hides the app) opens it with a second row: the replacement,
 Replace (also Enter in that field: this match, then the next) and Replace
 all (one undo step). The replacement is written into the source as typed,
@@ -165,7 +172,13 @@ mode changes is how a caret that never sees syntax maps onto the source.
 The **toolbar** has the paragraph style (Normal, Heading 1-4), bold, italic,
 underline, strikethrough, inline code, link | bulleted, numbered and task
 list, outdent, indent, quote | table | undo, redo | find. Buttons show the
-state at the caret and wrap to a second row in a narrow window. It offers
+state at the caret; a narrow window wraps the toolbar between groups, never
+inside one. Where no paragraph style applies, the style box names the
+caret's block: a list, a quote, a table, code or metadata
+(`GetBlockKindAtCaret()`). With the caret in a table, the table button (it
+grows a chevron) opens the table menu; elsewhere it inserts a table. With
+`SetFrontMatter(true)` the editor draws front matter as metadata, a code box
+in a muted colour, edited as code. It offers
 only what the file can store: no colour, size or alignment. Icons are
 drawn shapes (the engine has no icon font). In the other modes Bold and
 Italic with no selection insert a marker pair, as before.
@@ -269,8 +282,10 @@ seeds were run during development. Typing in a 57 KB document costs about
   one `CGuiViewMarkdownEditor` with real input (Word-like typing and the
   toolbar's buttons among them), one that walks every caret position of an
   agenda checking the Word-like invariants (arrows, Enter, Backspace, typing),
-  and one that captures the window in seven states and checks the pixels
-  (set `MT_MD_CAPTURE_DIR` to keep the captures as raw RGBA files).
+  one for the toolbar's groups, its table menu and the find highlight (the
+  current match must stand out most, by pixels), and one that captures the
+  window in ten states and checks the pixels (set `MT_MD_CAPTURE_DIR` to
+  keep the captures as raw RGBA files).
 
 Register the first two in a host's `CTestSuite` and the third next to its
 own UI tests.

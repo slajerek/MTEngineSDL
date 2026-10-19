@@ -46,6 +46,16 @@ public:
     virtual void     RenderFrame() {}
     virtual void     HandlePlatformEvent(void *platformEventData) {}
 
+    // Whether the bar is drawn. Hidden, the ImGui bar is not drawn and takes
+    // no space (the main viewport's work area is the whole window); its
+    // menus and items stay, and showing it again needs no rebuild. Shortcuts
+    // are unaffected: they live in the keyboard-shortcut system. Native bars
+    // keep the flag but stay shown: the macOS bar belongs to the system (it
+    // hides in fullscreen), and the Win32 HMENU is not detached. For a
+    // presentation over the whole window.
+    void SetVisible(bool v) { visible = v; }
+    bool IsVisible() const  { return visible; }
+
     // On some platforms (macOS) the OS native menu fires a menu item's key
     // equivalent directly, while SDL ALSO delivers the same keystroke as a
     // normal key event — running the bound action twice (a toggle nets to
@@ -58,6 +68,9 @@ public:
     virtual bool WasKeyHandledByNativeMenu(unsigned int sdlKeyCode,
                                            bool shift, bool alt,
                                            bool control, bool super) { return false; }
+
+protected:
+    bool visible = true;
 };
 
 // --- Which menu bar the engine creates ---------------------------------------

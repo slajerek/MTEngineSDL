@@ -246,6 +246,40 @@ after `imgui_te_context.h` brought back `<windows.h>`'s `Yield()` macro, which
 ate every `ctx->Yield(n)` in `CImGuiMarkdownEditorTests.cpp`; the file now
 undefines it after its includes, as `imgui_te_context.h` itself does.
 
+**Window decorations.** `VID_SetMainWindowBordered()` /
+`VID_IsMainWindowBordered()` hide and show the main window's title bar and
+frame, and `VID_SetMainWindowResizable()` / `VID_IsMainWindowResizable()`
+whether the user can resize it (SDL's `SDL_SetWindowBordered` /
+`SDL_SetWindowResizable`). For a presentation shared from a window. The
+per-platform behaviour is in `VID_Main.h`: on macOS the content grows by the
+title bar's height and the window can no longer be dragged by it, and a change
+made in a fullscreen Space applies when the window leaves it. Main thread
+only, like every window change.
+
+**The ImGui menu bar can be hidden.** `CMTNativeMenuBar::SetVisible(false)`:
+the ImGui backend draws nothing and the main viewport's work area is the whole
+window; menus, items and shortcuts stay, and showing it again needs no
+rebuild. Native bars keep the flag and stay shown (`docs/menu-bar.md`).
+
+**The Markdown editor: front matter, a table menu on the toolbar, find.**
+- YAML front matter (`---` ... `---` or `...` on the first line):
+  `CMarkdownDocument::SetFrontMatter(true)` makes it one fenced Code block
+  with `isFrontMatter`, and md4c never sees its lines (they reach it blank,
+  so offsets stay the source's). It is off by default, which keeps
+  CommonMark's reading (a rule, then a setext heading). The editor's
+  `SetFrontMatter()` draws it as metadata: a code box in a muted colour.
+  Incremental reparse falls back to a full parse for edits that could open,
+  close or move it; a randomized test checks 1500 edits against full parses.
+- The toolbar wraps between groups only. Its style box names the caret's
+  block where no paragraph style applies (a list, a quote, a table, code,
+  metadata: `GetBlockKindAtCaret()`). In a table cell the table button is a
+  menu of the table commands with their keys, plus Delete table
+  (`DeleteTable()`, one undo step); the right-click menu has the same items.
+  Find has a magnifier icon.
+- Find: every match is pale amber, the current one strong amber with an
+  outline, drawn instead of the selection, so it is the most salient. The
+  find bar's buttons are drawn chevrons and a cross.
+
 ## 3.21.21 — development
 
 **The Windows x64 build with `MT_CAP_YOLO=1` had never completed, and five

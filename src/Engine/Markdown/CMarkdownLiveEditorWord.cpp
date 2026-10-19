@@ -162,7 +162,7 @@ void CMarkdownLiveEditor::RebuildStops() const
 			{
 				uint32_t k = ls;
 				while (k < le && src[k] == ' ') k++;
-				if (k < le && src[k] == b.fenceChar) break;   // the closing fence
+				if (k < le && (src[k] == b.fenceChar || (b.isFrontMatter && src[k] == '.'))) break;   // the closing fence
 			}
 			bool content = false;
 			for (uint32_t o = ls; o < le; o++) if (contentMask[o]) { content = true; break; }
@@ -358,7 +358,7 @@ bool CMarkdownLiveEditor::CodeContentRange(int32_t block, uint32_t *beg, uint32_
 		{
 			uint32_t k = last;
 			while (k < src.size() && src[k] == ' ') k++;
-			if (k < src.size() && src[k] == b.fenceChar) z = last - 1;   // before the closing fence's newline
+			if (k < src.size() && (src[k] == b.fenceChar || (b.isFrontMatter && src[k] == '.'))) z = last - 1;   // before the closing fence's newline
 		}
 	}
 	if (z < a) z = a;
@@ -1601,6 +1601,23 @@ bool CMarkdownLiveEditor::IsInQuote() const
 	for (int32_t b = UnitBlockOf(caret); b > 0; b = blocks[b].parent)
 		if (blocks[b].type == EMarkdownBlockType::Quote) return true;
 	return false;
+}
+
+EMarkdownCaretBlock CMarkdownLiveEditor::GetBlockKindAtCaret() const
+{
+	if (CaretInCell(nullptr)) return EMarkdownCaretBlock::Table;
+	const auto &blocks = doc.GetBlocks();
+	const int32_t blk = UnitBlockOf(caret);
+	if (blk > 0 && blocks[blk].type == EMarkdownBlockType::Code)
+		return blocks[blk].isFrontMatter ? EMarkdownCaretBlock::FrontMatter : EMarkdownCaretBlock::Code;
+	if (blk > 0 && blocks[blk].type == EMarkdownBlockType::Html) return EMarkdownCaretBlock::Other;
+	if (IsInList(EMarkdownListKind::Task)) return EMarkdownCaretBlock::TaskList;
+	if (IsInList(EMarkdownListKind::Numbered)) return EMarkdownCaretBlock::NumberedList;
+	if (IsInList(EMarkdownListKind::Bullet)) return EMarkdownCaretBlock::BulletList;
+	const int level = GetHeadingLevelAtCaret();
+	if (level > 0) return EMarkdownCaretBlock::Heading;
+	if (IsInQuote()) return EMarkdownCaretBlock::Quote;
+	return level == 0 ? EMarkdownCaretBlock::Paragraph : EMarkdownCaretBlock::Other;
 }
 
 bool CMarkdownLiveEditor::ToggleQuote()

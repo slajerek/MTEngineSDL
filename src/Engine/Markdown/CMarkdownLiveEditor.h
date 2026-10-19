@@ -65,6 +65,9 @@ enum class EMarkdownInlineStyle : uint8_t { Strong, Emphasis, Strikethrough, Cod
 // Block kinds the toolbar's paragraph-level commands set.
 enum class EMarkdownListKind : uint8_t { Bullet, Numbered, Task };
 
+// The caret's block as the toolbar's style box names it.
+enum class EMarkdownCaretBlock : uint8_t { Paragraph, Heading, BulletList, NumberedList, TaskList, Quote, Table, Code, FrontMatter, Other };
+
 struct CMarkdownEditorFonts
 {
 	ImFont *regular = nullptr;
@@ -90,6 +93,11 @@ public:
 	void ClearDirty() { dirty = false; }
 	void SetReadOnly(bool value) { readOnly = value; }
 	bool IsReadOnly() const { return readOnly; }
+	// YAML front matter at the start (CMarkdownDocument::SetFrontMatter),
+	// off by default. On, it is drawn as metadata, a code box in a muted
+	// colour, instead of a rule and a heading; its text edits as code.
+	void SetFrontMatter(bool value) { doc.SetFrontMatter(value); layoutDirty = true; ComputeRevealed(); }
+	bool GetFrontMatter() const { return doc.GetFrontMatter(); }
 
 	// ---- Mode. Rendered (Word-like) is the default.
 	void SetEditMode(EMarkdownEditMode mode);
@@ -196,6 +204,9 @@ public:
 	bool ToggleQuote();
 	bool IsInQuote() const;
 	bool IndentListItem(bool outdent);
+	// What the caret is in: a table cell, then code, a list item, a heading,
+	// a quote, a paragraph (innermost first).
+	EMarkdownCaretBlock GetBlockKindAtCaret() const;
 	// A table with `columns` x `rows` (header row included) after the caret's
 	// block; the caret goes to the first header cell.
 	bool InsertTable(int columns, int rows);
@@ -222,6 +233,10 @@ public:
 	// on a right-click menu in a table, Alt+Shift+arrows (move row / column)
 	// and Ctrl/Cmd+Enter (row below). False when not in a cell or refused.
 	bool EditTable(EMarkdownTableEdit edit);
+	bool IsInTable() const { return CaretInCell(nullptr); }
+	// The caret's whole table, with one of the blank lines around it: one
+	// undo step; the caret goes to where the table was.
+	bool DeleteTable();
 
 	// ---- Find (Ctrl/Cmd+F). A bar above the text: matches of the query in the
 	// SOURCE (so `bold` finds `**bold**`; a query with markers finds them),
@@ -460,6 +475,7 @@ private:
 	void Changed();
 	void ComputeRevealed();
 	void RenderTableMenu();
+	void RenderTableMenuItems();   // the table menu's items, shared by the right-click menu and the toolbar
 	void RenderToolbar();
 	void RenderLinkDialog();
 
@@ -569,6 +585,7 @@ private:
 	bool findOpen = false;
 	bool findFocusRequest = false;
 	bool returnFocus = false;
+	ImVec2 tableMenuPos = ImVec2(0, 0), tableMenuPivot = ImVec2(0, 0);   // under the toolbar's table button
 	bool findCaseSensitive = false;
 	std::string findQuery;
 	char findBuffer[256] = {0};

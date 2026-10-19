@@ -2048,6 +2048,34 @@ void VID_SetMainApplicationWindowFullScreen(bool isFullScreen)
 	VID_isChangingFullScreenState = false;
 }
 
+bool VID_IsMainWindowBordered()
+{
+	if (gMainWindow == NULL)
+		return true;
+	return (SDL_GetWindowFlags(gMainWindow) & SDL_WINDOW_BORDERLESS) == 0;
+}
+
+void VID_SetMainWindowBordered(bool bordered)
+{
+	if (gMainWindow == NULL)
+		return;
+	SDL_SetWindowBordered(gMainWindow, bordered);
+}
+
+bool VID_IsMainWindowResizable()
+{
+	if (gMainWindow == NULL)
+		return false;
+	return (SDL_GetWindowFlags(gMainWindow) & SDL_WINDOW_RESIZABLE) != 0;
+}
+
+void VID_SetMainWindowResizable(bool resizable)
+{
+	if (gMainWindow == NULL)
+		return;
+	SDL_SetWindowResizable(gMainWindow, resizable);
+}
+
 // BUG: SDL_ShowCursor does not work. This is implemented in SYS_Platform
 //void VID_ShowMouseCursor()
 //{

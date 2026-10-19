@@ -1,7 +1,11 @@
 // CMarkdownLiveEditor, the formatting toolbar.
 //
 // A row above the text: paragraph style, inline styles, link, lists, indent,
-// quote, table, undo/redo, find. Buttons show the state at the caret. Only
+// quote, table, undo/redo, find. Buttons show the state at the caret; the
+// style box names the caret's block (a list, a quote, a table, code) where
+// no paragraph style applies. A narrow toolbar wraps between groups, never
+// inside one. In a table the table button is a menu of its rows, columns
+// and alignment. Only
 // what Markdown stores is offered (no colour, size, alignment); underline is
 // `<u>text</u>`.
 // Icons are drawn shapes: the engine has no icon font. Every command goes
@@ -62,14 +66,19 @@ void CMarkdownLiveEditor::RenderToolbar()
 	CMarkdownEditorBindings *kb = GetBindings();
 
 	// The next item on this row, or the next row when it would not fit. A
-	// group separator is drawn only between items on one row.
+	// group's first item moves to the next row when the whole group would not
+	// fit, so a group is split only when it is wider than the toolbar. A group
+	// separator is drawn only between items on one row.
 	bool separatorDue = false;
+	float groupWidth = 0;
 	auto place = [&](float w) {
+		const float need = std::max(w, groupWidth);
+		groupWidth = 0;
 		if (!first)
 		{
 			const float sepW = separatorDue ? style.ItemSpacing.x * 2 : 0.0f;
 			ImGui::SameLine();
-			if (ImGui::GetCursorPosX() + sepW + w > lineRight) ImGui::NewLine();
+			if (ImGui::GetCursorPosX() + sepW + need > lineRight) ImGui::NewLine();
 			else if (separatorDue)
 			{
 				const ImVec2 p = ImGui::GetCursorScreenPos();
@@ -82,7 +91,11 @@ void CMarkdownLiveEditor::RenderToolbar()
 		separatorDue = false;
 		first = false;
 	};
-	auto separator = [&]() { separatorDue = true; };
+	// A new group of `buttons` square buttons (plus `extra` width).
+	auto separator = [&](int buttons, float extra = 0.0f) {
+		separatorDue = true;
+		groupWidth = buttons * bw + std::max(0, buttons - 1) * style.ItemSpacing.x + extra;
+	};
 	auto tooltip = [&](const char *key, const char *fallback, ImGuiKeyChord chord) {
 		if (!ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_DelayShort)) return;
 		std::string tip = L(key, fallback);
@@ -121,14 +134,29 @@ void CMarkdownLiveEditor::RenderToolbar()
 	const char *styleFallbacks[] = { "Normal", "Heading 1", "Heading 2", "Heading 3", "Heading 4" };
 	const EMarkdownEditorCommand styleCommands[] = { EMarkdownEditorCommand::Paragraph, EMarkdownEditorCommand::Heading1,
 		EMarkdownEditorCommand::Heading2, EMarkdownEditorCommand::Heading3, EMarkdownEditorCommand::Heading4 };
+	// Where no paragraph style applies, the box names the block instead.
+	struct BlockName { EMarkdownCaretBlock kind; const char *key; const char *fallback; };
+	static const BlockName blockNames[] = {
+		{ EMarkdownCaretBlock::BulletList, "markdown.editor.toolbar.style_bullets", "Bulleted list" },
+		{ EMarkdownCaretBlock::NumberedList, "markdown.editor.toolbar.style_numbers", "Numbered list" },
+		{ EMarkdownCaretBlock::TaskList, "markdown.editor.toolbar.style_tasks", "Task list" },
+		{ EMarkdownCaretBlock::Quote, "markdown.editor.toolbar.style_quote", "Quote" },
+		{ EMarkdownCaretBlock::Table, "markdown.editor.toolbar.style_table", "Table" },
+		{ EMarkdownCaretBlock::Code, "markdown.editor.toolbar.style_code", "Code" },
+		{ EMarkdownCaretBlock::FrontMatter, "markdown.editor.toolbar.style_front_matter", "Metadata" },
+	};
 	float comboW = 0;
 	for (int i = 0; i < 5; i++) comboW = std::max(comboW, ImGui::CalcTextSize(L(styleKeys[i], styleFallbacks[i])).x);
+	for (const BlockName &n : blockNames) comboW = std::max(comboW, ImGui::CalcTextSize(L(n.key, n.fallback)).x);
 	comboW += h + style.FramePadding.x * 2;
 	place(comboW);
 	ImGui::SetNextItemWidth(comboW);
 	if (!editable) ImGui::BeginDisabled();
+	const EMarkdownCaretBlock kind = GetBlockKindAtCaret();
 	const int shown = level >= 0 && level <= 4 ? level : -1;
-	const std::string preview = shown >= 0 ? L(styleKeys[shown], styleFallbacks[shown]) : (level > 4 ? "H" + std::to_string(level) : "");
+	std::string preview = shown >= 0 ? L(styleKeys[shown], styleFallbacks[shown]) : (level > 4 ? "H" + std::to_string(level) : "");
+	for (const BlockName &n : blockNames)
+		if (n.kind == kind) preview = L(n.key, n.fallback);
 	if (ImGui::BeginCombo("###md_tb_style", preview.c_str()))
 	{
 		for (int i = 0; i < 5; i++)
@@ -147,7 +175,7 @@ void CMarkdownLiveEditor::RenderToolbar()
 	if (!editable) ImGui::EndDisabled();
 	tooltip("markdown.editor.toolbar.style", "Paragraph style", 0);
 
-	separator();
+	separator(6);
 	if (button("###md_tb_bold", IsInlineStyleActive(EMarkdownInlineStyle::Strong), editable, letter(fonts.bold, "B")))
 		ToggleInlineStyle(EMarkdownInlineStyle::Strong);
 	tooltip("markdown.editor.toolbar.bold", "Bold", kb->GetChord(EMarkdownEditorCommand::Bold));
@@ -194,7 +222,7 @@ void CMarkdownLiveEditor::RenderToolbar()
 	}
 	tooltip("markdown.editor.toolbar.link", "Link", kb->GetChord(EMarkdownEditorCommand::InsertLink));
 
-	separator();
+	separator(6);
 	const bool inBullet = IsInList(EMarkdownListKind::Bullet), inNumbered = IsInList(EMarkdownListKind::Numbered), inTask = IsInList(EMarkdownListKind::Task);
 	if (button("###md_tb_bullets", inBullet, editable,
 		[&](ImDrawList *dl, ImVec2 a, ImVec2 b, ImU32 col) {
@@ -253,19 +281,60 @@ void CMarkdownLiveEditor::RenderToolbar()
 		ToggleQuote();
 	tooltip("markdown.editor.toolbar.quote", "Quote", kb->GetChord(EMarkdownEditorCommand::Quote));
 
-	separator();
-	if (button("###md_tb_table", false, editable,
-		[&](ImDrawList *dl, ImVec2 a, ImVec2 b, ImU32 col) {
-			dl->AddRect(a, b, col, 0, 0, t);
-			const float w = b.x - a.x, hh = b.y - a.y;
-			dl->AddLine(ImVec2(a.x, a.y + hh / 3), ImVec2(b.x, a.y + hh / 3), col, t);
-			dl->AddLine(ImVec2(a.x, a.y + hh * 2 / 3), ImVec2(b.x, a.y + hh * 2 / 3), col, t);
-			dl->AddLine(ImVec2(a.x + w / 2, a.y), ImVec2(a.x + w / 2, b.y), col, t);
-		}))
-		InsertTable(2, 3);
-	tooltip("markdown.editor.toolbar.table", "Insert table", 0);
+	// Table: inserts one, or in a table opens the table menu (a chevron says so).
+	const bool inTable = IsInTable();
+	const float tableW = inTable ? bw * 1.5f : bw;
+	separator(0, tableW);
+	{
+		place(tableW);
+		if (!editable) ImGui::BeginDisabled();
+		ImGui::PushStyleColor(ImGuiCol_Button, 0u);
+		const bool clicked = ImGui::Button("###md_tb_table", ImVec2(tableW, h));
+		ImGui::PopStyleColor();
+		if (!editable) ImGui::EndDisabled();
+		const ImVec2 ia = ImGui::GetItemRectMin(), ib = ImGui::GetItemRectMax();
+		const float m = h * 0.24f;
+		const ImVec2 a(ia.x + m, ia.y + m), b(ia.x + bw - m, ib.y - m);
+		ImDrawList *dl = ImGui::GetWindowDrawList();
+		const ImU32 col = IconColor(editable);
+		dl->AddRect(a, b, col, 0, 0, t);
+		const float w = b.x - a.x, hh = b.y - a.y;
+		dl->AddLine(ImVec2(a.x, a.y + hh / 3), ImVec2(b.x, a.y + hh / 3), col, t);
+		dl->AddLine(ImVec2(a.x, a.y + hh * 2 / 3), ImVec2(b.x, a.y + hh * 2 / 3), col, t);
+		dl->AddLine(ImVec2(a.x + w / 2, a.y), ImVec2(a.x + w / 2, b.y), col, t);
+		if (inTable)
+		{
+			const float cx = (b.x + ib.x) * 0.5f - m * 0.15f, cy = (ia.y + ib.y) * 0.5f, s = h * 0.1f;
+			dl->AddTriangleFilled(ImVec2(cx - s, cy - s * 0.5f), ImVec2(cx + s, cy - s * 0.5f), ImVec2(cx, cy + s * 0.6f), col);
+		}
+		if (clicked)
+		{
+			if (inTable)
+			{
+				// Under the button, opening toward the middle of the window.
+				ImGui::OpenPopup("##md_tb_table_menu");
+				const ImGuiViewport *vp = ImGui::GetWindowViewport();
+				const bool rightHalf = ia.x > vp->Pos.x + vp->Size.x * 0.5f;
+				tableMenuPos = ImVec2(rightHalf ? ib.x : ia.x, ib.y);
+				tableMenuPivot = ImVec2(rightHalf ? 1.0f : 0.0f, 0.0f);
+			}
+			else
+			{
+				InsertTable(2, 3);
+				returnFocus = true;
+			}
+		}
+		if (inTable) tooltip("markdown.editor.toolbar.table_menu", "Table: rows, columns, alignment", 0);
+		else tooltip("markdown.editor.toolbar.table", "Insert table", 0);
+		ImGui::SetNextWindowPos(tableMenuPos, ImGuiCond_Always, tableMenuPivot);
+		if (ImGui::BeginPopup("##md_tb_table_menu"))
+		{
+			RenderTableMenuItems();
+			ImGui::EndPopup();
+		}
+	}
 
-	separator();
+	separator(2);
 	if (button("###md_tb_undo", false, editable && CanUndo(),
 		[&](ImDrawList *dl, ImVec2 a, ImVec2 b, ImU32 col) { DrawUndoArrow(dl, a, b, false, col, t); }))
 		Undo();
@@ -275,13 +344,16 @@ void CMarkdownLiveEditor::RenderToolbar()
 		Redo();
 	tooltip("markdown.editor.toolbar.redo", "Redo", kb->GetChord(EMarkdownEditorCommand::Redo));
 
-	separator();
+	separator(1);
 	if (button("###md_tb_find", findOpen, true,
 		[&](ImDrawList *dl, ImVec2 a, ImVec2 b, ImU32 col) {
-			const float hh = b.y - a.y, r = hh * 0.3f;
-			const ImVec2 c(a.x + r + t, a.y + r + t);
-			dl->AddCircle(c, r, col, 16, t);
-			dl->AddLine(ImVec2(c.x + r * 0.7f, c.y + r * 0.7f), ImVec2(b.x - t, b.y - t), col, t * 1.6f);
+			// A magnifier: a round lens of 0.8 of the icon's height, a short
+			// thick handle at 45 degrees (it may reach into the margin).
+			const float hh = b.y - a.y, r = hh * 0.4f;
+			const ImVec2 c((a.x + b.x) * 0.5f - hh * 0.2f, a.y + hh * 0.4f);
+			dl->AddCircle(c, r, col, 24, t * 1.3f);
+			const float d0 = r + t * 0.5f, d1 = r + hh * 0.55f;
+			dl->AddLine(ImVec2(c.x + d0 * 0.7071f, c.y + d0 * 0.7071f), ImVec2(c.x + d1 * 0.7071f, c.y + d1 * 0.7071f), col, t * 2.2f);
 		}))
 	{
 		if (findOpen) CloseFind();

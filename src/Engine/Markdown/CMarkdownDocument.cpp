@@ -62,13 +62,43 @@ void CMarkdownDocument::SetParserFlags(unsigned flags)
 	Parse();
 }
 
+void CMarkdownDocument::SetFrontMatter(bool value)
+{
+	if (frontMatter == value) return;
+	frontMatter = value;
+	Parse();
+}
+
+uint32_t CMarkdownDocument::FindFrontMatterEnd(std::string_view text)
+{
+	// One line of `text` from `at`, without its newline, a CR or trailing blanks.
+	auto lineAt = [&](size_t at, size_t *next) {
+		size_t e = text.find('\n', at);
+		if (e == std::string_view::npos) { e = text.size(); *next = e; }
+		else *next = e + 1;
+		while (e > at && (text[e - 1] == '\r' || text[e - 1] == ' ' || text[e - 1] == '\t')) e--;
+		return text.substr(at, e - at);
+	};
+	size_t next = 0;
+	if (text.empty() || lineAt(0, &next) != "---") return 0;
+	for (size_t at = next; at < text.size(); at = next)
+	{
+		const std::string_view line = lineAt(at, &next);
+		if (line == "---" || line == "...") return (uint32_t)next;
+	}
+	return 0;
+}
+
 uint32_t CMarkdownDocument::Replace(uint32_t beg, uint32_t end, std::string_view text)
 {
 	const uint32_t size = Size();
 	if (beg > size) beg = size;
 	if (end > size) end = size;
 	if (end < beg) std::swap(beg, end);
-	if (!(incrementalParse && TryIncrementalReplace(beg, end, text)))
+	// An edit that may open, close or move the front matter parses it all:
+	// its closing line can be anywhere below.
+	const bool nearFrontMatter = frontMatter && (frontMatterEnd > 0 ? beg <= frontMatterEnd : (Size() >= 3 && source.compare(0, 3, "---") == 0) || beg <= LineEnd(0) + 1);
+	if (!(incrementalParse && !nearFrontMatter && TryIncrementalReplace(beg, end, text)))
 	{
 		source.replace(beg, end - beg, text.data(), text.size());
 		Parse();
@@ -136,6 +166,7 @@ bool CMarkdownDocument::TryIncrementalReplace(uint32_t beg, uint32_t end, std::s
 	CMarkdownDocument sub;
 	sub.incrementalParse = false;
 	sub.parserFlags = parserFlags;
+	sub.frontMatter = frontMatter && r0 == 0;   // only the document's start can hold it
 	sub.SetSource(region);
 	const std::vector<int32_t> subTops = sub.GetChildren(0);
 	if (subTops.empty()) return false;
@@ -273,7 +304,20 @@ void CMarkdownDocument::Parse()
 	parser.leave_span = [](MD_SPANTYPE t, void *d, void *u) { return LeaveSpan((int)t, d, u); };
 	parser.text = [](MD_TEXTTYPE t, const MD_CHAR *text, MD_SIZE size, void *u) { return Text((int)t, text, size, u); };
 
-	md_parse(source.data(), (MD_SIZE)source.size(), &parser, this);
+	// The front matter's lines reach md4c as blank lines, so md4c parses the
+	// rest as if it were not there, at the same offsets.
+	frontMatterEnd = frontMatter ? FindFrontMatterEnd(source) : 0;
+	std::string blanked;
+	parseBase = source.data();
+	if (frontMatterEnd > 0)
+	{
+		blanked = source;
+		for (uint32_t i = 0; i < frontMatterEnd; i++)
+			if (blanked[i] != '\n' && blanked[i] != '\r') blanked[i] = ' ';
+		parseBase = blanked.data();
+	}
+	md_parse(parseBase, (MD_SIZE)source.size(), &parser, this);
+	parseBase = nullptr;
 	lastParseIncremental = false;
 	hasRefDefs = MayHaveLinkReferenceDefinitions(source);
 
@@ -331,7 +375,7 @@ int CMarkdownDocument::EnterBlock(int type, void *detail, void *userdata)
 		if (t == EMarkdownBlockType::UnorderedList || t == EMarkdownBlockType::OrderedList) listDepth++;
 	}
 
-	const char *base = doc->source.data();
+	const char *base = doc->parseBase;
 	auto offsetOf = [&](const MD_CHAR *p) -> uint32_t {
 		return (p >= base && p <= base + doc->source.size()) ? (uint32_t)(p - base) : 0;
 	};
@@ -417,7 +461,46 @@ int CMarkdownDocument::EnterBlock(int type, void *detail, void *userdata)
 	doc->blockStack.push_back(index);
 	if (block.IsLeaf())
 		doc->currentLeaf = index;
+	if (block.type == EMarkdownBlockType::Document && doc->frontMatterEnd > 0)
+		doc->AddFrontMatterBlock();
 	return 0;
+}
+
+// The front matter as the Document's first child: a fenced Code block, its
+// lines as md4c gives a code block's (the line's text, then a "\n" of its own).
+void CMarkdownDocument::AddFrontMatterBlock()
+{
+	CMarkdownBlock block;
+	block.type = EMarkdownBlockType::Code;
+	block.parent = 0;
+	block.depth = 1;
+	block.isFenced = true;
+	block.fenceChar = '-';
+	block.isFrontMatter = true;
+	block.beg = 0;
+	block.end = source[frontMatterEnd - 1] == '\n' ? frontMatterEnd - 1 : frontMatterEnd;
+	block.firstRun = (uint32_t)runs.size();
+	const int32_t index = (int32_t)blocks.size();
+	const uint32_t closingBeg = LineStart(block.end);
+	for (uint32_t ls = LineEnd(0) + 1; ls < closingBeg; ls = LineEnd(ls) + 1)
+	{
+		uint32_t le = LineEnd(ls);
+		if (le > ls && source[le - 1] == '\r') le--;
+		CMarkdownRun run;
+		run.block = index;
+		run.kind = EMarkdownRunKind::Code;
+		if (le > ls)
+		{
+			run.beg = ls;
+			run.end = le;
+			runs.push_back(run);
+		}
+		run.beg = run.end = le;
+		run.synthesized = "\n";
+		runs.push_back(run);
+	}
+	block.runCount = (uint32_t)runs.size() - block.firstRun;
+	blocks.push_back(block);
 }
 
 int CMarkdownDocument::LeaveBlock(int, void *, void *userdata)
@@ -559,7 +642,7 @@ int CMarkdownDocument::Text(int type, const char *text, unsigned size, void *use
 	run.href = doc->currentHref;
 	run.span = doc->openSpans.empty() ? -1 : doc->openSpans.back();
 
-	const char *base = doc->source.data();
+	const char *base = doc->parseBase;
 	const bool inSource = text >= base && text + size <= base + doc->source.size();
 
 	switch ((MD_TEXTTYPE)type)
@@ -1002,6 +1085,11 @@ void CMarkdownDocument::ResolveRanges()
 		else if (block.IsCell())
 		{
 			ResolveCellRange(i, rowLineBeg, cellCursor);
+			placed[i] = true;
+		}
+		else if (block.isFrontMatter)
+		{
+			cursor = std::max(cursor, block.end);   // placed when it was made
 			placed[i] = true;
 		}
 		else if (block.IsLeaf() || OwnsContent(i))

@@ -10,6 +10,7 @@
 #endif
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstring>
 
@@ -713,6 +714,33 @@ bool CMarkdownLiveEditor::EditTable(EMarkdownTableEdit edit)
 	return true;
 }
 
+bool CMarkdownLiveEditor::DeleteTable()
+{
+	if (readOnly) return false;
+	int32_t cell = -1;
+	if (!CaretInCell(&cell)) return false;
+	const int32_t table = doc.TableOf(cell);
+	if (table <= 0) return false;
+	const std::string &src = doc.GetSource();
+	const uint32_t size = (uint32_t)src.size();
+	const CMarkdownBlock &t = doc.GetBlocks()[table];
+	uint32_t beg = doc.LineStart(t.beg), end = doc.LineEnd(t.end);
+	if (end < size) end++;   // its last line's newline
+	// Blank lines on both sides: one of them goes too, so no empty paragraph
+	// is left where the table was. At the end of the text, the one before.
+	const bool blankBefore = beg >= 2 && src[beg - 1] == '\n' && src[beg - 2] == '\n';
+	if (blankBefore && end < size && src[end] == '\n') end++;
+	else if (blankBefore && end >= size) beg--;
+	BeginCompound();
+	doc.Replace(beg, end, "");
+	caret = anchor = std::min(beg, (uint32_t)doc.GetSource().size());
+	EndCompound();
+	preferredX = -1;
+	scrollToCaret = true;
+	Changed();
+	return true;
+}
+
 bool CMarkdownLiveEditor::SelectFirstCellOfRow()
 {
 	int32_t cell = -1;
@@ -727,6 +755,12 @@ bool CMarkdownLiveEditor::SelectFirstCellOfRow()
 void CMarkdownLiveEditor::RenderTableMenu()
 {
 	if (!ImGui::BeginPopup("##md_table_menu")) return;
+	RenderTableMenuItems();
+	ImGui::EndPopup();
+}
+
+void CMarkdownLiveEditor::RenderTableMenuItems()
+{
 	struct Item { const char *id; const char *key; const char *fallback; EMarkdownTableEdit edit; bool separatorBefore; };
 	static const Item items[] = {
 		{"md_table_row_above", "markdown.editor.table.insert_row_above", "Insert row above", EMarkdownTableEdit::InsertRowAbove, false},
@@ -744,14 +778,38 @@ void CMarkdownLiveEditor::RenderTableMenu()
 		{"md_table_align_right", "markdown.editor.table.align_right", "Align right", EMarkdownTableEdit::AlignRight, false},
 		{"md_table_align_default", "markdown.editor.table.align_default", "Default alignment", EMarkdownTableEdit::AlignDefault, false},
 	};
+	// The keys the editor gives these commands, shown beside them.
+	CMarkdownEditorBindings *kb = GetBindings();
+	auto chordOf = [kb](EMarkdownTableEdit edit) -> ImGuiKeyChord {
+		switch (edit)
+		{
+			case EMarkdownTableEdit::InsertRowBelow: return kb->GetChord(EMarkdownEditorCommand::ToggleTaskOrInsertRow);
+			case EMarkdownTableEdit::MoveRowUp: return kb->GetChord(EMarkdownEditorCommand::TableMoveRowUp);
+			case EMarkdownTableEdit::MoveRowDown: return kb->GetChord(EMarkdownEditorCommand::TableMoveRowDown);
+			case EMarkdownTableEdit::MoveColumnLeft: return kb->GetChord(EMarkdownEditorCommand::TableMoveColumnLeft);
+			case EMarkdownTableEdit::MoveColumnRight: return kb->GetChord(EMarkdownEditorCommand::TableMoveColumnRight);
+			default: return 0;
+		}
+	};
 	for (const Item &it : items)
 	{
 		if (it.separatorBefore) ImGui::Separator();
 		// `###id`: the item's identity does not depend on the translation.
 		const std::string label = std::string(L(it.key, it.fallback)) + "###" + it.id;
-		if (ImGui::MenuItem(label.c_str(), nullptr, false, !readOnly)) EditTable(it.edit);
+		const ImGuiKeyChord chord = chordOf(it.edit);
+		if (ImGui::MenuItem(label.c_str(), chord != 0 ? ImGui::GetKeyChordName(chord) : nullptr, false, !readOnly))
+		{
+			EditTable(it.edit);
+			returnFocus = true;
+		}
 	}
-	ImGui::EndPopup();
+	ImGui::Separator();
+	const std::string del = std::string(L("markdown.editor.table.delete_table", "Delete table")) + "###md_table_delete";
+	if (ImGui::MenuItem(del.c_str(), nullptr, false, !readOnly))
+	{
+		DeleteTable();
+		returnFocus = true;
+	}
 }
 
 // ---- Find ----------------------------------------------------------------------------
@@ -947,11 +1005,30 @@ void CMarkdownLiveEditor::RenderFindBar()
 	else snprintf(count, sizeof(count), "%d / %d", cur >= 0 ? cur + 1 : 0, (int)m.size());
 	ImGui::AlignTextToFramePadding();
 	ImGui::TextUnformatted(count);
+	// Drawn glyphs on the bar's buttons: chevrons up and down, a cross.
+	const float gt = std::max(1.0f, h * 0.08f);
+	auto glyph = [&](int kind) {
+		const ImVec2 a = ImGui::GetItemRectMin(), b = ImGui::GetItemRectMax();
+		const ImVec2 c((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f);
+		const float s = h * 0.2f;
+		const ImU32 col = ImGui::GetColorU32(ImGuiCol_Text);
+		ImDrawList *dl = ImGui::GetWindowDrawList();
+		if (kind == 2)
+		{
+			dl->AddLine(ImVec2(c.x - s, c.y - s), ImVec2(c.x + s, c.y + s), col, gt);
+			dl->AddLine(ImVec2(c.x - s, c.y + s), ImVec2(c.x + s, c.y - s), col, gt);
+			return;
+		}
+		const float dy = kind == 0 ? -s * 0.5f : s * 0.5f;
+		dl->AddPolyline(std::array<ImVec2, 3>{ ImVec2(c.x - s, c.y - dy), ImVec2(c.x, c.y + dy), ImVec2(c.x + s, c.y - dy) }.data(), 3, col, 0, gt);
+	};
 	ImGui::SameLine(lineRight - 4 * buttonW - 3 * ImGui::GetStyle().ItemSpacing.x);
-	if (ImGui::Button("<###md_find_prev", ImVec2(buttonW, h))) { FindPrevious(); findFocusRequest = true; }
+	if (ImGui::Button("###md_find_prev", ImVec2(buttonW, h))) { FindPrevious(); findFocusRequest = true; }
+	glyph(0);
 	ImGui::SetItemTooltip("%s", L("markdown.editor.find.previous", "Previous match (Shift+Enter)"));
 	ImGui::SameLine();
-	if (ImGui::Button(">###md_find_next", ImVec2(buttonW, h))) { FindNext(); findFocusRequest = true; }
+	if (ImGui::Button("###md_find_next", ImVec2(buttonW, h))) { FindNext(); findFocusRequest = true; }
+	glyph(1);
 	ImGui::SetItemTooltip("%s", L("markdown.editor.find.next", "Next match (Enter)"));
 	ImGui::SameLine();
 	if (findCaseSensitive) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetColorU32(ImGuiCol_ButtonActive));
@@ -960,7 +1037,8 @@ void CMarkdownLiveEditor::RenderFindBar()
 	if (caseClicked) { findCaseSensitive = !findCaseSensitive; findFocusRequest = true; }
 	ImGui::SetItemTooltip("%s", L("markdown.editor.find.match_case", "Match case"));
 	ImGui::SameLine();
-	if (ImGui::Button("x###md_find_close", ImVec2(buttonW, h))) CloseFind();
+	if (ImGui::Button("###md_find_close", ImVec2(buttonW, h))) CloseFind();
+	glyph(2);
 	ImGui::SetItemTooltip("%s", L("markdown.editor.find.close", "Close (Esc)"));
 
 	if (replaceOpen)
@@ -1353,14 +1431,21 @@ void CMarkdownLiveEditor::LayoutRuns(Emit &e, int32_t block, bool, uint32_t, uin
 	if (asCode)
 		for (uint32_t r = b.firstRun; r < b.firstRun + b.runCount; r++)
 			if (runs[r].block == block && !runs[r].IsSynthesized()) lastContentEnd = std::max(lastContentEnd, runs[r].end);
-	const Style plain = StyleFor(0, headingLevel, false, asCode, header);
+	// Front matter is metadata: muted, so it never competes with the text.
+	const ImU32 metaColor = WithAlpha(ImGui::GetColorU32(ImGuiCol_Text), 0.6f);
+	auto styleOf = [&](uint32_t styles) {
+		Style st = StyleFor(styles, headingLevel, false, asCode, header);
+		if (b.isFrontMatter) st.color = metaColor;
+		return st;
+	};
+	const Style plain = styleOf(0);
 
 	for (uint32_t r = b.firstRun; r < b.firstRun + b.runCount; r++)
 	{
 		while (nextBare < bare.size() && spans[bare[nextBare]].firstRun <= r) EmitImage(e, bare[nextBare++], plain);
 		const CMarkdownRun &run = runs[r];
 		if (run.block != block) continue;
-		const Style st = StyleFor(run.styles, headingLevel, false, asCode, header);
+		const Style st = styleOf(run.styles);
 
 		// A resolved image replaces its alt text with the picture.
 		if (run.styles & MD_STYLE_IMAGE)
@@ -2848,6 +2933,16 @@ void CMarkdownLiveEditor::Draw(ImDrawList *dl, ImVec2 origin)
 
 	caretRectValid = false;
 	if (findOpen) UpdateFindMatches();
+	bool selectionIsMatch = false;
+	if (findOpen)
+		for (const auto &m : findMatches)
+			if (m.first == selA && m.second == selB) { selectionIsMatch = true; break; }
+	// Amber on either theme: pale for every match, strong for the current one.
+	const ImVec4 bgv = ImGui::GetStyleColorVec4(ImGuiCol_WindowBg);
+	const bool darkTheme = 0.2126f * bgv.x + 0.7152f * bgv.y + 0.0722f * bgv.z < 0.5f;
+	const ImU32 matchFill = darkTheme ? IM_COL32(0xFD, 0xE6, 0x8A, 0x48) : IM_COL32(0xFD, 0xE6, 0x8A, 0x99);
+	const ImU32 currentMatchFill = darkTheme ? IM_COL32(0xF5, 0x9E, 0x0B, 0xA6) : IM_COL32(0xF5, 0x9E, 0x0B, 0xD9);
+	const ImU32 currentMatchEdge = darkTheme ? IM_COL32(0xFB, 0xBF, 0x24, 0xFF) : IM_COL32(0xB4, 0x53, 0x09, 0xFF);
 	const int caretLine = FindLineOfOffset(caret);
 	// Any move or edit restarts the blink with the caret shown, so it never
 	// hides while the user types or moves.
@@ -2867,10 +2962,13 @@ void CMarkdownLiveEditor::Draw(ImDrawList *dl, ImVec2 origin)
 		const Line &line = layout.lines[li];
 		const float baseY = origin.y + line.y + line.ascent;
 
-		// Find matches (the selected one is drawn as the selection).
+		// Find matches: every match a pale amber, the current one (the
+		// selection) a strong amber with an outline, drawn instead of the
+		// selection so it is the most salient of all.
 		if (findOpen && !findMatches.empty())
 		{
-			const ImU32 matchCol = WithAlpha(ImGui::GetColorU32(ImGuiCol_PlotHistogram), 0.35f);
+			const float rx0 = origin.y + line.y, rx1 = origin.y + line.y + line.height;
+			float cx0 = -1, cx1 = -1;
 			for (const Glyph &g : line.glyphs)
 			{
 				if (g.synthetic) continue;
@@ -2878,13 +2976,16 @@ void CMarkdownLiveEditor::Draw(ImDrawList *dl, ImVec2 origin)
 					[](uint32_t o, const std::pair<uint32_t, uint32_t> &m) { return o < m.first; });
 				if (it == findMatches.begin()) continue;
 				--it;
-				if (g.offset >= it->first && g.offset < it->second)
-					dl->AddRectFilled(ImVec2(origin.x + g.x0, origin.y + line.y), ImVec2(origin.x + g.x1, origin.y + line.y + line.height), matchCol);
+				if (!(g.offset >= it->first && g.offset < it->second)) continue;
+				const bool current = it->first == selA && it->second == selB;
+				dl->AddRectFilled(ImVec2(origin.x + g.x0, rx0), ImVec2(origin.x + g.x1, rx1), current ? currentMatchFill : matchFill);
+				if (current) { if (cx0 < 0) cx0 = g.x0; cx1 = g.x1; }
 			}
+			if (cx0 >= 0) dl->AddRect(ImVec2(origin.x + cx0, rx0), ImVec2(origin.x + cx1, rx1), currentMatchEdge, 2.0f, 0, 1.5f);
 		}
 
-		// Selection.
-		if (selA != selB)
+		// Selection (unless it is the current match, drawn above).
+		if (selA != selB && !selectionIsMatch)
 		{
 			float sx0 = -1, sx1 = -1;
 			for (const Glyph &g : line.glyphs)

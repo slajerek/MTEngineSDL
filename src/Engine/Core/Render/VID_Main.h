@@ -241,6 +241,26 @@ void VID_SetWindowAlwaysOnTop(CGuiView *view, bool isOnTop);
 bool VID_IsMainApplicationWindowFullScreen();
 void VID_SetMainApplicationWindowFullScreen(bool isFullScreen);
 
+// Window decorations of the main window (title bar and frame), and whether
+// the user can resize it. SDL_SetWindowBordered / SDL_SetWindowResizable.
+// Call on the main thread only (AppKit refuses window changes from another),
+// for example from MT_PostRenderEndFrame(); never from a test-engine thread.
+//  - macOS: borderless is NSWindowStyleMaskBorderless. The frame keeps its
+//    size, so the content grows by the title bar's height; the window can no
+//    longer be dragged by a title bar, and still resizes at its edges while
+//    resizable. In or entering a fullscreen Space the change is kept and
+//    applied when the window leaves it.
+//  - Windows: borderless is WS_POPUP; a resizable borderless window keeps
+//    invisible resize edges (WS_THICKFRAME).
+//  - Linux: the window manager draws decorations; X11 and Wayland honour the
+//    request through Motif hints / xdg-decoration, and a compositor may ignore it.
+// Restore with VID_SetMainWindowBordered(true): the title is set again.
+// Fullscreen is borderless on every platform whatever this says.
+bool VID_IsMainWindowBordered();
+void VID_SetMainWindowBordered(bool bordered);
+bool VID_IsMainWindowResizable();
+void VID_SetMainWindowResizable(bool resizable);
+
 bool VID_IsMouseCursorVisible();
 void VID_ShowMouseCursor();
 void VID_HideMouseCursor();

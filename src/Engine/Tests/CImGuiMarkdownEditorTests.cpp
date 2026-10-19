@@ -848,6 +848,88 @@ void RegisterMarkdownEditorTests(ImGuiTestEngine *engine)
 		ctx->SetRef("");
 	};
 
+	// The toolbar wraps between groups only; in a table its table button is
+	// the table menu; the current find match is the most salient highlight.
+	t = IM_REGISTER_TEST(engine, "markdown", "toolbar_groups_table_menu_and_find_salience");
+	t->TestFunc = [](ImGuiTestContext *ctx)
+	{
+		CGuiViewMarkdownEditor *view = EnsureView(ctx);
+		CMarkdownLiveEditor &ed = view->GetEditor();
+		ed.SetEditMode(EMarkdownEditMode::Rendered);
+		ed.SetToolbarVisible(true);
+		ed.SetFindQuery("");
+		const std::string src = "Plan the plan.\n\n| Item | Who |\n|------|-----|\n| Plan | Ann |\n\nEnd of the plan.\n";
+		ed.SetSource(src);
+		ctx->Yield(2);
+		ctx->SetRef("//MarkdownEditorTest/##markdowneditor/##md_toolbar");
+
+		// Every group on one row (the view is 600 px wide).
+		auto rowOf = [ctx](const char *id) { return ctx->ItemInfo(id).RectFull.Min.y; };
+		IM_CHECK_EQ(rowOf("###md_tb_undo"), rowOf("###md_tb_redo"));
+		IM_CHECK_EQ(rowOf("###md_tb_bold"), rowOf("###md_tb_link"));
+		IM_CHECK_EQ(rowOf("###md_tb_bullets"), rowOf("###md_tb_quote"));
+
+		// In a cell the table button opens the table menu.
+		IM_CHECK(ClickOffset(ctx, ed, (uint32_t)src.find("Ann") + 1));
+		IM_CHECK(ed.GetBlockKindAtCaret() == EMarkdownCaretBlock::Table);
+		const float plainW = ctx->ItemInfo("###md_tb_bold").RectFull.GetWidth();
+		IM_CHECK_GT(ctx->ItemInfo("###md_tb_table").RectFull.GetWidth(), plainW * 1.2f);   // the chevron
+		ctx->ItemClick("###md_tb_table");
+		ctx->Yield(2);
+		ctx->ItemClick("//$FOCUSED/###md_table_col_right");
+		ctx->Yield(2);
+		IM_CHECK(ed.GetSource().find("| Item | Who |     |") != std::string::npos || ed.GetSource().find("| Item | Who |   |") != std::string::npos);
+		IM_CHECK(ed.IsFocused());
+		IM_CHECK(ClickOffset(ctx, ed, (uint32_t)ed.GetSource().find("Ann") + 1));
+		ctx->ItemClick("###md_tb_table");
+		ctx->Yield(2);
+		ctx->ItemClick("//$FOCUSED/###md_table_delete");
+		ctx->Yield(2);
+		IM_CHECK_EQ(ed.GetSource(), std::string("Plan the plan.\n\nEnd of the plan.\n"));
+		// Outside a table the button inserts one, as before.
+		IM_CHECK_LT(ctx->ItemInfo("###md_tb_table").RectFull.GetWidth(), plainW * 1.2f);
+		ctx->SetRef("");
+
+		// Find "plan": three matches. The current one (the first after the
+		// caret) stands out more against the page than the others.
+		IM_CHECK(ClickOffset(ctx, ed, 0));
+		ctx->KeyPress(ImGuiMod_Ctrl | ImGuiKey_F);
+		ctx->Yield(2);
+		ctx->KeyChars("plan");
+		ctx->Yield(3);
+		const auto &m = ed.GetFindMatches();
+		IM_CHECK_EQ((int)m.size(), 3);
+		const int cur = ed.GetCurrentFindMatch();
+		IM_CHECK(cur >= 0);
+		std::vector<unsigned int> px;
+		int w = 0, h = 0;
+		IM_CHECK(MT_CaptureWindowRGBA(ctx, "//MarkdownEditorTest", &px, &w, &h));
+		ImGuiWindow *win = ctx->GetWindowByRef("//MarkdownEditorTest");
+		IM_CHECK(win != nullptr);
+		const unsigned int bg = px[(size_t)(h - 4) * (size_t)w + (size_t)(w - 4)];
+		// The distance of a match's fill from the page, sampled at the top of
+		// its line (above the letters) a few pixels into the match.
+		auto salience = [&](int index) {
+			ImVec2 pos;
+			float lh = 0;
+			if (!ed.GetOffsetScreenPos(m[index].first + 1, &pos, &lh)) return -1;
+			const int x = (int)(pos.x - win->Pos.x), y = (int)(pos.y - win->Pos.y) + 3;
+			if (x < 0 || y < 0 || x >= w || y >= h) return -1;
+			const unsigned int c = px[(size_t)y * (size_t)w + (size_t)x];
+			int d = 0;
+			for (int k = 0; k < 3; k++) d += std::abs((int)((c >> (8 * k)) & 0xFF) - (int)((bg >> (8 * k)) & 0xFF));
+			return d;
+		};
+		const int sCur = salience(cur), sOther = salience((cur + 1) % 3);
+		ctx->LogInfo("find salience: current %d, other %d", sCur, sOther);
+		IM_CHECK_GT(sOther, 0);
+		IM_CHECK_GT(sCur, sOther + 30);
+		ctx->KeyPress(ImGuiKey_Escape);
+		ed.SetFindQuery("");
+		ed.SetEditMode(EMarkdownEditMode::RevealNearCaret);
+		ctx->Yield(2);
+	};
+
 	// The caret blinks from its last move or edit, visible first, so it never
 	// hides while the user types; it can be steady and coloured. List numbers
 	// start at one column, whatever their width in a proportional font.
@@ -1400,6 +1482,33 @@ void RegisterMarkdownEditorTests(ImGuiTestEngine *engine)
 		shot("8_underline_replace");
 		ctx->KeyPress(ImGuiKey_Escape);
 		ed.SetFindQuery("");
+		// 9. YAML front matter, on: metadata above the text, not a rule and a heading.
+		const bool hadFrontMatter = ed.GetFrontMatter();
+		ed.SetFrontMatter(true);
+		ed.SetSource("---\ntitle: Weekly sync\ndate: 2026-10-24\n---\n\n# Agenda\n\n1. Introduction\n2. Release plan\n");
+		ctx->Yield(2);
+		IM_CHECK(ClickOffset(ctx, ed, (uint32_t)ed.GetSource().find("Release")));
+		shot("9_front_matter");
+		ed.SetFrontMatter(hadFrontMatter);
+		// 10. The table menu from the toolbar, the caret in a cell.
+		ed.SetSource(src);
+		ctx->Yield(2);
+		IM_CHECK(ClickOffset(ctx, ed, (uint32_t)src.find("Bob") + 1));
+		ctx->ItemClick("//MarkdownEditorTest/##markdowneditor/##md_toolbar/###md_tb_table");
+		ctx->Yield(2);
+		{
+			// The menu is a popup window of its own: capture the whole app window.
+			std::vector<unsigned int> px;
+			int w = 0, h = 0;
+			ImGuiWindow *popup = ctx->GetWindowByRef("//$FOCUSED");
+			IM_CHECK(popup != nullptr && (popup->Flags & ImGuiWindowFlags_Popup) != 0);
+			if (dir != nullptr && MT_CaptureWindowRGBA(ctx, "//MarkdownEditorTest", &px, &w, &h))
+				MT_WriteCaptureArtifact((std::string(dir) + "/10_table_menu_editor.rgba").c_str(), px, w, h);
+			if (dir != nullptr && MT_CaptureWindowRGBA(ctx, popup->Name, &px, &w, &h))
+				MT_WriteCaptureArtifact((std::string(dir) + "/10_table_menu.rgba").c_str(), px, w, h);
+		}
+		ctx->KeyPress(ImGuiKey_Escape);
+		ctx->Yield(2);
 		ed.SetSource(src);
 		ed.SetEditMode(EMarkdownEditMode::RevealNearCaret);
 		ctx->Yield(2);

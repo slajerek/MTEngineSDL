@@ -89,6 +89,7 @@ void CMTNativeMenuBarImGui::RemoveMenu(CMTMenu *menu)
 
 void CMTNativeMenuBarImGui::RenderFrame()
 {
+    if (!visible) return;
     if (!ImGui::BeginMainMenuBar()) return;
     for (auto &menu : menus)
         menu->Render();

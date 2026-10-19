@@ -866,5 +866,39 @@ void CTestMarkdownLiveEditor::Run(ITestCallback *callback)
 		ed.CloseFind();
 	}
 
+	// ---- What the style box names, Delete table, front matter ------------------
+	{
+		CMarkdownLiveEditor ed;
+		ed.SetSource("Text\n\n- a\n\n1. b\n\n- [ ] c\n\n> q\n\n## H\n\n```\nx\n```\n\n| A | B |\n|---|---|\n| 1 | 2 |\n\nEnd\n");
+		auto kindAt = [&ed](const char *needle, uint32_t plus) {
+			ed.SetCaret((uint32_t)ed.GetSource().find(needle) + plus);
+			return ed.GetBlockKindAtCaret();
+		};
+		MDE_ASSERT(kindAt("Text", 1) == EMarkdownCaretBlock::Paragraph && kindAt("- a", 2) == EMarkdownCaretBlock::BulletList
+			&& kindAt("1. b", 3) == EMarkdownCaretBlock::NumberedList && kindAt("] c", 2) == EMarkdownCaretBlock::TaskList
+			&& kindAt("> q", 2) == EMarkdownCaretBlock::Quote && kindAt("## H", 3) == EMarkdownCaretBlock::Heading
+			&& kindAt("\nx\n", 1) == EMarkdownCaretBlock::Code && kindAt("| 1", 2) == EMarkdownCaretBlock::Table
+			&& kindAt("End", 1) == EMarkdownCaretBlock::Paragraph,
+			"the caret's block kind: paragraph, the three lists, quote, heading, code, table");
+		MDE_ASSERT(kindAt("| 1", 2) == EMarkdownCaretBlock::Table && ed.IsInTable() && ed.DeleteTable()
+			&& ed.GetSource() == "Text\n\n- a\n\n1. b\n\n- [ ] c\n\n> q\n\n## H\n\n```\nx\n```\n\nEnd\n" && !ed.IsInTable(),
+			"Delete table removes the table and one blank line beside it");
+#if MT_ENABLE_UNDO
+		MDE_ASSERT(ed.Undo() && ed.GetSource().find("| 1 | 2 |\n\nEnd") != std::string::npos, "and undoes in one step");
+#endif
+		ed.SetCaret(0);
+		MDE_ASSERT(!ed.DeleteTable(), "outside a table Delete table does nothing");
+		ed.SetSource("Top\n\n| A |\n|---|\n| 1 |\n");
+		ed.SetCaret((uint32_t)ed.GetSource().find("1 |"));
+		MDE_ASSERT(ed.DeleteTable() && ed.GetSource() == "Top\n", "a table at the end goes with the blank line before it");
+
+		ed.SetFrontMatter(true);
+		ed.SetSource("---\ntitle: T\n---\n\nText\n");
+		MDE_ASSERT(kindAt("title", 2) == EMarkdownCaretBlock::FrontMatter && kindAt("Text", 1) == EMarkdownCaretBlock::Paragraph,
+			"front matter on: the caret in it is in metadata");
+		ed.SetFrontMatter(false);
+		MDE_ASSERT(kindAt("title", 2) != EMarkdownCaretBlock::FrontMatter, "off, it is ordinary text again");
+	}
+
 	TestCompleted(true, "Markdown live editor: commands and undo");
 }
